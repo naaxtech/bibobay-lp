@@ -1,3 +1,4 @@
+import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
@@ -55,8 +56,11 @@ export function verifyEnvironment(
 
 // Importing this module from tests or the app must never inspect or print process.env.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const phase = process.env.NODE_ENV || "development";
-  const report = verifyEnvironment(process.env, phase as EnvironmentPhase);
+  const phase = (process.argv[2] || process.env.NODE_ENV || "development") as EnvironmentPhase;
+  verifyEnvironment({}, phase);
+  Object.assign(process.env, { NODE_ENV: phase });
+  nextEnv.loadEnvConfig(process.cwd(), phase === "development");
+  const report = verifyEnvironment(process.env, phase);
   if (report.ok) {
     console.log(`Environment check passed (${report.phase}).`);
   } else {

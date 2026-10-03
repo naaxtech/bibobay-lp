@@ -1,3 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -120,4 +124,113 @@ describe("verifyEnvironment", () => {
   it("rejects an unknown phase", () => {
     expect(() => verifyEnvironment({}, "staging" as never)).toThrow(/phase/i);
   });
+});
+
+describe("environment CLI", () => {
+  it("rejects a forbidden public variable supplied only by .env.local without printing its value", () => {
+    const projectDir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "bibobay-env-"));
+    const secret = "synthetic-private-fixture-value";
+    writeFileSync(join(projectDir, ".env.local"), `NEXT_PUBLIC_RESEND_API_KEY=${secret}\n`);
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("NEXT_PUBLIC_")),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/verify-env.ts"), "production"],
+      { cwd: projectDir, env: { ...env, NODE_ENV: "production" }, encoding: "utf8" },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("NEXT_PUBLIC_RESEND_API_KEY");
+    expect(`${result.stdout}${result.stderr}`).not.toContain(secret);
+  });
+  it("uses production file precedence over a secret value in .env.local", () => {
+    const projectDir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "bibobay-env-"));
+    writeFileSync(join(projectDir, ".env.local"), "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_secret_fixture\n");
+    writeFileSync(join(projectDir, ".env.production.local"), "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_fixture\n");
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("NEXT_PUBLIC_")),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/verify-env.ts"), "production"],
+      { cwd: projectDir, env: { ...env, NODE_ENV: "production" }, encoding: "utf8" },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+  });
+  it("loads .env.test but skips .env.local during the test phase", () => {
+    const projectDir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "bibobay-env-"));
+    writeFileSync(join(projectDir, ".env.local"), "NEXT_PUBLIC_RESEND_API_KEY=ignored-local-value\n");
+    writeFileSync(join(projectDir, ".env.test"), "NEXT_PUBLIC_RESEND_API_KEY=forbidden-test-value\n");
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("NEXT_PUBLIC_")),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/verify-env.ts"), "test"],
+      { cwd: projectDir, env: { ...env, NODE_ENV: "production" }, encoding: "utf8" },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("NEXT_PUBLIC_RESEND_API_KEY");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("forbidden-test-value");
+  });
+});
+
+describe("Node compatibility", () => {
+  it("declares only Node versions supported by the pinned test environment", () => {
+    const app = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as { engines: { node: string } };
+    const jsdom = JSON.parse(readFileSync(resolve("node_modules/jsdom/package.json"), "utf8")) as { engines: { node: string } };
+    expect(app.engines.node).toBe(jsdom.engines.node);
+  });
+});
+
+describe("production build gate", () => {
+  it("blocks a secret in an isolated .env.local before Next compiles", () => {
+    const projectDir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "bibobay-build-"));
+    writeFileSync(join(projectDir, ".env.local"), "NEXT_PUBLIC_RESEND_API_KEY=synthetic-fixture-only\n");
+    const app = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as {
+      scripts: { build: string };
+    };
+    const verifier = `node ${[resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/verify-env.ts")]
+      .map((part) => `"${part.replaceAll("\\", "/")}"`).join(" ")}`;
+    writeFileSync(join(projectDir, "package.json"), JSON.stringify({
+      private: true,
+      scripts: { build: app.scripts.build, "verify:env": verifier },
+    }));
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("NEXT_PUBLIC_")),
+    );
+    const result = spawnSync("npm run build", {
+      cwd: projectDir,
+      env: { ...env, NODE_ENV: "production" },
+      encoding: "utf8",
+      shell: true,
+      timeout: 30_000,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("NEXT_PUBLIC_RESEND_API_KEY");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("Creating an optimized production build");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("synthetic-fixture-only");
+  }, 35_000);
+
+  it("checks production environment before launching the Next compiler", () => {
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("NEXT_PUBLIC_")),
+    );
+    const result = spawnSync("npm run build", {
+      cwd: process.cwd(),
+      env: { ...env, NODE_ENV: "production", NEXT_PUBLIC_RESEND_API_KEY: "synthetic-build-gate-value" },
+      encoding: "utf8",
+      shell: true,
+      timeout: 120_000,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("NEXT_PUBLIC_RESEND_API_KEY");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("Creating an optimized production build");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("synthetic-build-gate-value");
+  }, 125_000);
 });
