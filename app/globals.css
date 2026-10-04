@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Landing sections, header and footer; built on the tokens below. */
+@import "../components/landing/landing.css";
 
 /*
  * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and
@@ -227,36 +229,4 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* Placeholder home (Task 1). Task 4 replaces it with the CMS-driven landing page. */
-.home {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: var(--bibo-space-section) var(--bibo-space-gutter);
-  text-align: center;
-}
-
-.home-content {
-  display: grid;
-  justify-items: center;
-  max-width: 42rem;
-}
-
-.home-logo {
-  inline-size: clamp(10rem, 8rem + 12vw, 17rem);
-}
-
-.eyebrow {
-  color: var(--bibo-color-teal-ink);
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.tagline {
-  font-family: var(--bibo-font-display);
-  font-size: var(--bibo-text-lead);
-  font-weight: 600;
 }

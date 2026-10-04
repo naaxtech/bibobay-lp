@@ -91,5 +91,6 @@ describe("server configuration and presentation routes", () => {
       expect(actualClient({ preview: true })?.config().token).toBe("test-private-token");
       expect(actualClient({ preview: true })?.config().useCdn).toBe(false);
     } finally { vi.unstubAllEnvs(); }
-  });
+    // A cold import of the real Sanity client can pass 5s when the full suite saturates the CPU.
+  }, 20_000);
 });

@@ -2,27 +2,35 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { metadata } from "@/app/layout";
 import Home from "@/app/page";
 import { verifyEnvironment } from "@/scripts/verify-env";
+
+// The page reads Sanity through server-only modules; with no Sanity env it serves the safe fallback.
+vi.mock("server-only", () => ({}));
 
 afterEach(() => {
   cleanup();
 });
 
 describe("root page", () => {
-  it("renders a single meaningful BIBO level-one heading", () => {
-    render(<Home />);
+  it("renders the landing hero title as its single level-one heading", async () => {
+    render(await Home());
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(headings[0]?.textContent).toMatch(/BIBO/);
+    expect(headings[0]?.textContent).toBe("Where bright little adventures begin.");
   });
 
-  it("states the brand idea without unsupported claims", () => {
-    const { container } = render(<Home />);
+  it("names the BIBO brand with the canonical logo in the site header", async () => {
+    render(await Home());
+    expect(within(screen.getByRole("banner")).getByRole("img", { name: "BIBO" }).getAttribute("src")).toBe("/bibo-logo.svg");
+  });
+
+  it("states the brand idea without unsupported claims", async () => {
+    const { container } = render(await Home());
     const text = container.textContent ?? "";
     expect(text).toContain("Bright minds. Kind hearts. Better humans.");
     // No fabricated social proof, counts, experts, testimonials or dates.
@@ -30,8 +38,8 @@ describe("root page", () => {
     expect(text).not.toMatch(/testimonial|expert|trusted by|award|coming (in|on) \d/i);
   });
 
-  it("renders inside a main landmark", () => {
-    render(<Home />);
+  it("renders inside a main landmark", async () => {
+    render(await Home());
     expect(screen.getByRole("main")).toBeTruthy();
   });
 });

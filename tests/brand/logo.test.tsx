@@ -206,7 +206,11 @@ describe("single logo geometry source", () => {
     const fingerprints = Array.from(canonical().querySelectorAll("path")).map((path) => (path.getAttribute("d") ?? "").slice(0, 48));
     const offenders = ACTIVE_SOURCE.flatMap(walk)
       .filter((file) => TEXT_FILES.has(extname(file)) && !DERIVED.includes(file))
-      .filter((file) => fingerprints.some((fingerprint) => readText(file).includes(fingerprint)));
+      .filter((file) => {
+        // Read each file once, not once per fingerprint: the scan grows with the source tree.
+        const text = readText(file);
+        return fingerprints.some((fingerprint) => text.includes(fingerprint));
+      });
     expect(offenders).toEqual([]);
   });
 

@@ -1,15 +1,8 @@
-import { BiboLogo } from "@/components/brand/BiboLogo";
+import { LandingPage } from "@/components/landing/LandingPage";
+import { getLandingPage, getSiteSettings } from "@/lib/sanity/fetch";
 
-export default function Home() {
-  return (
-    <main className="home">
-      <div className="home-content">
-        <BiboLogo decorative priority className="home-logo" />
-        <p className="eyebrow">Welcome to BIBO Bay</p>
-        <h1>BIBO Bay</h1>
-        <p className="tagline">Bright minds. Kind hearts. Better humans.</p>
-        <p>Come imagine what we can make together.</p>
-      </div>
-    </main>
-  );
+// Both reads fall back to safe, claim-free content when Sanity is unconfigured or unreachable.
+export default async function Home() {
+  const [content, settings] = await Promise.all([getLandingPage(), getSiteSettings()]);
+  return <LandingPage content={content} settings={settings} />;
 }

@@ -1,0 +1,349 @@
+import { useState } from "react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { LandingPage } from "@/components/landing/LandingPage";
+import { Dialog } from "@/components/ui/Dialog";
+import type { LandingPageContent, SectionId, SiteSettings } from "@/lib/content/types";
+import { landingContent, siteSettings } from "./fixtures";
+
+vi.mock("server-only", () => ({}));
+
+afterEach(() => {
+  cleanup();
+});
+
+function renderPage(content: LandingPageContent = landingContent(), settings: SiteSettings = siteSettings()) {
+  return render(<LandingPage content={content} settings={settings} />);
+}
+
+const section = (id: SectionId) => {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`section #${id} is not rendered`);
+  return element;
+};
+
+const visiblePanelHeading = (id: SectionId) =>
+  within(within(section(id)).getByRole("tabpanel")).getByRole("heading", { level: 3 }).textContent;
+
+describe("landmarks and headings", () => {
+  it("has one banner, main and contentinfo, and names each navigation region distinctly", () => {
+    renderPage();
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getAllByRole("contentinfo")).toHaveLength(1);
+    const names = screen.getAllByRole("navigation").map((nav) => nav.getAttribute("aria-label"));
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    expect(names.every((name) => !!name?.trim())).toBe(true);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("has exactly one h1, the hero title, and never skips a heading level", () => {
+    renderPage();
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s.map((heading) => heading.textContent)).toEqual(["Where bright little adventures begin."]);
+    const levels = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6")).map((heading) => Number(heading.tagName.slice(1)));
+    expect(levels[0]).toBe(1);
+    levels.slice(1).forEach((level, index) => expect(level - levels[index]!, `heading #${index + 2}`).toBeLessThanOrEqual(1));
+  });
+
+  it("labels every section by a heading inside it", () => {
+    renderPage();
+    const roots = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
+    expect(roots).toHaveLength(11);
+    for (const root of roots) {
+      const heading = document.getElementById(root.getAttribute("aria-labelledby") ?? "");
+      expect(heading, root.id).not.toBeNull();
+      expect(root.contains(heading), root.id).toBe(true);
+      expect(heading!.tagName, root.id).toMatch(/^H[12]$/);
+    }
+  });
+
+  it("keeps a single h1 named for the site when the CMS hides the hero", () => {
+    renderPage(landingContent((draft) => {
+      for (const entry of draft.sections) if (entry.id === "hero") entry.visible = false;
+    }));
+    expect(screen.getAllByRole("heading", { level: 1 }).map((heading) => heading.textContent)).toEqual(["BIBO Bay"]);
+  });
+
+  it("never renders an empty navigation landmark or a Menu with nowhere to go", () => {
+    const hide = (ids: SectionId[]) => landingContent((draft) => {
+      for (const entry of draft.sections) if (ids.includes(entry.id)) entry.visible = false;
+    });
+    const { unmount } = renderPage(hide(["characters", "episodes"]));
+    expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+    // The founding-family call to action still lives in the menu.
+    expect(within(screen.getByRole("banner")).getByRole("button", { name: "Menu" })).toBeTruthy();
+    unmount();
+    renderPage(hide(["characters", "episodes", "lead"]));
+    expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+    expect(within(screen.getByRole("banner")).queryByRole("button", { name: "Menu" })).toBeNull();
+  });
+
+  it("starts with a skip link to the main content", () => {
+    renderPage();
+    const first = document.querySelector("a[href]");
+    expect(first?.textContent).toBe("Skip to content");
+    expect(first?.getAttribute("href")).toBe("#main-content");
+    expect(screen.getByRole("main").id).toBe("main-content");
+  });
+});
+
+describe("character selector", () => {
+  const characterTabs = () =>
+    within(within(section("characters")).getByRole("tablist", { name: "Six friends, lots of ways to explore." })).getAllByRole("tab");
+
+  it("names each friend's tab with name, role and concept status", () => {
+    renderPage();
+    const names = characterTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim());
+    expect(names).toEqual([
+      "Ollie the Sea Otter The Curious Heart Concept",
+      "Wally the Whale Shark The Gentle Giant Concept",
+      "Shelly the Sea Turtle The Planet Guardian Concept",
+      "Pip the Little Squid The Word Explorer Concept",
+      "Finny the Clownfish The Joyful Neighbor Concept",
+      "Pearl in the Shell The Quiet Wisdom Concept",
+    ]);
+    expect(screen.getByRole("tab", { name: "Ollie the Sea Otter The Curious Heart Concept" })).toBe(characterTabs()[0]);
+  });
+
+  it("selects the first friend and ties every tab to its own panel", () => {
+    renderPage();
+    characterTabs().forEach((tab, index) => {
+      expect(tab.getAttribute("aria-selected")).toBe(index === 0 ? "true" : "false");
+      expect(tab.tabIndex).toBe(index === 0 ? 0 : -1);
+      const panel = document.getElementById(tab.getAttribute("aria-controls") ?? "");
+      expect(panel?.getAttribute("role")).toBe("tabpanel");
+      expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
+      expect(panel?.hidden).toBe(index !== 0);
+    });
+    expect(visiblePanelHeading("characters")).toBe("Ollie the Sea Otter");
+    expect(within(within(section("characters")).getByRole("tabpanel")).getByText("Concept")).toBeTruthy();
+  });
+
+  it("moves selection and focus with the arrow keys, wrapping at both ends", () => {
+    renderPage();
+    const tabs = characterTabs();
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(tabs[1]!.tabIndex).toBe(0);
+    expect(tabs[0]!.getAttribute("aria-selected")).toBe("false");
+    expect(tabs[0]!.tabIndex).toBe(-1);
+    expect(visiblePanelHeading("characters")).toBe("Wally the Whale Shark");
+
+    fireEvent.keyDown(tabs[1]!, { key: "ArrowLeft" });
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(tabs[5]);
+    expect(visiblePanelHeading("characters")).toBe("Pearl in the Shell");
+
+    fireEvent.keyDown(tabs[5]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(tabs[0]);
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(tabs[5]);
+  });
+
+  it("jumps to the first and last friend with Home and End", () => {
+    renderPage();
+    const tabs = characterTabs();
+    tabs[2]!.focus();
+    fireEvent.keyDown(tabs[2]!, { key: "End" });
+    expect(document.activeElement).toBe(tabs[5]);
+    expect(tabs[5]!.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(tabs[5]!, { key: "Home" });
+    expect(document.activeElement).toBe(tabs[0]);
+    expect(visiblePanelHeading("characters")).toBe("Ollie the Sea Otter");
+  });
+
+  it("selects a friend on click", () => {
+    renderPage();
+    fireEvent.click(characterTabs()[3]!);
+    expect(characterTabs()[3]!.getAttribute("aria-selected")).toBe("true");
+    expect(visiblePanelHeading("characters")).toBe("Pip the Little Squid");
+  });
+
+  it("draws an abstract placeholder rather than pretend character art", () => {
+    renderPage();
+    const panel = within(section("characters")).getByRole("tabpanel");
+    expect(panel.querySelector("img")).toBeNull();
+    const art = panel.querySelector("svg");
+    expect(art?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("story concept selector", () => {
+  const storyTabs = () =>
+    within(within(section("episodes")).getByRole("tablist", { name: "Adventures we are imagining." })).getAllByRole("tab");
+
+  it("labels each story tab as a concept", () => {
+    renderPage();
+    expect(storyTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+      "The Lost Alphabet Coral Story concept",
+      "Wally’s Big Count & Calm Breath Story concept",
+      "Shelly’s Great Shoreline Clean-Up Story concept",
+    ]);
+    expect(visiblePanelHeading("episodes")).toBe("The Lost Alphabet Coral");
+  });
+
+  it("moves through the stories with the arrow keys and offers no play control", () => {
+    renderPage();
+    const tabs = storyTabs();
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(visiblePanelHeading("episodes")).toBe("Wally’s Big Count & Calm Breath");
+    fireEvent.keyDown(tabs[1]!, { key: "End" });
+    expect(visiblePanelHeading("episodes")).toBe("Shelly’s Great Shoreline Clean-Up");
+    const panel = within(section("episodes")).getByRole("tabpanel");
+    expect(within(panel).queryByRole("button")).toBeNull();
+    expect(panel.querySelector("video, audio")).toBeNull();
+    expect(panel.textContent).toContain("Story concept");
+  });
+});
+
+describe("FAQ accordion", () => {
+  it("puts every question in a native disclosure that holds its answer", () => {
+    const content = landingContent();
+    renderPage(content);
+    const items = Array.from(section("faq").querySelectorAll("details"));
+    expect(items).toHaveLength(content.faqs.length);
+    items.forEach((item, index) => {
+      const summary = item.querySelector(":scope > summary");
+      expect(summary?.textContent).toBe(content.faqs[index]!.question);
+      expect(item.textContent).toContain(content.faqs[index]!.answer);
+      // The browser owns the expanded state; a static aria-expanded would go stale without JS.
+      expect(summary?.hasAttribute("aria-expanded")).toBe(false);
+    });
+  });
+
+  it("opens the first answer and toggles each question on activation", () => {
+    renderPage();
+    const items = Array.from(section("faq").querySelectorAll("details"));
+    expect(items.map((item) => item.open)).toEqual([true, false, false]);
+    fireEvent.click(items[1]!.querySelector("summary")!);
+    expect(items[1]!.open).toBe(true);
+    fireEvent.click(items[0]!.querySelector("summary")!);
+    expect(items[0]!.open).toBe(false);
+  });
+});
+
+describe("Dialog", () => {
+  function DialogHarness({ onClose }: { onClose?: () => void }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open menu
+        </button>
+        <a href="#elsewhere">Behind the dialog</a>
+        <Dialog
+          open={open}
+          onClose={() => {
+            setOpen(false);
+            onClose?.();
+          }}
+          title="Site menu"
+        >
+          <a href="#first">First stop</a>
+          <button type="button">Last stop</button>
+        </Dialog>
+      </div>
+    );
+  }
+
+  const openDialog = () => {
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    return { trigger, dialog: screen.getByRole("dialog", { name: "Site menu" }) };
+  };
+
+  it("renders nothing while closed", () => {
+    render(<DialogHarness />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("First stop")).toBeNull();
+  });
+
+  it("opens as a labelled modal and moves focus inside", () => {
+    render(<DialogHarness />);
+    const { dialog } = openDialog();
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement).toBe(within(dialog).getByRole("link", { name: "First stop" }));
+  });
+
+  it("keeps Tab and Shift+Tab inside the dialog", () => {
+    render(<DialogHarness />);
+    const { dialog } = openDialog();
+    const first = within(dialog).getByRole("link", { name: "First stop" });
+    const last = within(dialog).getByRole("button", { name: "Last stop" });
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("closes on Escape and returns focus to the element that opened it", () => {
+    const onClose = vi.fn();
+    render(<DialogHarness onClose={onClose} />);
+    const { trigger } = openDialog();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("locks page scroll and makes the page behind it inert while open", () => {
+    const { container } = render(<DialogHarness />);
+    openDialog();
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(container.hasAttribute("inert")).toBe(true);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(container.hasAttribute("inert")).toBe(false);
+  });
+});
+
+describe("mobile navigation menu", () => {
+  const menuButton = () => within(screen.getByRole("banner")).getByRole("button", { name: "Menu" });
+  const openMenu = () => {
+    const button = menuButton();
+    button.focus();
+    fireEvent.click(button);
+    return { button, dialog: screen.getByRole("dialog", { name: "Menu" }) };
+  };
+
+  it("opens the site menu as a dialog holding every destination", () => {
+    renderPage();
+    expect(menuButton().getAttribute("aria-expanded")).toBe("false");
+    expect(menuButton().getAttribute("aria-haspopup")).toBe("dialog");
+    const { button, dialog } = openMenu();
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(within(dialog).getByRole("link", { name: "Meet the friends" }).getAttribute("href")).toBe("#characters");
+    expect(within(dialog).getByRole("link", { name: "Story ideas" }).getAttribute("href")).toBe("#episodes");
+    expect(within(dialog).getByRole("link", { name: "Join the list" }).getAttribute("href")).toBe("#lead");
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
+  });
+
+  it("closes when a destination is chosen", () => {
+    renderPage();
+    const { dialog } = openMenu();
+    fireEvent.click(within(dialog).getByRole("link", { name: "Story ideas" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(menuButton().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes from its Close button and on Escape, returning focus to Menu", () => {
+    renderPage();
+    const first = openMenu();
+    fireEvent.click(within(first.dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(first.button);
+    const second = openMenu();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(second.button);
+  });
+});
