@@ -10,19 +10,35 @@ const stringList = (value: unknown, fallback: string[]): string[] => Array.isArr
 const validUrl = (value: unknown): string | undefined => { if (typeof value !== "string") return; try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : undefined; } catch { return; } };
 const href = (value: unknown): string | undefined => typeof value === "string" && /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(value) ? value : validUrl(value);
 const cta = (raw: unknown, fallback: Cta): Cta => { const value = record(raw); return { label: text(value.label, fallback.label), href: href(value.href) ?? fallback.href, ...(value.external === true ? { external: true } : {}) }; };
-const image = (raw: unknown, identity: string): ImageWithAlt | undefined => {
+const imageGeometry = (raw: unknown, keys: string[]): Record<string, number> | undefined => {
+  const value = record(raw);
+  if (!keys.every((key) => typeof value[key] === "number" && Number.isFinite(value[key]) && (value[key] as number) >= 0 && (value[key] as number) <= 1)) return;
+  return Object.fromEntries(keys.map((key) => [key, value[key] as number]));
+};
+export const normalizeImage = (raw: unknown, identity: string): ImageWithAlt | undefined => {
   const value = record(raw); const asset = record(value.asset);
   const ref = text(asset._ref);
   if (!/^image-[a-zA-Z0-9_-]+-\d+x\d+-[a-zA-Z0-9]+$/.test(ref)) return undefined;
-  return { asset: { _ref: ref }, alt: value.decorative === true ? "" : text(value.alt, `${identity} illustration`), ...(value.decorative === true ? { decorative: true } : {}), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}) };
+  const crop = imageGeometry(value.crop, ["top", "bottom", "left", "right"]);
+  const hotspot = imageGeometry(value.hotspot, ["x", "y", "width", "height"]);
+  return { asset: { _ref: ref }, alt: value.decorative === true ? "" : text(value.alt, `${identity} illustration`), ...(value.decorative === true ? { decorative: true } : {}), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}), ...(crop ? { crop } : {}), ...(hotspot ? { hotspot } : {}) };
 };
+const image = normalizeImage;
 const intro = (raw: unknown, fallback: SectionIntro): SectionIntro => {
   const v = record(raw); const normalizedImage = image(v.image, text(v.heading, fallback.heading));
   return { eyebrow: text(v.eyebrow, fallback.eyebrow), heading: text(v.heading, fallback.heading), description: text(v.description, fallback.description), ...(normalizedImage ? { image: normalizedImage } : fallback.image ? { image: fallback.image } : {}) };
 };
-const portable = (value: unknown, fallback: PortableContent): PortableContent => Array.isArray(value) ? value.filter((block): block is PortableContent[number] => {
-  const b = record(block); return b._type === "block" && Array.isArray(b.children) && b.children.some((s) => record(s)._type === "span" && typeof record(s).text === "string");
-}).map((block) => ({ _type: "block", ...(optionalText(block._key) ? { _key: block._key } : {}), ...(optionalText(block.style) ? { style: block.style } : {}), children: list(block.children).map(record).filter((s) => s._type === "span" && typeof s.text === "string").map((s) => ({ _type: "span" as const, text: String(s.text) })), markDefs: [] })) : fallback;
+const DECORATORS = new Set(["strong", "em", "code", "underline", "strike-through"]);
+export const normalizePortableContent = (value: unknown, fallback: PortableContent = []): PortableContent => Array.isArray(value) ? value.map(record).filter((b) => b._type === "block" && Array.isArray(b.children)).map((block) => {
+  const markDefs = list(block.markDefs).map(record).filter((mark) => mark._type === "link" && optionalText(mark._key) && href(mark.href)).map((mark) => ({ _type: "link" as const, _key: text(mark._key), href: href(mark.href)! }));
+  const keys = new Set(markDefs.map((mark) => mark._key));
+  const children = list(block.children).map(record).filter((span) => span._type === "span" && typeof span.text === "string").map((span) => {
+    const marks = list(span.marks).filter((mark): mark is string => typeof mark === "string" && (DECORATORS.has(mark) || keys.has(mark)));
+    return { _type: "span" as const, ...(optionalText(span._key) ? { _key: text(span._key) } : {}), text: String(span.text), ...(Array.isArray(span.marks) ? { marks } : {}) };
+  });
+  const style = ["normal", "h2", "h3"].includes(String(block.style)) ? block.style as "normal" | "h2" | "h3" : undefined;
+  return { _type: "block" as const, ...(optionalText(block._key) ? { _key: text(block._key) } : {}), ...(style ? { style } : {}), children, markDefs };
+}).filter((block) => block.children.length > 0) : fallback;
 const seo = (raw: unknown, fallback: Seo): Seo => { const v = record(raw); const art = image(v.image, text(v.title, fallback.title)); return { title: text(v.title, fallback.title), description: text(v.description, fallback.description), ...(art ? { image: art } : {}), ...(v.noIndex === true || fallback.noIndex === true ? { noIndex: true } : {}) }; };
 const section = (id: SectionId, visible: boolean, raw: RecordValue): SectionConfig => {
   const theme = record(raw.theme);
@@ -31,12 +47,11 @@ const section = (id: SectionId, visible: boolean, raw: RecordValue): SectionConf
   return { id, visible, ...((background || accent) ? { theme: { ...(background ? { background } : {}), ...(accent ? { accent } : {}) } } : {}) };
 };
 const orderedSections = (raw: unknown, testimonialsEnabled: boolean): SectionConfig[] => {
-  const candidates = Array.isArray(raw) ? raw : [];
+  const candidates = Array.isArray(raw) && raw.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry)) ? raw : SAFE_FALLBACK_CONTENT.sections;
   const result: SectionConfig[] = []; const seen = new Set<SectionId>();
   for (const entry of candidates) { const v = record(entry); if (!DEFAULT_SECTION_IDS.includes(v.id as SectionId) || seen.has(v.id as SectionId)) continue;
-    const id = v.id as SectionId; seen.add(id); result.push(section(id, id === "hero" || id === "testimonials" && !testimonialsEnabled ? id === "hero" : v.visible !== false, v));
+    const id = v.id as SectionId; seen.add(id); result.push(section(id, id === "testimonials" && !testimonialsEnabled ? false : v.visible !== false, v));
   }
-  for (const id of DEFAULT_SECTION_IDS) if (!seen.has(id)) result.push({ id, visible: id !== "testimonials" });
   return result;
 };
 const itemId = (v: RecordValue): string => text(v.id, text(v._id, text(v._key)));
@@ -55,7 +70,7 @@ export function normalizeLandingContent(raw: unknown, options: { testimonialsEna
     const art = image(entry.image, `${title} story concept`);
     return { id, title, summary: text(entry.summary), characterFocus: text(entry.characterFocus), learningFocus: stringList(entry.learningFocus, []), offlinePrompt: text(entry.offlinePrompt), status: entry.status === "published" ? "published" : "concept", ...(art ? { image: art } : {}), ...(entry.status === "published" && validUrl(entry.mediaUrl) ? { mediaUrl: validUrl(entry.mediaUrl) } : {}) };
   });
-  const testimonials = items(v.testimonials, [], (entry): Testimonial | undefined => { const id = itemId(entry), quote = text(entry.quote), attribution = text(entry.attribution), verification = text(entry.verification); return entry.verified === true && id && quote && attribution && verification ? { id, quote, attribution, verification, verified: true } : undefined; });
+  const testimonials = items(v.testimonials, [], (entry): Testimonial | undefined => { const id = itemId(entry), quote = text(entry.quote), attribution = text(entry.attribution); return entry.verified === true && id && quote && attribution ? { id, quote, attribution, verified: true } : undefined; });
   const allowProof = options.testimonialsEnabled === true && testimonials.length > 0;
   const steps = items(record(v.offline).steps, f.offline.steps, (entry) => { const title = text(entry.title), description = text(entry.description); return title && description ? { title, description } : undefined; });
   const hero = record(v.hero), trust = record(v.trust), promise = record(v.promise), lead = record(v.lead), finalCta = record(v.finalCta), episodesIntro = record(v.episodesIntro);
@@ -63,7 +78,7 @@ export function normalizeLandingContent(raw: unknown, options: { testimonialsEna
     sections: orderedSections(v.sections, allowProof), seo: seo(v.seo, f.seo),
     hero: { ...intro(hero, f.hero), title: text(hero.title, text(hero.heading, f.hero.title)), primaryCta: cta(hero.primaryCta, f.hero.primaryCta), secondaryCta: cta(hero.secondaryCta, f.hero.secondaryCta), artworkDescription: text(hero.artworkDescription, f.hero.artworkDescription) },
     trust: { ...intro(trust, f.trust), items: stringList(trust.items, f.trust.items) },
-    promise: { ...intro(promise, f.promise), quote: text(promise.quote, f.promise.quote), body: portable(promise.body, f.promise.body) },
+    promise: { ...intro(promise, f.promise), quote: text(promise.quote, f.promise.quote), body: normalizePortableContent(promise.body, f.promise.body) },
     charactersIntro: intro(v.charactersIntro, f.charactersIntro), characters,
     episodesIntro: { ...intro(episodesIntro, f.episodesIntro), conceptLabel: text(episodesIntro.conceptLabel, f.episodesIntro.conceptLabel) }, episodes,
     offline: { ...intro(v.offline, f.offline), steps },
@@ -93,5 +108,5 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
 }
 export function normalizeLegalSettings(raw: unknown): LegalSettings {
   const v = record(raw), f = SAFE_FALLBACK_LEGAL;
-  return { privacy: portable(v.privacy, f.privacy), terms: portable(v.terms, f.terms), ...(optionalText(v.privacyVersion) ? { privacyVersion: text(v.privacyVersion) } : {}), ...(optionalText(v.termsVersion) ? { termsVersion: text(v.termsVersion) } : {}), consentCopyVersion: text(v.consentCopyVersion, f.consentCopyVersion) };
+  return { privacy: normalizePortableContent(v.privacy, f.privacy), terms: normalizePortableContent(v.terms, f.terms), ...(optionalText(v.privacyVersion) ? { privacyVersion: text(v.privacyVersion) } : {}), ...(optionalText(v.termsVersion) ? { termsVersion: text(v.termsVersion) } : {}), consentCopyVersion: text(v.consentCopyVersion, f.consentCopyVersion) };
 }

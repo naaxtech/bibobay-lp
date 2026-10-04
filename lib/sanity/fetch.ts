@@ -1,7 +1,7 @@
 import "server-only";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "../content/fallback";
-import { normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "../content/normalize";
-import type { ImageWithAlt, PortableContent, Product, ProductCategory } from "../content/types";
+import { normalizeImage, normalizeLandingContent, normalizeLegalSettings, normalizePortableContent, normalizeSiteSettings } from "../content/normalize";
+import type { ImageWithAlt, Product, ProductCategory } from "../content/types";
 import { getSanityClient } from "./client";
 import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY, SITE_SETTINGS_QUERY } from "./queries";
 
@@ -37,11 +37,7 @@ export async function getLegalSettings(options: ContentOptions = {}) {
 const rec = (raw: unknown): Record<string, unknown> => raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
 const str = (raw: unknown): string => typeof raw === "string" ? raw.trim() : "";
 const slug = (raw: unknown): string => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(str(raw)) ? str(raw) : "";
-const asset = (raw: unknown, label: string): ImageWithAlt | undefined => {
-  const v = rec(raw), ref = str(rec(v.asset)._ref);
-  if (!/^image-[a-zA-Z0-9_-]+-\d+x\d+-[a-zA-Z0-9]+$/.test(ref)) return;
-  return { asset: { _ref: ref }, alt: v.decorative === true ? "" : str(v.alt) || `${label} product illustration`, ...(v.decorative === true ? { decorative: true } : {}), ...(str(v.caption) ? { caption: str(v.caption) } : {}) };
-};
+const asset = (raw: unknown, label: string): ImageWithAlt | undefined => normalizeImage(raw, `${label} product`);
 const category = (raw: unknown): ProductCategory | undefined => {
   const v = rec(raw), id = str(v.id), name = str(v.name), handle = slug(v.slug);
   if (!id || !name || !handle) return;
@@ -54,11 +50,7 @@ function normalizeProduct(raw: unknown): Product | null {
   const images = Array.isArray(v.images) ? v.images.map((entry) => asset(entry, name)).filter((a): a is ImageWithAlt => !!a) : [];
   const linkedCategory = category(v.category);
 
-  const details: PortableContent = Array.isArray(v.details) ? v.details.map(rec).filter((block) => block._type === "block" && Array.isArray(block.children)).map((block) => ({
-    _type: "block" as const,
-    children: (block.children as unknown[]).map(rec).filter((child) => child._type === "span" && typeof child.text === "string").map((child) => ({ _type: "span" as const, text: String(child.text) })),
-    markDefs: [],
-  })).filter((block) => block.children.length > 0) : [];
+  const details = normalizePortableContent(v.details);
   const meta = rec(v.seo), notice = rec(v.commerceNotice);
   const seo = str(meta.title) && str(meta.description) ? { title: str(meta.title), description: str(meta.description), ...(meta.noIndex === true ? { noIndex: true } : {}), ...(asset(meta.image, name) ? { image: asset(meta.image, name) } : {}) } : undefined;
   const noticeCta = rec(notice.cta), ctaHref = str(noticeCta.href);

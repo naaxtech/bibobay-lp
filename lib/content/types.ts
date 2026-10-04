@@ -1,4 +1,4 @@
-export type PortableContent = Array<{ _type: "block"; _key?: string; style?: string; children?: Array<{ _type: "span"; text: string; marks?: string[] }>; markDefs?: unknown[] }>;
+export type PortableContent = Array<{ _type: "block"; _key?: string; style?: "normal" | "h2" | "h3"; children?: Array<{ _type: "span"; _key?: string; text: string; marks?: string[] }>; markDefs?: Array<{ _type: "link"; _key: string; href: string }> }>;
 export interface ImageWithAlt { asset: { _ref: string }; alt: string; decorative?: boolean; caption?: string; hotspot?: Record<string, number>; crop?: Record<string, number> }
 export interface Cta { label: string; href: string; external?: boolean }
 export interface Seo { title: string; description: string; image?: ImageWithAlt; noIndex?: boolean }
@@ -10,7 +10,7 @@ export interface Character { id: string; name: string; species: string; role: st
 export interface EpisodePreview { id: string; title: string; summary: string; characterFocus: string; learningFocus: string[]; offlinePrompt: string; image?: ImageWithAlt; mediaUrl?: string; status: "concept" | "published" }
 export interface BrandPillar { id: string; title: string; description: string; prompts: string[]; image?: ImageWithAlt }
 export interface EcosystemEntry { id: string; name: string; tagline: string; description: string; status: "idea" | "in-development" | "available"; image?: ImageWithAlt; cta?: Cta }
-export interface Testimonial { id: string; quote: string; attribution: string; verification: string; verified: boolean }
+export interface Testimonial { id: string; quote: string; attribution: string; verified: boolean }
 export interface FaqItem { id: string; question: string; answer: string }
 export interface LeadMagnet { title: string; description: string; fileUrl?: string; available: boolean }
 export interface ProductCategory { id: string; name: string; slug: string; description: string; image?: ImageWithAlt; order: number }

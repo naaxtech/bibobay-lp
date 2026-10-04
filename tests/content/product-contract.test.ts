@@ -37,4 +37,31 @@ describe("public catalogue never contains prices", () => {
     expect(detail?.commerceNotice?.cta).toEqual({ label: "Contact", href: "#lead" });
     expect(detail?.images[0]?.caption).toBe("Artwork concept");
   });
+
+  it("retains product detail heading and linked bold span without an unsafe link", async () => {
+    const details = [{ _type: "block", _key: "details", style: "h3", children: [
+      { _type: "span", _key: "s", text: "Details", marks: ["strong", "more", "bad"] },
+    ], markDefs: [
+      { _type: "link", _key: "more", href: "https://example.com/details" },
+      { _type: "link", _key: "bad", href: "data:text/html,unsafe" },
+    ] }];
+    fetch.mockImplementation((query: string) => query.includes("siteSettings") ? { commerceEnabled: true } : { id: "p", name: "Concept", slug: "concept", status: "listed", details });
+    expect((await getProductBySlug("concept"))?.details).toEqual([{ _type: "block", _key: "details", style: "h3", children: [
+      { _type: "span", _key: "s", text: "Details", marks: ["strong", "more"] },
+    ], markDefs: [{ _type: "link", _key: "more", href: "https://example.com/details" }] }]);
+  });
+
+  it("retains product, category and SEO image crop/hotspot and decorative alt", async () => {
+    const geometry = { crop: { top: 0.1, bottom: 0.1, left: 0, right: 0 }, hotspot: { x: 0.6, y: 0.4, width: 0.3, height: 0.3 } };
+    const image = { asset: { _ref: "image-abc-1200x1000-png" }, alt: "", decorative: true, ...geometry };
+    fetch.mockImplementation((query: string) => query.includes("siteSettings") ? { commerceEnabled: true } : {
+      id: "p", name: "Concept", slug: "concept", status: "listed", images: [image],
+      category: { id: "category", name: "Art", slug: "art", image },
+      seo: { title: "Art", description: "Art concept", image },
+    });
+    const result = await getProductBySlug("concept");
+    expect(result?.images[0]).toEqual(image);
+    expect(result?.category?.image).toEqual(image);
+    expect(result?.seo?.image).toEqual(image);
+  });
 });

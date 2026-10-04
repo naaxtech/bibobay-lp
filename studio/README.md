@@ -10,3 +10,5 @@ Standalone Sanity Studio 6.17.0; the website remains a separate Next.js applicat
 Seed content is concept-only: six characters, three story concepts, six values and eight envisioned ecosystem extensions. Commerce, tracking, and testimonials default off. No social URLs, legal notice, media, files, products, testimonials or contact details are invented. Privacy and terms are intentionally empty pending legal review; do not index or present them as final notices.
 
 The public catalogue holds **no prices**. Staff-controlled quotes and payment links belong in the protected operational system, not Sanity. The web application must enforce commerce gating server-side even if an editor enables its display flag.
+
+Testimonials publish only an approved quote, public attribution and `verified` flag, and remain disabled by default. Keep private consent/provenance evidence offline or in a future protected staff store, never in the public Sanity dataset (including fields labelled "internal"). Do not put evidence in a testimonial document even if a legacy document can still accept arbitrary fields.

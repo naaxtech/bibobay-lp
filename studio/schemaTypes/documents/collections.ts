@@ -32,7 +32,6 @@ export const ecosystemEntry = defineType({ name: "ecosystemEntry", title: "Wider
 export const testimonial = defineType({ name: "testimonial", title: "Verified experience", type: "document", fields: [
   defineField({ name: "quote", type: "text", validation: (rule) => rule.required() }),
   defineField({ name: "attribution", type: "string", validation: (rule) => rule.required() }),
-  defineField({ name: "verification", title: "Internal provenance and permission", type: "text", validation: (rule) => rule.required() }),
   defineField({ name: "verified", title: "Explicitly verified and cleared for publication", type: "boolean", initialValue: false }),
 ] });
 export const faqItem = defineType({ name: "faqItem", title: "Question and answer", type: "document", fields: [

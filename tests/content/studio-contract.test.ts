@@ -21,7 +21,7 @@ describe("Studio content model", () => {
     covers("episodePreview", ["title", "summary", "characterFocus", "learningFocus", "offlinePrompt", "image", "mediaUrl", "status"]);
     covers("brandPillar", ["title", "description", "prompts", "image"]);
     covers("ecosystemEntry", ["name", "tagline", "description", "status", "image", "cta"]);
-    covers("testimonial", ["quote", "attribution", "verification", "verified"]);
+    covers("testimonial", ["quote", "attribution", "verified"]);
     covers("faqItem", ["question", "answer"]);
     covers("leadMagnet", ["title", "description", "fileUrl", "available"]);
     covers("productCategory", ["name", "slug", "description", "image", "order"]);

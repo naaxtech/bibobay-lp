@@ -5,7 +5,7 @@ import { getSanityClient } from "./client";
 
 /** No asset means no URL; render an honest placeholder instead. */
 export function sanityImageUrl(image: ImageWithAlt | undefined, width?: number): string | undefined {
-  if (!image?.asset?._ref || !image.alt?.trim()) return undefined;
+  if (!image?.asset?._ref || (!image.alt?.trim() && image.decorative !== true)) return undefined;
   const client = getSanityClient();
   if (!client) return undefined;
   const builder = imageUrlBuilder(client).image(image);

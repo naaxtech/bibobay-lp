@@ -7,7 +7,7 @@ export const LANDING_PAGE_QUERY = `*[_id == "landingPage"][0]{
   "episodes": episodes[]->,
   "pillars": pillars[]->,
   "ecosystem": ecosystem[]->,
-  "testimonials": testimonials[]->,
+  "testimonials": testimonials[]->{ "id": _id, quote, attribution, verified },
   "faqs": faqs[]->,
   "lead": lead{..., "leadMagnet": leadMagnet->}
 }`;

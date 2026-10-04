@@ -1,7 +1,8 @@
 // Editorial bootstrap only. Never invent accounts, media, stock, endorsements or a legal notice.
 // Re-running `seed` creates missing documents; it never overwrites editor changes.
 export interface SeedDocument { _id: string; _type: string; [key: string]: unknown }
-const ref = (type: string, id: string) => ({ _type: "reference", _key: id, _ref: `${type}.${id}` });
+const collectionId = (type: string, id: string) => `${type}-${id}`;
+const ref = (type: string, id: string) => ({ _type: "reference", _key: id, _ref: collectionId(type, id) });
 const intro = (eyebrow: string, heading: string, description: string, type = "sectionIntro") => ({ _type: type, eyebrow, heading, description });
 const cta = (label: string, href: string) => ({ _type: "cta", label, href });
 const seo = (title: string, description: string) => ({ _type: "seo", title, description });
@@ -41,11 +42,11 @@ const sectionIds = ["hero", "trust", "promise", "characters", "episodes", "offli
 
 export function buildSeedDocuments(): SeedDocument[] {
   const collections: SeedDocument[] = [
-    ...names.map(([id, name, species, role, description]) => ({ _id: `character.${id}`, _type: "character", name, species, role, description, personality: description, catchphrase: "", favoriteActivity: "", teaches: [], status: "concept" })),
-    ...stories.map(([id, title, summary, characterFocus]) => ({ _id: `episodePreview.${id}`, _type: "episodePreview", title, summary, characterFocus, learningFocus: [], offlinePrompt: "Talk together about what the characters might try next.", status: "concept" })),
-    ...values.map(([id, title, description, prompts]) => ({ _id: `brandPillar.${id}`, _type: "brandPillar", title, description, prompts: [...prompts] })),
-    ...extensions.map(([id, name, tagline]) => ({ _id: `ecosystemEntry.${id}`, _type: "ecosystemEntry", name, tagline, description: `A possible future space for ${tagline.toLowerCase()}.`, status: "idea" })),
-    ...questions.map(([id, question, answer]) => ({ _id: `faqItem.${id}`, _type: "faqItem", question, answer })),
+    ...names.map(([id, name, species, role, description]) => ({ _id: collectionId("character", id), _type: "character", name, species, role, description, personality: description, catchphrase: "", favoriteActivity: "", teaches: [], status: "concept" })),
+    ...stories.map(([id, title, summary, characterFocus]) => ({ _id: collectionId("episodePreview", id), _type: "episodePreview", title, summary, characterFocus, learningFocus: [], offlinePrompt: "Talk together about what the characters might try next.", status: "concept" })),
+    ...values.map(([id, title, description, prompts]) => ({ _id: collectionId("brandPillar", id), _type: "brandPillar", title, description, prompts: [...prompts] })),
+    ...extensions.map(([id, name, tagline]) => ({ _id: collectionId("ecosystemEntry", id), _type: "ecosystemEntry", name, tagline, description: `A possible future space for ${tagline.toLowerCase()}.`, status: "idea" })),
+    ...questions.map(([id, question, answer]) => ({ _id: collectionId("faqItem", id), _type: "faqItem", question, answer })),
   ];
   const siteSettings: SeedDocument = {
     _id: "siteSettings", _type: "siteSettings", title: "BIBO Bay", description: "A story world in development for curious children and their families.",
