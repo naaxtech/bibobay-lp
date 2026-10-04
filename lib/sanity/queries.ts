@@ -8,13 +8,16 @@ export const LANDING_PAGE_QUERY = `*[_id == "landingPage"][0]{
   "pillars": pillars[]->,
   "ecosystem": ecosystem[]->,
   "testimonials": testimonials[]->,
-  "faqs": faqs[]->
+  "faqs": faqs[]->,
+  "lead": lead{..., "leadMagnet": leadMagnet->}
 }`;
-export const LISTED_PRODUCTS_QUERY = `*[_type == "product" && status == "listed"] | order(order asc, name asc){...,
+export const LISTED_PRODUCTS_QUERY = `*[_type == "product" && status == "listed"] | order(order asc, name asc){
+  name, description, details, images, status, order, seo, commerceNotice,
   "id": _id, "category": category-> { "id": _id, name, "slug": slug.current, description, image, order },
   "slug": slug.current
 }`;
-export const PRODUCT_BY_SLUG_QUERY = `*[_type == "product" && slug.current == $slug][0]{...,
+export const PRODUCT_BY_SLUG_QUERY = `*[_type == "product" && slug.current == $slug][0]{
+  name, description, details, images, status, order, seo, commerceNotice,
   "id": _id, "category": category-> { "id": _id, name, "slug": slug.current, description, image, order },
   "slug": slug.current
 }`;

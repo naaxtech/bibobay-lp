@@ -26,6 +26,11 @@ describe("untrusted editorial content", () => {
     expect(result.characters[0]?.name).toBe("Tess");
   });
 
+  it("retains a deliberately decorative CMS image with an empty alt", () => {
+    const result = normalizeLandingContent({ characters: [{ id: "new", name: "Tess", image: { asset: { _ref: "image-abc-120x100-png" }, decorative: true, alt: "" } }] });
+    expect(result.characters[0]?.image?.alt).toBe("");
+  });
+
   it("filters social links to explicitly verified platform URLs and defaults flags off", () => {
     const settings = normalizeSiteSettings({ commerceEnabled: "true", trackingEnabled: 1, testimonialsEnabled: null, socialLinks: [
       { platform: "instagram", url: "https://instagram.com/bibo", verified: false },

@@ -1,5 +1,5 @@
 export type PortableContent = Array<{ _type: "block"; _key?: string; style?: string; children?: Array<{ _type: "span"; text: string; marks?: string[] }>; markDefs?: unknown[] }>;
-export interface ImageWithAlt { asset: { _ref: string }; alt: string; caption?: string; hotspot?: Record<string, number>; crop?: Record<string, number> }
+export interface ImageWithAlt { asset: { _ref: string }; alt: string; decorative?: boolean; caption?: string; hotspot?: Record<string, number>; crop?: Record<string, number> }
 export interface Cta { label: string; href: string; external?: boolean }
 export interface Seo { title: string; description: string; image?: ImageWithAlt; noIndex?: boolean }
 export interface SectionTheme { background?: "paper" | "sea" | "sand" | "navy"; accent?: "teal" | "yellow" | "orange" | "purple" }
@@ -15,7 +15,7 @@ export interface FaqItem { id: string; question: string; answer: string }
 export interface LeadMagnet { title: string; description: string; fileUrl?: string; available: boolean }
 export interface ProductCategory { id: string; name: string; slug: string; description: string; image?: ImageWithAlt; order: number }
 export interface CommerceNotice { title: string; body: string; cta?: Cta }
-export interface Product { id: string; name: string; slug: string; description: string; details: PortableContent; images: ImageWithAlt[]; category?: ProductCategory; price?: number; currency?: string; status: "draft" | "listed" | "sold-out"; order: number; seo?: Seo; commerceNotice?: CommerceNotice }
+export interface Product { id: string; name: string; slug: string; description: string; details: PortableContent; images: ImageWithAlt[]; category?: ProductCategory; status: "draft" | "listed" | "sold-out"; order: number; seo?: Seo; commerceNotice?: CommerceNotice }
 export type SocialPlatform = "instagram" | "youtube" | "facebook" | "tiktok" | "pinterest";
 export interface SocialLink { platform: SocialPlatform; url: string; verified: true }
 export interface SiteSettings {

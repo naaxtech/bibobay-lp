@@ -1,0 +1,52 @@
+import { defineArrayMember, defineField, defineType } from "sanity";
+
+export const siteSettings = defineType({ name: "siteSettings", title: "Site settings", type: "document", fields: [
+  defineField({ name: "title", type: "string", validation: (rule) => rule.required() }),
+  defineField({ name: "description", type: "text" }),
+  defineField({ name: "canonicalUrl", title: "Verified canonical URL", type: "url", description: "Only add after ownership/DNS is verified." }),
+  defineField({ name: "canonicalUrlVerified", title: "Canonical URL ownership verified", type: "boolean", initialValue: false }),
+  defineField({ name: "seo", type: "seo" }),
+  defineField({ name: "commerceEnabled", title: "Enable public commerce", type: "boolean", initialValue: false }),
+  defineField({ name: "trackingEnabled", title: "Enable public order tracking", type: "boolean", initialValue: false }),
+  defineField({ name: "testimonialsEnabled", title: "Enable verified family experiences", type: "boolean", initialValue: false }),
+  defineField({ name: "contactEmail", title: "Verified public contact email", type: "email" }),
+  defineField({ name: "studioUrl", title: "Verified standalone Studio URL", type: "url" }),
+  defineField({ name: "socialLinks", type: "array", of: [defineArrayMember({ type: "socialLink" })] }),
+  defineField({ name: "navigation", type: "navigationSettings" }),
+  defineField({ name: "footer", type: "footerSettings" }),
+], initialValue: { commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false, socialLinks: [] } });
+
+export const landingPage = defineType({ name: "landingPage", title: "Landing page", type: "document", fields: [
+  defineField({ name: "sections", title: "Order and visibility", type: "array", of: [defineArrayMember({ type: "landingSection" })], validation: (rule) => rule.custom((value) => {
+    const ids = (value ?? []).map((entry) => (entry as { id?: string }).id).filter(Boolean);
+    return new Set(ids).size === ids.length ? true : "Each section may appear only once";
+  }) }),
+  defineField({ name: "seo", type: "seo" }),
+  defineField({ name: "hero", type: "heroSection" }),
+  defineField({ name: "trust", type: "trustSection" }),
+  defineField({ name: "promise", type: "promiseSection" }),
+  defineField({ name: "charactersIntro", type: "sectionIntro" }),
+  defineField({ name: "characters", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "character" }] })] }),
+  defineField({ name: "episodesIntro", type: "episodesSectionIntro" }),
+  defineField({ name: "episodes", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "episodePreview" }] })] }),
+  defineField({ name: "offline", type: "offlineSection" }),
+  defineField({ name: "pillarsIntro", type: "sectionIntro" }),
+  defineField({ name: "pillars", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "brandPillar" }] })] }),
+  defineField({ name: "ecosystemIntro", type: "sectionIntro" }),
+  defineField({ name: "ecosystem", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "ecosystemEntry" }] })] }),
+  defineField({ name: "testimonialsIntro", type: "sectionIntro" }),
+  defineField({ name: "testimonials", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "testimonial" }] })] }),
+  defineField({ name: "lead", type: "leadSection" }),
+  defineField({ name: "faqIntro", type: "sectionIntro" }),
+  defineField({ name: "faqs", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "faqItem" }] })] }),
+  defineField({ name: "finalCta", type: "finalCtaSection" }),
+] });
+
+export const legalSettings = defineType({ name: "legalSettings", title: "Legal and consent", type: "document", fields: [
+  defineField({ name: "privacy", type: "portableContent", description: "Requires counsel review before indexing." }),
+  defineField({ name: "terms", type: "portableContent", description: "Requires counsel review before indexing." }),
+  defineField({ name: "privacyVersion", type: "date" }), defineField({ name: "termsVersion", type: "date" }),
+  defineField({ name: "consentCopyVersion", type: "string", validation: (rule) => rule.required() }),
+] });
+
+export const singletonTypes = [siteSettings, landingPage, legalSettings];

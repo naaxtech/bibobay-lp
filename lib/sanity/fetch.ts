@@ -40,7 +40,7 @@ const slug = (raw: unknown): string => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(str(raw
 const asset = (raw: unknown, label: string): ImageWithAlt | undefined => {
   const v = rec(raw), ref = str(rec(v.asset)._ref);
   if (!/^image-[a-zA-Z0-9_-]+-\d+x\d+-[a-zA-Z0-9]+$/.test(ref)) return;
-  return { asset: { _ref: ref }, alt: str(v.alt) || `${label} product illustration` };
+  return { asset: { _ref: ref }, alt: v.decorative === true ? "" : str(v.alt) || `${label} product illustration`, ...(v.decorative === true ? { decorative: true } : {}), ...(str(v.caption) ? { caption: str(v.caption) } : {}) };
 };
 const category = (raw: unknown): ProductCategory | undefined => {
   const v = rec(raw), id = str(v.id), name = str(v.name), handle = slug(v.slug);
@@ -53,8 +53,7 @@ function normalizeProduct(raw: unknown): Product | null {
   if (!id || !name || !handle || v.status !== "listed") return null;
   const images = Array.isArray(v.images) ? v.images.map((entry) => asset(entry, name)).filter((a): a is ImageWithAlt => !!a) : [];
   const linkedCategory = category(v.category);
-  const price = typeof v.price === "number" && Number.isFinite(v.price) && v.price >= 0 ? v.price : undefined;
-  const currency = /^[A-Z]{3}$/.test(str(v.currency)) ? str(v.currency) : undefined;
+
   const details: PortableContent = Array.isArray(v.details) ? v.details.map(rec).filter((block) => block._type === "block" && Array.isArray(block.children)).map((block) => ({
     _type: "block" as const,
     children: (block.children as unknown[]).map(rec).filter((child) => child._type === "span" && typeof child.text === "string").map((child) => ({ _type: "span" as const, text: String(child.text) })),
@@ -62,9 +61,12 @@ function normalizeProduct(raw: unknown): Product | null {
   })).filter((block) => block.children.length > 0) : [];
   const meta = rec(v.seo), notice = rec(v.commerceNotice);
   const seo = str(meta.title) && str(meta.description) ? { title: str(meta.title), description: str(meta.description), ...(meta.noIndex === true ? { noIndex: true } : {}), ...(asset(meta.image, name) ? { image: asset(meta.image, name) } : {}) } : undefined;
-  const commerceNotice = str(notice.title) && str(notice.body) ? { title: str(notice.title), body: str(notice.body) } : undefined;
+  const noticeCta = rec(notice.cta), ctaHref = str(noticeCta.href);
+  let safeHref = /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(ctaHref) ? ctaHref : "";
+  if (!safeHref) { try { const url = new URL(ctaHref); if (url.protocol === "https:" && !url.username && !url.password) safeHref = url.toString(); } catch { /* invalid link is omitted */ } }
+  const commerceNotice = str(notice.title) && str(notice.body) ? { title: str(notice.title), body: str(notice.body), ...(str(noticeCta.label) && safeHref ? { cta: { label: str(noticeCta.label), href: safeHref, ...(noticeCta.external === true ? { external: true } : {}) } } : {}) } : undefined;
   return { id, name, slug: handle, description: str(v.description), details, images, status: "listed", order: typeof v.order === "number" && Number.isFinite(v.order) ? v.order : 0,
-    ...(linkedCategory ? { category: linkedCategory } : {}), ...(price !== undefined ? { price } : {}), ...(currency ? { currency } : {}),
+    ...(linkedCategory ? { category: linkedCategory } : {}),
     ...(seo ? { seo } : {}), ...(commerceNotice ? { commerceNotice } : {}) };
 }
 export async function getListedProducts(options: ContentOptions = {}): Promise<Product[]> {

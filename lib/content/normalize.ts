@@ -14,7 +14,7 @@ const image = (raw: unknown, identity: string): ImageWithAlt | undefined => {
   const value = record(raw); const asset = record(value.asset);
   const ref = text(asset._ref);
   if (!/^image-[a-zA-Z0-9_-]+-\d+x\d+-[a-zA-Z0-9]+$/.test(ref)) return undefined;
-  return { asset: { _ref: ref }, alt: text(value.alt, `${identity} illustration`), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}) };
+  return { asset: { _ref: ref }, alt: value.decorative === true ? "" : text(value.alt, `${identity} illustration`), ...(value.decorative === true ? { decorative: true } : {}), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}) };
 };
 const intro = (raw: unknown, fallback: SectionIntro): SectionIntro => {
   const v = record(raw); const normalizedImage = image(v.image, text(v.heading, fallback.heading));
