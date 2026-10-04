@@ -1,0 +1,118 @@
+components/ui/Dialog.tsx
+  s_a9e34acb796733::t_6c232f1971fa3a 65
+  s_a9e34acb796733::t_470f57f35b97b4 135
+  s_a9e34acb796733::t_9923908252d424 1-64,66-134
+components/landing/useRovingTabs.ts
+  s_a9e34acb796733::t_6d127ac1d53472 1-8,10-50
+  s_a9e34acb796733::t_aa456a29674f4c 9
+tests/landing/accessibility-contracts.test.tsx
+  s_a9e34acb796733::t_0d1db5900451da 1-51,55-68,83-349
+  s_a9e34acb796733::t_2fd7e8b14361b3 52-54
+  s_a9e34acb796733::t_cc8b60ec8b92dc 69-82
+components/landing/LeadCapture.tsx
+  s_a9e34acb796733::t_7d1cbbffdf2395 1-65
+tests/content/feature-defaults.test.ts
+  s_a9e34acb796733::t_0b95b63dd638e1 94-95
+components/landing/Hero.tsx
+  s_a9e34acb796733::t_6289e63ea5b2f0 21
+  s_a9e34acb796733::t_958a6e1ffc3b43 23,35
+  s_a9e34acb796733::t_0f0a83d41596d6 1-20,22,24-34,36-44
+components/landing/PortableText.tsx
+  s_a9e34acb796733::t_88c905f05c29e9 1-67
+components/landing/sections.ts
+  s_a9e34acb796733::t_0976b8ed47b26c 1-65,72-95
+  s_a9e34acb796733::t_3e191d4e4fda89 66-71
+components/landing/Characters.tsx
+  s_a9e34acb796733::t_6acbb7b8ae0741 1-94,96-117
+  s_a9e34acb796733::t_a1f886b86bd09b 95
+components/landing/Testimonials.tsx
+  s_a9e34acb796733::t_d562d2bf264b3f 1-43
+e2e/landing/page-health.spec.ts
+  s_a9e34acb796733::t_0e547cc219ea9c 1-36
+tests/landing/section-renderer.test.tsx
+  s_a9e34acb796733::t_976e768a94dd90 317-318
+  s_a9e34acb796733::t_ea5f3b542043bc 1-96,98-102,104-183,189-250,254-316,319-320
+  s_a9e34acb796733::t_8b6625ba2e4759 97,103
+  s_a9e34acb796733::t_7a742d40a8a8fd 184-188
+  s_a9e34acb796733::t_09d69a5e0a7bd3 251-253
+components/landing/ui-copy.ts
+  s_a9e34acb796733::t_07c2ca89e593e7 1-35
+e2e/landing/anchor-offset.spec.ts
+  s_a9e34acb796733::t_a06adf84c1ea34 1-13,15-38,46-53
+  s_a9e34acb796733::t_eeb6f267f13dce 14
+  s_a9e34acb796733::t_22c73744517a7c 39-45
+components/landing/Navbar.tsx
+  s_a9e34acb796733::t_7d662171b19fd9 28-29,38-48,52-66,70
+  s_a9e34acb796733::t_6289e63ea5b2f0 35,72
+  s_a9e34acb796733::t_f61568dd750eca 1-27,30-34,36-37,49-51,67-69,71,73-96
+components/landing/SectionShell.tsx
+  s_a9e34acb796733::t_40dba480e32fee 1-48
+components/landing/Footer.tsx
+  s_a9e34acb796733::t_d43c1dff110815 1-19,21-59
+  s_a9e34acb796733::t_6289e63ea5b2f0 20
+components/landing/Ecosystem.tsx
+  s_a9e34acb796733::t_1f45fa1e736e5a 1-34,36-55
+  s_a9e34acb796733::t_d2ce2bc6248483 35
+components/landing/TrustStrip.tsx
+  s_a9e34acb796733::t_cb2db8301194c0 1-21,24-35
+  s_a9e34acb796733::t_f4c650ebc37b3b 22-23
+app/globals.css
+  s_a9e34acb796733::t_ca3bdad985ca57 2-3
+components/landing/PaperMood.tsx
+  s_a9e34acb796733::t_2eca466f9a72b4 137-139,142-152,192,194,197,200-201
+  s_a9e34acb796733::t_d03103c32946e0 1-2,8-9,11-13,16-23,26-27,31-32,34-40,45-74,76-115,160,166,169-171,175-176,180-191,193,196,198,202-209
+  s_a9e34acb796733::t_e63e0a466818ac 3-7,10,14-15,24-25,28-30,33,41-44,75,116-136,140-141,153-159,161-165,167-168,172-174,177-179,195,199,210-212
+components/landing/CtaLink.tsx
+  s_a9e34acb796733::t_622528d0ccbbd0 1-40,44,46-55
+  s_a9e34acb796733::t_8b0d39289bf33e 41-43
+  s_a9e34acb796733::t_7d662171b19fd9 45
+components/landing/Episodes.tsx
+  s_a9e34acb796733::t_ae54c81f9f1612 1-126
+components/landing/LandingPage.tsx
+  s_a9e34acb796733::t_470f57f35b97b4 46
+  s_a9e34acb796733::t_c288b58ea249d7 1-45
+components/landing/OfflineLoop.tsx
+  s_a9e34acb796733::t_41c7b5ce6b5efc 1-101
+components/landing/Pillars.tsx
+  s_a9e34acb796733::t_71d791d051b5f5 1-45
+components/landing/landing.css
+  s_a9e34acb796733::t_958a6e1ffc3b43 367,1087-1088
+  s_a9e34acb796733::t_7ddf603efeb6d3 1-366,368-386,395,397-442,444,451-463,496-497,502,504-526,528-620,627-856,865-1086,1089-1112
+  s_a9e34acb796733::t_ef43f1cf1b1416 387-394,396,443,445-450,464-495,498-501,503,527,621-626,857-864
+tests/brand/logo.test.tsx
+  s_a9e34acb796733::t_5ca1852ffc98ba 209-213
+components/landing/FinalCta.tsx
+  s_a9e34acb796733::t_5834d9106b5944 1-31
+components/landing/SectionRenderer.tsx
+  s_a9e34acb796733::t_04ac2277bff685 1,81
+  s_a9e34acb796733::t_1497b389e3dc59 2-80,82
+components/landing/Promise.tsx
+  s_a9e34acb796733::t_a38e7916caa0dd 1-41,47-70
+  s_a9e34acb796733::t_f9d9fa90fa7b93 42-46
+app/page.tsx
+  s_a9e34acb796733::t_3c2a8d9995ef33 1-2,4-7
+tests/landing/fixtures.ts
+  s_a9e34acb796733::t_d3d8dd14d30c05 1-31
+components/landing/Faq.tsx
+  s_a9e34acb796733::t_83f862c008386f 1-50
+tests/smoke/app-foundation.test.tsx
+  s_a9e34acb796733::t_8824ee73a75257 5-6,12-14,20-21,24-29,32-33,41-42
+next.config.ts
+  s_a9e34acb796733::t_b31c11f1f1c0a4 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9667895f5e3491bd2747c3b944738fafe59dfa4d",
+  "prompts": {},
+  "sessions": {
+    "s_a9e34acb796733": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4c1acfa-216a-4df0-9f98-0d887690e025",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
