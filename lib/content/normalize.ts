@@ -21,7 +21,7 @@ export const normalizeImage = (raw: unknown, identity: string): ImageWithAlt | u
   if (!/^image-[a-zA-Z0-9_-]+-\d+x\d+-[a-zA-Z0-9]+$/.test(ref)) return undefined;
   const crop = imageGeometry(value.crop, ["top", "bottom", "left", "right"]);
   const hotspot = imageGeometry(value.hotspot, ["x", "y", "width", "height"]);
-  return { asset: { _ref: ref }, alt: value.decorative === true ? "" : text(value.alt, `${identity} illustration`), ...(value.decorative === true ? { decorative: true } : {}), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}), ...(crop ? { crop } : {}), ...(hotspot ? { hotspot } : {}) };
+  return { asset: { _ref: ref }, alt: value.decorative === true ? "" : text(value.alt, `${identity} illustration`), ...(value.decorative === true ? { decorative: true } : {}), ...(optionalText(value.caption) ? { caption: text(value.caption) } : {}), ...(crop && crop.left! + crop.right! < 1 && crop.top! + crop.bottom! < 1 ? { crop } : {}), ...(hotspot ? { hotspot } : {}) };
 };
 const image = normalizeImage;
 const intro = (raw: unknown, fallback: SectionIntro): SectionIntro => {

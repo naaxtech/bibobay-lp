@@ -18,6 +18,26 @@ describe("normalized image and Sanity URL", () => {
     expect(missingAlt.hero.image).toEqual({ asset: { _ref: ref }, alt: "Where bright little adventures begin. illustration", ...geometry });
   });
 
+  it.each([
+    ["horizontal zero width", { left: 0.5, right: 0.5, top: 0, bottom: 0 }],
+    ["horizontal negative width", { left: 1, right: 1, top: 0, bottom: 0 }],
+    ["vertical zero height", { left: 0, right: 0, top: 0.5, bottom: 0.5 }],
+    ["vertical negative height", { left: 0, right: 0, top: 1, bottom: 1 }],
+  ])("keeps the image but drops a crop with %s", (_case, crop) => {
+    vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "abcdefgh");
+    vi.stubEnv("NEXT_PUBLIC_SANITY_DATASET", "production");
+    try {
+      const image = normalizeLandingContent({ hero: { image: { asset: { _ref: ref }, alt: "Concept art", caption: "Waves", crop } } }).hero.image;
+      const url = sanityImageUrl(image, 400);
+      expect(url).toBeDefined();
+      const built = new URL(url!);
+      expect(built.pathname).toContain("/images/abcdefgh/production/abc-1200x1000.png");
+      expect(built.searchParams.get("rect")).toBeNull();
+      expect(built.searchParams.get("w")).toBe("400");
+      expect(image).toEqual({ asset: { _ref: ref }, alt: "Concept art", caption: "Waves" });
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("builds a real image URL for decorative art using crop and hotspot", () => {
     vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "abcdefgh");
     vi.stubEnv("NEXT_PUBLIC_SANITY_DATASET", "production");
