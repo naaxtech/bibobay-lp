@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "next-sanity";
+import { createClient } from "@sanity/client";
 import { getSanityEnvironment } from "./env";
 
 /** The only read-token access point; do not import into a Client Component. */

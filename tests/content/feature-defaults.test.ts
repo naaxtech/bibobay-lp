@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 import { getLandingPage, getSiteSettings, getLegalSettings, getListedProducts, getProductBySlug } from "@/lib/sanity/fetch";
@@ -10,6 +12,13 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/sanity/client", () => ({ getSanityClient: vi.fn(() => null) }));
 
 describe("Sanity data access", () => {
+  it("keeps Studio tooling out of the public site's production dependencies", () => {
+    const { dependencies } = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8")) as { dependencies: Record<string, string> };
+    expect(dependencies["@sanity/client"]).toBe("8.9.0");
+    expect(dependencies).not.toHaveProperty("next-sanity");
+    expect(dependencies).not.toHaveProperty("sanity");
+  });
+
   it("targets immutable singleton IDs rather than arbitrary first documents", () => {
     expect(LANDING_PAGE_QUERY).toContain('"landingPage"');
     expect(SITE_SETTINGS_QUERY).toContain('"siteSettings"');
