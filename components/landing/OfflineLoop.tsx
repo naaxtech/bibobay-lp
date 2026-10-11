@@ -16,6 +16,9 @@ function stepAngle(index: number, count: number) {
   return -Math.PI / 2 + (index * 2 * Math.PI) / count;
 }
 
+/** How far round the loop (0 to 1, clockwise from twelve o'clock, where the path starts) a mark sits; motion draws it in then. */
+const loopAt = (turns: number, count: number) => (turns / count).toFixed(3);
+
 const stepColor = (index: number) => STEP_COLORS[index % STEP_COLORS.length]!;
 const colorStyle = (value: string) => ({ "--step-color": value }) as CSSProperties;
 
@@ -47,7 +50,8 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
             <circle cx={204} cy={206} r={58} fill={color.navy} fillOpacity={0.08} />
             <circle cx={200} cy={200} r={58} fill={color.yellow} />
             <path d={LOOP_PATH} transform="translate(3 5)" fill="none" stroke={color.navy} strokeOpacity={0.1} strokeWidth={10} />
-            <path data-loop-path d={LOOP_PATH} fill="none" stroke={color.navy} strokeWidth={4} strokeLinecap="round" />
+            {/* pathLength 1 lets motion draw the loop by its share of the way round; it changes nothing static. */}
+            <path data-loop-path pathLength={1} d={LOOP_PATH} fill="none" stroke={color.navy} strokeWidth={4} strokeLinecap="round" />
             {offline.steps.map((step, index) => {
               const angle = stepAngle(index, count) + Math.PI / count;
               const x = 200 + LOOP_RADIUS * Math.cos(angle);
@@ -55,6 +59,7 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
               return (
                 <path
                   key={`arrow-${index}`}
+                  data-loop-at={loopAt(index + 0.5, count)}
                   d="M-7 -9L5 0L-7 9"
                   transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${((angle * 180) / Math.PI + 90).toFixed(1)})`}
                   fill="none"
@@ -72,6 +77,7 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
               <span
                 key={index}
                 className="loop-node"
+                data-loop-at={loopAt(index, count)}
                 style={{
                   ...colorStyle(stepColor(index)),
                   left: `${(50 + (LOOP_RADIUS / 4) * Math.cos(angle)).toFixed(2)}%`,

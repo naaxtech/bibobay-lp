@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { GsapProvider } from "@/components/motion/GsapProvider";
 import type { Cta, LandingPageContent, SiteSettings } from "@/lib/content/types";
 import { Footer } from "./Footer";
 import { Navbar } from "./Navbar";
@@ -23,14 +24,14 @@ function navigationLinks(settings: SiteSettings): Cta[] {
   return links;
 }
 
-/** The whole landing page: skip link, sticky header, CMS-ordered sections and footer. */
+/** The whole landing page: skip link, sticky header, CMS-ordered sections and footer, inside the motion layer. */
 export function LandingPage({ content, settings, leadForm }: LandingPageProps) {
   const sections = renderableSections(content, settings);
   const links = linkContext(sections, settings);
   const primaryCta = isReachable(settings.navigation.primaryCta.href, links) ? settings.navigation.primaryCta : undefined;
   const heroShown = sections.some((section) => section.id === "hero");
   return (
-    <>
+    <GsapProvider>
       <a href="#main-content" className="skip-link">
         {UI_COPY.skipToContent}
       </a>
@@ -41,6 +42,6 @@ export function LandingPage({ content, settings, leadForm }: LandingPageProps) {
         <SectionRenderer content={content} settings={settings} leadForm={leadForm} />
       </main>
       <Footer settings={settings} />
-    </>
+    </GsapProvider>
   );
 }

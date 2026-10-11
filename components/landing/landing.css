@@ -201,6 +201,25 @@
     box-shadow: var(--bibo-shadow-paper);
   }
 
+  /*
+   * Tactile press with the motion layer running (html[data-motion="full"], set by GsapProvider):
+   * GSAP eases --btn-press (pressed 0.96, back to 1 in under 180 ms) and the button scales by it.
+   * The CSS :active nudge stands down then, so a press is animated once; without the motion layer
+   * (no JavaScript, reduced motion) the nudge stays the press. While --btn-press is unset this
+   * transform is invalid at computed-value time, so an unpressed button has no transform at all.
+   */
+  html[data-motion="full"] .btn {
+    transform: scale(var(--btn-press));
+  }
+
+  html[data-motion="full"] .btn:active {
+    translate: none;
+  }
+
+  html[data-motion="full"] .btn:hover:active {
+    translate: 0 -2px;
+  }
+
   .text-link {
     color: inherit;
     font-weight: 600;

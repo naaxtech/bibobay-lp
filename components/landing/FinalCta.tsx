@@ -14,7 +14,7 @@ export interface FinalCtaProps {
 export function FinalCta({ section, finalCta, links }: FinalCtaProps) {
   const cta = isReachable(finalCta.cta.href, links) ? finalCta.cta : null;
   return (
-    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section">
+    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section" bay="settle">
       <div className="landing-container flex flex-col items-center text-center">
         {finalCta.eyebrow ? <Tape>{finalCta.eyebrow}</Tape> : null}
         <h2 id="finalCta-heading" className="mt-4 max-w-[16ch] font-display text-h1 font-semibold">

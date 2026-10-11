@@ -18,7 +18,7 @@ export function Hero({ section, hero, links }: HeroProps) {
   const primary = isReachable(hero.primaryCta.href, links) ? hero.primaryCta : null;
   const secondary = isReachable(hero.secondaryCta.href, links) ? hero.secondaryCta : null;
   return (
-    <SectionShell section={section} headingId="hero-heading" className="overflow-x-clip">
+    <SectionShell section={section} headingId="hero-heading" className="overflow-x-clip" bay="drift">
       <div className="landing-container grid items-center gap-x-10 gap-y-14 pb-section pt-10 sm:pt-14 lg:min-h-[calc(100svh-var(--site-header-height))] lg:grid-cols-12 lg:py-16">
         <div className="lg:col-span-6">
           <h1 id="hero-heading" className="max-w-[12ch] font-display text-display font-semibold tracking-[-0.015em]">
