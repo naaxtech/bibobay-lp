@@ -1,0 +1,45 @@
+package.json
+  s_a9e34acb796733::t_a783fec2d3a4d3 25
+components/landing/FinalCta.tsx
+  s_0cc7eb3d8eb999::t_028572c7860dde 17
+components/landing/Hero.tsx
+  s_0cc7eb3d8eb999::t_c86f3b9a841902 21
+package-lock.json
+  s_a9e34acb796733::t_51af87f2c4b34f 13,5579-5584
+components/landing/LandingPage.tsx
+  s_af1821bc154840::t_90bc7e38276fb2 3,27,34,45
+components/landing/SectionShell.tsx
+  s_af1821bc154840::t_ef3e48ca70e009 1,3-5,14-15,23,25,27-28,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d2d85adccce11a0b220283b0bb91927e3ae65b2",
+  "prompts": {},
+  "sessions": {
+    "s_0cc7eb3d8eb999": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9204abd3-77fd-4017-aca1-2322f5e9db32",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_a9e34acb796733": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4c1acfa-216a-4df0-9f98-0d887690e025",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_af1821bc154840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aac3bbaf368dbadbc",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
