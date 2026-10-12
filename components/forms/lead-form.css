@@ -126,6 +126,12 @@
     outline-offset: var(--bibo-focus-offset);
   }
 
+  /* The status line takes focus after a stored signup (LeadForm, review M6); an outline never changes layout. */
+  .lead-form__status:focus-visible {
+    outline: var(--bibo-focus-width) solid var(--bibo-focus-color);
+    outline-offset: var(--bibo-focus-offset);
+  }
+
   .lead-form__summary-title {
     font-family: var(--bibo-font-display);
     font-size: 1.125rem;

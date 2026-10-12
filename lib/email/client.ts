@@ -29,8 +29,13 @@ export type EmailSendResult =
   | { status: "sent"; providerMessageId: string }
   | { status: "failed"; errorCode: string };
 
+export interface EmailSendOptions {
+  /** Aborts the provider request, e.g. when the caller's timeout fires (Resend SDK `RequestOptions.signal`). */
+  signal?: AbortSignal;
+}
+
 export interface EmailSender {
-  send(message: EmailMessage): Promise<EmailSendResult>;
+  send(message: EmailMessage, options?: EmailSendOptions): Promise<EmailSendResult>;
 }
 
 export interface EmailEnvironment {
@@ -63,7 +68,7 @@ export interface ResendLike {
   emails: {
     send(
       payload: { from: string; to: string[]; subject: string; html: string; text: string; replyTo?: string },
-      options?: { idempotencyKey?: string },
+      options?: { idempotencyKey?: string; signal?: AbortSignal },
     ): Promise<{ data: { id: string } | null; error: { name: string; message: string; statusCode: number | null } | null; headers?: Record<string, string> | null }>;
   };
 }
@@ -73,7 +78,9 @@ const errorCode = (name: unknown) => (typeof name === "string" && /^[a-z0-9_]{1,
 export function createResendSender({ apiKey, from, client }: { apiKey: string; from: string; client?: ResendLike }): EmailSender {
   const resend: ResendLike = client ?? (new Resend(apiKey) as unknown as ResendLike);
   return {
-    async send(message) {
+    async send(message, { signal } = {}) {
+      // An already-expired caller budget: do not start a request that would only be abandoned.
+      if (signal?.aborted) return { status: "failed", errorCode: "send_aborted" };
       try {
         const payload = {
           from,
@@ -83,8 +90,12 @@ export function createResendSender({ apiKey, from, client }: { apiKey: string; f
           text: message.text,
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),
         };
-        const { data, error } = await resend.emails.send(payload, message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined);
-        if (error) return { status: "failed", errorCode: errorCode(error.name) };
+        const requestOptions = {
+          ...(message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : {}),
+          ...(signal ? { signal } : {}),
+        };
+        const { data, error } = await resend.emails.send(payload, Object.keys(requestOptions).length > 0 ? requestOptions : undefined);
+        if (error) return { status: "failed", errorCode: signal?.aborted ? "send_aborted" : errorCode(error.name) };
         if (!data?.id) return { status: "failed", errorCode: "missing_message_id" };
         return { status: "sent", providerMessageId: data.id };
       } catch {

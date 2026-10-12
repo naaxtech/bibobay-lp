@@ -9,7 +9,7 @@ import { verifyEnvironment } from "@/scripts/verify-env";
  * lead route needs is a server name, documented in .env.example without a public prefix, refused by
  * scripts/verify-env.ts if anyone adds a NEXT_PUBLIC_ copy, and unreachable from the browser form.
  */
-const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET"];
+const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR"];
 
 function envExampleNames() {
   return readFileSync(resolve(".env.example"), "utf8")
@@ -48,6 +48,38 @@ describe("lead environment names", () => {
     const report = verifyEnvironment({ LEAD_IP_HASH_SECRET: secret, NEXT_PUBLIC_APP_URL: secret }, "production");
     expect(report.forbiddenPublic).toEqual(["NEXT_PUBLIC_APP_URL"]);
     expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
+  it.each([
+    ["CRON_SECRET", "NEXT_PUBLIC_CRON_SECRET"],
+    ["LEAD_ACK_SEND_LIMIT_PER_HOUR", "NEXT_PUBLIC_LEAD_ACK_SEND_LIMIT_PER_HOUR"],
+  ])("keeps %s server-only", (_name, publicName) => {
+    expect(verifyEnvironment({ [publicName]: "60" }, "production").forbiddenPublic).toEqual([publicName]);
+  });
+});
+
+describe("address-hash secret strength (M8)", () => {
+  it("fails a production check when the secret is set but shorter than 32 characters, without echoing it", () => {
+    const secret = "s".repeat(31);
+    const report = verifyEnvironment({ LEAD_IP_HASH_SECRET: secret }, "production");
+    expect(report.ok).toBe(false);
+    expect(report.forbiddenPublic).toEqual([]);
+    expect(report.errors).toEqual(["LEAD_IP_HASH_SECRET must be at least 32 characters"]);
+    expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
+  it("passes a production check with a secret of 32 or more characters", () => {
+    expect(verifyEnvironment({ LEAD_IP_HASH_SECRET: "s".repeat(32) }, "production").ok).toBe(true);
+  });
+
+  it("passes a production check with no secret at all: leads then stay unconfigured and the route answers 503", () => {
+    expect(verifyEnvironment({}, "production").ok).toBe(true);
+    expect(verifyEnvironment({ LEAD_IP_HASH_SECRET: "   " }, "production").ok).toBe(true);
+  });
+
+  it("does not fail a development or test check for a short local secret; the route still treats storage as unconfigured", () => {
+    expect(verifyEnvironment({ LEAD_IP_HASH_SECRET: "short" }, "development").ok).toBe(true);
+    expect(verifyEnvironment({ LEAD_IP_HASH_SECRET: "short" }, "test").ok).toBe(true);
   });
 });
 

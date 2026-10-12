@@ -14,7 +14,8 @@ export interface EnvReport {
 const allowedPublicNames = new Set([
   // Lead capture (Task 5) adds no public name: the browser posts to /api/leads and never talks to
   // Supabase or Resend. Its server names (SUPABASE_SERVICE_ROLE_KEY, RESEND_*, STAFF_NOTIFICATION_EMAIL,
-  // LEAD_IP_HASH_SECRET) are refused here under a NEXT_PUBLIC_ prefix like any unlisted name.
+  // LEAD_IP_HASH_SECRET, LEAD_ACK_SEND_LIMIT_PER_HOUR) are refused here under a NEXT_PUBLIC_ prefix
+  // like any unlisted name.
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_SANITY_PROJECT_ID",
   "NEXT_PUBLIC_SANITY_DATASET",
@@ -22,6 +23,9 @@ const allowedPublicNames = new Set([
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
 ]);
+
+/** Matches lib/leads/dependencies.ts: a shorter address-hashing secret leaves lead storage unconfigured. */
+export const LEAD_IP_HASH_SECRET_MIN_LENGTH = 32;
 
 /** Reject public server credentials by name and secret-key values; never echo values. */
 export function verifyEnvironment(
@@ -49,11 +53,20 @@ export function verifyEnvironment(
     ))
     .sort();
 
+  // Review M8: a short HMAC secret makes a leaked rate-limit table brute-forceable over the IPv4
+  // space. The route already refuses to store leads with one (lib/leads/dependencies.ts); a
+  // production build fails loudly instead of shipping a form that only ever answers 503. Unset is
+  // allowed: leads are simply not configured yet. Only the name is reported, never the value.
+  const hashSecret = env.LEAD_IP_HASH_SECRET?.trim() ?? "";
+  const weak = phase === "production" && hashSecret.length > 0 && hashSecret.length < LEAD_IP_HASH_SECRET_MIN_LENGTH
+    ? [`LEAD_IP_HASH_SECRET must be at least ${LEAD_IP_HASH_SECRET_MIN_LENGTH} characters`]
+    : [];
+
   return {
-    ok: forbiddenPublic.length === 0,
+    ok: forbiddenPublic.length === 0 && weak.length === 0,
     phase,
     forbiddenPublic,
-    errors: forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`),
+    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak],
   };
 }
 

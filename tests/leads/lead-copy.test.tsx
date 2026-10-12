@@ -8,6 +8,19 @@ import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 
 vi.mock("server-only", () => ({}));
 
+/** Props every `next/link` receives, recorded by a wrapper that still renders the real Link (review M7). */
+const linkProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+vi.mock("next/link", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/link")>();
+  const { createElement } = await import("react");
+  const RealLink = actual.default;
+  function RecordingLink(props: Parameters<typeof RealLink>[0]) {
+    linkProps.push({ ...props });
+    return createElement(RealLink, props);
+  }
+  return { ...actual, default: RecordingLink };
+});
+
 const CMS: LeadFormCopy = {
   buttonLabel: "Join the Bay list",
   consentCopy: "I am an adult and agree to receive BIBO Bay updates.",
@@ -83,10 +96,15 @@ describe("fields and labels", () => {
     expect(submitButton().type).toBe("submit");
   });
 
-  it("links to the privacy notice without prefetching it", () => {
+  it("links to the privacy notice with prefetching turned off", () => {
+    linkProps.length = 0;
     renderForm();
     const link = screen.getByRole("link", { name: FORM_COPY.privacyLink });
     expect(link.getAttribute("href")).toBe("/privacy");
+    // The privacy page ships in Task 9; a prefetch of a missing route 404s in production builds.
+    const privacy = linkProps.filter((props) => props.href === "/privacy");
+    expect(privacy.length).toBeGreaterThan(0);
+    expect(privacy.every((props) => props.prefetch === false)).toBe(true);
   });
 
   it("hides the honeypot from people and assistive technology", () => {
@@ -231,6 +249,49 @@ describe("submission outcomes", () => {
     await waitFor(() => expect(button.disabled).toBe(false));
     expect(button.getAttribute("aria-busy")).toBe("false");
     expect(status().textContent).toBe(CMS.successMessage);
+  });
+
+  it("names the error summary as a group, so its title is announced when it takes focus (M5)", async () => {
+    renderForm();
+    await submit();
+    const summary = screen.getByRole("group", { name: FORM_COPY.errorSummaryTitle });
+    expect(document.activeElement).toBe(summary);
+  });
+
+  it("returns focus to the submit button after a failed request (M6)", async () => {
+    renderForm();
+    fillValid();
+    submitButton().focus();
+    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: "x" } });
+    // Chromium drops focus to <body> when the focused button is disabled; jsdom does not, so do it here.
+    submitButton().blur();
+    await submit();
+    await waitFor(() => expect(status().textContent).toBe(CMS.errorMessage));
+    await waitFor(() => expect(document.activeElement).toBe(submitButton()));
+  });
+
+  it("leaves focus where the person moved it while the request was pending (M6)", async () => {
+    let release: (response: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
+    renderForm();
+    fillValid();
+    await submit();
+    expect(submitButton().disabled).toBe(true);
+    emailInput().focus();
+    await act(async () => {
+      release(new Response(JSON.stringify({ ok: false, persisted: false, acknowledgementQueued: false, message: "x" }), { status: 503 }));
+    });
+    await waitFor(() => expect(status().textContent).toBe(CMS.errorMessage));
+    expect(document.activeElement).toBe(emailInput());
+  });
+
+  it("moves focus to the outcome after a stored signup (M6)", async () => {
+    renderForm();
+    fillValid();
+    await submit();
+    await waitFor(() => expect(status().textContent).toBe(CMS.successMessage));
+    await waitFor(() => expect(document.activeElement).toBe(status()));
+    expect(status().tabIndex).toBe(-1);
   });
 
   it("keeps every outcome message out of the DOM text until it is the outcome", () => {

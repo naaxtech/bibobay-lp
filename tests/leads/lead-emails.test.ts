@@ -76,7 +76,20 @@ describe("staff alert email", () => {
     expect(email.text).toContain("Ana");
     expect(email.text).toContain("6 to 8");
     expect(email.text).toMatch(/new signup/i);
-    expect(buildStaffLeadAlert({ ...lead, created: false }).text).toMatch(/updated an existing signup/i);
+  });
+
+  it("labels the address as submitted and unverified, since the form cannot prove who owns it", () => {
+    const email = buildStaffLeadAlert(lead);
+    expect(email.text).toMatch(/^Submitted address \(unverified\)\s+parent@example\.com$/m);
+    expect(email.html).toContain("Submitted address (unverified)</dt>");
+    expect(email.text).not.toMatch(/^Email\s/m);
+  });
+
+  it("describes a resubmitted address truthfully: nothing on the record changed", () => {
+    const text = buildStaffLeadAlert({ ...lead, created: false }).text;
+    expect(text).toMatch(/already on the founding-family list was submitted again/i);
+    expect(text).toMatch(/nothing on the existing record was changed/i);
+    expect(text).not.toMatch(/updated/i);
   });
 
   it("escapes every submitted value in HTML", () => {
@@ -128,5 +141,21 @@ describe("Resend sender", () => {
     const { client } = fakeResend(async () => { throw new Error("ECONNRESET"); });
     const result = await createResendSender({ apiKey: "re_123", from: "BIBO Bay <hello@bibobay.example>", client }).send(message);
     expect(result).toEqual({ status: "failed", errorCode: "send_exception" });
+  });
+
+  it("passes an abort signal to the SDK so a timed-out send stops its request (M4)", async () => {
+    const { client, spy } = fakeResend(async () => ({ data: { id: "re_abc" }, error: null, headers: null }));
+    const controller = new AbortController();
+    await createResendSender({ apiKey: "re_123", from: "BIBO Bay <hello@bibobay.example>", client }).send(message, { signal: controller.signal });
+    expect(spy.mock.calls[0]?.[1]).toEqual({ idempotencyKey: "lead-delivery/evt-1", signal: controller.signal });
+  });
+
+  it("reports an aborted send as a failure, without calling the SDK when already aborted", async () => {
+    const { client, spy } = fakeResend(async () => ({ data: { id: "re_abc" }, error: null, headers: null }));
+    const controller = new AbortController();
+    controller.abort();
+    const result = await createResendSender({ apiKey: "re_123", from: "BIBO Bay <hello@bibobay.example>", client }).send(message, { signal: controller.signal });
+    expect(result).toEqual({ status: "failed", errorCode: "send_aborted" });
+    expect(spy).not.toHaveBeenCalled();
   });
 });

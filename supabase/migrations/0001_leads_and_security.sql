@@ -50,6 +50,11 @@ create table if not exists public.lead_submissions (
   utm                     jsonb not null default '{}'::jsonb,
   -- Mirror of the acknowledgement's outbox status, for staff views and support.
   acknowledgement_status  text not null default 'not_queued',
+  -- Ruling R38 bookkeeping. The form cannot prove who owns an address, so a repeat submission of a
+  -- listed address changes nothing about the person; it only records that it happened, and (for a
+  -- withdrawn adult) that a re-join was asked for, which staff confirm through a verified channel.
+  last_submitted_at       timestamptz,
+  rejoin_requested_at     timestamptz,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
   constraint lead_submissions_email_key unique (email),
@@ -185,29 +190,33 @@ begin
     where tag.key not in ('source', 'medium', 'campaign', 'term', 'content')
        or jsonb_typeof(tag.value) <> 'string'
        or char_length(tag.value #>> '{}') not between 1 and 100
+       -- Control characters, as the browser and the server's schema refuse them (lib/leads/fields.ts).
+       or (tag.value #>> '{}') ~ '[\x01-\x1f\x7f]'
   ) then
     raise exception 'campaign tags are invalid' using errcode = '22023';
   end if;
 
-  -- One row per normalised email. A repeat signup refreshes the consent record (a new, explicit
-  -- grant under the current copy version) and keeps earlier details the adult did not resend.
-  -- Consent is only ever granted here; withdrawal is a separate staff action, never a side effect.
+  -- One row per normalised email. Ruling R38: nothing on this form proves that the submitter owns
+  -- the address, so a repeat submission must never change an existing person's record. Otherwise
+  -- anyone could re-subscribe an adult who withdrew (erasing when they did), replace the consent
+  -- version and grant time, or overwrite a name, age band, source, locale or first-touch campaign
+  -- tags. On conflict this records only that the address was submitted again, and for a withdrawn
+  -- adult that a re-join was asked for, so staff can follow up through a verified channel. Consent
+  -- is only ever granted here, on a new row; withdrawal is a separate staff action.
+  -- The caller gets the same {lead_id, created: false} whatever the existing row holds, so the API
+  -- answer never reveals who is on the list or who withdrew. The unique (lead_id, kind) outbox key
+  -- means a repeat submission never queues a second message.
+  -- Known gap (Task 5 fix round 1): a withdrawn adult cannot re-join, and nobody can change their
+  -- details, through this anonymous form. Both need a confirmed channel (double opt-in or staff).
   insert into public.lead_submissions as lead (
     email, first_name, age_band, consent_state, consent_version, consent_granted_at,
     consent_withdrawn_at, source, locale, utm
   )
   values (v_email, v_first_name, v_age_band, 'granted', v_version, now(), null, v_source, v_locale, v_utm)
   on conflict on constraint lead_submissions_email_key do update set
-    first_name           = coalesce(excluded.first_name, lead.first_name),
-    age_band             = coalesce(excluded.age_band, lead.age_band),
-    consent_state        = 'granted',
-    consent_version      = excluded.consent_version,
-    consent_granted_at   = excluded.consent_granted_at,
-    consent_withdrawn_at = null,
-    source               = excluded.source,
-    locale               = coalesce(excluded.locale, lead.locale),
-    utm                  = excluded.utm,
-    updated_at           = now()
+    last_submitted_at   = now(),
+    rejoin_requested_at = case when lead.consent_state = 'withdrawn' then now() else lead.rejoin_requested_at end,
+    updated_at          = now()
   returning lead.id, (lead.xmax = 0) into v_id, v_created;
 
   return query select v_id, v_created;
@@ -220,6 +229,11 @@ grant execute on function public.submit_lead(text, boolean, text, text, text, te
 -- ---------------------------------------------------------------------------
 -- enqueue_lead_delivery: write the outbox row for one message kind, once per lead and kind.
 -- With p_claim the new row starts as `sending` (attempt 1): the caller is about to send it now.
+-- An acknowledgement for a withdrawn adult is never claimed (ruling R38): an unverified submission
+-- must not make BIBO Bay email someone who asked to be removed. Such a row is written `pending`
+-- so the API answer stays identical, and the Task 8 worker must skip acknowledgements of
+-- withdrawn leads. (The app already claims nothing for an existing lead, lib/leads/submit.ts; this
+-- is the database's own guard.) Staff find re-join requests through `rejoin_requested_at`.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.enqueue_lead_delivery(
@@ -237,6 +251,7 @@ as $fn$
 declare
   v_id      uuid;
   v_status  text;
+  v_claim   boolean := coalesce(p_claim, false);
 begin
   if p_lead_id is null then
     raise exception 'lead id is required' using errcode = '22023';
@@ -245,13 +260,19 @@ begin
     raise exception 'delivery kind is invalid' using errcode = '22023';
   end if;
 
+  if p_kind = 'acknowledgement' and exists (
+    select 1 from public.lead_submissions as lead where lead.id = p_lead_id and lead.consent_state = 'withdrawn'
+  ) then
+    v_claim := false;
+  end if;
+
   insert into public.lead_delivery_events as event (lead_id, kind, status, attempts, last_attempt_at)
   values (
     p_lead_id,
     p_kind,
-    case when p_claim then 'sending' else 'pending' end,
-    case when p_claim then 1 else 0 end,
-    case when p_claim then now() end
+    case when v_claim then 'sending' else 'pending' end,
+    case when v_claim then 1 else 0 end,
+    case when v_claim then now() end
   )
   on conflict on constraint lead_delivery_events_lead_kind_key do nothing
   returning event.id, event.status into v_id, v_status;

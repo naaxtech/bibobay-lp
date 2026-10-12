@@ -137,6 +137,14 @@ describe("migration 0001: functions", () => {
     expect(submit?.body).toMatch(/raise exception/);
     expect(submit?.header).toMatch(/returns table ?\(lead_id uuid, created boolean\)/);
   });
+
+  it("changes only bookkeeping columns when an address is submitted again (ruling R38)", () => {
+    const submit = functions.find((fn) => fn.name === "submit_lead");
+    const conflict = submit?.body.match(/on conflict on constraint lead_submissions_email_key do update set (.*?) returning/);
+    expect(conflict, "submit_lead upserts on the normalised email").not.toBeNull();
+    const assigned = Array.from(conflict![1]!.matchAll(/(?:^|,)\s*(\w+)\s*=/g), (match) => match[1]).sort();
+    expect(assigned).toEqual(["last_submitted_at", "rejoin_requested_at", "updated_at"]);
+  });
 });
 
 describe("pgTAP file", () => {

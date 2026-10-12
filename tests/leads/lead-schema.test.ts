@@ -118,6 +118,10 @@ describe("optional details", () => {
   it.each([
     ["a campaign tag over the limit", { utm: { source: "x".repeat(LEAD_LIMITS.utm + 1) } }],
     ["an unknown campaign tag", { utm: { id: "123" } }],
+    ["a campaign tag with a line break (M11)", { utm: { campaign: "spring\nsale" } }],
+    ["a campaign tag with a NUL character (M11)", { utm: { source: "news\u0000letter" } }],
+    ["a campaign tag with a DEL character (M11)", { utm: { medium: "email\u007f" } }],
+    ["a campaign tag with an escape character (M11)", { utm: { content: "\u001b[31mhero" } }],
     ["a source that is not a slug", { source: "Landing Page!" }],
     ["a locale that is not a language tag", { locale: "en_AU; drop table" }],
     ["an over-long locale", { locale: `en-${"x".repeat(LEAD_LIMITS.locale)}` }],

@@ -10,14 +10,14 @@ vi.mock("server-only", () => ({}));
 /** Every RPC the route makes, in order, through the mocked Supabase client. */
 const { rpcCalls, rpcAnswers, createClient } = vi.hoisted(() => {
   const rpcCalls: Array<[string, Record<string, unknown>]> = [];
-  const rpcAnswers: Record<string, () => { data: unknown; error: { code?: string; message: string } | null }> = {};
+  const rpcAnswers: Record<string, (args: Record<string, unknown>) => { data: unknown; error: { code?: string; message: string } | null }> = {};
   const createClient = vi.fn((url: string, key: string, options: unknown) => {
     void url; void key; void options;
     return {
       rpc(fn: string, args: Record<string, unknown>) {
         rpcCalls.push([fn, args]);
         const answer = rpcAnswers[fn];
-        return Promise.resolve(answer ? answer() : { data: null, error: { code: "42883", message: "missing" } });
+        return Promise.resolve(answer ? answer(args) : { data: null, error: { code: "42883", message: "missing" } });
       },
     };
   });
@@ -25,15 +25,38 @@ const { rpcCalls, rpcAnswers, createClient } = vi.hoisted(() => {
 });
 vi.mock("@supabase/supabase-js", () => ({ createClient }));
 
+/** Work the route hands to `after()`: it runs once the response is sent, so tests run it by hand. */
+const { afterTasks } = vi.hoisted(() => ({ afterTasks: [] as Array<() => unknown> }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    afterTasks.push(task);
+  },
+}));
+
+/** The Resend SDK, so no test can reach the real API. */
+const { resendSend } = vi.hoisted(() => ({ resendSend: vi.fn() }));
+vi.mock("resend", () => ({
+  Resend: class {
+    emails = { send: resendSend };
+  },
+}));
+
 const LEAD_ID = "4f8c1c1e-1b51-4a43-9d1c-0d7c1d1f1a11";
 const EVENT_ID = "9d7c2a10-7a8b-4c4e-8c0f-1a2b3c4d5e6f";
 const CLIENT_IP = "203.0.113.9";
+const HASH_SECRET = "fixture-hash-secret-0123456789abcdef";
 const { successMessage, errorMessage } = SAFE_FALLBACK_CONTENT.lead;
 
 function configureSupabase() {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://bibo-test.supabase.co");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_fixture_only");
-  vi.stubEnv("LEAD_IP_HASH_SECRET", "fixture-hash-secret");
+  vi.stubEnv("LEAD_IP_HASH_SECRET", HASH_SECRET);
+}
+
+function configureResend() {
+  vi.stubEnv("RESEND_API_KEY", "re_fixture_only");
+  vi.stubEnv("RESEND_FROM", "BIBO Bay <hello@bibobay.example>");
 }
 
 function post(body: unknown, headers: Record<string, string> = {}) {
@@ -48,8 +71,10 @@ const VALID = { email: "Parent@Example.com", consent: true, firstName: "Ana", ag
 
 beforeEach(() => {
   rpcCalls.length = 0;
+  afterTasks.length = 0;
+  resendSend.mockReset();
   for (const key of Object.keys(rpcAnswers)) delete rpcAnswers[key];
-  for (const name of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "LEAD_IP_HASH_SECRET", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "NEXT_PUBLIC_SANITY_PROJECT_ID", "NEXT_PUBLIC_SANITY_DATASET"]) vi.stubEnv(name, "");
+  for (const name of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "NEXT_PUBLIC_SANITY_PROJECT_ID", "NEXT_PUBLIC_SANITY_DATASET"]) vi.stubEnv(name, "");
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "info").mockImplementation(() => {});
 });
@@ -70,6 +95,14 @@ describe("POST /api/leads without Supabase", () => {
   it("stays unconfigured while the address-hashing secret is missing", async () => {
     configureSupabase();
     vi.stubEnv("LEAD_IP_HASH_SECRET", "");
+    const response = await post(VALID);
+    expect(response.status).toBe(503);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("stays unconfigured while the address-hashing secret is shorter than 32 characters", async () => {
+    configureSupabase();
+    vi.stubEnv("LEAD_IP_HASH_SECRET", "x".repeat(31));
     const response = await post(VALID);
     expect(response.status).toBe(503);
     expect(rpcCalls).toEqual([]);
@@ -167,6 +200,74 @@ describe("POST /api/leads with Supabase configured (mocked)", () => {
     const response = await post(VALID);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, message: successMessage });
+  });
+
+  it("gives every address in one IPv6 /64 the same lead bucket, and another /64 a different one", async () => {
+    await post(VALID, { "x-forwarded-for": "2001:db8:85a3:8d3::1" });
+    await post(VALID, { "x-forwarded-for": "2001:db8:85a3:8d3:ffff:ffff:ffff:fffe" });
+    await post(VALID, { "x-forwarded-for": "2001:db8:85a3:8d4::1" });
+    const buckets = rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => args.bucket_key);
+    expect(buckets).toHaveLength(3);
+    expect(buckets[0]).toMatch(/^lead:[0-9a-f]{64}$/);
+    expect(buckets[1]).toBe(buckets[0]);
+    expect(buckets[2]).not.toBe(buckets[0]);
+  });
+});
+
+describe("POST /api/leads with Supabase and Resend configured (both mocked)", () => {
+  /** The global send bucket answers `sendAllowed`; every other bucket allows. */
+  let sendAllowed = true;
+
+  beforeEach(() => {
+    configureSupabase();
+    configureResend();
+    sendAllowed = true;
+    rpcAnswers.consume_rate_limit = (args) => ({
+      data: [args.bucket_key === "ack-send:global" && !sendAllowed
+        ? { allowed: false, remaining: 0, retry_after_seconds: 900 }
+        : { allowed: true, remaining: 4, retry_after_seconds: 0 }],
+      error: null,
+    });
+    rpcAnswers.submit_lead = () => ({ data: [{ lead_id: LEAD_ID, created: true }], error: null });
+    rpcAnswers.enqueue_lead_delivery = (args) => ({ data: [{ event_id: EVENT_ID, status: args.p_claim ? "sending" : "pending", created: true }], error: null });
+    rpcAnswers.record_lead_delivery_attempt = () => ({ data: true, error: null });
+    resendSend.mockResolvedValue({ data: { id: "re_fixture" }, error: null, headers: null });
+  });
+
+  it("spends one unit of the global send budget, claims the outbox row, answers, and only then sends", async () => {
+    const response = await post(VALID);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
+    expect(rpcCalls.map(([fn]) => fn)).toEqual(["consume_rate_limit", "submit_lead", "consume_rate_limit", "enqueue_lead_delivery"]);
+    expect(rpcCalls[2]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 60, window_seconds: 3600 });
+    expect(rpcCalls[3]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: true });
+    // Nothing has gone to the provider while the adult waits for the answer.
+    expect(resendSend).not.toHaveBeenCalled();
+    expect(afterTasks).toHaveLength(1);
+
+    await afterTasks[0]!();
+    expect(resendSend).toHaveBeenCalledTimes(1);
+    const [payload, options] = resendSend.mock.calls[0]!;
+    expect(payload).toMatchObject({ from: "BIBO Bay <hello@bibobay.example>", to: ["parent@example.com"] });
+    expect(options).toMatchObject({ idempotencyKey: `lead-delivery/${EVENT_ID}` });
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(rpcCalls.at(-1)).toEqual(["record_lead_delivery_attempt", { p_event_id: EVENT_ID, p_status: "sent", p_provider_message_id: "re_fixture", p_error_code: null }]);
+  });
+
+  it("reads the global send cap from LEAD_ACK_SEND_LIMIT_PER_HOUR", async () => {
+    vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "5");
+    await post(VALID);
+    expect(rpcCalls[2]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 5, window_seconds: 3600 });
+  });
+
+  it("past the global send cap: stores the lead, leaves the acknowledgement pending, sends nothing, and answers the same", async () => {
+    sendAllowed = false;
+    const response = await post(VALID);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
+    expect(rpcCalls[3]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
+    expect(afterTasks).toEqual([]);
+    expect(resendSend).not.toHaveBeenCalled();
   });
 });
 

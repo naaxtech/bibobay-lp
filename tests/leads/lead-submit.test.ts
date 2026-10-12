@@ -4,7 +4,7 @@ import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
 import type { DeliveryKind, DeliveryOutcome, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
-import { LEAD_RATE_LIMIT, submitLead, type LeadSubmissionDependencies } from "@/lib/leads/submit";
+import { ACK_SEND_LIMIT, LEAD_RATE_LIMIT, submitLead, type LeadSubmissionDependencies } from "@/lib/leads/submit";
 import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
 
 vi.mock("server-only", () => ({}));
@@ -23,21 +23,39 @@ const DELIVERY_CLAIM = /\b(sent|deliver(ed|y)?|inbox|check your (email|mail)|we(
 
 interface StoredEvent { id: string; leadId: string; kind: DeliveryKind; status: "pending" | "sending" | "sent" | "failed"; attempts: number; providerMessageId?: string; errorCode?: string }
 
-/** An in-memory stand-in for the Supabase repository, logging each call in order. */
+interface StoredLead {
+  id: string;
+  /** What the first signup stored. Ruling R38: a later, unverified submission never changes it. */
+  input: LeadRecordInput;
+  consentState: "granted" | "withdrawn";
+  /** Bookkeeping that a repeat submission may set (migration 0001 `last_submitted_at`, `rejoin_requested_at`). */
+  lastSubmittedAt?: number;
+  rejoinRequestedAt?: number;
+}
+
+/**
+ * An in-memory stand-in for the Supabase repository, logging each call in order. It models
+ * migration 0001 exactly: one row per normalised email; on a conflicting email only the
+ * bookkeeping columns change (ruling R38); one outbox row per lead and kind; and an
+ * acknowledgement for a withdrawn adult is never claimed for an immediate send.
+ */
 function fakeRepository() {
   const calls: string[] = [];
-  const leads = new Map<string, { id: string; input: LeadRecordInput }>();
+  const leads = new Map<string, StoredLead>();
   const events = new Map<string, StoredEvent>();
+  let clock = 0;
   const repository: LeadRepository = {
     async submitLead(input) {
       calls.push("submitLead");
+      clock += 1;
       const existing = leads.get(input.email);
       if (existing) {
-        existing.input = input;
+        existing.lastSubmittedAt = clock;
+        if (existing.consentState === "withdrawn") existing.rejoinRequestedAt = clock;
         return { leadId: existing.id, created: false };
       }
       const id = `lead-${leads.size + 1}`;
-      leads.set(input.email, { id, input });
+      leads.set(input.email, { id, input, consentState: "granted" });
       return { leadId: id, created: true };
     },
     async enqueueDelivery(leadId, kind, { claim }) {
@@ -45,7 +63,9 @@ function fakeRepository() {
       const key = `${leadId}:${kind}`;
       const existing = events.get(key);
       if (existing) return { eventId: existing.id, status: existing.status, created: false };
-      const event: StoredEvent = { id: `event-${events.size + 1}`, leadId, kind, status: claim ? "sending" : "pending", attempts: claim ? 1 : 0 };
+      const withdrawn = [...leads.values()].some((lead) => lead.id === leadId && lead.consentState === "withdrawn");
+      const claimed = claim && !(kind === "acknowledgement" && withdrawn);
+      const event: StoredEvent = { id: `event-${events.size + 1}`, leadId, kind, status: claimed ? "sending" : "pending", attempts: claimed ? 1 : 0 };
       events.set(key, event);
       return { eventId: event.id, status: event.status, created: true };
     },
@@ -58,7 +78,13 @@ function fakeRepository() {
       else event.errorCode = outcome.errorCode;
     },
   };
-  return { repository, calls, leads, events, event: (kind: DeliveryKind) => [...events.values()].find((entry) => entry.kind === kind) };
+  /** A lead that is already on the list (as staff or an earlier signup left it), with no outbox rows. */
+  const seed = (input: LeadRecordInput, consentState: StoredLead["consentState"]) => {
+    const lead: StoredLead = { id: `lead-${leads.size + 1}`, input, consentState };
+    leads.set(input.email, lead);
+    return lead;
+  };
+  return { repository, calls, leads, events, seed, event: (kind: DeliveryKind) => [...events.values()].find((entry) => entry.kind === kind) };
 }
 
 function fakeMailer(result: EmailSendResult | (() => Promise<EmailSendResult>) = { status: "sent", providerMessageId: "re_123" }) {
@@ -188,14 +214,14 @@ describe("shared rate limit", () => {
     expect(repo.calls).toEqual([]);
   });
 
-  it("counts every server instance against one shared budget", async () => {
-    const shared = createMemoryRateLimiter();
+  // Whether separate server instances share this budget depends on the limiter: the Supabase one
+  // keeps it in the database (consume_rate_limit; supabase/tests/0001_leads_rls.sql checks one bucket).
+  it("refuses the signup past the lead limit for one client, even with a new email each time", async () => {
+    const limiter = createMemoryRateLimiter();
     const repo = fakeRepository();
-    const instanceA = dependencies({ repository: repo.repository, rateLimiter: shared });
-    const instanceB = dependencies({ repository: repo.repository, rateLimiter: shared });
     const statuses: number[] = [];
     for (let attempt = 0; attempt < LEAD_RATE_LIMIT.maxHits + 1; attempt += 1) {
-      const result = await submitLead({ ...VALID, email: `parent${attempt}@example.com` }, attempt % 2 === 0 ? instanceA : instanceB);
+      const result = await submitLead({ ...VALID, email: `parent${attempt}@example.com` }, dependencies({ repository: repo.repository, rateLimiter: limiter }));
       statuses.push(result.status);
     }
     expect(statuses).toEqual([...Array(LEAD_RATE_LIMIT.maxHits).fill(200), 429]);
@@ -326,19 +352,180 @@ describe("email outbox", () => {
   });
 });
 
-describe("duplicate normalised email", () => {
-  it("updates one record for the same address in any case or spacing, answers the same way, and acknowledges once", async () => {
+describe("duplicate normalised email (ruling R38)", () => {
+  it("keeps one record for the same address in any case or spacing, changes none of it, answers the same way, and acknowledges once", async () => {
     const repo = fakeRepository();
     const { mailer, sent } = fakeMailer();
     const deps = dependencies({ repository: repo.repository, mailer });
-    const first = await submitLead({ ...VALID, email: "Ana@Example.com" }, deps);
-    const second = await submitLead({ ...VALID, email: "  ana@EXAMPLE.com ", firstName: "Ana B" }, deps);
+    const first = await submitLead({ ...VALID, email: "Ana@Example.com", utm: { campaign: "spring" } }, deps);
+    const second = await submitLead({ ...VALID, email: "  ana@EXAMPLE.com ", firstName: "Mallory", ageBand: "9-12", source: "promo", utm: { source: "forged" } }, { ...deps, consentVersion: "8" });
     expect(repo.leads.size).toBe(1);
-    expect(repo.leads.get("ana@example.com")?.input.firstName).toBe("Ana B");
+    // The form cannot prove who owns the address, so nothing about the person changes.
+    expect(repo.leads.get("ana@example.com")).toMatchObject({
+      consentState: "granted",
+      input: { email: "ana@example.com", firstName: "Ana", ageBand: "3-5", consentVersion: "7", source: "landing", utm: { campaign: "spring" } },
+      lastSubmittedAt: 2,
+    });
+    expect(repo.leads.get("ana@example.com")?.rejoinRequestedAt).toBeUndefined();
     // The answer never reveals whether the address was already on the list.
     expect(second).toEqual(first);
     expect(sent.filter((message) => message.to.includes("ana@example.com"))).toHaveLength(1);
   });
+
+  it("never re-subscribes or emails an adult who withdrew, and answers exactly as for anyone already listed", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const deps = dependencies({ repository: repo.repository, mailer, staffEmail: "team@bibobay.example" });
+    const stored = { email: "gone@example.com", firstName: "Alex", consentVersion: "1", source: "landing" };
+    repo.seed(stored, "withdrawn");
+    repo.seed({ email: "listed@example.com", consentVersion: "1", source: "landing" }, "granted");
+
+    const withdrawn = await submitLead({ ...VALID, email: "Gone@Example.com", firstName: "Mallory" }, deps);
+    const listed = await submitLead({ ...VALID, email: "listed@example.com" }, deps);
+
+    expect(withdrawn).toEqual(listed);
+    expect(withdrawn.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
+    expect(repo.leads.get("gone@example.com")).toMatchObject({ consentState: "withdrawn", input: stored, lastSubmittedAt: 1, rejoinRequestedAt: 1 });
+    // Nothing goes out now: the acknowledgement waits unclaimed, and the Task 8 worker skips withdrawn leads.
+    expect(sent.filter((message) => message.to.includes("gone@example.com"))).toEqual([]);
+    expect([...repo.events.values()].filter((event) => event.leadId === repo.leads.get("gone@example.com")?.id).map((event) => event.status)).toEqual(["pending", "pending"]);
+  });
+
+  it("never sends immediately for an address that was already listed, so a resubmission cannot spend the send budget", async () => {
+    const repo = fakeRepository();
+    repo.seed({ email: "parent@example.com", consentVersion: "1", source: "landing" }, "granted");
+    const { mailer, sent } = fakeMailer();
+    const consume = vi.fn(allowAll.consume);
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: { consume }, mailer, staffEmail: "team@bibobay.example" }));
+    expect(result.body.acknowledgementQueued).toBe(true);
+    expect(sent).toEqual([]);
+    expect(consume.mock.calls.map(([key]) => key)).toEqual([`${LEAD_RATE_LIMIT.scope}:client-hash`]);
+    expect([...repo.events.values()].map((event) => event.status)).toEqual(["pending", "pending"]);
+  });
+});
+
+describe("global immediate-send cap (ruling R40)", () => {
+  /** A limiter that allows the lead rule but records every key it is asked about. */
+  function recordingLimiter(decide: (key: string) => boolean | Error = () => true) {
+    const keys: Array<[string, { maxHits: number; windowSeconds: number }]> = [];
+    const limiter: RateLimiter = {
+      async consume(key, rule) {
+        keys.push([key, rule]);
+        const verdict = decide(key);
+        if (verdict instanceof Error) throw verdict;
+        return verdict ? { allowed: true, remaining: 1, retryAfterSeconds: 0 } : { allowed: false, remaining: 0, retryAfterSeconds: 900 };
+      },
+    };
+    return { limiter, keys };
+  }
+
+  it("asks the shared limiter for one global send under ack-send:global, 60 per hour by default", async () => {
+    const { limiter, keys } = recordingLimiter();
+    await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: fakeMailer().mailer }));
+    expect(keys).toEqual([
+      [`${LEAD_RATE_LIMIT.scope}:client-hash`, { maxHits: LEAD_RATE_LIMIT.maxHits, windowSeconds: LEAD_RATE_LIMIT.windowSeconds }],
+      [ACK_SEND_LIMIT.key, { maxHits: 60, windowSeconds: 3600 }],
+    ]);
+    expect(ACK_SEND_LIMIT.defaultPerHour).toBe(60);
+  });
+
+  it("uses the configured hourly cap", async () => {
+    const { limiter, keys } = recordingLimiter();
+    await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: fakeMailer().mailer, sendLimitPerHour: 7 }));
+    expect(keys[1]).toEqual([ACK_SEND_LIMIT.key, { maxHits: 7, windowSeconds: 3600 }]);
+  });
+
+  it("stores the lead and leaves the acknowledgement pending once the cap is spent, with the same answer", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const log = vi.fn();
+    const deps = dependencies({ repository: repo.repository, rateLimiter: createMemoryRateLimiter(), mailer, sendLimitPerHour: 1, log });
+    const first = await submitLead({ ...VALID, email: "first@example.com" }, deps);
+    const second = await submitLead({ ...VALID, email: "second@example.com" }, deps);
+    expect(second).toEqual(first);
+    expect(second.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
+    expect(repo.leads.size).toBe(2);
+    expect(sent.map((message) => message.to)).toEqual([["first@example.com"]]);
+    const secondLead = repo.leads.get("second@example.com")?.id;
+    expect([...repo.events.values()].find((event) => event.leadId === secondLead)).toMatchObject({ kind: "acknowledgement", status: "pending", attempts: 0 });
+    expect(log).toHaveBeenCalledWith({ event: "delivery_send_capped", kind: "acknowledgement" });
+  });
+
+  it("counts staff alerts against the same cap, leaving them pending beyond it", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: createMemoryRateLimiter(), mailer, staffEmail: "team@bibobay.example", sendLimitPerHour: 1 }));
+    expect(sent.map((message) => message.to)).toEqual([["parent@example.com"]]);
+    expect(repo.event("acknowledgement")).toMatchObject({ status: "sent" });
+    expect(repo.event("staff_alert")).toMatchObject({ status: "pending", attempts: 0 });
+  });
+
+  it("leaves the email pending, and still reports the stored signup, when the send budget cannot be checked", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const { limiter } = recordingLimiter((key) => (key === ACK_SEND_LIMIT.key ? new Error("connection refused") : true));
+    const log = vi.fn();
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: limiter, mailer, log }));
+    expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
+    expect(sent).toEqual([]);
+    expect(repo.event("acknowledgement")).toMatchObject({ status: "pending" });
+    expect(log).toHaveBeenCalledWith({ event: "delivery_send_cap_unavailable", kind: "acknowledgement", code: "unknown" });
+  });
+
+  it("spends no send budget while email is not configured", async () => {
+    const { limiter, keys } = recordingLimiter();
+    await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: null, staffEmail: "team@bibobay.example" }));
+    expect(keys.map(([key]) => key)).toEqual([`${LEAD_RATE_LIMIT.scope}:client-hash`]);
+  });
+});
+
+describe("sending without holding up the answer (M4)", () => {
+  it("writes the claimed outbox rows, answers, and only then sends when sends can run after the response", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const deferred: Array<() => Promise<void>> = [];
+    const result = await submitLead(VALID, dependencies({
+      repository: repo.repository,
+      mailer,
+      staffEmail: "team@bibobay.example",
+      runAfterResponse: (task) => { deferred.push(task); },
+    }));
+    expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
+    expect(sent).toEqual([]);
+    expect(repo.calls).toEqual(["submitLead", "enqueue:acknowledgement", "enqueue:staff_alert"]);
+    expect([...repo.events.values()].map((event) => event.status)).toEqual(["sending", "sending"]);
+    expect(deferred).toHaveLength(1);
+
+    await deferred[0]!();
+    expect(sent.map((message) => message.to).sort()).toEqual([["parent@example.com"], ["team@bibobay.example"]]);
+    expect([...repo.events.values()].map((event) => event.status)).toEqual(["sent", "sent"]);
+  });
+
+  it("sends the acknowledgement and the staff alert at the same time, not one after the other", async () => {
+    const releases: Array<() => void> = [];
+    const mailer: EmailSender = {
+      send: () => new Promise<EmailSendResult>((resolve) => { releases.push(() => resolve({ status: "sent", providerMessageId: "re_1" })); }),
+    };
+    const pending = submitLead(VALID, dependencies({ mailer, staffEmail: "team@bibobay.example" }));
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases.forEach((release) => release());
+    expect((await pending).status).toBe(200);
+  });
+
+  it("aborts the provider request when a send times out", async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    const mailer: EmailSender = {
+      send: (_message, options) => {
+        signals.push(options?.signal);
+        return new Promise<EmailSendResult>(() => {});
+      },
+    };
+    const repo = fakeRepository();
+    await submitLead(VALID, dependencies({ repository: repo.repository, mailer, sendTimeoutMs: 25 }));
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(repo.event("acknowledgement")).toMatchObject({ status: "failed", errorCode: "send_timeout" });
+  }, 2_000);
 });
 
 describe("staff alert", () => {
@@ -351,6 +538,23 @@ describe("staff alert", () => {
     expect(alert?.subject).toBe("New BIBO Bay founding-family signup");
     expect(alert?.subject).not.toContain("parent@example.com");
     expect(alert?.text).toContain("parent@example.com");
+  });
+
+  it("never sets the submitted, unverified address as the staff alert's reply-to, and labels it unverified", async () => {
+    const { mailer, sent } = fakeMailer();
+    await submitLead(VALID, dependencies({ mailer, staffEmail: "team@bibobay.example", replyTo: "hello@bibobay.example" }));
+    const alert = sent.find((message) => message.to.includes("team@bibobay.example"));
+    expect(alert).toBeDefined();
+    expect(alert).not.toHaveProperty("replyTo");
+    expect(alert?.text).toMatch(/Submitted address \(unverified\)\s+parent@example\.com/);
+  });
+
+  it("queues the staff alert even while email is not configured, as it does the acknowledgement", async () => {
+    const repo = fakeRepository();
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, mailer: null, staffEmail: "team@bibobay.example" }));
+    expect(result.body.acknowledgementQueued).toBe(true);
+    expect(repo.event("staff_alert")).toMatchObject({ status: "pending", attempts: 0 });
+    expect(repo.calls).toEqual(["submitLead", "enqueue:acknowledgement", "enqueue:staff_alert"]);
   });
 
   it("sends no staff alert without a staff address", async () => {

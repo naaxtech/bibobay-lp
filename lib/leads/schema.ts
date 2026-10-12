@@ -51,7 +51,10 @@ const firstName = z.preprocess(
 
 const ageBand = z.preprocess(blankToUndefined, z.enum(AGE_BANDS, { error: "invalid" }).optional());
 
-const utmValue = z.string().trim().min(1).max(LEAD_LIMITS.utm);
+/** Campaign tags carry no control characters: the browser drops such a tag (`utmFromSearch`), the server refuses it (review M11). */
+// Control characters are exactly what this rejects.
+const UTM_CONTROL_PATTERN = /[\u0000-\u001f\u007f]/;
+const utmValue = z.string().trim().min(1).max(LEAD_LIMITS.utm).refine((value) => !UTM_CONTROL_PATTERN.test(value));
 
 /**
  * The server's independent validation of a founding-family signup (spec §9.2). Strict: any key the

@@ -89,23 +89,33 @@ export function buildLeadAcknowledgement({ firstName, leadMagnet }: { firstName?
 }
 
 export interface StaffLeadSummary {
+  /** The address as submitted. Nothing on the form proves the submitter owns it. */
   email: string;
   firstName?: string | null;
   ageBand?: AgeBand | null;
   source: string;
-  /** False when an existing signup was updated rather than created. */
+  /** False when the address was already listed; ruling R38 means nothing on that record changed. */
   created: boolean;
 }
 
+/**
+ * The alert names what was submitted, not what is on file: for an address already on the list the
+ * stored record is unchanged (ruling R38) and the submitted details may differ from it. The address
+ * is labelled unverified and is never set as the reply-to (review M3): replying would write to
+ * whoever owns the typed address, which may not be the person who submitted the form.
+ */
 export function buildStaffLeadAlert(lead: StaffLeadSummary): RenderedEmail {
   const rows: Array<[string, string]> = [
-    ["Email", lead.email],
+    ["Submitted address (unverified)", lead.email],
     ["First name", lead.firstName?.trim() || "Not given"],
     ["Age range", lead.ageBand ? FORM_COPY.ageBands[lead.ageBand] : "Not given"],
     ["Source", lead.source],
   ];
-  const intro = lead.created ? "A new signup joined the founding-family list." : "An adult updated an existing signup on the founding-family list.";
-  const text = [intro, "", ...rows.map(([label, value]) => `${label.padEnd(12)} ${value}`), "", "Consent was given on the signup form."].join("\n");
+  const intro = lead.created
+    ? "A new signup joined the founding-family list."
+    : "An address already on the founding-family list was submitted again. Nothing on the existing record was changed; the details below are what this submission contained.";
+  const width = Math.max(...rows.map(([label]) => label.length));
+  const text = [intro, "", ...rows.map(([label, value]) => `${label.padEnd(width)} ${value}`), "", "Consent was given on the signup form."].join("\n");
   const html = shell([
     paragraph(escapeHtml(intro)),
     `<dl style="margin:0 0 16px;font-size:15px;line-height:1.6">${rows

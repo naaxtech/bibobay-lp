@@ -7,14 +7,15 @@
 -- Covers: RLS enabled AND forced with no policies; no table privilege for anon, authenticated or
 -- service_role; every RPC a security definer with an empty search_path, executable by service_role
 -- only (never PUBLIC, anon or authenticated); the retention helper executable by nobody but its
--- owner; and real behaviour under each API role.
+-- owner; real behaviour under each API role; and ruling R38: an unverified resubmission never
+-- changes an existing person's consent, profile or campaign tags.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(68);
+select plan(81);
 
 -- ---------------------------------------------------------------------------
 -- Tables: RLS enabled and forced, no policies, no privileges for any API role
@@ -131,7 +132,7 @@ select is(
 select is(
   (select created from public.submit_lead('parent@example.com', true, 'consent-v2')),
   false,
-  'the same normalised email updates the existing lead instead of adding one'
+  'the same normalised email finds the existing lead instead of adding one'
 );
 select throws_ok(
   $$ select * from public.submit_lead('someone@example.com', false, 'consent-v1') $$,
@@ -152,6 +153,10 @@ select throws_ok(
 select throws_ok(
   $$ select * from public.submit_lead('someone@example.com', true, 'consent-v1', null, null, 'landing', null, '{"school":"x"}'::jsonb) $$,
   '22023', 'campaign tags are invalid', 'submit_lead accepts only the five campaign tags'
+);
+select throws_ok(
+  $$ select * from public.submit_lead('someone@example.com', true, 'consent-v1', null, null, 'landing', null, jsonb_build_object('source', 'spring' || chr(1) || 'sale')) $$,
+  '22023', 'campaign tags are invalid', 'submit_lead refuses campaign tags with control characters'
 );
 
 select is(
@@ -216,8 +221,8 @@ select is(
 select is(
   (select concat_ws('|', first_name, age_band, consent_version, consent_state, locale)
      from public.lead_submissions where email = 'parent@example.com'),
-  'Sam|3-5|consent-v2|granted|en-GB',
-  'a repeat signup keeps earlier details and records the current consent version'
+  'Sam|3-5|consent-v1|granted|en-GB',
+  'a repeat signup keeps the first consent version and details'
 );
 select is(
   (select acknowledgement_status from public.lead_submissions where email = 'parent@example.com'),
@@ -230,6 +235,89 @@ select ok(
      join public.lead_submissions l on l.id = e.lead_id
     where l.email = 'parent@example.com' and e.kind = 'acknowledgement'),
   'a failed acknowledgement keeps its error code and is scheduled for retry'
+);
+
+-- ---------------------------------------------------------------------------
+-- Ruling R38: an unverified resubmission never changes an existing person's record
+-- ---------------------------------------------------------------------------
+-- The form cannot prove who owns an address, so a repeat signup may only note that it happened.
+-- The fixtures are written as the owner with past timestamps. Inside this one transaction now()
+-- is constant, so "left unchanged" and "set by this call" can be told apart exactly.
+
+select has_column('public', 'lead_submissions', 'last_submitted_at', 'lead_submissions records when an address was submitted again');
+select has_column('public', 'lead_submissions', 'rejoin_requested_at', 'lead_submissions records a withdrawn adult''s request to re-join');
+
+insert into public.lead_submissions
+  (email, first_name, age_band, consent_state, consent_version, consent_granted_at, consent_withdrawn_at, source, locale, utm, created_at, updated_at)
+values
+  ('granted@example.com', 'Sam', '3-5', 'granted', 'consent-v1', '2026-01-01 00:00:00+00', null, 'landing', 'en-GB',
+   '{"source": "newsletter", "campaign": "spring"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'),
+  ('withdrawn@example.com', 'Alex', '6-8', 'withdrawn', 'consent-v1', '2026-01-01 00:00:00+00', '2026-02-01 00:00:00+00', 'landing', 'en-AU',
+   '{"source": "podcast"}', '2026-01-01 00:00:00+00', '2026-02-01 00:00:00+00');
+
+set local role service_role;
+
+select is(
+  (select created from public.submit_lead(' Granted@Example.COM ', true, 'consent-v9', 'Mallory', '9-12', 'promo', 'fr-FR', '{"source": "forged", "medium": "x"}'::jsonb)),
+  false,
+  'resubmitting a listed address with different details reports an existing lead'
+);
+select is(
+  (select created from public.submit_lead('granted@example.com', true, 'consent-v9')),
+  false,
+  'resubmitting a listed address without details reports an existing lead'
+);
+select is(
+  (select created from public.submit_lead('withdrawn@example.com', true, 'consent-v9', 'Mallory', '9-12', 'promo', 'fr-FR', '{"source": "forged"}'::jsonb)),
+  false,
+  'resubmitting a withdrawn address reports an existing lead, like any other'
+);
+select is(
+  (select status from public.enqueue_lead_delivery((select lead_id from public.submit_lead('withdrawn@example.com', true, 'consent-v9')), 'acknowledgement', true)),
+  'pending',
+  'an acknowledgement for a withdrawn adult is never claimed for an immediate send'
+);
+
+reset role;
+
+-- The two new columns are read through to_jsonb, so a missing column reports "not ok" instead of
+-- aborting the whole plan.
+select ok(
+  (select consent_state = 'granted' and consent_version = 'consent-v1'
+          and consent_granted_at = '2026-01-01 00:00:00+00'::timestamptz and consent_withdrawn_at is null
+     from public.lead_submissions where email = 'granted@example.com'),
+  'a resubmission never changes a granted consent record'
+);
+select ok(
+  (select first_name = 'Sam' and age_band = '3-5' and source = 'landing' and locale = 'en-GB'
+          and utm = '{"source": "newsletter", "campaign": "spring"}'::jsonb
+     from public.lead_submissions where email = 'granted@example.com'),
+  'a resubmission never changes the stored profile or campaign tags'
+);
+select ok(
+  (select (to_jsonb(lead) ->> 'last_submitted_at')::timestamptz = now()
+          and to_jsonb(lead) -> 'rejoin_requested_at' = 'null'::jsonb
+          and lead.updated_at = now()
+     from public.lead_submissions as lead where lead.email = 'granted@example.com'),
+  'a resubmission of a granted address only records when it happened'
+);
+select ok(
+  (select consent_state = 'withdrawn' and consent_withdrawn_at = '2026-02-01 00:00:00+00'::timestamptz
+          and consent_version = 'consent-v1' and consent_granted_at = '2026-01-01 00:00:00+00'::timestamptz
+     from public.lead_submissions where email = 'withdrawn@example.com'),
+  'a resubmission never reverses a withdrawal or erases when it happened'
+);
+select ok(
+  (select first_name = 'Alex' and age_band = '6-8' and source = 'landing' and locale = 'en-AU'
+          and utm = '{"source": "podcast"}'::jsonb
+     from public.lead_submissions where email = 'withdrawn@example.com'),
+  'a resubmission never changes a withdrawn adult''s profile or campaign tags'
+);
+select ok(
+  (select (to_jsonb(lead) ->> 'rejoin_requested_at')::timestamptz = now()
+          and (to_jsonb(lead) ->> 'last_submitted_at')::timestamptz = now()
+     from public.lead_submissions as lead where lead.email = 'withdrawn@example.com'),
+  'a resubmission of a withdrawn address is only noted, for staff to confirm through a verified channel'
 );
 
 select * from finish();

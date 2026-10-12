@@ -32,6 +32,9 @@ export interface LeadFormProps {
 
 type Outcome = { tone: "success" | "error"; text: string } | null;
 
+/** Where focus goes once a request completes, unless the person has already moved it (review M6). */
+type FocusReturn = { target: "button" | "status"; request: number } | null;
+
 const LEAD_SOURCE = "landing";
 const FIELD_CODES = new Set<LeadFieldErrorCode>(["required", "invalid", "too_long"]);
 
@@ -61,10 +64,13 @@ function serverFieldErrors(body: unknown): LeadFieldErrors {
  * message. Nothing here says an email was sent.
  *
  * Accessibility: labels above fields, hints and errors tied by `aria-describedby`, an error summary
- * that takes focus on a failed submit and links to each field, one polite live region for the
- * result, and a submit button that is disabled and `aria-busy` while saving. The status line keeps
- * its height and the button keeps its width between states, so nothing jumps. Before hydration the
- * button stays disabled, so a native submit can never post the form somewhere unintended.
+ * (a named group, so its title is announced) that takes focus on a failed submit and links to each
+ * field, one polite live region for the result, and a submit button that is disabled and
+ * `aria-busy` while saving. Disabling the focused button drops focus to <body> in Chromium, so once
+ * the request completes focus returns to the button after a failure, or moves to the outcome after
+ * a success, unless the person has moved it elsewhere meanwhile. The status line keeps its height
+ * and the button keeps its width between states, so nothing jumps. Before hydration the button
+ * stays disabled, so a native submit can never post the form somewhere unintended.
  */
 export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
   const id = useId();
@@ -86,13 +92,24 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [pending, setPending] = useState(false);
   const [summaryFocus, setSummaryFocus] = useState(0);
+  const [focusReturn, setFocusReturn] = useState<FocusReturn>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
   const pendingRef = useRef(false);
 
   // Each failed submit moves focus to the summary, even when the same problems repeat.
   useEffect(() => {
     if (summaryFocus > 0) summaryRef.current?.focus();
   }, [summaryFocus]);
+
+  // Runs after the render that re-enabled the button, so the button can take focus again.
+  useEffect(() => {
+    if (!focusReturn) return;
+    const active = document.activeElement;
+    const lost = !active || active === document.body || active === submitRef.current;
+    if (lost) (focusReturn.target === "status" ? statusRef.current : submitRef.current)?.focus();
+  }, [focusReturn]);
 
   const showFieldErrors = (found: LeadFieldErrors) => {
     setErrors(found);
@@ -136,6 +153,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
 
     pendingRef.current = true;
     setPending(true);
+    // Field errors move focus to the summary instead; every other outcome returns it (review M6).
+    let returnFocusTo: "button" | "status" | null = "button";
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -147,10 +166,12 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
       if (response.ok && isRecord(answer) && answer.ok === true && answer.persisted === true) {
         setOutcome({ tone: "success", text: copy.successMessage });
         form.reset();
+        returnFocusTo = "status";
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
         showFieldErrors(serverFieldErrors(answer));
+        returnFocusTo = null;
       } else {
         setOutcome({ tone: "error", text: copy.errorMessage });
       }
@@ -159,6 +180,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
     } finally {
       pendingRef.current = false;
       setPending(false);
+      const target = returnFocusTo;
+      if (target) setFocusReturn((previous) => ({ target, request: (previous?.request ?? 0) + 1 }));
     }
   }
 
@@ -177,7 +200,9 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
   return (
     <form className="lead-form" aria-label={FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
       {listed.length > 0 ? (
-        <div ref={summaryRef} className="lead-form__summary" tabIndex={-1} aria-labelledby={ids.summaryTitle}>
+        // role="group": a generic <div> may not be named (ARIA 1.2), so its title might never be
+        // announced when it takes focus (review M5).
+        <div ref={summaryRef} role="group" className="lead-form__summary" tabIndex={-1} aria-labelledby={ids.summaryTitle}>
           <h3 id={ids.summaryTitle} className="lead-form__summary-title">
             {FORM_COPY.errorSummaryTitle}
           </h3>
@@ -301,7 +326,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
-      <button type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
+      <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}
       </button>
 
@@ -314,7 +339,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
        */}
       <div className="lead-form__outcome" data-reserve-a={copy.successMessage} data-reserve-b={copy.errorMessage}>
         <div className="lead-form__outcome" data-reserve-a={FORM_COPY.outcome.rateLimited} data-reserve-b={FORM_COPY.sending}>
-          <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
+          {/* tabIndex -1: focusable from script only, so a success can take focus (review M6). */}
+          <p ref={statusRef} role="status" aria-live="polite" aria-atomic="true" tabIndex={-1} className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
             {pending ? FORM_COPY.sending : (outcome?.text ?? "")}
           </p>
         </div>
