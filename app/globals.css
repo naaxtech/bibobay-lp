@@ -3,6 +3,8 @@
 @import "../components/landing/landing.css";
 /* The founding-family form; after the landing styles so it can build on .btn and .text-link. */
 @import "../components/forms/lead-form.css";
+/* Privacy, terms and the founding-family explainer, plus the draft preview notice (Task 9). */
+@import "../components/legal/simple-page.css";
 
 /*
  * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and

@@ -1,0 +1,92 @@
+/*
+ * Short reading pages: privacy, terms and the founding-family explainer (Task 9), plus the draft
+ * preview notice. Built on the landing primitives (site header, paper ground, .prose-paper,
+ * .btn, .text-link) and the --bibo-* tokens. Nothing starts hidden or transparent.
+ */
+
+@layer components {
+  .simple-page {
+    background-color: var(--ground);
+    color: var(--ink);
+    padding-block: clamp(2.5rem, 1.5rem + 5vw, 5.5rem) var(--bibo-space-section);
+  }
+
+  .simple-page__sheet {
+    max-inline-size: 46rem;
+  }
+
+  .simple-page__title {
+    margin: 0;
+    font-size: var(--bibo-text-h1);
+    line-height: 1.05;
+  }
+
+  .simple-page__title + * {
+    margin-block-start: 1.5rem;
+  }
+
+  .simple-page__meta {
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-small);
+  }
+
+  /* The "not yet reviewed" note: a taped paper slip, so it reads as a status, not as body text. */
+  .simple-page__note {
+    padding: 1rem 1.25rem;
+    border-radius: var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 18%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+    font-weight: 600;
+  }
+
+  .simple-page__prose {
+    margin-block-start: 2rem;
+    max-inline-size: 65ch;
+  }
+
+  .simple-page__prose h2 {
+    margin-block-start: 2.25rem;
+    font-size: var(--bibo-text-h3);
+  }
+
+  .simple-page__contact {
+    margin-block-start: 1rem;
+    max-inline-size: 65ch;
+  }
+
+  .simple-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    margin-block-start: 2.5rem;
+  }
+
+  /* Draft mode (ruling R33): a navy strip above the header, impossible to mistake for the live site. */
+  .preview-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 1rem;
+    padding: 0.5rem var(--bibo-space-gutter);
+    background-color: var(--bibo-color-navy);
+    color: var(--bibo-color-cream);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  .preview-notice p {
+    margin: 0;
+  }
+
+  .preview-notice__exit {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-color: var(--bibo-color-yellow);
+    text-underline-offset: 0.25em;
+  }
+}

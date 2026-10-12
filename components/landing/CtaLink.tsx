@@ -22,6 +22,12 @@ export interface CtaLinkProps {
 }
 
 /**
+ * Internal routes this site is known to serve (Task 9). Only these are prefetched; any other CMS
+ * route may not exist yet, and a prefetch of a missing route is a 404 in production builds.
+ */
+export const PREFETCHABLE_ROUTES: ReadonlySet<string> = new Set(["/", "/privacy", "/terms"]);
+
+/**
  * One CMS call to action. Page anchors stay plain links so the browser scrolls (and moves the
  * focus starting point) itself; internal routes use next/link; an external link opens a new tab,
  * says so to assistive technology and never hands the new page a reference to this one.
@@ -39,10 +45,11 @@ export function CtaLink({ cta, variant = "plain", className, onClick, children }
   }
   if (cta.href.startsWith("/") && !cta.href.startsWith("/#")) {
     // src: https://nextjs.org/docs/app/api-reference/components/link#prefetch · next 16.3.8 · 2026-10-05
-    // CMS links may name routes that do not exist yet (legal pages ship later); a viewport prefetch of a
-    // missing route is a 404 and a console error on every visit. Navigation stays client-side.
+    // CMS links may name routes that do not exist yet; a viewport prefetch of a missing route is a 404
+    // and a console error on every visit. Routes this site serves (PREFETCHABLE_ROUTES, Task 9) keep
+    // Next's default prefetch. Navigation stays client-side either way.
     return (
-      <Link href={cta.href} className={classes} onClick={onClick} prefetch={false}>
+      <Link href={cta.href} className={classes} onClick={onClick} {...(PREFETCHABLE_ROUTES.has(cta.href) ? {} : { prefetch: false })}>
         {label}
       </Link>
     );

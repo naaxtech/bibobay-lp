@@ -16,6 +16,8 @@ const allowedPublicNames = new Set([
   // Supabase or Resend. Its server names (SUPABASE_SERVICE_ROLE_KEY, RESEND_*, STAFF_NOTIFICATION_EMAIL,
   // LEAD_IP_HASH_SECRET, LEAD_ACK_SEND_LIMIT_PER_HOUR) are refused here under a NEXT_PUBLIC_ prefix
   // like any unlisted name.
+  // Task 9 adds none either: SANITY_REVALIDATE_SECRET (webhook), SANITY_API_READ_TOKEN (draft preview)
+  // and SANITY_STUDIO_ORIGIN (CSP frame-ancestors) are read on the server only (proxy.ts, route handlers).
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_SANITY_PROJECT_ID",
   "NEXT_PUBLIC_SANITY_DATASET",
