@@ -27,7 +27,11 @@ export function safeRedirectPath(input: unknown): string {
   try {
     const url = new URL(input, PLACEHOLDER_ORIGIN);
     if (url.origin !== PLACEHOLDER_ORIGIN) return "/";
-    return `${url.pathname}${url.search}${url.hash}`;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    // Dot segments ("/.//x", "/a/..//x", "/%2e//x") normalise to a protocol-relative "//x", which a
+    // browser follows to another host. Re-check the normalised result, not only the input.
+    if (path.startsWith("//") || path.startsWith("/\\")) return "/";
+    return path;
   } catch {
     return "/";
   }

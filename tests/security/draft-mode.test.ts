@@ -50,7 +50,11 @@ describe("safe redirect paths", () => {
     expect(safeRedirectPath(input)).toBe(expected);
   });
 
-  it.each([undefined, null, "", "privacy", "//evil.example/x", "/\\evil.example", "\\\\evil.example", "https://evil.example/", "javascript:alert(1)", "/\t/evil.example", "/%0d%0aSet-Cookie:x=1".replace("%0d%0a", "\r\n")])(
+  it.each([
+    undefined, null, "", "privacy", "//evil.example/x", "/\\evil.example", "\\\\evil.example", "https://evil.example/", "javascript:alert(1)", "/\t/evil.example", "/%0d%0aSet-Cookie:x=1".replace("%0d%0a", "\r\n"),
+    // Dot segments normalise to a protocol-relative path, which a browser follows off-site (Task 9 review I3).
+    "/.//evil.example", "/a/..//evil.example", "/%2e//evil.example/x", "/%2E%2E//evil.example",
+  ])(
     "sends %j home instead",
     (input) => {
       expect(safeRedirectPath(input)).toBe("/");

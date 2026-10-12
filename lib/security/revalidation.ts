@@ -44,6 +44,10 @@ export const REVALIDATION_TAGS: Readonly<Record<string, readonly string[]>> = Ob
   legalSettings: ["legalSettings"],
   product: ["product"],
   productCategory: ["productCategory"],
+  // A download has no read of its own: the landing query dereferences it (`lead.leadMagnet->` in
+  // lib/sanity/queries.ts), so publishing or withdrawing one must expire the landing page read.
+  // Without this, a download switched off in Studio stays promised on the page (spec §3.3).
+  leadMagnet: ["landingPage"],
 });
 
 /** The tags for a document type; an unknown or odd value maps to nothing. */

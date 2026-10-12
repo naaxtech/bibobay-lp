@@ -61,6 +61,9 @@ const privacy: PortableContent = [
   paragraph("Supabase hosts the database where signups are stored."),
   paragraph("Resend delivers the emails described above."),
   paragraph(
+    "For each email, the database keeps a delivery record: which email it was, whether it was sent, how many attempts were made and when, the email service's message reference, and a short error code if sending failed. It does not keep a copy of the email.",
+  ),
+  paragraph(
     "Sanity hosts the website's text and pictures. When a page shows a picture from Sanity, your browser loads it from Sanity's image service. No form details are sent to Sanity.",
   ),
   paragraph(
@@ -68,7 +71,7 @@ const privacy: PortableContent = [
   ),
   heading("How long we keep your details"),
   paragraph(
-    "We keep your signup until you ask us to remove it; nothing deletes it automatically. When you ask, a member of the BIBO Bay team marks your signup as withdrawn, and it is no longer used to email you.",
+    "We keep your signup, and its delivery records, for as long as the list exists; nothing deletes it automatically. When you ask to be removed, a member of the BIBO Bay team marks your signup as withdrawn: it is no longer used to email you, and the record that you withdrew, and when, is kept so we can respect your choice. The website does not delete the signup itself. If the same email address is submitted again after you withdrew, the website only notes the date; it does not sign you up again.",
   ),
   heading("How to ask for removal or a copy"),
   paragraph(

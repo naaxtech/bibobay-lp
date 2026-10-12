@@ -61,9 +61,19 @@ describe("repository fallback legal text (ruling R30)", () => {
   });
 
   it("describes retention as the database implements it, without inventing a period", () => {
-    expect(privacy).toMatch(/until you ask us to remove/i);
+    // Withdrawal marks the row; migration 0001 has no delete path, so the text must not imply deletion
+    // (Task 9 review I2).
+    expect(privacy).not.toMatch(/until you ask us to remove/i);
+    expect(privacy).toMatch(/marks your signup as withdrawn/i);
+    expect(privacy).toMatch(/does not delete/i);
+    expect(privacy).toMatch(/nothing deletes it automatically/i);
     expect(privacy).toMatch(/rate-limit/i);
     expect(privacy).not.toMatch(/\b\d+\s*(days|months|years)\b/i);
+  });
+
+  it("mentions the delivery records kept for each email (lead_delivery_events)", () => {
+    expect(privacy).toMatch(/delivery record/i);
+    expect(privacy).toMatch(/error code/i);
   });
 
   it("invents no company name, address, registration, jurisdiction, governing law or contact email", () => {

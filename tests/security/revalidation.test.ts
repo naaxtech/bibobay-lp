@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -102,7 +104,28 @@ describe("document type to cache tag mapping", () => {
       legalSettings: ["legalSettings"],
       product: ["product"],
       productCategory: ["productCategory"],
+      // Not fetched on its own: the landing query dereferences it (`lead.leadMagnet->`), so a change
+      // to a download must expire the landing page read (Task 9 review I1).
+      leadMagnet: ["landingPage"],
     });
+  });
+
+  it("covers every document type the Studio schema defines, so no published edit is silently ignored", () => {
+    const schemaDir = join(process.cwd(), "studio", "schemaTypes", "documents");
+    const documentTypes = readdirSync(schemaDir)
+      .filter((file) => file.endsWith(".ts"))
+      .flatMap((file) => [...readFileSync(join(schemaDir, file), "utf8").matchAll(/defineType\(\{\s*name:\s*"(\w+)"[^]*?type:\s*"document"/g)].map((match) => match[1]!));
+    // 3 singletons + 9 collections today; guards against the pattern silently matching nothing.
+    expect(documentTypes.length).toBeGreaterThanOrEqual(12);
+    for (const type of documentTypes) {
+      expect(tagsForDocumentType(type), `document type ${type}`).not.toEqual([]);
+    }
+  });
+
+  it("covers every document the published queries dereference", () => {
+    const queries = readFileSync(join(process.cwd(), "lib", "sanity", "queries.ts"), "utf8");
+    expect(queries).toMatch(/leadMagnet->/);
+    expect(tagsForDocumentType("leadMagnet")).toEqual(["landingPage"]);
   });
 
   it.each(["unknownType", "sanity.imageAsset", "__proto__", "constructor", "toString", "", 42, null])("ignores %s", (type) => {
