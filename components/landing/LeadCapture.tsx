@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 
 import { brandTokens } from "@/lib/brand/tokens";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
+import { CmsArt } from "./CmsArt";
 import { PaperEdge, SectionShell, Tape } from "./SectionShell";
+import type { StageArt } from "./sections";
 
 const { color } = brandTokens;
 
@@ -34,10 +36,16 @@ export interface LeadCaptureProps {
    * never shows an outcome; with no form supplied it shows the CMS copy alone.
    */
   form?: ReactNode;
+  /**
+   * The section's CMS image: a paper print in the cove. It takes the form's column while there is
+   * no form, and sits under the copy once Task 5's form fills that column.
+   */
+  art?: StageArt;
 }
 
-export function LeadCapture({ section, lead, form }: LeadCaptureProps) {
+export function LeadCapture({ section, lead, form, art }: LeadCaptureProps) {
   const magnet = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? lead.leadMagnet : null;
+  const artBeside = art && !form;
   return (
     <SectionShell section={section} headingId="lead-heading" className="relative overflow-x-clip pb-40 pt-16 sm:pb-48 sm:pt-24">
       <PaperEdge />
@@ -56,8 +64,12 @@ export function LeadCapture({ section, lead, form }: LeadCaptureProps) {
               {magnet.description ? <span className="mt-1 block text-(--ink-soft)">{magnet.description}</span> : null}
             </p>
           ) : null}
+          {art && form ? <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 20rem, 90vw" className="mt-10 max-w-[20rem]" /> : null}
         </div>
         {form ? <div className="lead-slot lg:col-span-5 lg:col-start-8">{form}</div> : null}
+        {artBeside ? (
+          <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 22rem, 90vw" className="max-w-[22rem] lg:col-span-4 lg:col-start-9 lg:self-center" />
+        ) : null}
       </div>
       <Cove />
     </SectionShell>

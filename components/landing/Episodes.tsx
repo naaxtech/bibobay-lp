@@ -1,8 +1,9 @@
 "use client";
 
-import Image from "next/image";
+import { useId } from "react";
 
 import type { EpisodePreview, LandingPageContent, SectionConfig } from "@/lib/content/types";
+import { ArtImage, CmsArt } from "./CmsArt";
 import { PaperMood, moodAccent } from "./PaperMood";
 import { SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
@@ -14,19 +15,21 @@ type PanelProps = ReturnType<ReturnType<typeof useRovingTabs>["panelProps"]>;
 /** Covers start further round the palette than the friends, so the two sections never look alike. */
 const COVER_OFFSET = 3;
 
-function Storybook({ story, index, art, conceptLabel, panelProps }: {
+function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }: {
   story: EpisodePreview;
   index: number;
   art?: StageArt;
   conceptLabel: string;
   panelProps: PanelProps;
+  /** id of the line saying which concept of how many this is, while it is the open one. */
+  describedBy?: string;
 }) {
   const isConcept = story.status === "concept";
   return (
-    <div {...panelProps} className="storybook">
+    <div {...panelProps} aria-describedby={describedBy} className="storybook">
       <div className="storybook__cover">
         {art ? (
-          <Image src={art.src} alt={art.alt} fill sizes="(min-width: 64rem) 34rem, 100vw" unoptimized className="object-cover" />
+          <ArtImage art={art} sizes="(min-width: 80rem) 38rem, (min-width: 48rem) 50vw, 100vw" />
         ) : (
           <PaperMood variant={index + COVER_OFFSET} accent={moodAccent(undefined, index + COVER_OFFSET)} />
         )}
@@ -80,26 +83,56 @@ export interface EpisodesProps {
   episodes: EpisodePreview[];
   /** Approved Sanity artwork by story id; a story without it keeps an abstract cover. */
   art: Readonly<Record<string, StageArt>>;
+  /** The section's own CMS image: a paper print beside the heading. */
+  introArt?: StageArt;
+}
+
+type StopState = "past" | "current" | "upcoming";
+const stopState = (index: number, selected: number): StopState => (index < selected ? "past" : index === selected ? "current" : "upcoming");
+
+/**
+ * Where the open story concept sits among them (spec §7 "timeline-style progress", ruling R22): a
+ * row of paper bookmark ticks, one per concept, with the open one long and inked. It follows the
+ * tabs and nothing else: no playback, no running time, no advancing on its own. The ticks are a
+ * picture for sighted readers; assistive technology hears "k of N" with the open story instead.
+ */
+function StoryProgress({ count, selected, countId }: { count: number; selected: number; countId: string }) {
+  return (
+    <div className="story-progress" data-story-progress>
+      <ol className="story-progress__stops" aria-hidden="true">
+        {Array.from({ length: count }, (_, index) => (
+          <li key={index} className="story-progress__stop" data-state={stopState(index, selected)} />
+        ))}
+      </ol>
+      <p id={countId} className="sr-only">
+        {UI_COPY.storyPosition(selected + 1, count)}
+      </p>
+    </div>
+  );
 }
 
 /**
  * Story concepts as an open storybook: titles as bookmarks above, the chosen concept on the
- * spread. Every unfinished story says it is a concept; there is no play control or running time.
+ * spread, a quiet marker of which concept is open between them. Every unfinished story says it
+ * is a concept; there is no play control or running time.
  */
-export function Episodes({ section, intro, episodes, art }: EpisodesProps) {
+export function Episodes({ section, intro, episodes, art, introArt }: EpisodesProps) {
   const tabs = useRovingTabs(episodes.length);
+  const countId = useId();
+  const showProgress = episodes.length > 1;
   return (
     <SectionShell section={section} headingId="episodes-heading" className="py-section">
       <div className="landing-container">
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
-          <div className="lg:col-span-6">
+        <div className="grid gap-8 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-7">
             {intro.eyebrow ? <Tape>{intro.eyebrow}</Tape> : null}
             <h2 id="episodes-heading" className="mt-4 max-w-[14ch] font-display text-h2 font-semibold">
               {intro.heading}
             </h2>
+            {intro.description ? <p className="mt-4 max-w-[46ch] text-(--ink-soft)">{intro.description}</p> : null}
           </div>
-          {intro.description ? (
-            <p className="max-w-[44ch] text-(--ink-soft) lg:col-span-5 lg:col-start-8">{intro.description}</p>
+          {introArt ? (
+            <CmsArt frame="print" art={introArt} sizes="(min-width: 64rem) 20rem, 90vw" className="max-w-[20rem] lg:col-span-4 lg:col-start-9" />
           ) : null}
         </div>
         <div role="tablist" aria-labelledby="episodes-heading" className="story-tabs mt-10 lg:mt-14">
@@ -110,6 +143,7 @@ export function Episodes({ section, intro, episodes, art }: EpisodesProps) {
             </button>
           ))}
         </div>
+        {showProgress ? <StoryProgress count={episodes.length} selected={tabs.selected} countId={countId} /> : null}
         {episodes.map((story, index) => (
           <Storybook
             key={story.id}
@@ -118,6 +152,7 @@ export function Episodes({ section, intro, episodes, art }: EpisodesProps) {
             art={art[story.id]}
             conceptLabel={intro.conceptLabel}
             panelProps={tabs.panelProps(index)}
+            describedBy={showProgress && index === tabs.selected ? countId : undefined}
           />
         ))}
       </div>

@@ -2,7 +2,9 @@ import type { CSSProperties } from "react";
 
 import { brandTokens } from "@/lib/brand/tokens";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
+import { CmsArt } from "./CmsArt";
 import { SectionShell, Tape } from "./SectionShell";
+import type { StageArt } from "./sections";
 
 const { color } = brandTokens;
 
@@ -25,14 +27,17 @@ const colorStyle = (value: string) => ({ "--step-color": value }) as CSSProperti
 export interface OfflineLoopProps {
   section: SectionConfig;
   offline: LandingPageContent["offline"];
+  /** The section's CMS image: a round cut-out at the heart of the loop, in place of the paper sun. */
+  art?: StageArt;
 }
 
 /**
  * From screen to real life: the steps as an ordered list (the readable source of truth) beside a
  * decorative loop that carries them round and back to the start. Motion may draw the path later;
- * it is fully drawn without it.
+ * it is fully drawn without it. The loop's marks repeat the list, so they are hidden from
+ * assistive technology; a CMS image at its centre is real content and keeps its alt text.
  */
-export function OfflineLoop({ section, offline }: OfflineLoopProps) {
+export function OfflineLoop({ section, offline, art }: OfflineLoopProps) {
   const count = offline.steps.length;
   return (
     <SectionShell section={section} headingId="offline-heading" className="overflow-x-clip py-section">
@@ -45,10 +50,14 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
           {offline.description ? <p className="mt-5 max-w-[42ch] text-lead text-(--ink-soft)">{offline.description}</p> : null}
         </div>
 
-        <div className="loop-diagram lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:self-center" aria-hidden="true">
-          <svg className="loop-diagram__drawing" viewBox="0 0 400 400" focusable="false">
-            <circle cx={204} cy={206} r={58} fill={color.navy} fillOpacity={0.08} />
-            <circle cx={200} cy={200} r={58} fill={color.yellow} />
+        <div className="loop-diagram lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:self-center">
+          <svg className="loop-diagram__drawing" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+            {art ? null : (
+              <>
+                <circle cx={204} cy={206} r={58} fill={color.navy} fillOpacity={0.08} />
+                <circle cx={200} cy={200} r={58} fill={color.yellow} />
+              </>
+            )}
             <path d={LOOP_PATH} transform="translate(3 5)" fill="none" stroke={color.navy} strokeOpacity={0.1} strokeWidth={10} />
             {/* pathLength 1 lets motion draw the loop by its share of the way round; it changes nothing static. */}
             <path data-loop-path pathLength={1} d={LOOP_PATH} fill="none" stroke={color.navy} strokeWidth={4} strokeLinecap="round" />
@@ -77,6 +86,7 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
               <span
                 key={index}
                 className="loop-node"
+                aria-hidden="true"
                 data-loop-at={loopAt(index, count)}
                 style={{
                   ...colorStyle(stepColor(index)),
@@ -88,6 +98,7 @@ export function OfflineLoop({ section, offline }: OfflineLoopProps) {
               </span>
             );
           })}
+          {art ? <CmsArt frame="round" art={art} sizes="12rem" className="loop-diagram__art" /> : null}
         </div>
 
         <ol className="loop-steps lg:col-span-6 lg:row-start-2">

@@ -2,16 +2,28 @@
  * BIBO Bay landing page: section grounds, paper primitives and section compositions.
  * Imported by app/globals.css; every value draws on the --bibo-* brand tokens declared there.
  * Nothing here starts hidden or transparent: motion (Task 4B) may enhance, never reveal.
+ *
+ * Kept as one file (Task 4C decision): the design pass changed a few rules per section rather than
+ * rewriting any, and every section's rules sit under its own banner below. Split it by section
+ * only when a section's rules grow past what one banner can hold.
+ *
+ * Shape rule (one radius per kind of thing, used everywhere): anything you press or that labels a
+ * state (buttons, chips, status tags, nav links) is a pill; a large paper surface (the hero
+ * postcard, friend stage, storybook, editor prints) is a sticker (2rem); a tab is paper (1.25rem);
+ * a small note or thumbnail is soft (0.75rem). Round cut-outs stay round.
  */
 
-/* The sticky header's height. In-page anchors and keyboard focus scroll clear of it. */
+/*
+ * The sticky header's height. In-page anchors and keyboard focus scroll clear of it. On a desktop
+ * it is 80px, the rulebook's cap; the logo sticker is a touch taller and overhangs its lower edge.
+ */
 :root {
   --site-header-height: 5.25rem;
 }
 
 @media (min-width: 64rem) {
   :root {
-    --site-header-height: 6rem;
+    --site-header-height: 5rem;
   }
 }
 
@@ -36,6 +48,53 @@
     position: relative;
     background-color: var(--ground);
     color: var(--ink);
+  }
+
+  /* ---------- Editor art (CMS images) in its paper frame ---------- */
+
+  .cms-art {
+    position: relative;
+    overflow: hidden;
+    border: 0.375rem solid var(--bibo-color-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-ocean) 12%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  /* A section's own art: a die-cut print, slightly askew like everything pinned to this page. */
+  .cms-art--print {
+    inline-size: 100%;
+    aspect-ratio: 4 / 3;
+    border-width: clamp(0.4rem, 0.3rem + 0.4vw, 0.625rem);
+    border-radius: var(--bibo-radius-sticker);
+    box-shadow: var(--bibo-shadow-lifted);
+    rotate: -1.5deg;
+  }
+
+  .cms-art--sticker {
+    flex: none;
+    inline-size: 5.5rem;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    rotate: -4deg;
+  }
+
+  .cms-art--thumb {
+    flex: none;
+    inline-size: 4.5rem;
+    aspect-ratio: 1;
+    border-width: 0.25rem;
+    border-radius: var(--bibo-radius-soft);
+  }
+
+  /* At the heart of the screen-to-life loop, exactly where the paper sun sits without it. */
+  .cms-art--round {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 29%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    translate: -50% -50%;
   }
 
   /* ---------- Grounds and accents: the CMS section theme picks the paper and the ink ---------- */
@@ -105,7 +164,7 @@
     display: inline-block;
     padding: 0.2rem 0.7rem;
     border: 2px solid currentColor;
-    border-radius: 0.5rem;
+    border-radius: var(--bibo-radius-soft);
     color: var(--accent-ink, var(--bibo-color-navy));
     font-family: var(--bibo-font-display);
     font-size: var(--bibo-text-small);
@@ -281,6 +340,16 @@
     border-radius: var(--bibo-radius-soft);
   }
 
+  /* The logo is a die-cut sticker: on a desktop it sits a little low and laps over the header's edge. */
+  @media (min-width: 64rem) {
+    .site-header__home {
+      position: relative;
+      z-index: 1;
+      align-self: flex-start;
+      margin-block-start: 0.5rem;
+    }
+  }
+
   .nav-link {
     display: inline-flex;
     align-items: center;
@@ -375,6 +444,18 @@
 
   /* ---------- Hero ---------- */
 
+  /*
+   * The opening headline: five words on two lines on a desktop screen (balanced, so neither line is
+   * a stub), at most 72px. Smaller than the section display size so the promise, both CTAs and the
+   * Bay postcard share the first viewport.
+   */
+  .hero-title {
+    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
   .hero-postcard {
     position: relative;
     margin: 0;
@@ -424,34 +505,23 @@
     );
   }
 
+  /* Four short principles as a quiet two-by-two set of type: the tape band is the decoration, so no bullets. */
+  .trust-list {
+    display: grid;
+    gap: 0.6rem 2.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    .trust-list {
+      grid-template-columns: repeat(2, max-content);
+    }
+  }
+
   .trust-list__item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
     font-family: var(--bibo-font-display);
     font-size: 1.125rem;
     font-weight: 500;
-  }
-
-  .trust-list__item::before {
-    flex: none;
-    inline-size: 0.7rem;
-    block-size: 0.7rem;
-    border-radius: 50%;
-    background-color: var(--bibo-color-teal);
-    content: "";
-  }
-
-  .trust-list__item:nth-child(4n + 2)::before {
-    background-color: var(--bibo-color-orange);
-  }
-
-  .trust-list__item:nth-child(4n + 3)::before {
-    background-color: var(--bibo-color-purple);
-  }
-
-  .trust-list__item:nth-child(4n + 4)::before {
-    background-color: var(--bibo-color-seagrass);
+    line-height: 1.3;
   }
 
   /* ---------- Promise ---------- */
@@ -576,7 +646,7 @@
   .friend-tab__status {
     padding: 0.05rem 0.55rem;
     border: 1.5px solid currentColor;
-    border-radius: 0.4rem;
+    border-radius: var(--bibo-radius-pill);
     color: var(--accent-ink, var(--bibo-color-navy));
     font-size: var(--bibo-text-small);
     font-weight: 600;
@@ -660,7 +730,7 @@
     gap: 0.45rem;
     min-block-size: 2.75rem;
     padding: 1rem 1.15rem 1.1rem;
-    border-radius: var(--bibo-radius-paper) var(--bibo-radius-paper) 0.4rem 0.4rem;
+    border-radius: var(--bibo-radius-paper) var(--bibo-radius-paper) var(--bibo-radius-soft) var(--bibo-radius-soft);
     background-color: color-mix(in srgb, var(--accent, var(--bibo-color-purple)) 10%, var(--bibo-color-paper));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bibo-color-navy) 10%, transparent);
     color: var(--bibo-color-navy);
@@ -692,6 +762,50 @@
     color: var(--accent-ink, var(--bibo-color-navy));
     font-size: var(--bibo-text-small);
     font-weight: 600;
+  }
+
+  /*
+   * Which story concept is open (ruling R22): a row of paper bookmark ticks, one per concept. Read
+   * ones are tinted, the open one is inked and stands taller, the rest are outlined paper. There is
+   * no track behind them and nothing fills over time; they change only when a tab is chosen, with a
+   * short ease that the reduced-motion tokens collapse to nothing.
+   */
+  .story-progress {
+    margin-block-start: 1.5rem;
+  }
+
+  .story-progress__stops {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.4rem;
+    block-size: 0.875rem;
+  }
+
+  .story-progress__stop {
+    inline-size: 2.25rem;
+    block-size: 0.5rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--bibo-color-navy) 28%, transparent);
+    transform-origin: bottom;
+    transition-property: background-color, box-shadow, scale;
+    transition-duration: var(--bibo-duration-base);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .story-progress__stop[data-state="past"] {
+    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-purple)) 45%, var(--bibo-color-paper));
+    box-shadow: none;
+  }
+
+  .story-progress__stop[data-state="current"] {
+    background-color: var(--accent-ink, var(--bibo-color-navy));
+    box-shadow: none;
+    scale: 1 1.75;
+  }
+
+  .story-progress ~ .storybook {
+    margin-block-start: 1rem;
   }
 
   .storybook {
@@ -833,46 +947,56 @@
     border-block-end: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
   }
 
-  .pillar__title {
+  .pillar__head {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
+    gap: 1rem;
+  }
+
+  .pillar__title {
     font-family: var(--bibo-font-display);
     font-size: clamp(2rem, 1.3rem + 3vw, 3.75rem);
     font-weight: 600;
-    line-height: 1.02;
+    line-height: 1.08;
     letter-spacing: -0.015em;
   }
 
-  .pillar__title::before {
-    flex: none;
-    inline-size: 0.5em;
-    block-size: 0.5em;
-    border-radius: 58% 42% 52% 48% / 48% 58% 42% 52%;
-    background-color: var(--bibo-color-teal);
-    box-shadow: 0.06em 0.09em 0 rgb(19 41 75 / 0.12);
-    content: "";
-    rotate: -12deg;
+  /*
+   * Each value is marked by a strip of coloured paper tape laid under the lower half of its words
+   * (the page's tape motif, not a bullet dot); a long value carries the tape onto every line.
+   */
+  .pillar__ink {
+    --pillar-tape: var(--bibo-color-teal);
+    padding-inline: 0.08em;
+    background-image: linear-gradient(
+      to top,
+      transparent 0.06em,
+      color-mix(in srgb, var(--pillar-tape) 40%, transparent) 0.06em,
+      color-mix(in srgb, var(--pillar-tape) 40%, transparent) 0.44em,
+      transparent 0.44em
+    );
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
-  .pillar:nth-child(6n + 2) .pillar__title::before {
-    background-color: var(--bibo-color-yellow);
+  .pillar:nth-child(6n + 2) .pillar__ink {
+    --pillar-tape: var(--bibo-color-yellow);
   }
 
-  .pillar:nth-child(6n + 3) .pillar__title::before {
-    background-color: var(--bibo-color-orange);
+  .pillar:nth-child(6n + 3) .pillar__ink {
+    --pillar-tape: var(--bibo-color-orange);
   }
 
-  .pillar:nth-child(6n + 4) .pillar__title::before {
-    background-color: var(--bibo-color-purple);
+  .pillar:nth-child(6n + 4) .pillar__ink {
+    --pillar-tape: var(--bibo-color-purple);
   }
 
-  .pillar:nth-child(6n + 5) .pillar__title::before {
-    background-color: var(--bibo-color-ocean);
+  .pillar:nth-child(6n + 5) .pillar__ink {
+    --pillar-tape: var(--bibo-color-ocean);
   }
 
-  .pillar:nth-child(6n + 6) .pillar__title::before {
-    background-color: var(--bibo-color-seagrass);
+  .pillar:nth-child(6n + 6) .pillar__ink {
+    --pillar-tape: var(--bibo-color-seagrass);
   }
 
   .pillar:nth-child(3n + 2) {
@@ -931,6 +1055,14 @@
   .eco-entry {
     padding-block: 1.25rem 1.4rem;
     border-block-start: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  /* An entry with approved art: its small print beside the name and lines. */
+  .eco-entry[data-art] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
   }
 
   .eco-entry__line {
@@ -1107,6 +1239,12 @@
     margin-block-start: clamp(1rem, 0.5rem + 2vw, 2.5rem);
   }
 
+  /* An editor's closing panorama fills the same wide frame; a phone keeps a taller crop of it. */
+  .final-bay--art {
+    overflow: hidden;
+    min-block-size: 14rem;
+  }
+
   .site-footer {
     --footer-ink-soft: color-mix(in srgb, var(--bibo-color-cream) 80%, var(--bibo-color-navy));
     background-color: var(--bibo-color-navy);
@@ -1128,4 +1266,13 @@
   .footer-link:hover {
     text-decoration-color: var(--bibo-color-yellow);
   }
+}
+
+/*
+ * Two sections in a row on the same plain paper read as one sheet: the second needs only half a
+ * section's space above it, or the seam becomes an empty band (FAQ into the closing invitation).
+ * The trust band keeps its own tight spacing. Unlayered, so it outranks the sections' padding utilities.
+ */
+.landing-section[data-ground="paper"] + .landing-section[data-ground="paper"]:not([data-section="trust"]) {
+  padding-block-start: calc(var(--bibo-space-section) / 2);
 }

@@ -1,5 +1,7 @@
 import type { FaqItem, SectionConfig, SectionIntro } from "@/lib/content/types";
+import { CmsArt } from "./CmsArt";
 import { SectionShell, Tape } from "./SectionShell";
+import type { StageArt } from "./sections";
 
 /** A cut-paper plus that turns into a cross while its answer is open. */
 function ToggleMark() {
@@ -14,13 +16,15 @@ export interface FaqProps {
   section: SectionConfig;
   intro: SectionIntro;
   faqs: FaqItem[];
+  /** The section's own CMS image: a paper print under the sticky heading. */
+  introArt?: StageArt;
 }
 
 /**
  * Questions as native disclosures: the browser owns the expanded state, so it is always exposed
  * correctly, and every answer is in the server HTML and opens without JavaScript.
  */
-export function Faq({ section, intro, faqs }: FaqProps) {
+export function Faq({ section, intro, faqs, introArt }: FaqProps) {
   return (
     <SectionShell section={section} headingId="faq-heading" className="py-section">
       <div className="landing-container grid gap-x-12 gap-y-10 lg:grid-cols-12">
@@ -30,6 +34,7 @@ export function Faq({ section, intro, faqs }: FaqProps) {
             {intro.heading}
           </h2>
           {intro.description ? <p className="mt-4 max-w-[36ch] text-(--ink-soft)">{intro.description}</p> : null}
+          {introArt ? <CmsArt frame="print" art={introArt} sizes="(min-width: 64rem) 16rem, 70vw" className="mt-8 max-w-[16rem]" /> : null}
         </div>
         <div className="faq-list lg:col-span-7 lg:col-start-6">
           {faqs.map((faq, index) => (

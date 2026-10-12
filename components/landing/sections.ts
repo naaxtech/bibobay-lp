@@ -1,4 +1,4 @@
-import type { Cta, LandingPageContent, SectionConfig, SectionId, SectionTheme, SiteSettings, Testimonial } from "@/lib/content/types";
+import type { Cta, ImageWithAlt, LandingPageContent, SectionConfig, SectionId, SectionTheme, SiteSettings, Testimonial } from "@/lib/content/types";
 
 /** The paper and accent each section is printed on unless its CMS theme says otherwise. */
 const DEFAULT_SECTION_THEMES: Record<SectionId, Required<SectionTheme>> = {
@@ -67,6 +67,26 @@ export function renderableSections(content: LandingPageContent, settings: SiteSe
 export interface StageArt {
   src: string;
   alt: string;
+  /**
+   * CSS object-position that keeps the editor's hotspot in view when the frame crops the image
+   * (`"75% 33.33%"`). Absent without a hotspot: the image stays centred.
+   */
+  position?: string;
+}
+
+const share = (value: number) => `${Number((Math.min(1, Math.max(0, value)) * 100).toFixed(2))}%`;
+
+/**
+ * Where the editor's hotspot sits inside the delivered image, as a CSS object-position. The URL
+ * already carries the editor's crop, so the hotspot is measured within the cropped area.
+ */
+export function artPosition(image: ImageWithAlt): string | undefined {
+  const { hotspot } = image;
+  if (hotspot?.x === undefined || hotspot.y === undefined) return undefined;
+  const { left = 0, right = 0, top = 0, bottom = 0 } = image.crop ?? {};
+  const x = (hotspot.x - left) / (1 - left - right);
+  const y = (hotspot.y - top) / (1 - top - bottom);
+  return `${share(x)} ${share(y)}`;
 }
 
 /** Where links on this page may lead. */

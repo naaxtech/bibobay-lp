@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import type { CSSProperties } from "react";
 
 import type { Character, SectionConfig, SectionIntro } from "@/lib/content/types";
+import { ArtImage, CmsArt } from "./CmsArt";
 import { PaperMood, moodAccent } from "./PaperMood";
 import { PaperEdge, SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
@@ -23,7 +23,7 @@ function FriendStage({ friend, index, art, panelProps }: { friend: Character; in
     <div {...panelProps} className="friend-stage" style={accentStyle(accent)}>
       <div className="friend-stage__art">
         {art ? (
-          <Image src={art.src} alt={art.alt} fill sizes="(min-width: 64rem) 30rem, 100vw" unoptimized className="object-cover" />
+          <ArtImage art={art} sizes="(min-width: 64rem) 30rem, (min-width: 48rem) 45vw, 100vw" />
         ) : (
           <PaperMood variant={index} accent={accent} />
         )}
@@ -65,27 +65,32 @@ export interface CharactersProps {
   characters: Character[];
   /** Approved Sanity artwork by character id; a friend without it keeps an abstract placeholder. */
   art: Readonly<Record<string, StageArt>>;
+  /** The section's own CMS image: a paper print beside the heading. */
+  introArt?: StageArt;
 }
 
 /**
  * Meet the Bay friends: one friend at a time on a large paper stage, chosen from six named tabs.
- * Every friend is labelled with role and concept status; no pretend character art.
+ * Every friend is labelled with role and concept status; no pretend character art. The heading
+ * and its line of context read as one stacked block; the right of the header is the section's
+ * own art when the CMS has some.
  */
-export function Characters({ section, intro, characters, art }: CharactersProps) {
+export function Characters({ section, intro, characters, art, introArt }: CharactersProps) {
   const tabs = useRovingTabs(characters.length);
   return (
     <SectionShell section={section} headingId="characters-heading" className="relative pb-section pt-16 sm:pt-24">
       <PaperEdge />
       <div className="landing-container">
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
+        <div className="grid gap-8 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
             {intro.eyebrow ? <Tape>{intro.eyebrow}</Tape> : null}
             <h2 id="characters-heading" className="mt-4 max-w-[16ch] font-display text-h1 font-semibold">
               {intro.heading}
             </h2>
+            {intro.description ? <p className="mt-5 max-w-[46ch] text-lead text-(--ink-soft)">{intro.description}</p> : null}
           </div>
-          {intro.description ? (
-            <p className="max-w-[40ch] text-lead text-(--ink-soft) lg:col-span-4 lg:col-start-9">{intro.description}</p>
+          {introArt ? (
+            <CmsArt frame="print" art={introArt} sizes="(min-width: 64rem) 22rem, 90vw" className="max-w-[22rem] lg:col-span-4 lg:col-start-9" />
           ) : null}
         </div>
         <div className="mt-10 grid gap-6 lg:mt-14 lg:grid-cols-12 lg:gap-8">

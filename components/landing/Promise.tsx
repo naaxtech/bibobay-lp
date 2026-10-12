@@ -1,7 +1,9 @@
 import { brandTokens } from "@/lib/brand/tokens";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
+import { CmsArt } from "./CmsArt";
 import { PortableText } from "./PortableText";
 import { SectionShell, Tape } from "./SectionShell";
+import type { StageArt } from "./sections";
 
 const { color } = brandTokens;
 
@@ -37,13 +39,15 @@ function SunRays() {
 export interface PromiseProps {
   section: SectionConfig;
   promise: LandingPageContent["promise"];
+  /** The section's CMS image: a paper print pinned beneath the pull quote. */
+  art?: StageArt;
 }
 
 /**
  * The promise as a large pull quote beside a short philosophy, signed with the brand idea.
  * (Named PromiseSection so it never shadows the global Promise where it is imported.)
  */
-export function PromiseSection({ section, promise }: PromiseProps) {
+export function PromiseSection({ section, promise, art }: PromiseProps) {
   return (
     <SectionShell section={section} headingId="promise-heading" className="py-section">
       <div className="landing-container grid gap-x-10 gap-y-10 lg:grid-cols-12">
@@ -53,6 +57,7 @@ export function PromiseSection({ section, promise }: PromiseProps) {
           <h2 id="promise-heading" className="relative max-w-[13ch] font-display text-h1 font-semibold">
             {promise.heading}
           </h2>
+          {art ? <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 22rem, 90vw" className="mt-10 max-w-[22rem]" /> : null}
         </div>
         <div className="lg:col-span-5 lg:pt-28">
           {promise.description ? <p className="max-w-[44ch] text-lead">{promise.description}</p> : null}

@@ -25,6 +25,8 @@ export const UI_COPY = {
   themes: "Themes",
   tryTogether: "Try together",
   watchStory: "Watch the story",
+  /** Which story concept of how many is open (read by assistive technology with the open story). */
+  storyPosition: (current: number, total: number) => `${current} of ${total}`,
   socialPlatforms: {
     instagram: "Instagram",
     youtube: "YouTube",
