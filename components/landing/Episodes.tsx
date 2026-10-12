@@ -144,17 +144,20 @@ export function Episodes({ section, intro, episodes, art, introArt }: EpisodesPr
           ))}
         </div>
         {showProgress ? <StoryProgress count={episodes.length} selected={tabs.selected} countId={countId} /> : null}
-        {episodes.map((story, index) => (
-          <Storybook
-            key={story.id}
-            story={story}
-            index={index}
-            art={art[story.id]}
-            conceptLabel={intro.conceptLabel}
-            panelProps={tabs.panelProps(index)}
-            describedBy={showProgress && index === tabs.selected ? countId : undefined}
-          />
-        ))}
+        {/* Every storybook shares one spread, so the section keeps its height whichever is open. */}
+        <div className="storybooks">
+          {episodes.map((story, index) => (
+            <Storybook
+              key={story.id}
+              story={story}
+              index={index}
+              art={art[story.id]}
+              conceptLabel={intro.conceptLabel}
+              panelProps={tabs.panelProps(index)}
+              describedBy={showProgress && index === tabs.selected ? countId : undefined}
+            />
+          ))}
+        </div>
       </div>
     </SectionShell>
   );

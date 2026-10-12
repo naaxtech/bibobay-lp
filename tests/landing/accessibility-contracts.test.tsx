@@ -115,7 +115,7 @@ describe("character selector", () => {
       const panel = document.getElementById(tab.getAttribute("aria-controls") ?? "");
       expect(panel?.getAttribute("role")).toBe("tabpanel");
       expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
-      expect(panel?.hidden).toBe(index !== 0);
+      expect(panel?.hasAttribute("inert"), "only the chosen friend can be reached").toBe(index !== 0);
     });
     expect(visiblePanelHeading("characters")).toBe("Ollie the Sea Otter");
     expect(within(within(section("characters")).getByRole("tabpanel")).getByText("Concept")).toBeTruthy();
@@ -200,6 +200,44 @@ describe("story concept selector", () => {
     expect(within(panel).queryByRole("button")).toBeNull();
     expect(panel.querySelector("video, audio")).toBeNull();
     expect(panel.textContent).toContain("Story concept");
+  });
+});
+
+/*
+ * Spec §7 "no layout jump": every panel of a selector stays laid out (the stage is as tall as its
+ * tallest panel), so choosing another one cannot change the page's height. Only the chosen panel is
+ * shown, reachable from the keyboard or announced; the rest are inert and hidden from assistive
+ * technology, which is what the `hidden` attribute used to do while also taking them out of layout.
+ */
+describe("tab panels of both selectors", () => {
+  const panelsOf = (id: SectionId) => Array.from(section(id).querySelectorAll<HTMLElement>("[role='tabpanel']"));
+
+  it.each(["characters", "episodes"] as const)("%s: keeps every panel laid out and exposes only the chosen one", (id) => {
+    renderPage();
+    const tabs = within(section(id)).getAllByRole("tab");
+    const expectChosen = (selected: number) => {
+      const panels = panelsOf(id);
+      expect(panels).toHaveLength(tabs.length);
+      panels.forEach((panel, index) => {
+        const chosen = index === selected;
+        const which = `${id} panel ${index + 1} with tab ${selected + 1} chosen`;
+        expect(panel.hidden, `${which}: stays in the layout`).toBe(false);
+        expect(panel.hasAttribute("inert"), `${which}: inert`).toBe(!chosen);
+        expect(panel.getAttribute("aria-hidden"), `${which}: aria-hidden`).toBe(chosen ? null : "true");
+        expect(panel.tabIndex, `${which}: tab stop`).toBe(chosen ? 0 : -1);
+        expect(panel.querySelector("h3")?.textContent, `${which}: content is rendered`).toBeTruthy();
+      });
+      expect(within(section(id)).getAllByRole("tabpanel"), "assistive technology sees the chosen panel only").toEqual([panels[selected]]);
+    };
+
+    expectChosen(0);
+    fireEvent.click(tabs[2]!);
+    expectChosen(2);
+    tabs[2]!.focus();
+    fireEvent.keyDown(tabs[2]!, { key: "ArrowLeft" });
+    expectChosen(1);
+    fireEvent.keyDown(tabs[1]!, { key: "Home" });
+    expectChosen(0);
   });
 });
 

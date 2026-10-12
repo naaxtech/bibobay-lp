@@ -23,46 +23,82 @@ async function openLanding(page: Page) {
 
 const section = (page: Page, id: string) => page.locator(`section#${id}`);
 
-/** The tab list's height and the page's scroll height must not change when the selection does. */
-async function geometry(tablistSection: Locator) {
-  return tablistSection.evaluate((root) => ({
-    sectionHeight: Math.round(root.getBoundingClientRect().height),
-    pageHeight: document.documentElement.scrollHeight,
-  }));
+/**
+ * The layout around a tab selector (spec §7 "no layout jump"): how tall the selector's own section
+ * is, where the section after it starts on the page, and how long the page is. Positions are in
+ * page coordinates, so a scroll caused by clicking or focusing a tab does not count as a move.
+ * Rounded to 1/100 px only to absorb floating-point noise; any real move is far larger.
+ */
+async function layoutAround(selectorSection: Locator) {
+  return selectorSection.evaluate((root) => {
+    const sections = Array.from(document.querySelectorAll("[data-section]"));
+    const next = sections[sections.indexOf(root) + 1];
+    if (!next) throw new Error(`no section follows #${root.id}`);
+    const exact = (value: number) => Math.round(value * 100) / 100;
+    return {
+      sectionHeight: exact(root.getBoundingClientRect().height),
+      nextSectionTop: exact(next.getBoundingClientRect().top + window.scrollY),
+      pageHeight: document.documentElement.scrollHeight,
+    };
+  });
 }
 
-async function expectTabsDriveTheStage(page: Page, id: "characters" | "episodes") {
+/** Inline motion styles (GSAP's opacity, transform, visibility) left anywhere among the section's tab panels. */
+const panelMotionStyles = (selectorSection: Locator) =>
+  selectorSection.evaluate((root) =>
+    Array.from(root.querySelectorAll("[role='tabpanel'], [role='tabpanel'] *")).filter((node) => /opacity|transform|translate|visibility/.test(node.getAttribute("style") ?? "")).length,
+  );
+
+/**
+ * Walks every tab of a selector, first by click and then by keyboard, and after each switch checks
+ * that the chosen panel is the only one exposed, and that the layout around the selector is exactly
+ * what it was before the first switch: at once (mid-transition) and again once the transition settles.
+ */
+async function expectSwitchesKeepTheLayout(page: Page, id: "characters" | "episodes") {
   const root = section(page, id);
   const tabs = root.getByRole("tab");
   const panel = root.getByRole("tabpanel");
+  const count = await tabs.count();
+  expect(count, "a selector needs at least two tabs to switch between").toBeGreaterThan(1);
+  // Web fonts change line wrapping; measure only once they are in, so a late font is not a "jump".
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await root.scrollIntoViewIfNeeded();
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-  const firstHeading = await panel.getByRole("heading", { level: 3 }).textContent();
-  const before = await geometry(root);
+  const before = await layoutAround(root);
+  const headings = new Set([await panel.getByRole("heading", { level: 3 }).textContent()]);
 
-  await tabs.nth(1).click();
-  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
-  await expect(panel).toHaveCount(1);
-  const secondHeading = await panel.getByRole("heading", { level: 3 }).textContent();
-  expect(secondHeading).not.toBe(firstHeading);
-  await expect(panel).toHaveAttribute("aria-labelledby", (await tabs.nth(1).getAttribute("id")) ?? "");
+  const expectSwitchedTo = async (index: number, how: string) => {
+    const step = `${id}: ${how} to tab ${index + 1}`;
+    await expect(tabs.nth(index), step).toHaveAttribute("aria-selected", "true");
+    await expect(tabs.nth(index), step).toBeFocused();
+    await expect(panel, `${step}: only the chosen panel is exposed`).toHaveCount(1);
+    await expect(panel, step).toHaveAttribute("aria-labelledby", (await tabs.nth(index).getAttribute("id")) ?? "");
+    expect(await layoutAround(root), `${step}: layout straight after the switch`).toEqual(before);
+    await expect.poll(() => panelMotionStyles(root), `${step}: the transition settles`).toBe(0);
+    expect(await layoutAround(root), `${step}: layout once the transition has settled`).toEqual(before);
+    headings.add(await panel.getByRole("heading", { level: 3 }).textContent());
+  };
 
-  await page.keyboard.press("ArrowRight");
-  await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
-  await expect(tabs.nth(2)).toBeFocused();
-  await page.keyboard.press("ArrowLeft");
-  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  // By click: every tab in turn.
+  for (let index = 1; index < count; index += 1) {
+    await tabs.nth(index).click();
+    await expectSwitchedTo(index, "click");
+  }
+  // By keyboard, from the last tab: Home, every tab with ArrowRight, wrap round, End, ArrowLeft.
   await page.keyboard.press("Home");
-  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByRole("heading", { level: 3 })).toHaveText(firstHeading ?? "");
+  await expectSwitchedTo(0, "Home");
+  for (let index = 1; index < count; index += 1) {
+    await page.keyboard.press("ArrowRight");
+    await expectSwitchedTo(index, "ArrowRight");
+  }
+  await page.keyboard.press("ArrowRight");
+  await expectSwitchedTo(0, "ArrowRight (wrapping)");
+  await page.keyboard.press("End");
+  await expectSwitchedTo(count - 1, "End");
+  await page.keyboard.press("ArrowLeft");
+  await expectSwitchedTo(count - 2, "ArrowLeft");
 
-  // Every transition has finished and nothing moved the layout around it. CSS transitions show in
-  // getAnimations(); GSAP tweens do not, but leave inline opacity/transform until they finish and clear.
-  await expect.poll(() => panel.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(0);
-  await expect
-    .poll(() => panel.evaluate((element) => [element, ...element.querySelectorAll("*")].filter((node) => /opacity|transform/.test(node.getAttribute("style") ?? "")).length))
-    .toBe(0);
-  await expect.poll(() => geometry(root)).toEqual(before);
+  expect(headings.size, "every tab showed its own panel").toBe(count);
   await expect(panel).toBeVisible();
   expect(await panel.evaluate((element) => getComputedStyle(element).opacity)).toBe("1");
 }
@@ -71,17 +107,17 @@ for (const { name, use } of VIEWPORTS) {
   test.describe(`landing interactions on ${name}`, () => {
     test.use(use);
 
-    test("friend tabs change the stage by click and arrow keys without a layout jump", async ({ page }) => {
+    test("switching friends by click or keyboard never moves the section's height or what follows it", async ({ page }) => {
       const problems = collectProblems(page);
       await openLanding(page);
-      await expectTabsDriveTheStage(page, "characters");
+      await expectSwitchesKeepTheLayout(page, "characters");
       expect(problems).toEqual([]);
     });
 
-    test("story tabs change the open storybook by click and arrow keys without a layout jump", async ({ page }) => {
+    test("switching stories by click or keyboard never moves the section's height or what follows it", async ({ page }) => {
       const problems = collectProblems(page);
       await openLanding(page);
-      await expectTabsDriveTheStage(page, "episodes");
+      await expectSwitchesKeepTheLayout(page, "episodes");
       expect(problems).toEqual([]);
     });
 
@@ -154,6 +190,40 @@ for (const { name, use } of VIEWPORTS) {
     test.describe("with reduced motion", () => {
       test.use({ reducedMotion: "reduce" });
 
+      for (const id of ["characters", "episodes"] as const) {
+        test(`${id}: a switch shows the chosen panel in the same frame, with nothing easing in or out`, async ({ page }) => {
+          const problems = collectProblems(page);
+          await openLanding(page);
+          await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
+          const root = section(page, id);
+          await root.scrollIntoViewIfNeeded();
+          const before = await layoutAround(root);
+          const count = await root.getByRole("tab").count();
+          for (const index of [...Array.from({ length: count }, (_, step) => step).slice(1), 0]) {
+            // Click and read back inside one task: no frame can render in between, so whatever
+            // the reader would see first is exactly what is measured here.
+            const seen = await root.evaluate(async (element, chosen) => {
+              element.querySelectorAll<HTMLElement>("[role='tab']")[chosen]!.click();
+              for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+              return Array.from(element.querySelectorAll<HTMLElement>("[role='tabpanel']")).map((panel) => {
+                const parts = [panel, ...Array.from(panel.querySelectorAll<HTMLElement>("*"))];
+                return {
+                  reachable: !panel.hasAttribute("inert"),
+                  shown: getComputedStyle(panel).visibility,
+                  partsShown: parts.every((part) => getComputedStyle(part).visibility === getComputedStyle(panel).visibility),
+                  easing: parts.flatMap((part) => part.getAnimations()).length,
+                };
+              });
+            }, index);
+            expect(seen, `${id}: tab ${index + 1}`).toEqual(
+              seen.map((_, panel) => ({ reachable: panel === index, shown: panel === index ? "visible" : "hidden", partsShown: true, easing: 0 })),
+            );
+            expect(await layoutAround(root), `${id}: tab ${index + 1}`).toEqual(before);
+          }
+          expect(problems).toEqual([]);
+        });
+      }
+
       test("every section stays visible and unmoved after a full scroll, and nothing animates", async ({ page }) => {
         const problems = collectProblems(page);
         await openLanding(page);
@@ -172,7 +242,8 @@ for (const { name, use } of VIEWPORTS) {
           const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
           for (const root of sections) {
             for (const element of [root, ...Array.from(root.querySelectorAll<HTMLElement | SVGElement>("*"))]) {
-              if (element.closest("[hidden]")) continue;
+              // An unchosen tab panel is meant to be unseen (inert, aria-hidden, visibility:hidden).
+              if (element.closest("[hidden], [role='tabpanel'][inert]")) continue;
               const style = getComputedStyle(element);
               const inline = element.getAttribute("style") ?? "";
               if (style.opacity === "0" || style.visibility === "hidden") offenders.push(`hidden: ${element.outerHTML.slice(0, 60)}`);

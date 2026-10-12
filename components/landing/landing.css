@@ -653,18 +653,68 @@
     line-height: 1.3;
   }
 
+  /*
+   * Tab panels (friend stages, storybooks) all share one grid cell, so the selector is always as
+   * tall as its tallest panel and choosing another never moves anything below it (spec §7 "no layout
+   * jump"). Unchosen panels stay laid out but unpainted; useRovingTabs makes them inert and
+   * aria-hidden, so only the chosen one can be seen, reached or announced. They sit above the chosen
+   * panel, so the one just left can fade out over it (the motion layer holds it visible meanwhile);
+   * hidden or inert, they never catch a pointer.
+   */
+  .friend-stages,
+  .storybooks {
+    display: grid;
+  }
+
+  .friend-stages > [role="tabpanel"],
+  .storybooks > [role="tabpanel"] {
+    grid-area: 1 / 1;
+  }
+
+  .friend-stage[inert],
+  .storybook[inert] {
+    z-index: 1;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /*
+   * Kept from before panels stayed laid out: a panel given the `hidden` attribute instead (a future
+   * selector that does not need a steady height, or a no-JS fallback) still leaves the layout entirely.
+   */
+  .friend-stage[hidden],
+  .storybook[hidden] {
+    display: none;
+  }
+
+  /*
+   * Under reduced motion a switch is instant. The global reduced-motion rule (globals.css) turns every
+   * style change into a 0.01 ms transition, and a visibility transition paints its starting value for
+   * the frame it starts in: the panel left behind would show for one more frame and the chosen one
+   * would not. Panels and everything in them therefore change with no transition at all.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .friend-stages > [role="tabpanel"],
+    .friend-stages > [role="tabpanel"] *,
+    .friend-stages > [role="tabpanel"] *::before,
+    .friend-stages > [role="tabpanel"] *::after,
+    .storybooks > [role="tabpanel"],
+    .storybooks > [role="tabpanel"] *,
+    .storybooks > [role="tabpanel"] *::before,
+    .storybooks > [role="tabpanel"] *::after {
+      transition-property: none;
+    }
+  }
+
   .friend-stage {
     display: grid;
+    /* On a phone the art keeps its shape; a panel stretched to the tallest friend grows its text side. */
+    grid-template-rows: auto 1fr;
     overflow: hidden;
     border-radius: var(--bibo-radius-sticker);
     background-color: var(--bibo-color-paper);
     color: var(--bibo-color-navy);
     box-shadow: var(--bibo-shadow-lifted);
-  }
-
-  .friend-stage[hidden],
-  .storybook[hidden] {
-    display: none;
   }
 
   .friend-stage__art {
@@ -702,6 +752,7 @@
   @media (min-width: 48rem) {
     .friend-stage {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      grid-template-rows: none;
       min-block-size: 30rem;
     }
 
@@ -804,12 +855,15 @@
     scale: 1 1.75;
   }
 
-  .story-progress ~ .storybook {
+  /* The storybooks share one spread (see "Tab panels" above), so the gap is set on each of them. */
+  .story-progress ~ .storybooks > .storybook {
     margin-block-start: 1rem;
   }
 
   .storybook {
     display: grid;
+    /* On a phone the cover keeps its shape; a book stretched to the longest story grows its page. */
+    grid-template-rows: auto 1fr;
     overflow: hidden;
     margin-block-start: 1.5rem;
     border-radius: var(--bibo-radius-sticker);
@@ -864,6 +918,7 @@
 
     .storybook {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: none;
     }
 
     .storybook__cover {

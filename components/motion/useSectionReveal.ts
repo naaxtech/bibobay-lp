@@ -51,6 +51,18 @@ const LOOP_SECONDS = 1.6;
 const LOOP_MARK_SECONDS = 0.35;
 const STAGE = { y: 14, duration: 0.32, stagger: 0.07 } as const;
 const MOTION_PROPS = "opacity,transform";
+/** The panel left behind is held visible only while it fades; clearing both hands it back to the stylesheet. */
+const STAGE_LEAVE_PROPS = "opacity,visibility";
+/**
+ * How a tab panel is put out of reach: `inert` (useRovingTabs; the panel stays laid out), or
+ * `hidden` (the panel leaves the layout). Both are watched, so either way of hiding a panel animates.
+ */
+const PANEL_TOGGLES = ["inert", "hidden"] as const;
+/** Out of reach and unseen: an unchosen tab panel, decoration, or anything else hidden from the reader. */
+const UNSEEN = "[aria-hidden='true'], [hidden], [inert]";
+
+/** A tab panel that is no longer the chosen one (read from the attributes, which every DOM reflects). */
+const isLeftBehind = (panel: HTMLElement) => panel.hasAttribute("inert") || panel.hidden;
 
 type ContextSafe = <T extends (...args: never[]) => unknown>(func: T) => T;
 
@@ -62,7 +74,7 @@ const percent = (share: number) => `${Math.round(share * 100)}%`;
 /** Outermost readable blocks in the section, skipping decoration and panels that are not shown. */
 function revealBlocks(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(REVEAL_BLOCKS)).filter((element) => {
-    if (element.closest("[aria-hidden='true'], [hidden]")) return false;
+    if (element.closest(UNSEEN)) return false;
     const outer = element.parentElement?.closest(REVEAL_BLOCKS);
     return !outer || !root.contains(outer);
   });
@@ -76,7 +88,8 @@ function revealBlocks(root: HTMLElement): HTMLElement[] {
 function revealOnScroll(root: HTMLElement, contextSafe: ContextSafe, isActive: () => boolean) {
   let entering: HTMLElement[] = [];
   const flush = contextSafe(() => {
-    const blocks = entering.filter((block) => topOnScreen(block) >= ARRIVED_BY_JUMP);
+    // A panel the reader has since switched away from is not revealed; the stage transition owns it.
+    const blocks = entering.filter((block) => topOnScreen(block) >= ARRIVED_BY_JUMP && !block.closest(UNSEEN));
     entering = [];
     if (!isActive() || blocks.length === 0) return;
     gsap.from(blocks, { opacity: 0, y: REVEAL.y, duration: REVEAL.duration, stagger: REVEAL.stagger, ease: "power2.out", clearProps: MOTION_PROPS });
@@ -161,27 +174,40 @@ function drawLoop(root: HTMLElement, contextSafe: ContextSafe, isActive: () => b
 }
 
 /**
- * Tab stages (the friend stage, the storybook) bring the chosen panel's parts in with a short fade
- * and rise. The stage itself stays put, so the layout never jumps; the outgoing panel just closes.
+ * Tab stages (the friend stage, the storybook) crossfade. Every panel shares one grid cell (see
+ * landing.css), so the stage keeps its size and the layout never jumps. The panel left behind is
+ * held on screen and fades out above the chosen one; the chosen panel's paper stays solid beneath it
+ * while its parts come in with a short fade and rise. Opacity and transform only; nothing is left
+ * inline once a transition ends, so the stylesheet hides the panel left behind again.
  */
 function transitionStages(root: HTMLElement, contextSafe: ContextSafe, isActive: () => boolean) {
   const panels = Array.from(root.querySelectorAll<HTMLElement>("[role='tabpanel']"));
   if (panels.length < 2) return;
-  const finish = (parts: Element[]) => {
-    for (const tween of gsap.getTweensOf(parts)) tween.progress(1);
+  /** Jumps a panel's running transition to its end, so switching quickly never stacks fades. */
+  const finish = (panel: HTMLElement) => {
+    for (const tween of gsap.getTweensOf([panel, ...Array.from(panel.children)])) tween.progress(1);
   };
   const onToggle = contextSafe((records: MutationRecord[]) => {
     if (!isActive()) return;
-    for (const { target } of records) {
+    // One transition per panel, however many of its toggles changed in the same commit.
+    for (const target of new Set(records.map((record) => record.target))) {
       if (!(target instanceof HTMLElement)) continue;
+      finish(target);
+      if (isLeftBehind(target)) {
+        gsap.fromTo(
+          target,
+          { opacity: 1, visibility: "visible" },
+          { opacity: 0, duration: STAGE.duration, ease: "power1.out", clearProps: STAGE_LEAVE_PROPS },
+        );
+        continue;
+      }
       const parts = Array.from(target.children);
-      finish(parts);
-      if (target.hidden || parts.length === 0) continue;
+      if (parts.length === 0) continue;
       gsap.from(parts, { opacity: 0, y: STAGE.y, duration: STAGE.duration, stagger: STAGE.stagger, ease: "power2.out", clearProps: MOTION_PROPS });
     }
   });
   const observer = new MutationObserver(onToggle);
-  for (const panel of panels) observer.observe(panel, { attributes: true, attributeFilter: ["hidden"] });
+  for (const panel of panels) observer.observe(panel, { attributes: true, attributeFilter: [...PANEL_TOGGLES] });
   return () => observer.disconnect();
 }
 

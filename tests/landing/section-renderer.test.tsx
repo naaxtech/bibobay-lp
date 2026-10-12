@@ -254,7 +254,9 @@ describe("content stays visible and server-rendered", () => {
       expect(element.style.opacity, element.outerHTML.slice(0, 80)).not.toBe("0");
       expect(element.style.visibility).not.toBe("hidden");
       expect(element.style.transform).toBe("");
-      if (element.hidden) expect(element.getAttribute("role"), element.outerHTML.slice(0, 80)).toBe("tabpanel");
+      // Only an unchosen tab panel may start out of reach (inert, or hidden as tab panels once were);
+      // it is still laid out and hidden by the stylesheet, never by an inline style.
+      if (element.hidden || element.hasAttribute("inert")) expect(element.getAttribute("role"), element.outerHTML.slice(0, 80)).toBe("tabpanel");
     }
   });
 

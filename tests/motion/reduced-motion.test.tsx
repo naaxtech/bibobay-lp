@@ -175,6 +175,23 @@ describe("the landing page under reduced motion", () => {
     expect(document.documentElement.dataset.motion).not.toBe("full");
   });
 
+  it("switches friends and stories at once: the panel left behind is out of reach in the same step and nothing tweens", async () => {
+    emulateMotionPreference("reduce");
+    renderPage();
+    for (const id of ["characters", "episodes"]) {
+      const outgoing = shownPanel(id);
+      fireEvent.click(within(sectionById(id)).getAllByRole("tab")[1]!);
+      const incoming = shownPanel(id);
+      await motionReacted();
+      expect(incoming, `${id}: the chosen panel is the one exposed`).not.toBe(outgoing);
+      expect(outgoing.hasAttribute("inert"), `${id}: the panel left behind is out of reach at once`).toBe(true);
+      expect(incoming.hasAttribute("inert")).toBe(false);
+      const panels = [outgoing, incoming];
+      expect(gsap.getTweensOf([...panels, ...panels.flatMap((panel) => Array.from(panel.querySelectorAll("*")))])).toHaveLength(0);
+      for (const panel of panels) expect(panel.getAttribute("style") ?? "", `${id}: no inline motion`).not.toMatch(/opacity|visibility|transform|translate/);
+    }
+  });
+
   it("drops every animation and inline style the moment the reader asks for reduced motion", async () => {
     const preference = emulateMotionPreference("no-preference");
     renderPage();
@@ -302,18 +319,37 @@ describe("the landing page with motion allowed", () => {
     await vi.waitFor(() => expect(cta.style.getPropertyValue("--btn-press")).toBe(""));
   });
 
-  it("brings in the chosen friend and story with a short transition and no lasting styles", async () => {
+  it("crossfades friends and stories: the panel left behind fades out while the chosen one fades in, then no styles remain", async () => {
     emulateMotionPreference("no-preference");
     renderPage();
     for (const id of ["characters", "episodes"]) {
+      const outgoing = shownPanel(id);
+      const ownStyles = Array.from(outgoing.style);
       fireEvent.click(within(sectionById(id)).getAllByRole("tab")[2]!);
-      const panel = shownPanel(id);
+      const incoming = shownPanel(id);
+      expect(incoming, `${id}: the chosen panel is the one exposed`).not.toBe(outgoing);
       await motionReacted();
-      expect(gsap.getTweensOf(panel.children).length, `${id} transition`).toBeGreaterThan(0);
-      expect(panel.style.opacity, "the paper stage itself stays solid").toBe("");
-      for (const tween of gsap.getTweensOf(panel.children)) expect(tween.totalDuration()).toBeLessThan(0.6);
+
+      // The panel left behind is out of reach at once, but still painted while it fades out.
+      expect(outgoing.hasAttribute("inert"), `${id}: left behind`).toBe(true);
+      const fadeOut = gsap.getTweensOf(outgoing);
+      expect(fadeOut.length, `${id}: the panel left behind is tweened out`).toBeGreaterThan(0);
+      expect(outgoing.style.visibility, `${id}: held on screen while it fades`).not.toBe("hidden");
+      const added = Array.from(outgoing.style).filter((property) => !ownStyles.includes(property));
+      expect(added.filter((property) => !["opacity", "visibility"].includes(property)), `${id}: fades, never moves or resizes`).toEqual([]);
+      for (const tween of fadeOut) tween.progress(0.5);
+      const midway = Number(gsap.getProperty(outgoing, "opacity"));
+      expect(midway, `${id}: half way through it is fading`).toBeGreaterThan(0);
+      expect(midway).toBeLessThan(1);
+
+      // The chosen panel's parts fade and rise in; its paper stage stays solid beneath the one leaving.
+      expect(gsap.getTweensOf(incoming.children).length, `${id}: the chosen panel comes in`).toBeGreaterThan(0);
+      expect(incoming.style.opacity, "the paper stage itself stays solid").toBe("");
+      for (const tween of [...fadeOut, ...gsap.getTweensOf(incoming.children)]) expect(tween.totalDuration()).toBeLessThan(0.6);
     }
     await vi.waitFor(() => expect(inlineMotionStyles()).toEqual([]), { timeout: 3000 });
+    const panels = ["characters", "episodes"].flatMap((id) => Array.from(sectionById(id).querySelectorAll("[role='tabpanel'], [role='tabpanel'] *")));
+    expect(gsap.getTweensOf(panels), "every stage transition has finished").toHaveLength(0);
   });
 
   it("kills every ScrollTrigger and tween and restores every style on unmount", async () => {
@@ -333,7 +369,7 @@ describe("the landing page with motion allowed", () => {
     expect(ScrollTrigger.getAll()).toHaveLength(0);
     expect(gsap.getTweensOf(touched)).toHaveLength(0);
     for (const element of touched) {
-      expect(element.getAttribute("style") ?? "", element.outerHTML.slice(0, 70)).not.toMatch(/opacity|transform|translate|--btn-press|stroke-dash/);
+      expect(element.getAttribute("style") ?? "", element.outerHTML.slice(0, 70)).not.toMatch(/opacity|visibility|transform|translate|--btn-press|stroke-dash/);
       if (element.matches("[data-bay-layer]")) expect(element.hasAttribute("transform")).toBe(false);
     }
     expect(document.documentElement.hasAttribute("data-motion"), "the page-level motion flag goes with the page").toBe(false);

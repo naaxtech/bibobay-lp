@@ -110,7 +110,7 @@ export function Characters({ section, intro, characters, art, introArt }: Charac
               );
             })}
           </div>
-          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-1">
+          <div className="friend-stages lg:col-span-8 lg:col-start-1 lg:row-start-1">
             {characters.map((friend, index) => (
               <FriendStage key={friend.id} friend={friend} index={index} art={art[friend.id]} panelProps={tabs.panelProps(index)} />
             ))}

@@ -38,13 +38,25 @@ export function useRovingTabs(count: number) {
       onClick: () => select(index, false),
       onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => onKeyDown(event, index),
     }),
-    panelProps: (index: number) => ({
-      id: panelId(index),
-      role: "tabpanel" as const,
-      "aria-labelledby": tabId(index),
-      hidden: index !== selected,
-      // A panel of plain text must still be reachable from the keyboard.
-      tabIndex: 0,
-    }),
+    panelProps: (index: number) => {
+      const chosen = index === selected;
+      return {
+        id: panelId(index),
+        role: "tabpanel" as const,
+        "aria-labelledby": tabId(index),
+        /*
+         * Every panel stays laid out, stacked in one grid cell by the stylesheet, so the stage is
+         * always as tall as its tallest panel and choosing another never moves the page (spec §7
+         * "no layout jump"). An unchosen panel is what `hidden` used to make it, minus leaving the
+         * layout: unreachable (inert: no focus, no clicks, no find-in-page), silent to assistive
+         * technology (aria-hidden), and unpainted (landing.css hides `[role=tabpanel][inert]`).
+         * The motion layer may hold the panel being left on screen while it fades out.
+         */
+        inert: !chosen,
+        "aria-hidden": chosen ? undefined : true,
+        // The chosen panel of plain text must still be reachable from the keyboard.
+        tabIndex: chosen ? 0 : -1,
+      };
+    },
   };
 }
