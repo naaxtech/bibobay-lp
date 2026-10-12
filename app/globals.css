@@ -1,6 +1,8 @@
 @import "tailwindcss";
 /* Landing sections, header and footer; built on the tokens below. */
 @import "../components/landing/landing.css";
+/* The founding-family form; after the landing styles so it can build on .btn and .text-link. */
+@import "../components/forms/lead-form.css";
 
 /*
  * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and

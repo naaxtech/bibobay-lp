@@ -12,6 +12,9 @@ export interface EnvReport {
 }
 
 const allowedPublicNames = new Set([
+  // Lead capture (Task 5) adds no public name: the browser posts to /api/leads and never talks to
+  // Supabase or Resend. Its server names (SUPABASE_SERVICE_ROLE_KEY, RESEND_*, STAFF_NOTIFICATION_EMAIL,
+  // LEAD_IP_HASH_SECRET) are refused here under a NEXT_PUBLIC_ prefix like any unlisted name.
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_SANITY_PROJECT_ID",
   "NEXT_PUBLIC_SANITY_DATASET",
