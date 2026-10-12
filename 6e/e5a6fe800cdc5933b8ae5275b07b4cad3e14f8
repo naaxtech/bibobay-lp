@@ -1,0 +1,56 @@
+.env.example
+  h_0549c11fec2ab0 19,21,23-24
+components/forms/LeadForm.tsx
+  h_0549c11fec2ab0 35-37,67-73,95,97-98,106-113,156-157,169,174,183-184,203-205,329,342-343
+components/forms/lead-form.css
+  h_0549c11fec2ab0 129-134
+e2e/leads/lead-form.spec.ts
+  h_0549c11fec2ab0 1,6-11,14-16,26-32,39-62,68,82-103,116,121,123-125,143,148-150,158,164,167,169-170,189-191,198-205,233-235
+lib/email/client.ts
+  h_0549c11fec2ab0 32-36,38,71,81-83,93-98
+lib/email/lead-emails.ts
+  h_0549c11fec2ab0 92,97,101-106,109,114-118
+lib/leads/dependencies.ts
+  h_0549c11fec2ab0 3-6,12,22-33,35-64,70,82,91,93-95,99-101
+lib/leads/http.ts
+  h_0549c11fec2ab0 8-15,24-85
+lib/leads/schema.ts
+  h_0549c11fec2ab0 54-57
+lib/leads/submit.ts
+  h_0549c11fec2ab0 13,19-27,46-50,63-70,83,85-86,95,105,110-116,146-148,151-154,157-160,166-167,169-170,172-188,191,193-195,198,201,205,207-240,300-307,309-323,325-340
+scripts/verify-env.ts
+  h_0549c11fec2ab0 17-18,27-29,56-64,66,69
+supabase/migrations/0001_leads_and_security.sql
+  h_0549c11fec2ab0 53-57,193-194,199-210,217-219,232-236,254,263-268,273-275
+supabase/tests/0001_leads_rls.sql
+  h_0549c11fec2ab0 10-11,18,135,157-160,224-225,240-322
+tests/leads/client-key.test.ts
+  h_0549c11fec2ab0 1-93
+tests/leads/env-boundary.test.ts
+  h_0549c11fec2ab0 12,52-83
+tests/leads/lead-copy.test.tsx
+  h_0549c11fec2ab0 11-23,99-100,104-107,254-296
+tests/leads/lead-dependencies.test.ts
+  h_0549c11fec2ab0 1-112
+tests/leads/lead-emails.test.ts
+  h_0549c11fec2ab0 79-92,145-160
+tests/leads/lead-route.test.ts
+  h_0549c11fec2ab0 13,20,28-44,48,54-59,74-75,77,103-110,204-271
+tests/leads/lead-schema.test.ts
+  h_0549c11fec2ab0 121-124
+tests/leads/lead-submit.test.ts
+  h_0549c11fec2ab0 7,26-41,44,46,50,53-54,58,66-68,81-87,217-220,224,355-356,360-361,363-369,374-528,543-559
+tests/leads/migration-policy.test.ts
+  h_0549c11fec2ab0 140-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ee5a6fe800cdc5933b8ae5275b07b4cad3e14f8",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
