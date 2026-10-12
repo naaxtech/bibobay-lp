@@ -1,0 +1,19 @@
+package.json
+  s_deed703217db6f::t_b85db9d3a7a6db 25,30-32,35-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cceac675bcd7f5129478d5bdda6ae9a96b31c0e4",
+  "prompts": {},
+  "sessions": {
+    "s_deed703217db6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3504e079468593a6",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
