@@ -1,0 +1,30 @@
+components/landing/Characters.tsx
+  h_0549c11fec2ab0 113
+components/landing/Episodes.tsx
+  h_0549c11fec2ab0 147-160
+components/landing/landing.css
+  h_0549c11fec2ab0 656-708,711-712,755,858-859,865-866,921
+components/landing/useRovingTabs.ts
+  h_0549c11fec2ab0 41-60
+components/motion/useSectionReveal.ts
+  h_0549c11fec2ab0 54-65,77,91-92,177-181,186-188,192-193,195-203,205,210
+e2e/landing/interactions.spec.ts
+  h_0549c11fec2ab0 26-43,46-57,61-64,67-93,95-97,99-101,110,113,117,120,193-226,245-246
+tests/landing/accessibility-contracts.test.tsx
+  h_0549c11fec2ab0 118,206-243
+tests/landing/section-renderer.test.tsx
+  h_0549c11fec2ab0 257-259
+tests/motion/reduced-motion.test.tsx
+  h_0549c11fec2ab0 178-194,322,326-327,329-330,332-348,351-352,372
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "47b1274648c0c5740786c51079f4c6855794ba0d",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
