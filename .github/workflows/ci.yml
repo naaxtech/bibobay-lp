@@ -1,0 +1,170 @@
+# Continuous integration for the BIBO Bay site and Studio.
+#
+# Runs without any repository secret, so it behaves the same on a fork. Every action is pinned to a
+# full commit SHA (the version is in the comment); see docs/deployment.md for how the SHAs were
+# checked and how to update them.
+
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - gh-pages
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    name: Typecheck, lint, unit tests, build, bundle scan, audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (from the lockfile)
+        run: npm ci
+      - name: Environment contract
+        run: npm run verify:env
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm run test:run
+      - name: Production build (no secrets; the build's own production environment check must pass)
+        run: npm run build
+      - name: Client bundle secret scan
+        run: npm run verify:bundle
+      - name: Dependency audit, shipped dependencies (blocking)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Dependency audit, including dev tooling (reported, not blocking)
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm audit --audit-level=high > audit-full.txt 2>&1 && status=0 || status=$?
+          {
+            echo "### npm audit --audit-level=high (dev tooling included, not blocking)"
+            echo '```'
+            tail -n 40 audit-full.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: Keep the full audit report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-audit-full
+          path: audit-full.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+  studio:
+    name: Sanity Studio typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Harmless placeholders: the build needs a project id and dataset, never a real one or a token.
+      SANITY_STUDIO_PROJECT_ID: ci-placeholder
+      SANITY_STUDIO_DATASET: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - name: Install Studio (from its lockfile)
+        run: npm --prefix studio ci
+      - name: Studio typecheck
+        run: npm --prefix studio run typecheck
+      - name: Studio build
+        run: npm --prefix studio run build
+      - name: Studio dependency audit (reported, not blocking)
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm --prefix studio audit --omit=dev --audit-level=high > studio-audit.txt 2>&1 && status=0 || status=$?
+          {
+            echo "### Studio npm audit --omit=dev --audit-level=high (not blocking)"
+            echo '```'
+            tail -n 40 studio-audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: Keep the Studio audit report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: studio-npm-audit
+          path: studio-audit.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: Playwright against the production build
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_PRODUCTION: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (from the lockfile)
+        run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Production build
+        run: npm run build
+      - name: Start the production server and wait for /api/health
+        shell: bash
+        run: |
+          nohup npx next start -p 3000 -H 127.0.0.1 > next-start.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "next start is healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "next start did not answer /api/health within 60s"
+          cat next-start.log
+          exit 1
+      - name: Playwright (lead requests are always mocked; nothing reaches a real service)
+        run: npx playwright test --reporter=github,html
+      - name: Deployment verifier against the same server (fetch and browser)
+        run: npm run verify:deployment -- http://127.0.0.1:3000 --browser --expect-heading "Where bright little adventures begin."
+      - name: Keep the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            next-start.log
+          if-no-files-found: ignore
+          retention-days: 14

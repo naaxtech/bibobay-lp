@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// Imported statically so module loading is not timed inside a test: a dynamic import of a route
+// pulled the Sanity client graph into the first test's 5 s budget and timed out under full-suite
+// load. Each route reads process.env when it is called, so env stubs in the tests still apply.
+import manifestRoute from "@/app/manifest";
+import * as openGraphImage from "@/app/opengraph-image";
+import robotsRoute from "@/app/robots";
+import sitemapRoute from "@/app/sitemap";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
 import {
@@ -212,26 +219,22 @@ describe("metadata routes", () => {
 
   it("app/robots.ts disallows all crawling without a production deployment", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
-    const { default: robots } = await import("@/app/robots");
-    expect(await robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
+    expect(await robotsRoute()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
   });
 
   it("app/sitemap.ts lists the home page only, in production with a verified origin and fallback legal text", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://bibobay.example");
-    const { default: sitemap } = await import("@/app/sitemap");
-    expect((await sitemap()).map((entry) => entry.url)).toEqual(["https://bibobay.example/"]);
+    expect((await sitemapRoute()).map((entry) => entry.url)).toEqual(["https://bibobay.example/"]);
   });
 
   it("app/manifest.ts serves the fallback settings without Sanity", async () => {
-    const { default: manifest } = await import("@/app/manifest");
-    expect((await manifest()).name).toBe(SAFE_FALLBACK_SETTINGS.title);
+    expect((await manifestRoute()).name).toBe(SAFE_FALLBACK_SETTINGS.title);
   });
 
-  it("app/opengraph-image.tsx describes the image it draws", async () => {
-    const og = await import("@/app/opengraph-image");
-    expect(og.size).toEqual({ width: 1200, height: 630 });
-    expect(og.contentType).toBe("image/png");
-    expect(og.alt).toMatch(/BIBO/);
+  it("app/opengraph-image.tsx describes the image it draws", () => {
+    expect(openGraphImage.size).toEqual({ width: 1200, height: 630 });
+    expect(openGraphImage.contentType).toBe("image/png");
+    expect(openGraphImage.alt).toMatch(/BIBO/);
   });
 });

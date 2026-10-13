@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",
     "verify:env": "tsx scripts/verify-env.ts",
-    "verify:bundle": "tsx scripts/verify-bundle-secrets.ts"
+    "verify:bundle": "tsx scripts/verify-bundle-secrets.ts",
+    "verify:deployment": "tsx scripts/verify-deployment.ts"
   },
   "dependencies": {
     "@sanity/client": "8.9.0",
@@ -49,6 +50,7 @@
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "yaml": "2.9.1"
   }
 }

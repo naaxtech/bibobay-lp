@@ -26,6 +26,15 @@ const allowedPublicNames = new Set([
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
 ]);
 
+/**
+ * The only names the browser may see. scripts/verify-bundle-secrets.ts reads this same set, so a
+ * name added here is accepted by the client-bundle scan too, and any other NEXT_PUBLIC_ name fails it.
+ */
+export const ALLOWED_PUBLIC_NAMES: ReadonlySet<string> = allowedPublicNames;
+
+/** Server names whose values are credentials; their values must never reach a public name or the client bundle. */
+export const PRIVATE_NAME_PATTERN = /(?:_SECRET(?:_|$)|_TOKEN$|_PRIVATE_KEY$|_SERVICE_ROLE_KEY$|_API_KEY$)/i;
+
 /** Matches lib/leads/dependencies.ts: a shorter address-hashing secret leaves lead storage unconfigured. */
 export const LEAD_IP_HASH_SECRET_MIN_LENGTH = 32;
 
@@ -42,7 +51,7 @@ export function verifyEnvironment(
     Object.entries(env)
       .filter(([name, value]) =>
         !name.startsWith("NEXT_PUBLIC_") &&
-        /(?:_SECRET(?:_|$)|_TOKEN$|_PRIVATE_KEY$|_SERVICE_ROLE_KEY$|_API_KEY$)/i.test(name) &&
+        PRIVATE_NAME_PATTERN.test(name) &&
         Boolean(value?.trim()),
       )
       .map(([, value]) => value?.trim()),
