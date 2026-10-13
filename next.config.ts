@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   // src: node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/poweredByHeader.md · next 16.3.8 · 2026-10-13
   // No `X-Powered-By: Next.js`: nothing to gain from naming the framework to scanners.
   poweredByHeader: false,
+  // src: node_modules/next/dist/docs/01-app/03-api-reference/05-config/02-typescript.md#custom-tsconfig-path · next 16.3.8 · 2026-10-13
+  // `next build` type-checks the program this file selects. tsconfig.build.json is the root tsconfig
+  // minus tests/ and e2e/: two unit tests import the Studio schema, which needs `sanity` from
+  // studio/node_modules, and Vercel installs the root only. `npm run typecheck` still checks the tests.
+  typescript: { tsconfigPath: "tsconfig.build.json" },
   images: {
     // src: node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md#remotepatterns · next 16.3.8 · 2026-10-12
     // CMS art comes only from Sanity's image CDN (lib/sanity/image.ts); every other remote host stays blocked.

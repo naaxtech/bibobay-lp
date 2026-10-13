@@ -125,9 +125,16 @@ describe("CI workflow", () => {
     }
   });
 
+  it("verify installs the Studio before the gates that read its schema, caching both lockfiles", () => {
+    // Root typecheck and unit tests import studio/schemaTypes, which needs `sanity` from studio/node_modules.
+    const node = job("verify").steps.find((step) => step.uses?.startsWith("actions/setup-node@"));
+    expect(String(node?.with?.["cache-dependency-path"]).split(/\s+/).filter(Boolean).sort()).toEqual(["package-lock.json", "studio/package-lock.json"]);
+  });
+
   it("verify runs the gates in order, with the production audit blocking", () => {
-    expect(runs("verify").slice(0, 8)).toEqual([
+    expect(runs("verify").slice(0, 9)).toEqual([
       "npm ci",
+      "npm --prefix studio ci",
       "npm run verify:env",
       "npm run typecheck",
       "npm run lint",
@@ -168,6 +175,8 @@ describe("CI workflow", () => {
     expect(order.every((index) => index >= 0), String(order)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(stepRunning("e2e", "next start")?.run).toContain("http://127.0.0.1:3000/api/health");
+    // The e2e build is shaped like Vercel's: root install only, so it proves the deploy builds without the Studio.
+    expect(commands.some((run) => run.includes("--prefix studio"))).toBe(false);
     expect(commands.some((run) => run.includes("verify:deployment") && run.includes("--browser"))).toBe(true);
     const upload = e2e.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
     expect(upload?.if).toBe("failure()");
@@ -193,10 +202,12 @@ describe("CI workflow", () => {
  * deleted), so Vercel is told explicitly to install from package-lock.json instead of guessing.
  */
 describe("Vercel build settings", () => {
-  it("installs with npm ci and builds with the repository's build script", () => {
+  it("installs with npm ci, builds with the repository's build script, then scans the bundle with the deployment's own values (review M7)", () => {
     expect(existsSync(resolve("vercel.json"))).toBe(true);
     const config = JSON.parse(readFileSync(resolve("vercel.json"), "utf8")) as Record<string, unknown>;
-    expect(config).toMatchObject({ framework: "nextjs", installCommand: "npm ci", buildCommand: "npm run build" });
+    // The secret-value rule needs real values, and only the deployment build has them (CI has no
+    // secrets). Findings name the file and rule, never the value, so the build log stays clean.
+    expect(config).toMatchObject({ framework: "nextjs", installCommand: "npm ci", buildCommand: "npm run build && npm run verify:bundle" });
     expect(JSON.stringify(config)).not.toMatch(/\bbunx?\b|\$\{|secret|token/i);
   });
 });

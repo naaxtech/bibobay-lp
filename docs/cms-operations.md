@@ -131,5 +131,7 @@ Published content is cached by the site and expired by a signed webhook:
    `{_type, _id}`, secret = the site's `SANITY_REVALIDATE_SECRET`.
 2. On publish, the site expires the cache tag for that document type, and the next visitor sees the
    change. Publishing a download (`leadMagnet`) refreshes the landing page.
-3. Without the webhook (or the secret), published changes do not appear until the next deployment,
-   and `/api/readiness` reports `revalidation: false`.
+3. The site caches published content with no time limit, and that cache persists across deployments
+   (the Next.js `fetch` Data Cache), so a redeploy does not refresh it. Without the webhook (or the
+   secret), published changes do not appear until the webhook is set up and the document is
+   published again; `/api/readiness` reports `revalidation: false` meanwhile.

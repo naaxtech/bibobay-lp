@@ -35,7 +35,7 @@ export const CODE_INDICATORS: readonly string[] = Object.freeze([
 ]);
 
 /** Server names whose values are addresses rather than credentials, but still private. */
-const ADDRESS_NAMES = new Set(["RESEND_FROM", "STAFF_NOTIFICATION_EMAIL"]);
+export const ADDRESS_NAMES: ReadonlySet<string> = new Set(["RESEND_FROM", "STAFF_NOTIFICATION_EMAIL"]);
 /** Shorter values match too much by accident ("60", "true", a dataset name). */
 const MIN_SECRET_VALUE_LENGTH = 8;
 

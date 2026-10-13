@@ -7,11 +7,11 @@ specification (`docs/superpowers/specs/`, section 17). Commands are run from the
 
 ```bash
 npm ci                                        # package-lock.json must not change
+npm --prefix studio ci                        # before typecheck, tests and build: they read the Studio schema
 npm run verify:env
 npm run typecheck
 npm run lint
 npm run test:run
-npm --prefix studio ci
 npm --prefix studio run typecheck
 SANITY_STUDIO_PROJECT_ID=ci-placeholder SANITY_STUDIO_DATASET=production npm --prefix studio run build
 npm run build
@@ -70,7 +70,7 @@ must all be configured). No deployment exists yet (Task 11).
 | 6 | Commerce disabled by default and server-enforced | Feature-default tests | Default off; commerce routes not built yet (Tasks 6 and 7) |
 | 7 | Manual ordering works end to end in a controlled test environment | Task 12 | Not built yet (Tasks 6 to 8) |
 | 8 | RLS and function grants prevent anonymous/private data reads | `tests/leads/migration-database.test.ts` (pgTAP in PGlite); `supabase test db` on the real project | PGlite yes; real project not yet (Task 11) |
-| 9 | No service-role or secret value in the client bundle or repository | `npm run verify:bundle`; `npm run verify:env` | Yes |
+| 9 | No service-role or secret value in the client bundle or repository | `npm run verify:bundle` (client JavaScript); `npm run verify:deployment -- <url>` (the rendered pages, which the build output does not hold); `npm run verify:env` | Yes locally; secret values are checked for real on the first Vercel build (Task 11) |
 | 10 | No unsupported social proof or unverifiable claims on the published page | Review the page; `tests/content/feature-defaults.test.ts` | Fallback content yes; review the live dataset |
 | 11 | Legal routes have reviewed text or stay noindex with a reported blocker | `/api/readiness` `legalReviewed`; `<meta name="robots">` on `/privacy`, `/terms` | Fallback text, noindex; legal review outstanding |
 | 12 | Vercel, Studio and Supabase identifiers and links verified, no secrets exposed | Task 11 records them | Not provisioned yet |

@@ -14,12 +14,14 @@ import {
   checkSecurityHeaders,
   checkTitle,
   classifyBrowserRun,
+  displayUrl,
   exitCodeFor,
   formatTable,
   parseArgs,
   runFetchChecks,
   type CheckResult,
 } from "@/scripts/lib/deployment-checks";
+import { deriveSecretRules } from "@/scripts/lib/bundle-secrets";
 
 /*
  * scripts/verify-deployment.ts (ruling R44): classification is pure, so every rule is tested here
@@ -35,16 +37,27 @@ const failures = (results: CheckResult[]) => results.filter((result) => result.s
 
 type Canned = { status: number; type?: string; body?: string; headers?: Record<string, string> };
 
-/** A fetch stand-in answering from a URL table; anything unlisted is a 404 page. */
+/**
+ * A fetch stand-in answering from a URL table; anything unlisted is a 404 page. Like real fetch, it
+ * follows 3xx `location` headers unless the caller asks for `redirect: "manual"`.
+ */
 function fakeFetch(routes: Record<string, Canned>, seen: string[] = []): typeof fetch {
-  return (async (input: string | URL | Request) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const answer = (url: string): Response => {
     seen.push(url);
     const canned = routes[url] ?? { status: 404, type: "text/html; charset=utf-8", body: "<html><title>404</title></html>" };
     const headers = new Headers(canned.headers ?? {});
     if (canned.type) headers.set("content-type", canned.type);
     const response = new Response(canned.status === 204 ? null : (canned.body ?? ""), { status: canned.status, headers });
     Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    let url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    let response = answer(url);
+    for (let hop = 0; init?.redirect !== "manual" && hop < 5 && response.status >= 300 && response.status < 400 && response.headers.get("location"); hop += 1) {
+      url = new URL(response.headers.get("location")!, url).href;
+      response = answer(url);
+    }
     return response;
   }) as typeof fetch;
 }
@@ -166,13 +179,28 @@ describe("single checks", () => {
     expect(checkReadiness(500, null, { requireReady: false }).status).toBe("fail");
   });
 
-  it("needs a noindex signal on a non-production URL and warns when production is noindex", () => {
+  it("needs a noindex signal on a non-production URL and fails production carrying any noindex signal", () => {
     expect(checkNoindex({ production: false, robotsMeta: "noindex, nofollow", robotsHeader: null, robotsTxt: "" }).status).toBe("pass");
     expect(checkNoindex({ production: false, robotsMeta: null, robotsHeader: "noindex", robotsTxt: "" }).status).toBe("pass");
     expect(checkNoindex({ production: false, robotsMeta: null, robotsHeader: null, robotsTxt: "User-Agent: *\nDisallow: /\n" }).status).toBe("pass");
     expect(checkNoindex({ production: false, robotsMeta: "index, follow", robotsHeader: null, robotsTxt: "User-Agent: *\nAllow: /\n" }).status).toBe("fail");
     expect(checkNoindex({ production: true, robotsMeta: "index, follow", robotsHeader: null, robotsTxt: "User-Agent: *\nAllow: /\n" }).status).toBe("pass");
-    expect(checkNoindex({ production: true, robotsMeta: "noindex", robotsHeader: null, robotsTxt: "" }).status).toBe("warn");
+    // Review M2: a de-indexed production site is a release blocker, whichever signal does it.
+    expect(checkNoindex({ production: true, robotsMeta: "noindex", robotsHeader: null, robotsTxt: "" }).status).toBe("fail");
+    expect(checkNoindex({ production: true, robotsMeta: null, robotsHeader: "noindex", robotsTxt: "" }).status).toBe("fail");
+    expect(checkNoindex({ production: true, robotsMeta: null, robotsHeader: null, robotsTxt: "User-agent: *\nDisallow: /\n" }).status).toBe("fail");
+  });
+
+  // Review M3: only the group that applies to every crawler counts as a site-wide signal.
+  it.each([
+    ["a Disallow: / for one named bot", "User-agent: *\nAllow: /\n\nUser-agent: BadBot\nDisallow: /\n", false],
+    ["a Disallow: / for one named bot listed first", "User-agent: BadBot\nDisallow: /\n\nUser-agent: *\nDisallow: /private\n", false],
+    ["Disallow: / for every crawler", "User-agent: *\nDisallow: /\n", true],
+    ["a * group shared with a named bot", "User-agent: BadBot\nUser-agent: *\nDisallow: / # all\n", true],
+    ["Next's own output", "User-Agent: *\nDisallow: /\n\nHost: https://h.example\n", true],
+    ["Disallow of a sub-path only", "User-agent: *\nDisallow: /api/\n", false],
+  ])("reads robots.txt with %s as site-wide noindex: %s", (_label, robotsTxt, expected) => {
+    expect(checkNoindex({ production: false, robotsMeta: null, robotsHeader: null, robotsTxt }).status).toBe(expected ? "pass" : "fail");
   });
 });
 
@@ -227,6 +255,135 @@ describe("runFetchChecks", () => {
     }) as unknown as typeof fetch;
     await expect(runFetchChecks(new URL("http://127.0.0.1:9/"), { fetch: unreachable })).rejects.toBeInstanceOf(DeploymentNetworkError);
   });
+
+  // Review M1: the URL that was asked for is the one verified; nothing is sent to a host the operator never named.
+  it("fails a home page that redirects to another origin and probes nothing there", async () => {
+    const origin = "https://preview.example.com";
+    const elsewhere = "https://sso.thirdparty.example";
+    const seen: string[] = [];
+    const routes = { ...healthyPage(elsewhere), [`${origin}/`]: { status: 307, headers: { location: `${elsewhere}/` } } };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: fakeFetch(routes, seen) });
+    expect(statusOf(results, "home status")).toBe("fail");
+    expect(results.find((result) => result.name === "home status")?.detail).toContain("another origin");
+    expect(seen.filter((url) => url.startsWith(elsewhere))).toEqual([]);
+    expect(exitCodeFor(results)).toBe(1);
+  });
+
+  it("follows a same-origin redirect and a same-host upgrade to https", async () => {
+    const origin = "https://site.example.com";
+    const routes = { ...healthyPage(origin), [`${origin}/start`]: { status: 308, headers: { location: "/" } }, "http://site.example.com/": { status: 301, headers: { location: `${origin}/start` } } };
+    const results = await runFetchChecks(new URL("http://site.example.com/"), { fetch: fakeFetch(routes) });
+    expect(failures(results)).toEqual([]);
+  });
+
+  it("never follows a probe's redirect to another origin", async () => {
+    const origin = "http://127.0.0.1:3200";
+    const seen: string[] = [];
+    const routes = { ...healthyPage(origin), [`${origin}/api/health`]: { status: 302, headers: { location: "https://health.thirdparty.example/ok" } } };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: fakeFetch(routes, seen) });
+    expect(statusOf(results, "health")).toBe("fail");
+    expect(seen.some((url) => url.includes("thirdparty"))).toBe(false);
+  });
+});
+
+/*
+ * Review I1: every page is rendered per request, so no page HTML or RSC payload exists in the build
+ * output for verify:bundle to scan. The deployment verifier fetches them from the running site and
+ * runs the same rules over them.
+ */
+describe("runFetchChecks client payload scan", () => {
+  const origin = "http://127.0.0.1:3200";
+  const rules = deriveSecretRules({
+    envExample: "SUPABASE_SERVICE_ROLE_KEY=\nSANITY_REVALIDATE_SECRET=\nNEXT_PUBLIC_SITE_URL=\n",
+    allowedPublicNames: new Set(["NEXT_PUBLIC_SITE_URL"]),
+    env: { SANITY_REVALIDATE_SECRET: "rv-7Hq2LmN9xPz4" },
+  });
+  const RSC_TYPE = "text/x-component";
+
+  function withPayloads(overrides: Record<string, Canned> = {}): Record<string, Canned> {
+    const routes = healthyPage(origin);
+    const page = routes[`${origin}/`]!;
+    for (const path of ["/privacy", "/terms", "/thank-you"]) routes[`${origin}${path}`] = { ...page };
+    for (const path of ["/", "/privacy", "/terms", "/thank-you"]) routes[`rsc:${origin}${path}`] = { status: 200, type: RSC_TYPE, body: '0:{"P":null,"b":"build"}\n1:["$","main",null,{}]\n' };
+    return { ...routes, ...overrides };
+  }
+
+  /** Answers `RSC: 1` requests from the `rsc:` entries, everything else from the plain table. */
+  function rscAwareFetch(routes: Record<string, Canned>, seen: string[] = []): typeof fetch {
+    const plain = fakeFetch(routes, seen);
+    return (async (input: string | URL | Request, init?: RequestInit) => {
+      const isRsc = new Headers(init?.headers).get("rsc") === "1";
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (isRsc) {
+        seen.push(`rsc:${url}`);
+        const canned = routes[`rsc:${url}`] ?? { status: 404, type: "text/html", body: "missing" };
+        return new Response(canned.body ?? "", { status: canned.status, headers: { ...(canned.type ? { "content-type": canned.type } : {}), ...canned.headers } });
+      }
+      return plain(input, init);
+    }) as typeof fetch;
+  }
+
+  it("scans the HTML and the RSC payload of /, /privacy, /terms and /thank-you", async () => {
+    const seen: string[] = [];
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(withPayloads(), seen), scanRules: rules });
+    const scan = results.find((result) => result.name === "client payloads");
+    expect(scan?.status).toBe("pass");
+    expect(scan?.detail).toContain("8 responses");
+    for (const path of ["/", "/privacy", "/terms", "/thank-you"]) expect(seen).toContain(`rsc:${origin}${path}`);
+    expect(exitCodeFor(results)).toBe(0);
+  });
+
+  it("fails when a server-only name or a configured secret value reaches a page's RSC payload, never repeating the value", async () => {
+    const leak = { status: 200, type: RSC_TYPE, body: '1:["$","form",null,{"k":"rv-7Hq2LmN9xPz4","n":"SUPABASE_SERVICE_ROLE_KEY"}]\n' };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(withPayloads({ [`rsc:${origin}/terms`]: leak })), scanRules: rules });
+    const scan = results.find((result) => result.name === "client payloads");
+    expect(scan?.status).toBe("fail");
+    expect(scan?.detail).toContain("/terms");
+    expect(scan?.detail).toContain("SANITY_REVALIDATE_SECRET");
+    expect(scan?.detail).toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(scan?.detail).not.toContain("rv-7Hq2LmN9xPz4");
+  });
+
+  it("fails when a token-shaped secret reaches the server-rendered HTML of a page", async () => {
+    const routes = withPayloads();
+    const resendKey = `re_Ab12Cd34_${"Xy9".repeat(8)}`;
+    routes[`${origin}/privacy`] = { ...routes[`${origin}/privacy`]!, body: `<html><body><script>self.__next_f.push([1,"${resendKey}"])</script></body></html>` };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: rules });
+    const scan = results.find((result) => result.name === "client payloads");
+    expect(scan?.status).toBe("fail");
+    expect(scan?.detail).toContain("/privacy");
+    expect(scan?.detail).not.toContain(resendKey);
+  });
+
+  it("fails when a page cannot be fetched, because it was not scanned", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(withPayloads({ [`${origin}/thank-you`]: { status: 500, type: "text/html", body: "boom" } })), scanRules: rules });
+    const scan = results.find((result) => result.name === "client payloads");
+    expect(scan?.status).toBe("fail");
+    expect(scan?.detail).toContain("/thank-you");
+  });
+
+  it("fails when the RSC request is not answered with an RSC payload", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(withPayloads({ [`rsc:${origin}/privacy`]: { status: 200, type: "text/html", body: "<html></html>" } })), scanRules: rules });
+    const scan = results.find((result) => result.name === "client payloads");
+    expect(scan?.status).toBe("fail");
+    expect(scan?.detail).toContain("/privacy");
+  });
+
+  it("does not treat a published contact address as a leak, even when it is the configured sender or staff address", async () => {
+    const withSender = deriveSecretRules({
+      envExample: "RESEND_FROM=\nSTAFF_NOTIFICATION_EMAIL=\nSANITY_REVALIDATE_SECRET=\n",
+      allowedPublicNames: new Set(),
+      env: { RESEND_FROM: "BIBO Bay <hello@bibobay.example>", STAFF_NOTIFICATION_EMAIL: "team@bibobay.example", SANITY_REVALIDATE_SECRET: "rv-7Hq2LmN9xPz4" },
+    });
+    const routes = withPayloads();
+    routes[`${origin}/privacy`] = { ...routes[`${origin}/privacy`]!, body: `<html><body><a href="mailto:hello@bibobay.example">hello@bibobay.example</a> team@bibobay.example</body></html>` };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: withSender });
+    expect(results.find((result) => result.name === "client payloads")?.status).toBe("pass");
+    // Credentials are still looked for on the same pages.
+    routes[`${origin}/privacy`] = { ...routes[`${origin}/privacy`]!, body: "<html><body>rv-7Hq2LmN9xPz4</body></html>" };
+    const leaked = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: withSender });
+    expect(leaked.find((result) => result.name === "client payloads")?.status).toBe("fail");
+  });
 });
 
 describe("classifyBrowserRun", () => {
@@ -235,6 +392,33 @@ describe("classifyBrowserRun", () => {
 
   it("passes a clean load", () => {
     expect(classifyBrowserRun(clean).every((result) => result.status === "pass")).toBe(true);
+  });
+
+  it("prints failing response URLs without their query string (review M4: a bypass token must not reach CI logs)", () => {
+    const results = classifyBrowserRun({
+      ...clean,
+      responses: [
+        { url: `${origin}/?x-vercel-protection-bypass=tok-same`, status: 401 },
+        { url: "https://cdn.example.com/a.js?x-vercel-protection-bypass=tok-cross", status: 403 },
+      ],
+    });
+    const printed = JSON.stringify(results);
+    expect(printed).not.toContain("tok-same");
+    expect(printed).not.toContain("tok-cross");
+    expect(results.find((result) => result.name === "browser same-origin responses")?.detail).toContain(`401 ${origin}/?…`);
+  });
+
+  it("redacts query strings in every printed line, including browser-reported text (review M4)", () => {
+    const results: CheckResult[] = [
+      { name: "browser console", status: "fail", detail: `Failed to load resource: ${origin}/x.js?x-vercel-protection-bypass=tok-console&a=1 (404)` },
+      { name: "browser csp violations", status: "fail", detail: "script-src blocked https://evil.example/s.js?token=tok-csp" },
+      { name: "home", status: "pass", detail: "200 at http://127.0.0.1:3200/ (query kept: none)" },
+    ];
+    const table = formatTable(results);
+    expect(table).not.toMatch(/tok-(console|csp)/);
+    expect(table).toContain(`${origin}/x.js?… (404)`);
+    expect(table).toContain("https://evil.example/s.js?…");
+    expect(table).toContain("200 at http://127.0.0.1:3200/ (query kept: none)");
   });
 
   it.each([
@@ -278,6 +462,32 @@ describe("command line", () => {
   it.each([[[]], [["ftp://site.example.com"]], [["not a url"]], [["https://a.example", "--unknown"]], [["https://a.example", "--min-text", "x"]], [["https://a.example", "https://b.example"]]])("refuses %j as a usage error", (argv) => {
     const parsed = parseArgs(argv as string[]);
     expect(parsed.ok).toBe(false);
+  });
+
+  // Review M4: printed output lands in CI logs.
+  it("refuses a URL carrying credentials, without repeating them", () => {
+    const result = parseArgs(["https://user:hunter2-pass@site.example.com/"]);
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error).not.toContain("hunter2-pass");
+  });
+
+  it("prints the page URL without its query string, which may hold a preview bypass token", () => {
+    expect(displayUrl(new URL("https://preview.example.com/a?x-vercel-protection-bypass=tok3n-Value&x=1"))).toBe("https://preview.example.com/a?…");
+    expect(displayUrl(new URL("https://site.example.com/"))).toBe("https://site.example.com/");
+  });
+
+  it("never repeats the page URL's query string in any check result", async () => {
+    const origin = "https://preview.example.com";
+    const page = new URL(`${origin}/?x-vercel-protection-bypass=tok3n-Value`);
+    const routes = { ...healthyPage(origin), [page.href]: { status: 307, headers: { location: `https://elsewhere.example/?x-vercel-protection-bypass=tok3n-Value` } } };
+    const results = await runFetchChecks(page, { fetch: fakeFetch(routes) });
+    expect(JSON.stringify(results)).not.toContain("tok3n-Value");
+    const unreachable = (async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const error = await runFetchChecks(page, { fetch: unreachable }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(DeploymentNetworkError);
+    expect((error as Error).message).not.toContain("tok3n-Value");
   });
 
   it("prints a compact table with a verdict and never more than one line per check", () => {

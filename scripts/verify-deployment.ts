@@ -1,4 +1,10 @@
-import { classifyBrowserRun, DeploymentNetworkError, exitCodeFor, formatTable, parseArgs, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
+import nextEnv from "@next/env";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { deriveSecretRules } from "./lib/bundle-secrets";
+import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
+import { ALLOWED_PUBLIC_NAMES } from "./verify-env";
 
 /*
  * npm run verify:deployment -- <url> [--browser] [--require-ready] [--production] [--expect-heading <text>] [--min-text <n>]
@@ -6,7 +12,12 @@ import { classifyBrowserRun, DeploymentNetworkError, exitCodeFor, formatTable, p
  * Checks a running deployment (ruling R44): the home page answers 200 with a real title and visible
  * content, every same-origin script, stylesheet and icon it references answers 200 with a sane type,
  * the security headers are present, /api/health is ok, /api/readiness is reported, robots.txt
- * answers, and a non-production URL carries a noindex signal. Rules: scripts/lib/deployment-checks.ts.
+ * answers, a non-production URL carries a noindex signal (and --production carries none), and the
+ * server-rendered HTML and RSC payload of every page hold no secret: the bundle scan's rules
+ * (scripts/lib/bundle-secrets.ts) run over what the site actually sends, because every page is
+ * rendered per request and so is absent from the build output verify:bundle scans. Secret values
+ * come from this machine's environment and .env files, as for verify:bundle. Redirects are followed
+ * only within the requested origin. Rules: scripts/lib/deployment-checks.ts.
  *
  * --browser also loads the page in Chromium through @playwright/test (a dev dependency; run
  * `npx playwright install chromium` once) and fails on console errors, uncaught errors, CSP
@@ -34,7 +45,7 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     // Verification must never write a lead: block and record any request to the lead route.
     await context.route((url) => url.pathname.replace(/\/+$/, "") === "/api/leads", async (route) => {
-      observation.leadRequests.push(`${route.request().method()} ${route.request().url()}`);
+      observation.leadRequests.push(`${route.request().method()} ${displayUrl(new URL(route.request().url()))}`);
       await route.abort("blockedbyclient");
     });
     // Init scripts run before page scripts and are not subject to the page's CSP.
@@ -56,9 +67,9 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
     try {
       response = await page.goto(options.url.href, { waitUntil: "load", timeout: 45_000 });
     } catch (error) {
-      throw new DeploymentNetworkError(`Chromium could not load ${options.url.href}: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
+      throw new DeploymentNetworkError(`Chromium could not load ${displayUrl(options.url)}: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
     }
-    if (!response) throw new DeploymentNetworkError(`Chromium got no response for ${options.url.href}`);
+    if (!response) throw new DeploymentNetworkError(`Chromium got no response for ${displayUrl(options.url)}`);
     // Scroll end to end so lazy images, reveals and link prefetches all fire.
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     for (let y = 0; y < height; y += 600) {
@@ -86,12 +97,16 @@ async function main(): Promise<number> {
     return 2;
   }
   const { options } = parsed;
+  // Scan for the values this machine (or CI job) holds, read the same way verify:bundle reads them.
+  nextEnv.loadEnvConfig(process.cwd(), false);
+  const scanRules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, env: process.env });
   const results: CheckResult[] = [];
   try {
     results.push(
       ...(await runFetchChecks(options.url, {
         requireReady: options.requireReady,
         production: options.production,
+        scanRules,
         ...(options.expectHeading ? { expectHeading: options.expectHeading } : {}),
         ...(options.minTextLength !== undefined ? { minTextLength: options.minTextLength } : {}),
       })),
@@ -99,10 +114,10 @@ async function main(): Promise<number> {
     if (options.browser) results.push(...(await browserChecks(options)));
   } catch (error) {
     if (results.length > 0) console.log(formatTable(results));
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(redactQueries(error instanceof Error ? error.message : String(error)));
     return 2;
   }
-  console.log(`Deployment checks for ${options.url.href}${options.browser ? " (fetch + browser)" : " (fetch)"}`);
+  console.log(`Deployment checks for ${displayUrl(options.url)}${options.browser ? " (fetch + browser)" : " (fetch)"}; ${scanRules.secretValues.length} configured secret values scanned for`);
   console.log(formatTable(results));
   return exitCodeFor(results);
 }
@@ -112,7 +127,7 @@ main().then(
     process.exitCode = code;
   },
   (error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(redactQueries(error instanceof Error ? error.message : String(error)));
     process.exitCode = 2;
   },
 );

@@ -64,7 +64,9 @@ Not created yet (Task 11). Settings to use:
 
 - Webhook: URL `https://<site>/api/revalidate`, POST, on create/update/delete of all documents,
   projection `{_type, _id}`, secret = `SANITY_REVALIDATE_SECRET`. The route answers 503 while the
-  secret is unset, 401 for a bad or old (over 5 minutes) signature, 200 otherwise.
+  secret is unset, 413 for a body over 256 KiB, 401 for a bad or old (over 5 minutes) signature, 400
+  for a signed body that is not a `{_type}` JSON object, and 200 otherwise (`revalidated: false`
+  when the document type maps to no cache tag).
 - CORS origins in Sanity: only the verified local, preview, production and Studio origins.
 - `SANITY_STUDIO_ORIGIN` on the site, and `previewMode.enable: "/api/draft-mode/enable"` in the
   Studio's `presentationTool` config (still to do, Task 11). Details: [cms-operations.md](cms-operations.md#preview-draft-mode).
@@ -99,7 +101,19 @@ stylesheet and icon the page references answers 200 with a matching content type
 script nonce and no `'unsafe-eval'`; `X-Content-Type-Options: nosniff`; a `Referrer-Policy`;
 `/api/health` ok; `/api/readiness` reported (a 503 is a warning unless `--require-ready`);
 `robots.txt` reachable; and for a non-production URL a `noindex` signal (pass `--production` for
-the indexable site). `--expect-heading "<text>"` also requires that exact `<h1>`.
+the indexable site, which then fails on any `noindex` meta tag or `X-Robots-Tag`, or a robots.txt
+group for `User-agent: *` that disallows `/`). `--expect-heading "<text>"` also requires that exact `<h1>`.
+
+Redirects are followed only within the starting origin: a home page that redirects to another
+origin fails, and the checks never run against a host you did not name. Printed URLs drop the query
+string and fragment, and a URL carrying a user name or password is refused, so a protection-bypass
+token cannot reach a CI log.
+
+The client-payload check fetches `/`, `/privacy`, `/terms` and `/thank-you` as HTML and as the
+React Server Components payload (`RSC: 1`) and runs the bundle scan's rules (below) over both.
+Pages are rendered per request, so this is the only check that sees what the server actually sends,
+for example a server value passed to a client component as a prop. Contact addresses are allowed
+there, because the pages publish the address editors choose.
 
 `--browser` loads the page in Chromium (`npx playwright install chromium` once), scrolls it, and
 fails on console errors, uncaught errors, CSP violations or same-origin responses of 400 or more.
@@ -126,6 +140,13 @@ Pages blank page (its only script, `/src/main.tsx`, answered 404); a unit test p
 Findings name the file and the rule, never the secret. With no build output it exits 2 instead of
 passing.
 
+Every page is rendered per request (the CSP nonce is per request), so the build output holds no
+page HTML or RSC payload: this scan covers the client JavaScript and `public/`, and
+`npm run verify:deployment` scans the rendered pages of a running site. The secret-value rule only
+has real values where the real environment is: the Vercel build runs `npm run build && npm run
+verify:bundle` (`vercel.json`), so a deployment whose client output carries a configured secret
+fails to build. CI has no secrets and checks names, strings and token shapes only.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push (except to `gh-pages`) and on pull requests, with
@@ -133,9 +154,9 @@ passing.
 
 | Job | Steps |
 |---|---|
-| `verify` | `npm ci`, `npm run verify:env`, typecheck, lint, `npm run test:run`, `npm run build`, `npm run verify:bundle`, `npm audit --omit=dev --audit-level=high` (blocking), full `npm audit --audit-level=high` (reported in the job summary and kept as an artifact, not blocking) |
+| `verify` | `npm ci`, `npm --prefix studio ci` (root typecheck and tests import the Studio schema), `npm run verify:env`, typecheck, lint, `npm run test:run`, `npm run build`, `npm run verify:bundle`, `npm audit --omit=dev --audit-level=high` (blocking), full `npm audit --audit-level=high` (reported in the job summary and kept as an artifact, not blocking) |
 | `studio` | `npm --prefix studio ci`, typecheck, build with placeholder `SANITY_STUDIO_PROJECT_ID=ci-placeholder` / `SANITY_STUDIO_DATASET=production`, Studio audit (reported, not blocking) |
-| `e2e` (after `verify`) | `npm ci`, Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
+| `e2e` (after `verify`) | `npm ci` only, as Vercel installs (so it proves the site builds without the Studio: `next build` type-checks `tsconfig.build.json`, which leaves tests out), Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
 
 The end-to-end tests never reach a real service: every lead request is mocked, and no
 configuration is present in CI.

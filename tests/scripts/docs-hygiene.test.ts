@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -6,9 +7,9 @@ import { posix, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /*
- * Repository documentation (rulings R45, R47, R48). The repository is public, so its docs must hold
- * no local machine paths, no real email addresses (only @example.com placeholders) and no names of
- * private reference projects or internal tooling; and they must describe the code as it is: every
+ * Repository hygiene (rulings R45, R47, R48). The repository is public, so no tracked file may hold
+ * a local machine path, a real email address (only domains reserved for examples) or the name of a
+ * private reference project or internal tooling; and the docs must describe the code as it is: every
  * command they mention exists, every environment name is documented, and unbuilt parts say so.
  */
 
@@ -20,8 +21,22 @@ const docFiles = () => [
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => posix.join("docs", entry.name)),
 ];
-/** Also public and also written for this project: the CI workflow and the archived reference note. */
-const hygieneFiles = () => [...docFiles(), ".github/workflows/ci.yml", "references/test.md", "studio/README.md"];
+/**
+ * Review M5: every tracked text file is public, not just the docs, so all of them are scanned: code
+ * comments, tests, specs, workflows and configuration included. Left out: the planning documents
+ * under docs/superpowers/ (an owner decision is pending on them), lockfiles (generated), binary
+ * files, and the legacy skeleton archive (never edited).
+ */
+const HYGIENE_EXCLUDED = [/^docs\/superpowers\//, /(^|\/)(package-lock\.json|bun\.lock)$/, /^bibo-skeleton-1$/];
+const BINARY_FILE = /\.(png|jpe?g|gif|webp|avif|ico|svg|woff2?|ttf|otf|eot|pdf|zip|gz|mp4|webm|glb)$/i;
+const trackedFiles = () => execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
+const hygieneFiles = () => trackedFiles().filter((file) => !BINARY_FILE.test(file) && !HYGIENE_EXCLUDED.some((pattern) => pattern.test(file)) && existsSync(resolve(file)));
+/**
+ * This file holds the deliberate probes for the path, address and ledger rules (the self-test at the
+ * end), so it is the one file those three rules skip. The private-word rule still scans it.
+ */
+const SELF = "tests/scripts/docs-hygiene.test.ts";
+const probeFreeFiles = () => hygieneFiles().filter((file) => file !== SELF);
 const read = (file: string) => readFileSync(resolve(file), "utf8");
 
 const REQUIRED_DOCS = [
@@ -42,6 +57,13 @@ const ABSOLUTE_PATHS = [
 ];
 /** An address: the domain ends in a letters-only top-level domain, so `package@1.2.3` is not one. */
 const EMAIL = /[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})(?![A-Za-z0-9-])/g;
+/** URL user info (`scheme://user:pass@host`) is not an address; test fixtures use it to probe URL checks. */
+const IN_URL_USERINFO = /\/\/[^\s/@"'`]*$/;
+/** Domains reserved for documentation and tests (RFC 2606, RFC 6761): never a real person's address. */
+const RESERVED_DOMAIN = /(?:^|\.)example\.(?:com|net|org)$|\.(?:example|test|invalid|localhost)$/i;
+function addressDomainsIn(text: string): string[] {
+  return [...text.matchAll(EMAIL)].filter((match) => !IN_URL_USERINFO.test(text.slice(0, match.index))).map((match) => match[1]!.toLowerCase());
+}
 /**
  * Private words that must not appear in public files, stored as SHA-256 hashes of the lower-case word
  * so this public test does not publish them itself (two private reference projects and an internal
@@ -54,11 +76,25 @@ const PRIVATE_WORD_HASHES = new Set([
   "8ff92747045c7feb5994066bfbb321915b85f4570e0fbf0ffc50db99621d1c42",
   "52ecbf3904d68afdd0d27116f26ef521220f74bdbca3f58a41c02f9690d721ff",
 ]);
-const LEDGER_FOLDER = /(?<![\w/-])\.superpowers\b/;
+const LEDGER_FOLDER = /(?<![\w-])\.superpowers\b/;
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+/**
+ * Word tokens to hash: each full token (`[A-Za-z][A-Za-z0-9_-]*`) and also each letter run and
+ * camel-case part inside it, so `<word>-agent`, `<word>_notes` and `<Word>Agent` are all caught.
+ */
+function wordsOf(text: string): Set<string> {
+  const words = new Set<string>();
+  for (const token of text.match(/[A-Za-z][A-Za-z0-9_-]*/g) ?? []) {
+    words.add(token.toLowerCase());
+    for (const run of token.match(/[A-Za-z]+/g) ?? []) {
+      words.add(run.toLowerCase());
+      for (const part of run.match(/[A-Z]?[a-z]+|[A-Z]+(?![a-z])/g) ?? []) words.add(part.toLowerCase());
+    }
+  }
+  return words;
+}
 function privateWordsIn(text: string, hashes: ReadonlySet<string> = PRIVATE_WORD_HASHES): string[] {
-  const tokens = new Set((text.match(/[A-Za-z][A-Za-z0-9_-]*/g) ?? []).map((token) => token.toLowerCase()));
-  return [...tokens].filter((token) => hashes.has(sha256(token)));
+  return [...wordsOf(text)].filter((word) => hashes.has(sha256(word)));
 }
 
 describe("public-repository hygiene", () => {
@@ -66,30 +102,32 @@ describe("public-repository hygiene", () => {
     for (const file of REQUIRED_DOCS) expect(existsSync(resolve(file)), file).toBe(true);
   });
 
-  it.each(["README.md", "AGENTS.md", "docs/architecture.md", ".github/workflows/ci.yml"])("scans %s among the public files", (file) => {
+  it.each(["README.md", "AGENTS.md", "docs/architecture.md", ".github/workflows/ci.yml", "scripts/lib/deployment-checks.ts", "lib/leads/submit.ts", "tests/scripts/docs-hygiene.test.ts", "e2e/leads/lead-form.spec.ts", "supabase/migrations/0001_leads_and_security.sql", "studio/schemaTypes/index.ts", "next.config.ts"])("scans %s among the public files", (file) => {
     expect(hygieneFiles()).toContain(file);
   });
 
+  it("leaves out only the pending planning docs, lockfiles, binaries and the legacy archive", () => {
+    const scanned = new Set(hygieneFiles());
+    const skipped = trackedFiles().filter((file) => !scanned.has(file));
+    for (const file of skipped) expect(BINARY_FILE.test(file) || HYGIENE_EXCLUDED.some((pattern) => pattern.test(file)), file).toBe(true);
+  });
+
   it("contains no local absolute path", () => {
-    for (const file of hygieneFiles()) {
+    for (const file of probeFreeFiles()) {
       const text = read(file);
       for (const { name, pattern } of ABSOLUTE_PATHS) expect(pattern.exec(text)?.[0] ?? null, `${file}: ${name}`).toBeNull();
     }
   });
 
-  it("contains no email address except @example.com placeholders", () => {
-    for (const file of hygieneFiles()) {
-      const domains = [...read(file).matchAll(EMAIL)].map((match) => match[1]!.toLowerCase());
-      expect(domains.filter((domain) => domain !== "example.com"), file).toEqual([]);
+  it("contains no email address except on domains reserved for examples", () => {
+    for (const file of probeFreeFiles()) {
+      expect(addressDomainsIn(read(file)).filter((domain) => !RESERVED_DOMAIN.test(domain)), file).toEqual([]);
     }
   });
 
   it("names no private reference project, internal tool or internal ledger", () => {
-    for (const file of hygieneFiles()) {
-      const text = read(file);
-      expect(privateWordsIn(text), file).toEqual([]);
-      expect(LEDGER_FOLDER.exec(text)?.[0] ?? null, `${file}: internal ledger folder`).toBeNull();
-    }
+    for (const file of hygieneFiles()) expect(privateWordsIn(read(file)), file).toEqual([]);
+    for (const file of probeFreeFiles()) expect(LEDGER_FOLDER.exec(read(file))?.[0] ?? null, `${file}: internal ledger folder`).toBeNull();
   });
 
   it("catches each kind of leak it is meant to catch", () => {
@@ -99,13 +137,21 @@ describe("public-repository hygiene", () => {
     expect([..."owner@example.com, staff@example.org".matchAll(EMAIL)].map((match) => match[1])).toEqual(["example.com", "example.org"]);
     expect([..."eslint-config-next@16.3.8 and braces@3.0.3".matchAll(EMAIL)]).toEqual([]);
     expect([..."reach someone.private@gmail.com".matchAll(EMAIL)].map((match) => match[1])).toEqual(["gmail.com"]);
+    expect(addressDomainsIn("reach someone.private@gmail.com or mailto:team@bibobay.example")).toEqual(["gmail.com", "bibobay.example"]);
+    expect(addressDomainsIn("connect to https://user:secret@db.host-name.co/x and ftp://me@files.host-name.co")).toEqual([]);
+    for (const reserved of ["example.com", "studio.example.com", "example.org", "bibobay.example", "a.test"]) expect(RESERVED_DOMAIN.test(reserved), reserved).toBe(true);
+    for (const real of ["gmail.com", "examples.com", "example.co", "my-example.com"]) expect(RESERVED_DOMAIN.test(real), real).toBe(false);
+    expect(probeFreeFiles()).not.toContain(SELF);
+    expect(hygieneFiles()).toContain(SELF);
     // The private-word matcher, exercised with a stand-in hash list (the real list is never spelled out here).
     const standIn = new Set([sha256("zebrafish")]);
     expect(privateWordsIn("See the ZebraFish notes.", standIn)).toEqual(["zebrafish"]);
     expect(privateWordsIn("zebrafishes and zebra", standIn)).toEqual([]);
+    // Review M5: joined, snake-case and camel-case variants are caught too.
+    for (const variant of ["zebrafish-agent", "zebrafish_reference", "ZebrafishAgent", "useZebrafish", "the zebrafish2 build"]) expect(privateWordsIn(variant, standIn), variant).toEqual(["zebrafish"]);
     expect(PRIVATE_WORD_HASHES.size).toBe(3);
     expect(privateWordsIn("Sanity, Supabase, Resend and Vercel host the site.")).toEqual([]);
-    expect(LEDGER_FOLDER.test("see .superpowers/sdd/notes.md")).toBe(true);
+    for (const ledger of ["see .superpowers/sdd/notes.md", "./.superpowers/sdd", "repo/.superpowers/x"]) expect(LEDGER_FOLDER.test(ledger), ledger).toBe(true);
     expect(LEDGER_FOLDER.test("the plan under `docs/superpowers/plans/`")).toBe(false);
   });
 });

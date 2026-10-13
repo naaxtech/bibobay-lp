@@ -35,8 +35,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            studio/package-lock.json
       - name: Install (from the lockfile)
         run: npm ci
+      # Root typecheck and unit tests import the Studio schema, which needs `sanity` from studio/node_modules.
+      - name: Install Studio (from its lockfile)
+        run: npm --prefix studio ci
       - name: Environment contract
         run: npm run verify:env
       - name: Typecheck
@@ -133,7 +139,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - name: Install (from the lockfile)
+      - name: Install (from the lockfile; root only, as Vercel installs, so this proves the deploy builds without the Studio)
         run: npm ci
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium

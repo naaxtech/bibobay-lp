@@ -8,6 +8,8 @@
  * check below would have failed that page.
  */
 
+import { ADDRESS_NAMES, scanText, type SecretRules } from "./bundle-secrets";
+
 export type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
 export interface CheckResult {
@@ -183,8 +185,31 @@ export function checkReadiness(status: number, body: unknown, { requireReady }: 
   return { name: "readiness", status: requireReady ? "fail" : "warn", detail };
 }
 
-/** robots.txt that blocks every crawler from the whole site. */
-const disallowsAll = (robotsTxt: string) => /user-agent:\s*\*\s*[\r\n]+(?:[^\r\n]*[\r\n]+)*?\s*disallow:\s*\/\s*(?:$|[\r\n])/im.test(robotsTxt);
+/**
+ * robots.txt that blocks every crawler from the whole site: a `Disallow: /` inside a group whose
+ * user agents include `*`. Groups are split at each run of `User-agent` lines, so a rule for one
+ * named bot is never read as a site-wide signal (review M3).
+ */
+function disallowsAll(robotsTxt: string): boolean {
+  let agents: string[] = [];
+  let inRules = false;
+  for (const rawLine of robotsTxt.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    const match = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const field = match[1]!.toLowerCase();
+    const value = match[2]!.trim();
+    if (field === "user-agent") {
+      if (inRules) agents = [];
+      inRules = false;
+      agents.push(value);
+      continue;
+    }
+    inRules = true;
+    if (field === "disallow" && value === "/" && agents.includes("*")) return true;
+  }
+  return false;
+}
 
 export function checkNoindex({ production, robotsMeta, robotsHeader, robotsTxt }: { production: boolean; robotsMeta: string | null; robotsHeader: string | null; robotsTxt: string }): CheckResult {
   const signals = [
@@ -193,7 +218,8 @@ export function checkNoindex({ production, robotsMeta, robotsHeader, robotsTxt }
     disallowsAll(robotsTxt) ? "robots.txt Disallow: /" : null,
   ].filter((signal): signal is string => signal !== null);
   if (production) {
-    if (robotsMeta && /noindex/i.test(robotsMeta)) return { name: "noindex", status: "warn", detail: `production home page is ${robotsMeta}` };
+    // Review M2: a de-indexed production site is a release blocker, whichever signal causes it.
+    if (signals.length > 0) return { name: "noindex", status: "fail", detail: `production site is not indexable: ${signals.join("; ")}` };
     return { name: "noindex", status: "pass", detail: "production: indexable" };
   }
   if (signals.length === 0) return { name: "noindex", status: "fail", detail: "non-production URL has no noindex signal (meta, header or robots.txt)" };
@@ -208,10 +234,55 @@ export interface FetchCheckOptions {
   minTextLength?: number;
   /** Per-request timeout. */
   timeoutMs?: number;
+  /**
+   * The bundle scan's rules (scripts/lib/bundle-secrets.ts). When given, the HTML and RSC payload of
+   * every page in PAYLOAD_PATHS are fetched and scanned (review I1).
+   */
+  scanRules?: SecretRules;
 }
 
-async function get(fetcher: typeof fetch, url: string, timeoutMs: number): Promise<Response> {
-  return fetcher(url, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": "bibobay-verify-deployment" } });
+/**
+ * How a URL is printed: origin and path only. A query string may carry a preview bypass token
+ * (`x-vercel-protection-bypass`), so it is shown as `?…`; parseArgs refuses user names and passwords.
+ */
+export function displayUrl(url: URL): string {
+  return `${url.origin}${url.pathname}${url.search ? "?…" : ""}`;
+}
+
+const safeDisplay = (href: string) => {
+  try {
+    return displayUrl(new URL(href));
+  } catch {
+    return href;
+  }
+};
+
+const MAX_REDIRECTS = 5;
+
+type Fetched = { ok: true; response: Response; url: URL } | { ok: false; status: number; crossOrigin: URL };
+
+/**
+ * GET that follows redirects only within `allowed` origins (review M1): the URL the operator named is
+ * the one verified, and nothing is sent to a host they never named. Throws on network errors.
+ */
+async function get(fetcher: typeof fetch, start: URL, allowed: ReadonlySet<string>, timeoutMs: number, extraHeaders: Record<string, string> = {}): Promise<Fetched> {
+  let url = start;
+  for (let hop = 0; ; hop += 1) {
+    const response = await fetcher(url.href, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": "bibobay-verify-deployment", ...extraHeaders } });
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status >= 400 || !location || hop >= MAX_REDIRECTS) return { ok: true, response, url };
+    await response.arrayBuffer().catch(() => undefined);
+    const next = new URL(location, url);
+    if (!allowed.has(next.origin)) return { ok: false, status: response.status, crossOrigin: next };
+    url = next;
+  }
+}
+
+/** The requested origin, plus its https form when it was asked for over http (a same-host upgrade). */
+function allowedOrigins(pageUrl: URL): Set<string> {
+  const origins = new Set([pageUrl.origin]);
+  if (pageUrl.protocol === "http:") origins.add(`https://${pageUrl.host}`);
+  return origins;
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -222,22 +293,73 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+/** Pages whose server-rendered HTML and RSC payload are scanned for secrets (all are rendered per request). */
+export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you"] as const;
+
+async function scanClientPayloads(fetcher: typeof fetch, origin: string, allowed: ReadonlySet<string>, timeoutMs: number, rules: SecretRules): Promise<CheckResult> {
+  const name = "client payloads";
+  if (rules.configErrors.length > 0) return { name, status: "fail", detail: rules.configErrors.join("; ") };
+  // Pages legitimately publish the contact address editors choose in the CMS, which may be the
+  // sender or staff address. Addresses are not credentials, so only they are skipped here; the
+  // client-JS scan (verify:bundle) still looks for them.
+  const pageRules: SecretRules = { ...rules, secretValues: rules.secretValues.filter(({ name: valueName }) => !ADDRESS_NAMES.has(valueName)) };
+  const problems: string[] = [];
+  let scanned = 0;
+  for (const path of PAYLOAD_PATHS) {
+    for (const kind of ["html", "rsc"] as const) {
+      const label = `${path} ${kind}`;
+      let fetched: Fetched;
+      try {
+        fetched = await get(fetcher, new URL(path, origin), allowed, timeoutMs, kind === "rsc" ? { RSC: "1" } : {});
+      } catch (error) {
+        problems.push(`${label} not scanned (${error instanceof Error ? error.message : "request failed"})`);
+        continue;
+      }
+      if (!fetched.ok) {
+        problems.push(`${label} not scanned (redirected to another origin)`);
+        continue;
+      }
+      const { response } = fetched;
+      const body = await response.text().catch(() => "");
+      const type = response.headers.get("content-type") ?? "";
+      if (response.status !== 200) {
+        problems.push(`${label} not scanned (${response.status})`);
+        continue;
+      }
+      if (kind === "rsc" && !/^text\/x-component\b/i.test(type)) {
+        problems.push(`${label} not scanned (answered ${type.split(";")[0] || "no content-type"}, not an RSC payload)`);
+        continue;
+      }
+      scanned += 1;
+      for (const finding of scanText(body, label, pageRules)) problems.push(`${label}: ${finding.kind} ${finding.rule}`);
+    }
+  }
+  if (problems.length > 0) return { name, status: "fail", detail: clip(problems, 6) };
+  return { name, status: "pass", detail: `${scanned} responses (HTML and RSC of ${PAYLOAD_PATHS.join(", ")}): no server name, secret value, token shape or server-code string` };
+}
+
 /** Every fetch-only check, in table order. Throws DeploymentNetworkError when the home page is unreachable. */
 export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = {}): Promise<CheckResult[]> {
   const fetcher = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? 15_000;
   const results: CheckResult[] = [];
+  const allowed = allowedOrigins(pageUrl);
 
-  let home: Response;
+  let fetched: Fetched;
   try {
-    home = await get(fetcher, pageUrl.href, timeoutMs);
+    fetched = await get(fetcher, pageUrl, allowed, timeoutMs);
   } catch (error) {
-    throw new DeploymentNetworkError(`${pageUrl.href} could not be reached: ${error instanceof Error ? error.message : String(error)}`);
+    throw new DeploymentNetworkError(`${displayUrl(pageUrl)} could not be reached: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const finalUrl = new URL(home.url || pageUrl.href);
+  if (!fetched.ok) {
+    // Nothing is checked or probed on a host the operator never named.
+    return [{ name: "home status", status: "fail", detail: `${fetched.status} redirected to another origin (${fetched.crossOrigin.origin}); the requested URL was not verified` }];
+  }
+  const home = fetched.response;
+  const finalUrl = fetched.url;
   const html = await home.text();
   const homeType = home.headers.get("content-type") ?? "";
-  results.push({ name: "home status", status: home.status === 200 ? "pass" : "fail", detail: `${home.status} ${homeType.split(";")[0] || "no content-type"}${finalUrl.href !== pageUrl.href ? ` (redirected to ${finalUrl.href})` : ""}` });
+  results.push({ name: "home status", status: home.status === 200 ? "pass" : "fail", detail: `${home.status} ${homeType.split(";")[0] || "no content-type"}${finalUrl.href !== pageUrl.href ? ` (redirected to ${displayUrl(finalUrl)})` : ""}` });
 
   const analysis = analyzeHtml(html, finalUrl);
   results.push(checkTitle(analysis.title));
@@ -248,15 +370,19 @@ export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = 
   if (!sameOrigin.some((asset) => asset.kind === "stylesheet")) results.push({ name: "asset stylesheet", status: "warn", detail: "the page references no same-origin stylesheet" });
   for (const asset of analysis.assets) {
     if (!asset.sameOrigin) {
-      results.push({ name: `asset ${asset.kind}`, status: "skip", detail: `${asset.url} (cross-origin, not fetched)` });
+      results.push({ name: `asset ${asset.kind}`, status: "skip", detail: `${safeDisplay(asset.url)} (cross-origin, not fetched)` });
       continue;
     }
     try {
-      const response = await get(fetcher, asset.url, timeoutMs);
-      await response.arrayBuffer().catch(() => undefined);
-      results.push(checkAsset(asset, { status: response.status, contentType: response.headers.get("content-type") }));
+      const assetFetch = await get(fetcher, new URL(asset.url), allowed, timeoutMs);
+      if (!assetFetch.ok) {
+        results.push({ name: `asset ${asset.kind}`, status: "fail", detail: `${safeDisplay(asset.url)} -> ${assetFetch.status} redirected to another origin` });
+        continue;
+      }
+      await assetFetch.response.arrayBuffer().catch(() => undefined);
+      results.push(checkAsset({ ...asset, url: safeDisplay(asset.url) }, { status: assetFetch.response.status, contentType: assetFetch.response.headers.get("content-type") }));
     } catch (error) {
-      results.push({ name: `asset ${asset.kind}`, status: "fail", detail: `${asset.url} -> ${error instanceof Error ? error.message : "request failed"}` });
+      results.push({ name: `asset ${asset.kind}`, status: "fail", detail: `${safeDisplay(asset.url)} -> ${error instanceof Error ? error.message : "request failed"}` });
     }
   }
 
@@ -265,15 +391,15 @@ export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = 
   const origin = finalUrl.origin;
   const probe = async (path: string) => {
     try {
-      const response = await get(fetcher, `${origin}${path}`, timeoutMs);
-      return { status: response.status, response };
+      const probed = await get(fetcher, new URL(path, origin), allowed, timeoutMs);
+      return probed.ok ? { status: probed.response.status, response: probed.response } : { status: probed.status, response: null };
     } catch {
       return { status: 0, response: null };
     }
   };
 
   const health = await probe("/api/health");
-  results.push(checkHealth(health.status, health.response ? await readJson(health.response) : null));
+  results.push(checkHealth(health.status, health.response && health.status === 200 ? await readJson(health.response) : null));
 
   const readiness = await probe("/api/readiness");
   results.push(checkReadiness(readiness.status, readiness.response ? await readJson(readiness.response) : null, { requireReady: options.requireReady === true }));
@@ -283,6 +409,7 @@ export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = 
   results.push({ name: "robots.txt", status: robots.status === 200 ? "pass" : "fail", detail: `/robots.txt -> ${robots.status || "unreachable"}` });
 
   results.push(checkNoindex({ production: options.production === true, robotsMeta: analysis.robotsMeta, robotsHeader: home.headers.get("x-robots-tag"), robotsTxt }));
+  if (options.scanRules) results.push(await scanClientPayloads(fetcher, origin, allowed, timeoutMs, options.scanRules));
   return results;
 }
 
@@ -315,8 +442,8 @@ export function classifyBrowserRun(observation: BrowserObservation): CheckResult
     list("browser console", observation.consoleErrors, "no console errors"),
     list("browser page errors", observation.pageErrors, "no uncaught errors"),
     list("browser csp violations", observation.cspViolations, "no CSP violations"),
-    list("browser same-origin responses", sameOrigin.map((response) => `${response.status} ${response.url}`), `${observation.responses.length} responses, none >= 400`),
-    { name: "browser cross-origin responses", status: crossOrigin.length === 0 ? "pass" : "warn", detail: crossOrigin.length === 0 ? "none >= 400" : clip(crossOrigin.map((response) => `${response.status} ${response.url}`)) },
+    list("browser same-origin responses", sameOrigin.map((response) => `${response.status} ${safeDisplay(response.url)}`), `${observation.responses.length} responses, none >= 400`),
+    { name: "browser cross-origin responses", status: crossOrigin.length === 0 ? "pass" : "warn", detail: crossOrigin.length === 0 ? "none >= 400" : clip(crossOrigin.map((response) => `${response.status} ${safeDisplay(response.url)}`)) },
     list("browser lead requests", observation.leadRequests, "the form was not submitted"),
   ];
 }
@@ -362,18 +489,27 @@ export function parseArgs(argv: readonly string[]): { ok: true; options: CliOpti
       try {
         url = new URL(arg);
       } catch {
-        return { ok: false, error: `not a URL: ${arg}` };
+        return { ok: false, error: "not a URL (expected http:// or https://)" };
       }
       if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false, error: "the URL must be http or https" };
+      // Review M4: the URL is printed and lands in CI logs; credentials never belong in it.
+      if (url.username || url.password) return { ok: false, error: "the URL must not contain a user name or password" };
     }
   }
   if (!url) return { ok: false, error: "a URL is required" };
   return { ok: true, options: { url, ...options } };
 }
 
+/**
+ * Review M4: the table lands in CI logs, and browser-reported text (console errors, CSP reports,
+ * navigation errors) can quote any URL, so every `http(s)://…?query` in a detail is cut to `?…`.
+ */
+const URL_QUERY = /(https?:\/\/[^\s?#"'<>()]+)\?[^\s#"'<>()]*/g;
+export const redactQueries = (text: string) => text.replace(URL_QUERY, "$1?…");
+
 export function formatTable(results: readonly CheckResult[]): string {
   const width = Math.max(4, ...results.map((result) => result.name.length));
-  const lines = results.map((result) => `${result.status.toUpperCase().padEnd(4)}  ${result.name.padEnd(width)}  ${result.detail.replace(/\s+/g, " ")}`);
+  const lines = results.map((result) => `${result.status.toUpperCase().padEnd(4)}  ${result.name.padEnd(width)}  ${redactQueries(result.detail.replace(/\s+/g, " "))}`);
   const count = (status: CheckStatus) => results.filter((result) => result.status === status).length;
   const verdict = exitCodeFor(results) === 0 ? "PASS" : "FAIL";
   return [...lines, `Result: ${verdict} (${count("pass")} pass, ${count("warn")} warn, ${count("fail")} fail, ${count("skip")} skip)`].join("\n");
