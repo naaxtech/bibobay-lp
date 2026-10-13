@@ -57,12 +57,12 @@ const ABSOLUTE_PATHS = [
 ];
 /** An address: the domain ends in a letters-only top-level domain, so `package@1.2.3` is not one. */
 const EMAIL = /[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})(?![A-Za-z0-9-])/g;
-/** URL user info (`scheme://user:pass@host`) is not an address; test fixtures use it to probe URL checks. */
-const IN_URL_USERINFO = /\/\/[^\s/@"'`]*$/;
+/** URL credentials (`scheme://user:pass@host`) are not an address; test fixtures use them to probe URL checks. */
+const IN_URL_CREDENTIALS = /[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s/@"'`:]*:[^\s/@"'`]*$/;
 /** Domains reserved for documentation and tests (RFC 2606, RFC 6761): never a real person's address. */
 const RESERVED_DOMAIN = /(?:^|\.)example\.(?:com|net|org)$|\.(?:example|test|invalid|localhost)$/i;
 function addressDomainsIn(text: string): string[] {
-  return [...text.matchAll(EMAIL)].filter((match) => !IN_URL_USERINFO.test(text.slice(0, match.index))).map((match) => match[1]!.toLowerCase());
+  return [...text.matchAll(EMAIL)].filter((match) => !IN_URL_CREDENTIALS.test(text.slice(0, match.index))).map((match) => match[1]!.toLowerCase());
 }
 /**
  * Private words that must not appear in public files, stored as SHA-256 hashes of the lower-case word
@@ -138,7 +138,9 @@ describe("public-repository hygiene", () => {
     expect([..."eslint-config-next@16.3.8 and braces@3.0.3".matchAll(EMAIL)]).toEqual([]);
     expect([..."reach someone.private@gmail.com".matchAll(EMAIL)].map((match) => match[1])).toEqual(["gmail.com"]);
     expect(addressDomainsIn("reach someone.private@gmail.com or mailto:team@bibobay.example")).toEqual(["gmail.com", "bibobay.example"]);
-    expect(addressDomainsIn("connect to https://user:secret@db.host-name.co/x and ftp://me@files.host-name.co")).toEqual([]);
+    expect(addressDomainsIn("connect to https://user:secret@db.host-name.co/x and https://u:@db2.host-name.co")).toEqual([]);
+    // Only the credentials form (`scheme://user:pass@host`) is exempt: an address dressed as a URL is still an address.
+    for (const disguised of ["https://name@gmail.com", "// name@gmail.com", "//name@gmail.com", "ftp://me@gmail.com/x"]) expect(addressDomainsIn(disguised), disguised).toEqual(["gmail.com"]);
     for (const reserved of ["example.com", "studio.example.com", "example.org", "bibobay.example", "a.test"]) expect(RESERVED_DOMAIN.test(reserved), reserved).toBe(true);
     for (const real of ["gmail.com", "examples.com", "example.co", "my-example.com"]) expect(RESERVED_DOMAIN.test(real), real).toBe(false);
     expect(probeFreeFiles()).not.toContain(SELF);

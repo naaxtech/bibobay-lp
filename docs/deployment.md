@@ -50,7 +50,8 @@ Generate random secrets with, for example, `node -e "console.log(require('node:c
 Not created yet (Task 11). Settings to use:
 
 - Framework Next.js, root directory = repository root. `vercel.json` pins `installCommand: npm ci`
-  and `buildCommand: npm run build`, so Vercel never installs from `bun.lock`.
+  and `buildCommand: npm run build && npm run verify:bundle`, so Vercel never installs from
+  `bun.lock` and every deployment's client bundle is scanned with its own secret values.
 - Node.js 26 (matches `.nvmrc`).
 - The build runs `npm run verify:env -- production` first; it fails on a forbidden public name or a
   short `LEAD_IP_HASH_SECRET`.

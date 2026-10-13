@@ -46,6 +46,13 @@ describe("operations docs", () => {
     expect(verifyRow.indexOf("npm --prefix studio ci")).toBeLessThan(verifyRow.indexOf("typecheck"));
   });
 
+  it("states the Vercel install and build commands exactly as vercel.json sets them (re-review minor)", () => {
+    const vercel = JSON.parse(read("vercel.json")) as { installCommand: string; buildCommand: string };
+    const project = section(read("docs/deployment.md"), "Vercel project").replace(/\s+/g, " ");
+    expect(project).toContain(`\`installCommand: ${vercel.installCommand}\``);
+    expect(project).toContain(`\`buildCommand: ${vercel.buildCommand}\``);
+  });
+
   it("says where server-rendered pages are scanned, since the build output holds none (review I1)", () => {
     const scan = section(read("docs/deployment.md"), "Client bundle secret scan");
     expect(scan).toMatch(/rendered per request/i);
