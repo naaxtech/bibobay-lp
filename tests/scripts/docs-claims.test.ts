@@ -10,12 +10,12 @@ import { MAX_WEBHOOK_BODY_BYTES } from "@/lib/security/revalidation";
  * code they describe so they cannot drift back.
  */
 const read = (file: string) => readFileSync(resolve(file), "utf8");
-const firstBashBlock = (markdown: string) => /```bash\n([\s\S]*?)```/.exec(markdown)?.[1] ?? "";
+const firstBashBlock = (markdown: string) => /```bash\r?\n([\s\S]*?)```/.exec(markdown)?.[1] ?? "";
 const section = (markdown: string, heading: string) => {
   const start = markdown.indexOf(`## ${heading}`);
   if (start < 0) return "";
-  const next = markdown.indexOf("\n## ", start + 3);
-  return markdown.slice(start, next < 0 ? undefined : next);
+  const next = markdown.slice(start + 3).search(/\r?\n## /);
+  return next < 0 ? markdown.slice(start) : markdown.slice(start, start + 3 + next);
 };
 
 describe("operations docs", () => {
@@ -34,11 +34,14 @@ describe("operations docs", () => {
   });
 
   it("installs the Studio before the root gates that import its schema (review C1)", () => {
+    // Windows checkouts (core.autocrlf) turn the docs CRLF; the block must still be found.
+    expect(firstBashBlock("# x\r\n```bash\r\nnpm ci\r\n```\r\n")).toBe("npm ci\r\n");
+    expect(section("## A\r\none\r\n## B\r\ntwo", "A")).toBe("## A\r\none");
     const gates = firstBashBlock(read("docs/qa-checklist.md"));
     const studioInstall = gates.indexOf("npm --prefix studio ci");
     expect(studioInstall).toBeGreaterThan(-1);
     for (const gate of ["npm run typecheck", "npm run test:run", "npm run build"]) expect(studioInstall, gate).toBeLessThan(gates.indexOf(gate));
-    const verifyRow = read("docs/deployment.md").split("\n").find((line) => line.startsWith("| `verify` |")) ?? "";
+    const verifyRow = read("docs/deployment.md").split(/\r?\n/).find((line) => line.startsWith("| `verify` |")) ?? "";
     expect(verifyRow.indexOf("npm --prefix studio ci")).toBeGreaterThan(-1);
     expect(verifyRow.indexOf("npm --prefix studio ci")).toBeLessThan(verifyRow.indexOf("typecheck"));
   });
@@ -47,7 +50,7 @@ describe("operations docs", () => {
     const scan = section(read("docs/deployment.md"), "Client bundle secret scan");
     expect(scan).toMatch(/rendered per request/i);
     expect(scan).toContain("verify:deployment");
-    const criterion9 = read("docs/qa-checklist.md").split("\n").find((line) => line.startsWith("| 9 |")) ?? "";
+    const criterion9 = read("docs/qa-checklist.md").split(/\r?\n/).find((line) => line.startsWith("| 9 |")) ?? "";
     expect(criterion9).toContain("npm run verify:deployment");
   });
 });
