@@ -23,11 +23,12 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 |---|---|
 | `app/` | Routes, metadata files, API route handlers |
 | `components/landing/` | One component per landing section, the section renderer, `ui-copy.ts` (interface labels not held in Sanity) |
-| `components/brand/` | The logo renderer and the bay backdrop art |
+| `components/brand/` | The logo renderer and the drawn scenery: `ReefBackdrop` (sunbeams, bubbles and the sandy sea floor behind the hero and the closing scene) and `BayBackdrop` (the earlier paper horizon, kept for a slot with no art at all) |
 | `components/forms/` | The founding-family form (`LeadForm.tsx`) and its copy |
 | `components/legal/`, `components/preview/` | Privacy, terms and thank-you page shells; the draft-preview notice |
 | `components/motion/` | GSAP provider, reduced-motion hook, section reveals |
-| `lib/content/` | Content types, normalisation, repository fallback content and fallback legal text |
+| `lib/content/` | Content types, normalisation, repository fallback content, fallback legal text, and `lib/content/brand-art.ts`: the registry of repository brand art (each still's size, srcset, alt text and source video) |
+| `public/brand/art/` | Stills cut from the Bibo Bay channel's own videos and their thumbnails, each pre-sized at standard widths for a srcset; static files, never resized at request time |
 | `lib/sanity/` | Client, queries, cached fetches, image URLs, draft mode |
 | `lib/leads/`, `lib/email/`, `lib/supabase/` | Lead submission, Resend adapter and emails, Supabase adapters |
 | `lib/security/` | Security headers and CSP, rate limiter, webhook signature check |
@@ -201,6 +202,7 @@ Kept on purpose and never deleted. They are excluded from typecheck, lint and te
 | `bibo-skeleton-1` | A zip archive (no extension) of the original prototype export. Reference only. |
 | `bun.lock` | The prototype's bun lockfile. npm and `package-lock.json` are canonical; do not run bun. |
 | `references/test.md` | An archived placeholder note, marked audit-only. |
-| `references/bibo-logo.jpg` | Source material: the reference artwork for the canonical logo `public/bibo-logo.svg`. |
+| `references/bibo-channel-mark.jpg` | Source material: the YouTube channel's mark, which the canonical logo `public/bibo-logo.svg` is traced from. The channel is the brand authority. |
+| `references/bibo-logo.jpg` | Earlier reference artwork, kept for history; no longer the logo's source. |
 | `brandfoundation.md`, `styleprompt.md` | Source material: brand foundation and visual style brief. |
 | `CLAUDE.md` | A one-line pointer to `AGENTS.md`, written by `next dev`. |

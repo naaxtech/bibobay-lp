@@ -10,7 +10,10 @@ export interface FinalCtaProps {
   section: SectionConfig;
   finalCta: LandingPageContent["finalCta"];
   links: LinkContext;
-  /** The closing scene: the CMS image, else the channel's reef (ruling R58); without either, the drawn Bay horizon. */
+  /**
+   * The closing scene: the CMS image, else the channel's reef (ruling R58); without either, the drawn
+   * Bay horizon. Reef sand is drawn over the channel's scene only, never over an editor's own image.
+   */
   art?: StageArt;
 }
 
@@ -23,7 +26,7 @@ export interface FinalCtaProps {
 export function FinalCta({ section, finalCta, links, art }: FinalCtaProps) {
   const cta = isReachable(finalCta.cta.href, links) ? finalCta.cta : null;
   return (
-    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section" bay="settle">
+    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section" bay={art && !art.repository ? undefined : "settle"}>
       <div className="landing-container flex flex-col items-center text-center">
         {finalCta.eyebrow ? <Tape>{finalCta.eyebrow}</Tape> : null}
         <h2 id="finalCta-heading" className="mt-4 max-w-[16ch] font-display text-h1 font-semibold">
@@ -34,13 +37,13 @@ export function FinalCta({ section, finalCta, links, art }: FinalCtaProps) {
       </div>
       <div className={art ? "final-bay final-bay--art" : "final-bay"}>
         {art ? (
-          <div className="final-bay__scene">
+          <div className={art.repository ? "final-bay__scene final-bay__scene--reef" : "final-bay__scene"}>
             <ArtImage art={art} sizes="100vw" />
           </div>
         ) : (
           <BayBackdrop className="absolute inset-0" />
         )}
-        {art ? <ReefBackdrop className="final-bay__reef" /> : null}
+        {art?.repository ? <ReefBackdrop className="final-bay__reef" /> : null}
       </div>
     </SectionShell>
   );

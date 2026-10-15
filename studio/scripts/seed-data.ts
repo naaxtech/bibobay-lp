@@ -18,7 +18,7 @@ const SEO = ["BIBO Bay | Bright minds. Kind hearts. Big adventures.", "A gentle 
 
 const names = [
   ["tula", "Tula the Turtle", "Sea turtle", "The fruit finder", "Tula loves discovering colourful fruit and counting along. When feelings feel big, she shows little ones how to breathe out a slow bubble.", ["Fruits and colours", "Counting", "Calm breathing"], "#6fbf4a"],
-  ["bob", "Bob the Fish", "Clownfish", "The little spotter", "Bob is often first to spot something new in the Bay, like tiny lights glowing in the water, and he always calls his friends over to look.", ["Noticing", "Friendship", "Slow breaths"], "#f06b32"],
+  ["bob", "Bob the Fish", "Clownfish", "The little spotter", "In Twinkle Twinkle Little Star Under the Sea, Bob spots tiny lights glowing in the water and calls his friends over to look.", ["Noticing", "Friendship", "Slow breaths"], "#f06b32"],
   ["lumi", "Lumi", "Octopus", "The song and dance friend", "Lumi loves to sing and dance with friends, from wiggly songs in the sunshine to gentle songs under the stars.", ["Songs and rhymes", "Moving to music", "Bedtime calm"], "#9467aa"],
 ] as const;
 /** Real, published channel videos, each checked on 2026-10-15. */
@@ -37,7 +37,7 @@ const values = [
   ["feelings", "Big feelings", "Name big feelings and find a calm, slow breath.", ["What could help?"]],
   ["capable", "Confident kids", "Build confidence by trying, and trying again.", ["Can I try?"]],
   ["imagine", "Wild imaginations", "Enjoy memorable stories, songs and adventures.", ["What could we invent?"]],
-  ["planet", "Little planet protectors", "Discover the creatures and colours of the sea.", ["What lives in the sea?"]],
+  ["planet", "Curious explorers", "Meet baby animals and the creatures of the sea.", ["What lives in the sea?"]],
 ] as const;
 const extensions = [
   ["academy", "BIBO Academy", "Guided learning"], ["lab", "BIBO Lab", "Hands-on discovery"],

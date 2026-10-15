@@ -35,7 +35,7 @@ npm run build
 npx next start -p 3200 -H 127.0.0.1 &        # pick a free port
 curl -fsS http://127.0.0.1:3200/api/health    # wait until this answers
 E2E_PRODUCTION=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test
-npm run verify:deployment -- http://127.0.0.1:3200 --browser --expect-heading "Where bright little adventures begin."
+npm run verify:deployment -- http://127.0.0.1:3200 --browser --expect-heading "Bright minds. Kind hearts. Big adventures."
 ```
 
 Stop the server afterwards. `E2E_PRODUCTION=1` turns on the checks that only hold for a production

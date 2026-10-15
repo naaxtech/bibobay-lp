@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
+import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
+
 /*
  * .github/workflows/ci.yml (ruling R43). Neither actionlint nor action-validator runs here (no
  * network for new tools), so the workflow is parsed and its shape asserted: triggers, least
@@ -209,5 +211,12 @@ describe("Vercel build settings", () => {
     // secrets). Findings name the file and rule, never the value, so the build log stays clean.
     expect(config).toMatchObject({ framework: "nextjs", installCommand: "npm ci", buildCommand: "npm run build && npm run verify:bundle" });
     expect(JSON.stringify(config)).not.toMatch(/\bbunx?\b|\$\{|secret|token/i);
+  });
+});
+
+describe("deployment verifier step (rebrand review C1)", () => {
+  it("expects the repository fallback's own hero heading, so a copy change cannot leave CI checking the old one", () => {
+    const verify = runs("e2e").find((run) => run.includes("verify:deployment"));
+    expect(/--expect-heading "([^"]+)"/.exec(verify ?? "")?.[1]).toBe(SAFE_FALLBACK_CONTENT.hero.title);
   });
 });

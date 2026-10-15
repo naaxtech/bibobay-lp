@@ -54,7 +54,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
   charactersIntro: { eyebrow: "Meet the Bay friends", heading: "Say hello to Tula, Bob and Lumi.", description: "Three friends who learn and grow with your little one in the gentle underwater world of Bibo Bay." },
   characters: [
     character("tula", "Tula the Turtle", "Sea turtle", "The fruit finder", "Tula loves discovering colourful fruit and counting along. When feelings feel big, she shows little ones how to breathe out a slow bubble.", ["Fruits and colours", "Counting", "Calm breathing"], "#6fbf4a"),
-    character("bob", "Bob the Fish", "Clownfish", "The little spotter", "Bob is often first to spot something new in the Bay, like tiny lights glowing in the water, and he always calls his friends over to look.", ["Noticing", "Friendship", "Slow breaths"], "#f06b32"),
+    character("bob", "Bob the Fish", "Clownfish", "The little spotter", "In Twinkle Twinkle Little Star Under the Sea, Bob spots tiny lights glowing in the water and calls his friends over to look.", ["Noticing", "Friendship", "Slow breaths"], "#f06b32"),
     character("lumi", "Lumi", "Octopus", "The song and dance friend", "Lumi loves to sing and dance with friends, from wiggly songs in the sunshine to gentle songs under the stars.", ["Songs and rhymes", "Moving to music", "Bedtime calm"], "#9467aa"),
   ],
   episodesIntro: { eyebrow: "Watch now", heading: "Songs and adventures to watch together.", description: "Sing, count, breathe and wind down with the friends of Bibo Bay. Every video opens on YouTube.", conceptLabel: "Story concept" },
@@ -75,7 +75,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
     { id: "feelings", title: "Big feelings", description: "Name big feelings and find a calm, slow breath.", prompts: ["What could help?"] },
     { id: "capable", title: "Confident kids", description: "Build confidence by trying, and trying again.", prompts: ["Can I try?"] },
     { id: "imagine", title: "Wild imaginations", description: "Enjoy memorable stories, songs and adventures.", prompts: ["What could we invent?"] },
-    { id: "planet", title: "Little planet protectors", description: "Discover the creatures and colours of the sea.", prompts: ["What lives in the sea?"] },
+    { id: "planet", title: "Curious explorers", description: "Meet baby animals and the creatures of the sea.", prompts: ["What lives in the sea?"] },
   ],
   ecosystemIntro: { eyebrow: "A wider world", heading: "Ideas beyond the Bay.", description: "The wider BIBO ecosystem is a vision for future experiences, not a list of available products or services." },
   ecosystem: [

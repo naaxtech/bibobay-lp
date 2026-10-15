@@ -150,28 +150,46 @@
     background-image: radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--bibo-color-ocean) 32%, transparent), transparent 70%);
   }
 
+  /*
+   * --accent-ink is the accent's text colour on the section's own ground; --accent-ink-paper is the
+   * same accent's text colour on a white surface (a card, a stage, a stamp), whatever the ground.
+   */
   [data-accent="teal"] {
     --accent: var(--bibo-color-teal);
     --accent-ink: var(--bibo-color-teal-ink);
+    --accent-ink-paper: var(--bibo-color-teal-ink);
   }
 
   [data-accent="yellow"] {
     --accent: var(--bibo-color-yellow);
     --accent-ink: var(--bibo-color-orange-ink);
+    --accent-ink-paper: var(--bibo-color-orange-ink);
   }
 
   [data-accent="orange"] {
     --accent: var(--bibo-color-orange);
     --accent-ink: var(--bibo-color-orange-ink);
+    --accent-ink-paper: var(--bibo-color-orange-ink);
   }
 
   [data-accent="purple"] {
     --accent: var(--bibo-color-purple);
     --accent-ink: var(--bibo-color-purple-ink);
+    --accent-ink-paper: var(--bibo-color-purple-ink);
   }
 
   [data-ground="navy"][data-accent] {
     --accent-ink: var(--bibo-color-yellow);
+  }
+
+  /*
+   * Rebrand review I1: yellow ink is for text on the deep-sea ground itself. White surfaces inside a
+   * deep-sea section (the video player, a friend's stage, a chosen tab, a status stamp) take the
+   * accent's paper ink again, so their labels keep AA contrast on white.
+   */
+  [data-ground="navy"] :is(.storybook, .friend-stage, .friend-tab, .story-tab[aria-selected="true"], .paper-stamp) {
+    --accent-ink: var(--accent-ink-paper, var(--bibo-color-navy));
+    --bibo-focus-color: var(--bibo-color-navy);
   }
 
   /* ---------- Paper primitives ---------- */
@@ -1214,6 +1232,30 @@
     text-decoration: none;
   }
 
+  /*
+   * Rebrand review I2: the card clips anything drawn outside the cover, and the cover's picture
+   * paints over anything drawn beneath it, so the focus ring is a layer above the picture, inside the
+   * cover's edge: a navy line with a white band inside it, visible on any picture. The transparent
+   * outline stays for forced-colours mode, where box shadows are not drawn and it takes a system colour.
+   */
+  .storybook__watch::after {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    border-radius: inherit;
+    content: "";
+    pointer-events: none;
+  }
+
+  .storybook__watch:focus-visible {
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+  }
+
+  .storybook__watch:focus-visible::after {
+    box-shadow: inset 0 0 0 3px var(--bibo-color-navy), inset 0 0 0 7px var(--bibo-color-paper);
+  }
+
   /* The play disc: the yellow of the primary button, ringed in white, with a navy triangle. */
   .storybook__play {
     position: absolute;
@@ -1244,10 +1286,11 @@
     scale: 1.08;
   }
 
+  /* On a phone the label sits top-left, clear of the title printed along a thumbnail's foot. */
   .storybook__watch-label {
     position: absolute;
-    inset-block-end: 1rem;
-    inset-inline-start: 1rem;
+    inset-block-start: 0.75rem;
+    inset-inline-start: 0.75rem;
     padding: 0.45rem 1.05rem 0.5rem;
     border-radius: var(--bibo-radius-pill);
     background-color: var(--bibo-color-paper);
@@ -1261,6 +1304,11 @@
   @media (min-width: 48rem) {
     .watch-layout .storybook__facts {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .storybook__watch-label {
+      inset-block: auto 1rem;
+      inset-inline-start: 1rem;
     }
   }
 
@@ -1677,7 +1725,11 @@
   /* The closing scene stops short of the sand drawn over its foot, so the friends stand above it. */
   .final-bay__scene {
     position: absolute;
-    inset: 0 0 12% 0;
+    inset: 0;
+  }
+
+  .final-bay__scene--reef {
+    inset-block-end: 12%;
   }
 
   .final-bay__reef {

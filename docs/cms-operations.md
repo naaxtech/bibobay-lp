@@ -83,8 +83,15 @@ eyebrow renders nothing.
   (then it gets an empty `alt`). The Studio refuses an image with neither.
 - Set the crop and **hotspot** in the image editor. The site applies the crop and keeps the hotspot
   in view when a frame cuts the image further.
-- When an image is absent, the section keeps its drawn placeholder art. Images are served from
-  Sanity's CDN (`cdn.sanity.io`), the only image host the site allows.
+- When an image is absent, the slot shows the repository's channel art instead: stills cut from the
+  Bibo Bay channel's own videos (`public/brand/art/`, registered in `lib/content/brand-art.ts`). A
+  friend gets a portrait only when their first name is Tula, Bob or Lumi; a video gets its
+  thumbnail when its media link is a YouTube link to one of the channel's videos; the section scenes
+  (hero, promise, loop, values, signup, closing) always have one. Upload an image to replace a
+  slot's channel art; it cannot be switched off from the Studio. A slot with neither keeps its drawn
+  placeholder.
+- Editors' images are served from Sanity's CDN (`cdn.sanity.io`), the only image host the site
+  allows. Channel art is served by the site itself.
 
 ## Downloads (lead magnets)
 

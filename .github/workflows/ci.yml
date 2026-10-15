@@ -162,7 +162,7 @@ jobs:
       - name: Playwright (lead requests are always mocked; nothing reaches a real service)
         run: npx playwright test --reporter=github,html
       - name: Deployment verifier against the same server (fetch and browser)
-        run: npm run verify:deployment -- http://127.0.0.1:3000 --browser --expect-heading "Where bright little adventures begin."
+        run: npm run verify:deployment -- http://127.0.0.1:3000 --browser --expect-heading "Bright minds. Kind hearts. Big adventures."
       - name: Keep the Playwright report and traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

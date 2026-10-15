@@ -49,3 +49,14 @@ describe("truthful offline content", () => {
     expect(SAFE_FALLBACK_LEGAL.privacy).toEqual([]);
   });
 });
+
+describe("claims about the cast and values (rebrand review M1)", () => {
+  it("states no habit the channel never shows: no 'always' or 'often' about a friend", () => {
+    for (const friend of SAFE_FALLBACK_CONTENT.characters) expect(friend.description, friend.name).not.toMatch(/\b(?:always|often|never|every time)\b/i);
+  });
+
+  it("names only values the channel's own words support", () => {
+    const titles = SAFE_FALLBACK_CONTENT.pillars.map(({ title }) => title);
+    expect(titles.join(" ")).not.toMatch(/planet|protector|eco|climate/i);
+  });
+});

@@ -46,7 +46,10 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
           <span className="storybook__play" aria-hidden="true" />
           <span className="storybook__watch-label">
             {youtubeVideoId(watchHref) ? UI_COPY.watchOnYouTube : UI_COPY.watchStory}
-            <span className="sr-only"> {UI_COPY.opensInNewTab}</span>
+            {/* The title tells the seven ways out apart in a screen reader's list of links. */}
+            <span className="sr-only">
+              : {story.title} {UI_COPY.opensInNewTab}
+            </span>
           </span>
         </a>
       ) : (

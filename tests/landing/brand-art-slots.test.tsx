@@ -38,9 +38,9 @@ const imagesIn = (root: Element) => Array.from(root.querySelectorAll("img"));
 const showsFile = (root: Element, file: string) => imagesIn(root).some((image) => shownFile(image) === file);
 
 describe("repository art in empty CMS slots", () => {
-  it("opens on the channel's own trio, described by the CMS artwork description and loaded first", () => {
+  it("opens on the channel's own trio, described by its own alt text and loaded first", () => {
     renderPage();
-    const image = within(section("hero")).getByRole("img", { name: landingContent().hero.artworkDescription });
+    const image = within(section("hero")).getByRole("img", { name: BRAND_ART.sections.hero!.alt });
     expect(shownFile(image)).toBe(BRAND_ART.sections.hero!.src);
     expect(image.getAttribute("fetchpriority")).toBe("high");
     expect(image.getAttribute("loading")).toBe("eager");
@@ -80,7 +80,7 @@ describe("repository art in empty CMS slots", () => {
 
   it("lets the browser pick a pre-sized file for the slot's width, with no request-time resizing", () => {
     renderPage();
-    const hero = within(section("hero")).getByRole("img", { name: landingContent().hero.artworkDescription });
+    const hero = within(section("hero")).getByRole("img", { name: BRAND_ART.sections.hero!.alt });
     expect(hero.getAttribute("srcset")).toBe(BRAND_ART.sections.hero!.srcSet);
     expect(hero.getAttribute("sizes")).toMatch(/vw|rem/);
     expect(hero.getAttribute("decoding")).toBe("async");
@@ -121,5 +121,50 @@ describe("precedence", () => {
     expect(stage.querySelector(".friend-stage__art svg")?.getAttribute("aria-hidden")).toBe("true");
     const book = within(section("episodes")).getByRole("tabpanel");
     expect(book.querySelector(".storybook__cover img")).toBeNull();
+  });
+});
+
+describe("rebrand review fixes", () => {
+  it("describes the repository trio by its own alt text, whatever the CMS says about other artwork (M2)", () => {
+    renderPage(landingContent((draft) => { draft.hero.artworkDescription = "A drawing of the Bay at dusk"; }));
+    const hero = within(section("hero")).getByRole("img", { name: BRAND_ART.sections.hero!.alt });
+    expect(shownFile(hero)).toBe(BRAND_ART.sections.hero!.src);
+    expect(within(section("hero")).queryByRole("img", { name: "A drawing of the Bay at dusk" })).toBeNull();
+  });
+
+  it("names each video's way out by its title, so a links list tells them apart (M6)", () => {
+    renderPage();
+    const tabs = within(section("episodes")).getAllByRole("tab");
+    landingContent().episodes.forEach((video, index) => {
+      fireEvent.click(tabs[index]!);
+      const panel = within(section("episodes")).getByRole("tabpanel");
+      const link = within(panel).getByRole("link", { name: /Watch on YouTube/ });
+      expect(link.textContent).toContain(video.title);
+    });
+  });
+
+  it("draws the reef only on the sea ground, and its front dune only when the sand band follows (M7)", () => {
+    renderPage();
+    const reef = () => section("hero").querySelector(".reef-backdrop");
+    expect(reef()).not.toBeNull();
+    expect(reef()!.querySelector("[data-bay-layer='sand'] [data-dune]:last-child")?.getAttribute("fill")).toBe("#fbe9d4");
+    cleanup();
+
+    // The trust band hidden: the hero meets the promise's clear water, so no sand dune runs into it.
+    renderPage(landingContent((draft) => { draft.sections = draft.sections.map((entry) => (entry.id === "trust" ? { ...entry, visible: false } : entry)); }));
+    expect(reef()).not.toBeNull();
+    expect(Array.from(reef()!.querySelectorAll("[data-dune]"), (dune) => dune.getAttribute("fill"))).not.toContain("#fbe9d4");
+    cleanup();
+
+    renderPage(landingContent((draft) => { draft.sections = draft.sections.map((entry) => (entry.id === "hero" ? { ...entry, theme: { background: "paper" } } : entry)); }));
+    expect(reef()).toBeNull();
+  });
+
+  it("draws reef sand over the channel's closing scene but never over an editor's own image (M7)", () => {
+    renderPage();
+    expect(section("finalCta").querySelector(".reef-backdrop")).not.toBeNull();
+    cleanup();
+    renderPage(landingContent((draft) => { draft.finalCta.image = { asset: { _ref: "image-close-1600x900-jpg" }, alt: "Footprints along the shore" }; }));
+    expect(section("finalCta").querySelector(".reef-backdrop")).toBeNull();
   });
 });

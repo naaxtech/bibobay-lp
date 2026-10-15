@@ -214,3 +214,15 @@ describe("CSS custom properties", () => {
     expect(parseFloat(brandTokens.focus.width)).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("stylesheets after the palette change (rebrand review M5)", () => {
+  it("draws no colour from the old palette", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { execFileSync } = await import("node:child_process");
+    const sheets = execFileSync("git", ["ls-files", "app", "components"], { encoding: "utf8" }).split(/\r?\n/).filter((file) => file.endsWith(".css") || file.endsWith(".tsx"));
+    for (const file of sheets) {
+      const text = readFileSync(file, "utf8").toLowerCase();
+      for (const old of ["13294b", "f8f3e9"]) expect(text.includes(old), `${file} still uses #${old}`).toBe(false);
+    }
+  });
+});

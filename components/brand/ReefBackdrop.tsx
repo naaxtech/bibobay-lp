@@ -72,6 +72,8 @@ const SAND: readonly ReefShape[] = [
   { d: "M-20 700C180 672 380 672 600 684C820 696 1000 680 1200 670C1320 664 1400 668 1460 674V740H-20Z", fill: color.sand, dune: true },
 ];
 
+const FRONT_DUNE = SAND.at(-1);
+
 /** Back to front. Only the sand stays with the page; light and bubbles lag behind as it scrolls. */
 const REEF_LAYERS: readonly ReefLayer[] = [
   { name: "rays", depth: 0.15, shapes: RAYS },
@@ -92,6 +94,11 @@ function BubbleShape({ cx, cy, r, near }: Bubble & { near: boolean }) {
 export interface ReefBackdropProps {
   /** Position and size the reef; it covers its box from the bottom edge. */
   className?: string;
+  /**
+   * Draw the front dune in the sand colour, to run on into a sand section below (default). Without
+   * it the floor ends on the warm back dune, which reads as the bottom of the sea against any ground.
+   */
+  frontDune?: boolean;
 }
 
 /**
@@ -101,7 +108,7 @@ export interface ReefBackdropProps {
  * `[data-bay-layer]` groups by their `data-depth` (the same contract as the paper bay), but never
  * needs to reveal them.
  */
-export function ReefBackdrop({ className }: ReefBackdropProps) {
+export function ReefBackdrop({ className, frontDune = true }: ReefBackdropProps) {
   return (
     <svg
       className={className ? `reef-backdrop ${className}` : "reef-backdrop"}
@@ -112,9 +119,11 @@ export function ReefBackdrop({ className }: ReefBackdropProps) {
     >
       {REEF_LAYERS.map((layer) => (
         <g key={layer.name} data-bay-layer={layer.name} data-depth={layer.depth}>
-          {layer.shapes?.map((shape) => (
-            <path key={shape.d} d={shape.d} fill={shape.fill} fillOpacity={shape.fillOpacity} data-dune={shape.dune ? "" : undefined} />
-          ))}
+          {layer.shapes
+            ?.filter((shape) => frontDune || shape !== FRONT_DUNE)
+            .map((shape) => (
+              <path key={shape.d} d={shape.d} fill={shape.fill} fillOpacity={shape.fillOpacity} data-dune={shape.dune ? "" : undefined} />
+            ))}
           {layer.bubbles?.map((bubble) => (
             <BubbleShape key={`${bubble.cx}-${bubble.cy}`} {...bubble} near={layer.name === "near-bubbles"} />
           ))}

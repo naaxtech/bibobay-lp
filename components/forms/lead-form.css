@@ -70,7 +70,7 @@
   .lead-form__select {
     appearance: none;
     padding-inline-end: 2.75rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6l4.5 4.5L12.5 6' fill='none' stroke='%2313294b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6l4.5 4.5L12.5 6' fill='none' stroke='%23283b63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-position: right 0.875rem center;
     background-repeat: no-repeat;
     background-size: 1rem;
@@ -148,6 +148,8 @@
 
   /* The label never changes, so the button never changes size between states. */
   .lead-form .lead-form__submit {
+    /* Navy on the white form, with a navy lip (the page's primary is yellow with an amber lip). */
+    --btn-lip: color-mix(in srgb, var(--bibo-color-navy) 70%, #000000);
     justify-self: start;
     background-color: var(--bibo-color-navy);
     color: var(--bibo-color-cream);

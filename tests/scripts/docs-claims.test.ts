@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { MAX_WEBHOOK_BODY_BYTES } from "@/lib/security/revalidation";
 
 /*
@@ -59,5 +60,31 @@ describe("operations docs", () => {
     expect(scan).toContain("verify:deployment");
     const criterion9 = read("docs/qa-checklist.md").split(/\r?\n/).find((line) => line.startsWith("| 9 |")) ?? "";
     expect(criterion9).toContain("npm run verify:deployment");
+  });
+});
+
+describe("rebrand docs (rebrand review C1, M3)", () => {
+  it("gives the manual QA run the repository fallback's own hero heading", () => {
+    const headings = [...read("docs/qa-checklist.md").matchAll(/--expect-heading "([^"]+)"/g)].map((match) => match[1]);
+    expect(headings.length).toBeGreaterThan(0);
+    for (const heading of headings) expect(heading).toBe(SAFE_FALLBACK_CONTENT.hero.title);
+  });
+
+  it("names the channel mark as the logo's source, and the channel as the brand authority", () => {
+    for (const file of ["README.md", "docs/architecture.md"]) {
+      const text = read(file);
+      expect(text, file).toContain("references/bibo-channel-mark.jpg");
+      expect(text, file).not.toMatch(/bibo-logo\.jpg`?[^\n|]*(?:traced|canonical logo)/);
+    }
+  });
+
+  it("tells editors what an empty image slot shows and how repository art is matched", () => {
+    const images = section(read("docs/cms-operations.md"), "Images");
+    expect(images).toMatch(/channel/i);
+    expect(images).toContain("lib/content/brand-art.ts");
+    expect(images).toMatch(/first name/i);
+    expect(images).toMatch(/YouTube/);
+    const map = read("docs/architecture.md");
+    for (const name of ["public/brand/art/", "lib/content/brand-art.ts", "ReefBackdrop"]) expect(map, name).toContain(name);
   });
 });

@@ -88,8 +88,13 @@ The full pre-release list, including running Playwright against a production bui
 
 ## Source material kept in the repository
 
-- `brandfoundation.md` and `styleprompt.md`: the brand foundation and visual style brief.
-- `references/bibo-logo.jpg`: the reference artwork the canonical logo (`public/bibo-logo.svg`) is traced from.
+- The Bibo Bay YouTube channel ([@bibobay-tv](https://www.youtube.com/@bibobay-tv)) is the brand authority: its
+  name, mark, colours, cast (Tula, Bob and Lumi) and videos. Where the documents below disagree with it, the channel wins.
+- `references/bibo-channel-mark.jpg`: the channel's mark, which the canonical logo (`public/bibo-logo.svg`) is traced from.
+- `public/brand/art/`: stills cut from the channel's own videos and their thumbnails, registered with alt text and
+  source in `lib/content/brand-art.ts`. They fill every image slot the CMS leaves empty.
+- `brandfoundation.md` and `styleprompt.md`: the earlier brand foundation and visual style brief.
+- `references/bibo-logo.jpg`: the earlier reference artwork, kept for history; it is no longer the logo's source.
 - `bibo-skeleton-1`: a zip archive (no file extension) of the original prototype export, kept for reference.
 
 ## The old GitHub Pages site

@@ -13,7 +13,7 @@ import { LeadCapture } from "./LeadCapture";
 import { OfflineLoop } from "./OfflineLoop";
 import { Pillars } from "./Pillars";
 import { PromiseSection } from "./Promise";
-import { artPosition, linkContext, renderableSections, verifiedTestimonials, type LinkContext, type StageArt } from "./sections";
+import { artPosition, linkContext, renderableSections, sectionTheme, verifiedTestimonials, type LinkContext, type StageArt } from "./sections";
 import { Testimonials } from "./Testimonials";
 import { TrustStrip } from "./TrustStrip";
 
@@ -33,15 +33,18 @@ function resolveArt(image: ImageWithAlt | undefined, size: ArtSize): StageArt | 
   return { src, alt: image.decorative ? "" : image.alt, ...(position ? { position } : {}) };
 }
 
-/** Repository brand art for a slot the CMS leaves empty (ruling R58); `alt` overrides the still's own. */
-function brandArt(art: BrandArt | undefined, alt?: string): StageArt | undefined {
+/**
+ * Repository brand art for a slot the CMS leaves empty (ruling R58). It keeps its own alt text: the
+ * CMS describes the editor's artwork, which may not be this still.
+ */
+function brandArt(art: BrandArt | undefined): StageArt | undefined {
   if (!art) return undefined;
-  return { src: art.src, srcSet: art.srcSet, alt: alt ?? art.alt, ...(art.position ? { position: art.position } : {}) };
+  return { src: art.src, srcSet: art.srcSet, alt: art.alt, repository: true, ...(art.position ? { position: art.position } : {}) };
 }
 
 /** A slot's art: the editor's image, else the repository's, else none (the drawn placeholder stays). */
-function slotArt(image: ImageWithAlt | undefined, size: ArtSize, fallback: BrandArt | undefined, alt?: string): StageArt | undefined {
-  return resolveArt(image, size) ?? brandArt(fallback, alt);
+function slotArt(image: ImageWithAlt | undefined, size: ArtSize, fallback: BrandArt | undefined): StageArt | undefined {
+  return resolveArt(image, size) ?? brandArt(fallback);
 }
 
 /** Art for each entry of a collection that has some, by entry id. */
@@ -64,12 +67,24 @@ interface RenderContext {
   content: LandingPageContent;
   links: LinkContext;
   leadForm?: ReactNode;
+  /** The section rendered after each one, by id (none after the last). */
+  nextSection: ReadonlyMap<SectionConfig["id"], SectionConfig>;
 }
 
-function renderSection(section: SectionConfig, { content, links, leadForm }: RenderContext): ReactNode {
+function renderSection(section: SectionConfig, { content, links, leadForm, nextSection }: RenderContext): ReactNode {
   switch (section.id) {
-    case "hero":
-      return <Hero section={section} hero={content.hero} links={links} art={slotArt(content.hero.image, "stage", SCENES.hero, content.hero.artworkDescription || undefined)} />;
+    case "hero": {
+      const next = nextSection.get("hero");
+      return (
+        <Hero
+          section={section}
+          hero={content.hero}
+          links={links}
+          art={slotArt(content.hero.image, "stage", SCENES.hero)}
+          meetsSand={next !== undefined && sectionTheme(next).background === "sand"}
+        />
+      );
+    }
     case "trust":
       return <TrustStrip section={section} trust={content.trust} art={resolveArt(content.trust.image, "thumb")} />;
     case "promise":
@@ -148,6 +163,7 @@ export interface SectionRendererProps {
  */
 export function SectionRenderer({ content, settings, leadForm }: SectionRendererProps) {
   const sections = renderableSections(content, settings);
-  const context: RenderContext = { content, links: linkContext(sections, settings), leadForm };
+  const nextSection = new Map(sections.slice(0, -1).map((section, index) => [section.id, sections[index + 1]!] as const));
+  const context: RenderContext = { content, links: linkContext(sections, settings), leadForm, nextSection };
   return sections.map((section) => <Fragment key={section.id}>{renderSection(section, context)}</Fragment>);
 }

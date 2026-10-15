@@ -82,6 +82,8 @@ export interface StageArt {
    * CDN and has none.
    */
   srcSet?: string;
+  /** True for repository brand art (not an editor's own image), which the page may draw over. */
+  repository?: boolean;
 }
 
 const share = (value: number) => `${Number((Math.min(1, Math.max(0, value)) * 100).toFixed(2))}%`;

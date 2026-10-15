@@ -4,7 +4,7 @@ import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage } from "./CmsArt";
 import { CtaLink } from "./CtaLink";
 import { SectionShell } from "./SectionShell";
-import { isReachable, type LinkContext, type StageArt } from "./sections";
+import { isReachable, sectionTheme, type LinkContext, type StageArt } from "./sections";
 
 export interface HeroProps {
   section: SectionConfig;
@@ -12,9 +12,11 @@ export interface HeroProps {
   links: LinkContext;
   /**
    * The hero art, resolved on the server: the CMS image, else the channel's own trio (ruling R58).
-   * Without either, the illustrated Bay stands in, named by the CMS artwork description.
+   * The illustrated Bay, named by the CMS artwork description, stands in only if neither exists.
    */
   art?: StageArt;
+  /** The next section is printed on sand, so the reef's front dune runs on into it. */
+  meetsSand?: boolean;
 }
 
 /**
@@ -44,12 +46,14 @@ function HeroTitle({ title }: { title: string }) {
  * below. The opening keeps its natural height, so the promise, both CTAs and the friends share the
  * first viewport.
  */
-export function Hero({ section, hero, links, art }: HeroProps) {
+export function Hero({ section, hero, links, art, meetsSand = false }: HeroProps) {
   const primary = isReachable(hero.primaryCta.href, links) ? hero.primaryCta : null;
   const secondary = isReachable(hero.secondaryCta.href, links) ? hero.secondaryCta : null;
+  // The reef is the sea ground's own scenery: a hero an editor prints on another ground gets none.
+  const underwater = sectionTheme(section).background === "sea";
   return (
-    <SectionShell section={section} headingId="hero-heading" className="hero overflow-x-clip" bay="drift">
-      <ReefBackdrop className="hero__reef" />
+    <SectionShell section={section} headingId="hero-heading" className="hero overflow-x-clip" bay={underwater ? "drift" : undefined}>
+      {underwater ? <ReefBackdrop className="hero__reef" frontDune={meetsSand} /> : null}
       <div className="landing-container hero__grid">
         <div className="hero__copy">
           <h1 id="hero-heading" className="hero-title font-display font-semibold">

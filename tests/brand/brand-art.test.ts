@@ -58,6 +58,19 @@ describe("repository brand art (ruling R58)", () => {
     }
   });
 
+  it("records where each still was cut, so it can be cut again (rebrand review M4)", () => {
+    for (const art of entries) {
+      if (art.source.endsWith("thumbnail")) continue;
+      // `<video id> at m:ss, crop x,y wxh` in the 1920x1080 frame, scaled to the still's own shape.
+      const crop = /^[\w-]{11} at \d+:\d{2}, crop (\d+),(\d+) (\d+)x(\d+)$/.exec(art.source);
+      expect(crop, `${art.src}: ${art.source}`).not.toBeNull();
+      const [x, y, w, h] = crop!.slice(1).map(Number) as [number, number, number, number];
+      expect(x + w, art.src).toBeLessThanOrEqual(1920);
+      expect(y + h, art.src).toBeLessThanOrEqual(1080);
+      expect(Math.abs(w / h - art.width / art.height), art.src).toBeLessThan(0.01);
+    }
+  });
+
   it("gives every fallback friend, video and value its own art", () => {
     for (const friend of SAFE_FALLBACK_CONTENT.characters) expect(friendArt(friend), friend.name).toBeDefined();
     for (const video of SAFE_FALLBACK_CONTENT.episodes) expect(videoArt(video.mediaUrl), video.title).toBeDefined();
@@ -86,10 +99,12 @@ describe("repository brand art (ruling R58)", () => {
     expect(youtubeVideoId(`https://evil.example/?u=https://youtu.be/${id}`)).toBeUndefined();
   });
 
-  it("matches a friend by Studio id or first name, and has nothing for a friend it does not know", () => {
-    expect(friendArt({ id: "character-bob", name: "Anything" })).toBe(BRAND_ART.friends.bob);
+  it("matches a friend by first name, and never shows one friend's portrait for another (rebrand review M2)", () => {
+    expect(friendArt({ id: "character-bob", name: "Bob the Fish" })).toBe(BRAND_ART.friends.bob);
     expect(friendArt({ id: "6f1c2b3a", name: "Lumi" })).toBe(BRAND_ART.friends.lumi);
     expect(friendArt({ id: "tula", name: "Tula the Turtle" })).toBe(BRAND_ART.friends.tula);
+    // A seeded document renamed for someone else gets no portrait: its alt text would name the wrong friend.
+    expect(friendArt({ id: "character-bob", name: "Pip the Squid" })).toBeUndefined();
     expect(friendArt({ id: "character-pip", name: "Pip the Little Squid" })).toBeUndefined();
     // Inherited object keys are never a match.
     expect(friendArt({ id: "constructor", name: "toString" })).toBeUndefined();
