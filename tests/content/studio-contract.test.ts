@@ -25,7 +25,8 @@ describe("Studio content model", () => {
     covers("faqItem", ["question", "answer"]);
     covers("leadMagnet", ["title", "description", "fileUrl", "available"]);
     covers("productCategory", ["name", "slug", "description", "image", "order"]);
-    covers("product", ["name", "slug", "description", "details", "images", "category", "status", "order", "seo", "commerceNotice"]);
+    // R80: SKU, variant and pack are what an order snapshots (spec §10 step 5).
+    covers("product", ["name", "slug", "description", "details", "images", "category", "status", "order", "seo", "commerceNotice", "sku", "variant", "pack"]);
     for (const type of ["imageWithAlt", "cta", "seo", "socialLink", "sectionTheme", "commerceNotice", "sectionIntro", "landingSection", "heroSection", "trustSection", "promiseSection", "episodesSectionIntro", "offlineSection", "leadSection", "finalCtaSection", "navigationSettings", "footerSettings"]) expect(types.has(type), `${type} object schema`).toBe(true);
     expect(types.get("imageWithAlt")?.type).toBe("image"); // Sanity image owns asset, crop and hotspot intrinsically.
     covers("imageWithAlt", ["alt", "caption", "decorative"]);

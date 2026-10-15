@@ -63,6 +63,10 @@ export const product = defineType({ name: "product", title: "Enquiry catalogue p
   defineField({ name: "images", type: "array", of: [defineArrayMember({ type: "imageWithAlt" })] }),
   defineField({ name: "category", type: "reference", to: [{ type: "productCategory" }] }),
   defineField({ name: "status", type: "string", options: { list: ["draft", "listed", "sold-out"] }, initialValue: "draft" }),
+  // R80: what an order request snapshots (spec §10 step 5). Optional; no prices, ever.
+  defineField({ name: "sku", title: "SKU", type: "string", description: "Stock code staff use for this product. Never shown with a price.", validation: (rule) => rule.max(64) }),
+  defineField({ name: "variant", type: "string", description: "Size, colour or edition, when the product has one.", validation: (rule) => rule.max(120) }),
+  defineField({ name: "pack", type: "string", description: "What one unit contains, e.g. \"Set of 3\".", validation: (rule) => rule.max(120) }),
   defineField({ name: "order", type: "number", initialValue: 0 }),
   defineField({ name: "seo", type: "seo" }),
   defineField({ name: "commerceNotice", type: "commerceNotice" }),

@@ -15,7 +15,7 @@ export interface FaqItem { id: string; question: string; answer: string }
 export interface LeadMagnet { title: string; description: string; fileUrl?: string; available: boolean }
 export interface ProductCategory { id: string; name: string; slug: string; description: string; image?: ImageWithAlt; order: number }
 export interface CommerceNotice { title: string; body: string; cta?: Cta }
-export interface Product { id: string; name: string; slug: string; description: string; details: PortableContent; images: ImageWithAlt[]; category?: ProductCategory; status: "draft" | "listed" | "sold-out"; order: number; seo?: Seo; commerceNotice?: CommerceNotice }
+export interface Product { id: string; name: string; slug: string; description: string; details: PortableContent; images: ImageWithAlt[]; category?: ProductCategory; status: "draft" | "listed" | "sold-out"; order: number; seo?: Seo; commerceNotice?: CommerceNotice; sku?: string; variant?: string; pack?: string }
 export type SocialPlatform = "instagram" | "youtube" | "facebook" | "tiktok" | "pinterest";
 export interface SocialLink { platform: SocialPlatform; url: string; verified: true }
 export interface SiteSettings {

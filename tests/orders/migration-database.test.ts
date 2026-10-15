@@ -1,0 +1,81 @@
+import type { PGlite } from "@electric-sql/pglite";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { applyMigrations, createSupabaseStandIn, migrationFiles, pgtapFiles, readPgtap, runTap, summariseTap } from "@/tests/support/supabase-db";
+
+/*
+ * Applies every migration (0001-0005) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
+ * and runs every pgTAP file against the result, so each file proves its policy holds alongside all
+ * the others. This is the same set Task 11 runs against the real project with `supabase test db`.
+ */
+let db: PGlite;
+
+beforeAll(async () => {
+  db = await createSupabaseStandIn();
+  await applyMigrations(db, migrationFiles());
+}, 120_000);
+
+afterAll(async () => {
+  await db?.close();
+});
+
+describe("every migration in Postgres", () => {
+  it("applies 0001 to 0005 in order", () => {
+    expect(migrationFiles()).toEqual([
+      "0001_leads_and_security.sql",
+      "0002_orders.sql",
+      "0003_order_tracking.sql",
+      "0004_lock_tracking_payload.sql",
+      "0005_shared_rate_limits_and_token_rotation.sql",
+    ]);
+  });
+
+  it("has a pgTAP file for the leads, the orders and the tracking grants", () => {
+    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql"]);
+  });
+
+  it.each(pgtapFiles())("passes every pgTAP assertion in supabase/tests/%s", async (file) => {
+    let lines: string[] = [];
+    let error: unknown;
+    try {
+      lines = await runTap(db, readPgtap(file));
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : caught;
+      await db.exec("rollback;").catch(() => {});
+    }
+    expect(error, `${file} ran to the end`).toBeUndefined();
+    const { planned, passed, failures } = summariseTap(lines);
+    expect(planned, `${file} printed a plan`).not.toBeNull();
+    expect(failures).toEqual([]);
+    expect(passed).toBe(planned);
+  }, 120_000);
+
+  it("leaves every order object owned by a role that bypasses RLS", async () => {
+    const { rows } = await db.query<{ name: string; owner: string }>(
+      `select proname as name, pg_get_userbyid(proowner) as owner from pg_proc
+        where pronamespace = 'public'::regnamespace and proname in ('submit_order', 'lookup_order_by_token', 'lookup_order_by_reference_email', 'rotate_order_tracking_token')
+        order by proname`,
+    );
+    expect(rows).toEqual([
+      { name: "lookup_order_by_reference_email", owner: "migrator" },
+      { name: "lookup_order_by_token", owner: "migrator" },
+      { name: "rotate_order_tracking_token", owner: "migrator" },
+      { name: "submit_order", owner: "migrator" },
+    ]);
+  });
+
+  it("can apply every migration a second time without error (idempotent objects)", async () => {
+    await expect(applyMigrations(db, migrationFiles())).resolves.toBeUndefined();
+  }, 120_000);
+});
+
+describe("migration preconditions", () => {
+  it("refuses to apply the orders migration before migration 0001", async () => {
+    const fresh = await createSupabaseStandIn();
+    try {
+      await expect(applyMigrations(fresh, ["0002_orders.sql"])).rejects.toThrow(/0001 must be applied/);
+    } finally {
+      await fresh.close();
+    }
+  }, 120_000);
+});

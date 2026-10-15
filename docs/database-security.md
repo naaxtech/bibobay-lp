@@ -1,8 +1,10 @@
 # Database security
 
-The Supabase database as defined in `supabase/migrations/0001_leads_and_security.sql`, the only
-migration so far. It covers founding-family leads, their email outbox and the shared rate limit.
-Order, staff and audit tables are not built yet (Task 7 and Task 8).
+The Supabase database as defined in `supabase/migrations/`: `0001_leads_and_security.sql` covers
+founding-family leads, their email outbox and the shared rate limit; `0002` to `0005` cover order
+requests, their lines, audit trail and email outbox, order tracking and tracking-token rotation
+(see [Orders](#orders-migrations-0002-to-0005)). Staff tables and staff access are not built yet
+(Task 8).
 
 ## Principles
 
@@ -11,7 +13,7 @@ Order, staff and audit tables are not built yet (Task 7 and Task 8).
   table; Supabase's default grants are explicitly revoked.
 - **One way in.** The website server calls narrow `security definer` functions with bounded
   arguments and `set search_path = ''`, using the server-only service-role key. The functions are
-  executable by `service_role` only. The browser never talks to Supabase for leads, so `anon` needs nothing.
+  executable by `service_role` only. The browser never talks to Supabase for leads or orders, so `anon` needs nothing.
 - **No raw IP address** is stored anywhere. Rate-limit keys are `<scope>:<HMAC>` values computed by
   the server (`lib/leads/http.ts`, keyed by `LEAD_IP_HASH_SECRET`) and never joined to a lead.
 - **No child data.** An adult's email, optional first name, optional broad age band.
@@ -80,6 +82,41 @@ closed with 503. The in-memory limiter in `lib/security/rate-limit.ts` is for te
 The client address is taken from the left-most `x-forwarded-for` entry, which is correct behind
 Vercel's edge; on another host it could be spoofed.
 
+## Orders (migrations 0002 to 0005)
+
+The same principles apply: forced RLS with no policies, every privilege revoked from every API role,
+and narrow functions executable by `service_role` only. Each order migration stops unless the
+migrating role bypasses RLS, and `0004` re-checks the order grants in the same transaction, so a
+deploy fails instead of leaving a door open. No order holds a price until staff quote it (Task 8),
+and no payment detail is ever stored.
+
+| Table | Holds | Notes |
+|---|---|---|
+| `orders` | One row per order request | Human-readable `reference` (`BB-XXXX-XXXX`), `status` (`new`, `confirmed`, `paid`, `dispatched`, `closed`, `cancelled`), `status_changed_at`, adult contact and delivery details (each bounded: name 120, email 254, phone 32, address lines 200, city and region 100, postal code 16, notes 1000, a two-letter country), `consent_version`, `consent_granted_at`, `tracking_token_hash` (SHA-256 only, never the token), `tracking_token_expires_at`, `tracking_token_rotated_at`, and the staff quote columns (`currency`, `subtotal_minor`, `freight_minor`, `payment_url`, `quote_sent_at`), empty until Task 8. |
+| `order_items` | The CMS snapshot of each product at ordering time | `sanity_id`, `title`, `sku`, `variant`, `pack`, `quantity` (1 to 999), `line_number` (1 to 40). One line per product. |
+| `order_events` | The audit trail | `actor` (`customer`, `staff`, `system`), `event_type`, `old_status`, `new_status`, `metadata` (a small JSON object). |
+| `order_email_outbox` | Order emails waiting for the Task 8 worker | Shaped like `lead_delivery_events`: `kind` (`acknowledgement` or `staff_alert`), `status`, `attempts`, `next_attempt_at`, `provider_message_id`, `last_error_code`. Unique on `(order_id, kind)`. |
+
+| Function | Does | Executable by |
+|---|---|---|
+| `submit_order(...)` → `(order_id, reference, tracking_token, tracking_token_expires_at, acknowledgement_queued)` | Re-validates every argument, then in one transaction writes the order, its lines (the server's canonical CMS snapshot, checked key by key), an `order_submitted` audit event and both outbox rows. If any part fails, nothing is kept. The tracking token is returned this once. | `service_role` only |
+| `lookup_order_by_token(token)` → JSON or null | The order for a current, unexpired token. | `service_role` only |
+| `lookup_order_by_reference_email(reference, email)` → JSON or null | The order with that reference AND that email, both normalised. | `service_role` only |
+| `rotate_order_tracking_token(order_id)` → `(tracking_token, tracking_token_expires_at)` | Issues a new token with a new expiry (180 days); the old one stops working; records a `tracking_token_rotated` event. For staff and the Task 8 worker. | `service_role` only |
+| `order_tracking_payload`, `order_tracking_token_hash`, `issue_order_tracking_token` | Internal helpers, run with their caller's rights. | nobody but their owner |
+
+Both lookups return the same locked payload: reference, status, `submittedAt`, `statusChangedAt` and
+each line's title, variant, pack and quantity. Never an address, email, name, phone, notes, SKU,
+product id, price or payment link. Every miss (unknown, malformed, expired, wrong email) returns the
+same null, so a lookup cannot reveal which references exist.
+
+Order rate limits reuse `consume_rate_limit` (ruling R79; no second limiter table):
+
+| Limit | Key | Value |
+|---|---|---|
+| Order requests per client | `order:<HMAC of the client address>` | 5 per hour |
+| Tracking lookups per client | `order-track:<HMAC of the client address>` | 10 per 10 minutes, found or not |
+
 ## Tests
 
 - `tests/leads/migration-policy.test.ts`: static checks of the SQL text (forced RLS, revokes,
@@ -89,6 +126,10 @@ Vercel's edge; on another host it could be spoofed.
   stand-in for Supabase's roles and default grants. It runs with every `npm test`.
 - Against a real project (Task 11): `supabase test db` runs the same pgTAP file. PGlite proves the
   policy logic, not Supabase's own role setup, so the real run is the authority.
+- `tests/orders/migration-policy.test.ts` and `tests/orders/migration-database.test.ts` do the same
+  for the order migrations: the second applies `0001` to `0005` in order and runs every pgTAP file
+  (`supabase/tests/0002_orders_rls.sql`, `0003_tracking_grants.sql` and the lead file) against the
+  result.
 
 ## Migration rules
 

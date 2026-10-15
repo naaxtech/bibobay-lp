@@ -3,7 +3,7 @@ import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } fr
 import { normalizeImage, normalizeLandingContent, normalizeLegalSettings, normalizePortableContent, normalizeSiteSettings } from "../content/normalize";
 import type { ImageWithAlt, Product, ProductCategory } from "../content/types";
 import { getSanityClient } from "./client";
-import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY, SITE_SETTINGS_QUERY } from "./queries";
+import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, ORDER_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY, SITE_SETTINGS_QUERY } from "./queries";
 
 export interface ContentOptions { preview?: boolean }
 
@@ -57,8 +57,10 @@ function normalizeProduct(raw: unknown): Product | null {
   let safeHref = /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(ctaHref) ? ctaHref : "";
   if (!safeHref) { try { const url = new URL(ctaHref); if (url.protocol === "https:" && !url.username && !url.password) safeHref = url.toString(); } catch { /* invalid link is omitted */ } }
   const commerceNotice = str(notice.title) && str(notice.body) ? { title: str(notice.title), body: str(notice.body), ...(str(noticeCta.label) && safeHref ? { cta: { label: str(noticeCta.label), href: safeHref, ...(noticeCta.external === true ? { external: true } : {}) } } : {}) } : undefined;
+  // R80: optional order snapshot fields; a blank or non-text value is left out.
+  const codes = Object.fromEntries((["sku", "variant", "pack"] as const).flatMap((key) => (str(v[key]) ? [[key, str(v[key])]] : []))) as Pick<Product, "sku" | "variant" | "pack">;
   return { id, name, slug: handle, description: str(v.description), details, images, status: "listed", order: typeof v.order === "number" && Number.isFinite(v.order) ? v.order : 0,
-    ...(linkedCategory ? { category: linkedCategory } : {}),
+    ...(linkedCategory ? { category: linkedCategory } : {}), ...codes,
     ...(seo ? { seo } : {}), ...(commerceNotice ? { commerceNotice } : {}) };
 }
 export async function getListedProducts(options: ContentOptions = {}): Promise<Product[]> {
@@ -73,4 +75,20 @@ export async function getProductBySlug(handle: string, options: ContentOptions =
   if (!settings.commerceEnabled) return null;
   const raw = await query<unknown>(PRODUCT_BY_SLUG_QUERY, { slug: handle }, ["product", "productCategory"], options);
   return normalizeProduct(raw);
+}
+
+/**
+ * The CMS documents an order may snapshot (lib/orders/catalogue.ts): read fresh from the published
+ * dataset on every order, never from the Data Cache, so a product unlisted a moment ago cannot be
+ * ordered from a stale copy. Null when Sanity is unconfigured, unreachable or answers oddly.
+ */
+export async function getOrderableProducts(ids: readonly string[]): Promise<unknown[] | null> {
+  const client = getSanityClient();
+  if (!client) return null;
+  try {
+    const raw = await client.fetch<unknown>(ORDER_PRODUCTS_QUERY, { ids: [...ids] }, { cache: "no-store", perspective: "published" });
+    return Array.isArray(raw) ? raw : null;
+  } catch {
+    return null;
+  }
 }

@@ -51,6 +51,8 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/_not-found` | ƒ | 404 page |
 | `/studio` | ƒ | 307 to the Studio URL from site settings when it is https; 404 otherwise |
 | `/api/leads` | ƒ | POST: founding-family signup |
+| `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
+| `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
 | `/api/health` | ƒ | GET: liveness, `{status, version, time}` |
 | `/api/readiness` | ƒ | GET: configuration booleans; 200 when ready, 503 otherwise |
 | `/api/revalidate` | ƒ | POST: signed Sanity webhook that expires cache tags |
@@ -61,9 +63,9 @@ Planned, not in the code:
 
 | Route | State |
 |---|---|
-| `/shop`, `/shop/[slug]` | not built yet (Task 7): catalogue, gated by `commerceEnabled` on the server |
-| `/order` | not built yet (Task 7): order request form |
-| `/track`, `/orders/[token]` | not built yet (Task 7): order tracking |
+| `/shop`, `/shop/[slug]` | not built yet (Task 7b): catalogue, gated by `commerceEnabled` on the server |
+| `/order` | not built yet (Task 7b): order request form |
+| `/track`, `/orders/[token]` | not built yet (Task 7b): order tracking pages |
 | `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8): staff order administration |
 
 The robots rules already keep crawlers out of those future private paths (`ROBOTS_DISALLOW` in
@@ -77,7 +79,8 @@ The robots rules already keep crawlers out of those future private paths (`ROBOT
 - Every module that reads a server setting or talks to Sanity with a token, Supabase or Resend
   imports `server-only`, so importing it from a client component is a build error:
   `lib/sanity/{client,fetch,image}.ts`, `lib/leads/{submit,dependencies,http}.ts`,
-  `lib/email/client.ts`, `lib/supabase/{admin,leads,server}.ts`, `lib/security/rate-limit.ts`,
+  `lib/orders/{catalogue,submit,track,dependencies}.ts`,
+  `lib/email/client.ts`, `lib/supabase/{admin,leads,orders,server}.ts`, `lib/security/rate-limit.ts`,
   `lib/ops/readiness.ts`. (`lib/sanity/env.ts` reads only the public project id, dataset and API
   version; `lib/sanity/draft-mode.ts` is used only by server routes and pages.)
 - The browser form imports only `lib/leads/fields.ts` (no Zod, no `process.env`); a test walks its

@@ -29,6 +29,25 @@ describe("public catalogue never contains prices", () => {
     expect(detail).not.toHaveProperty("currency");
   });
 
+  it("projects the SKU, variant and pack an order snapshots (R80)", () => {
+    for (const query of [LISTED_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY]) {
+      for (const field of ["sku", "variant", "pack"]) expect(query, field).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
+  it("keeps a product's SKU, variant and pack, trimmed, and leaves out blank or missing ones", async () => {
+    fetch.mockImplementation((query: string) => query.includes("siteSettings")
+      ? { commerceEnabled: true }
+      : { id: "p", name: "Concept", slug: "concept", status: "listed", sku: " BB-TULA-01 ", variant: "Large", pack: "  " });
+    const detail = await getProductBySlug("concept");
+    expect(detail).toMatchObject({ sku: "BB-TULA-01", variant: "Large" });
+    expect(detail).not.toHaveProperty("pack");
+    fetch.mockImplementation((query: string) => query.includes("siteSettings") ? { commerceEnabled: true } : { id: "p", name: "Concept", slug: "concept", status: "listed", sku: 42 });
+    const bare = await getProductBySlug("concept");
+    expect(bare).not.toHaveProperty("sku");
+    expect(bare).not.toHaveProperty("variant");
+  });
+
   it("retains a safe editor-authored product notice CTA and image caption", async () => {
     fetch.mockImplementation((query: string) => query.includes("siteSettings")
       ? { commerceEnabled: true }

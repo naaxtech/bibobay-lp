@@ -1,10 +1,12 @@
 # Manual checkout operations
 
-**Status: not built yet.** There is no shop, order form, order database, staff area or quote email
-in the code today. The commerce gate and order pad are Task 6, the catalogue, order requests and
-tracking are Task 7, and staff order administration with quote emails is Task 8 (see the plan in
-`docs/superpowers/plans/`). `commerceEnabled` is `false` by default and must stay off: switching it
-on today only adds a header link to a `/shop` page that does not exist.
+**Status: partly built, not usable yet.** The commerce gate and order pad (Task 6) exist, and so do
+the order database, the order request API and the tracking API (Task 7a; see
+[database-security.md](database-security.md#orders-migrations-0002-to-0005)). The shop, order and
+tracking pages are not built yet (Task 7b), and neither are the staff area and quote emails (Task 8;
+see the plan in `docs/superpowers/plans/`). `commerceEnabled` is `false` by default and must stay
+off: switching it on today adds a header link to a `/shop` page that does not exist, and opens the
+order and tracking APIs, which would store order requests that nobody can manage yet.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been

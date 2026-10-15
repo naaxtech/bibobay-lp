@@ -20,10 +20,11 @@ What exists today and what does not:
 | Signed Sanity revalidation webhook, Studio draft preview | built (needs secrets; see [docs/deployment.md](docs/deployment.md)) |
 | Nonce Content-Security-Policy and security headers, `/api/health`, `/api/readiness` | built |
 | CI, client-bundle secret scan, deployment verifier | built |
-| Commerce gate and order pad | not built yet (Task 6) |
-| Catalogue, order requests, tracking, order tables | not built yet (Task 7) |
+| Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; nothing mounts the pad until the shop pages exist) |
+| Order tables, order request and tracking APIs (`/api/orders`, `/api/orders/track`), gated by `commerceEnabled` | built (Task 7a) |
+| Shop, order and tracking pages | not built yet (Task 7b) |
 | Staff order administration, quote emails, outbox worker | not built yet (Task 8) |
-| Error monitoring and consent-gated analytics | not built yet (Task 10M) |
+| Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11) |
 
 "Task N" refers to the numbered tasks in the implementation plan under `docs/superpowers/plans/`.

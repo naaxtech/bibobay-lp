@@ -42,14 +42,14 @@ Collections:
 | `testimonial` (Verified experience) | Only when `testimonialsEnabled` is on and the entry is marked verified |
 | `faqItem` | FAQ section |
 | `leadMagnet` (Download) | A download link in the signup section, only when real (see below) |
-| `productCategory`, `product` | Not shown anywhere yet: the catalogue is not built yet (Task 7) |
+| `productCategory`, `product` | Not shown anywhere yet: the shop pages are not built yet (Task 7b). An order request reloads each listed product and stores its name, SKU, variant and pack as they are at that moment (Task 7a). |
 
 ## Feature toggles (site settings)
 
 | Toggle | Default | Effect today |
 |---|---|---|
-| `commerceEnabled` | `false` | Adds the shop link to the header and lets `/shop` links render. The shop itself is not built yet (Task 7), so leave it off. |
-| `trackingEnabled` | `false` | Stored only; order tracking is not built yet (Task 7). |
+| `commerceEnabled` | `false` | Adds the shop link to the header, lets `/shop` links render and opens the order API (`/api/orders`). The shop pages are not built yet (Task 7b) and nobody can manage orders yet (Task 8), so leave it off. |
+| `trackingEnabled` | `false` | With commerce on, opens the tracking API (`/api/orders/track`). The tracking pages are not built yet (Task 7b). |
 | `testimonialsEnabled` | `false` | Allows the testimonials section to render, and then only entries marked verified. |
 | `canonicalUrlVerified` | `false` | The canonical URL is used (canonical tags, sitemap, structured data) only when this is on. Turn it on only after the domain is verified. |
 

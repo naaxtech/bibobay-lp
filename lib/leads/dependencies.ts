@@ -29,7 +29,8 @@ import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } fr
  */
 export const LEAD_IP_HASH_SECRET_MIN_LENGTH = 32;
 
-function hashSecretFrom(env: Record<string, string | undefined>): string | null {
+/** The client-address hashing secret, or null when missing or too short (also used by lib/orders/dependencies.ts). */
+export function hashSecretFrom(env: Record<string, string | undefined>): string | null {
   const secret = env.LEAD_IP_HASH_SECRET?.trim();
   return secret && secret.length >= LEAD_IP_HASH_SECRET_MIN_LENGTH ? secret : null;
 }
@@ -43,7 +44,7 @@ export function leadStorageConfigured(env: Record<string, string | undefined> = 
  * kept to a plain token, so a CMS typo cannot carry markup or control characters into the consent
  * record.
  */
-const CONSENT_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/;
+export const CONSENT_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/;
 
 /** The CMS consent version when the database will accept it, else the repository fallback. */
 function consentVersionFrom(cmsVersion: string, log: (event: LeadLogEvent) => void): string {
