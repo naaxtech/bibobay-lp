@@ -1,0 +1,19 @@
+tests/smoke/app-foundation.test.tsx
+  s_af1821bc154840::t_0c9d215366a738 24,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "404d2ad3283c3ab83d444984771d2aba784bad50",
+  "prompts": {},
+  "sessions": {
+    "s_af1821bc154840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aac3bbaf368dbadbc",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
