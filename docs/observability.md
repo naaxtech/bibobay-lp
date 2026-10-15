@@ -109,12 +109,20 @@ project); otherwise nothing loads and nothing is sent.
 - **App code** reaches Sentry only through `lib/observability/report.ts`: `reportError(error, {area,
   event})` and `reportEvent(event, {kind, code})`. Tags must be plain identifiers (`lead_route_failed`,
   `acknowledgement`, `PGRST301`); anything else, such as an address or a name, is dropped.
-- **Scrubbing** (`lib/observability/sentry-config.ts`, every event, transaction and breadcrumb):
-  `sendDefaultPii: false`; the request keeps its method, its URL without the query and the user
-  agent only; the user and all extra data are removed; email-shaped text becomes `[email]`;
-  breadcrumb and span URLs lose their queries; a private order link's token becomes
-  `/orders/[token]` in request URLs, transaction names, breadcrumbs, messages and spans. No session replay. Traces: 0.1 in production, all in
-  preview and development.
+- **Error reports only (ruling R86):** no performance tracing (no `tracesSampleRate`, no browser
+  tracing integration) and no session replay. Sentry SDK 11 streams traces as spans and never runs
+  `beforeSendTransaction` on them, so traces would leave with URL queries and private order tokens;
+  `e2e/observability/sentry.spec.ts` fails if anything but events (and the SDK's client reports)
+  leaves the page.
+- **Data collection:** SDK 11 has no `sendDefaultPii`; `dataCollection` is set to the minimum
+  (no user info, cookies, bodies, query strings, database or queue data, or stack-frame variables;
+  only the `user-agent` request header).
+- **Scrubbing** (`lib/observability/sentry-config.ts`, every event and breadcrumb): the request
+  keeps its method, its URL without the query and the user agent only; the user, all extra data and
+  stack-frame variables are removed; every string at every depth of contexts, tags, breadcrumbs and
+  messages is cut to 2,000 characters, loses any query (also mid-text), and has email-shaped text
+  replaced by `[email]` and a private order link's token by `/orders/[token]` (any 64-digit hex
+  run becomes `[token]`).
 - **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.
   There is no `SENTRY_ENVIRONMENT` setting: Sentry's browser SDK reads that name itself, so listing
   it in `.env.example` would make `verify:bundle` flag the SDK chunk.

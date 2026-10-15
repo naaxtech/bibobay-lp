@@ -19,6 +19,44 @@ function eventsIn(request: Request): Array<Record<string, unknown>> {
   return events;
 }
 
+/** Every item of every envelope: its type and its payload text. */
+function itemsIn(request: Request): Array<{ type: string; text: string }> {
+  const lines = (request.postData() ?? "").split("\n").filter(Boolean);
+  const items: Array<{ type: string; text: string }> = [];
+  for (let index = 1; index < lines.length - 1; index += 2) {
+    const header = JSON.parse(lines[index]!) as { type?: string };
+    items.push({ type: header.type ?? "", text: lines[index + 1]! });
+  }
+  return items;
+}
+
+// Ruling R86 (Task 7b re-review): SDK 11 streams traces as spans, which no scrubber of ours sees.
+// Error reports only: nothing but events (and the SDK's own client reports) may leave the page,
+// and no item may carry a private order token, a query value or an email address.
+test("sends error reports only, and no item carries a token, a query or an email", async ({ page }) => {
+  const TOKEN = "3f9a0c1d2e4b5a6978c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
+  const requests: Request[] = [];
+  await page.route(`${INGEST}/**`, async (route) => {
+    requests.push(route.request());
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+  await page.goto("/?email=parent%40example.com&utm_source=newsletter");
+  await page.waitForTimeout(2_000);
+  await page.goto(`/orders/${TOKEN}?qv=QSECRET`);
+  await page.waitForTimeout(2_000);
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error("Order page failed");
+    }, 0);
+  });
+  await expect.poll(() => requests.flatMap(eventsIn).length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1_000);
+  const items = requests.flatMap(itemsIn);
+  expect([...new Set(items.map((item) => item.type))].filter((type) => !["event", "client_report"].includes(type))).toEqual([]);
+  const text = items.map((item) => item.text).join("\n");
+  for (const secret of [TOKEN, "QSECRET", "parent@example.com", "parent%40example.com", "newsletter"]) expect(text, secret).not.toContain(secret);
+});
+
 test("reports a browser error without the address's query, any email address or the visitor", async ({ page }) => {
   const requests: Request[] = [];
   await page.route(`${INGEST}/**`, async (route) => {

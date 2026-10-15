@@ -29,3 +29,29 @@ describe("maskPrivatePaths", () => {
     expect(maskPrivatePaths(input)).toBe(input);
   });
 });
+
+describe("tracking tokens outside a path (Task 7b re-review O2, O4)", () => {
+  const TOKEN = "3f9a0c1d2e4b5a6978c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
+
+  it.each([
+    [`%5B%22orders%22%2C%7B%22children%22%3A%5B%22token%22%2C%22${TOKEN}%22`, "a router state header"],
+    [`bibo.example/orders/${TOKEN}`, "a host without a scheme"],
+    [`/orders//${TOKEN}`, "a doubled slash"],
+    [`%252Forders%252F${TOKEN}`, "a double-encoded path"],
+    [`token=${TOKEN.toUpperCase()}`, "upper-case hex"],
+  ])("masks a 64-digit hex token anywhere (%s: %s)", (input) => {
+    expect(maskPrivatePaths(input).toLowerCase()).not.toContain(TOKEN);
+  });
+
+  it("leaves shorter hex alone (trace and span ids, commit hashes)", () => {
+    for (const id of ["0123456789abcdef0123456789abcdef", "0123456789abcdef", "a86ec9d570cb854962ca99058efdf369615a1b28"]) expect(maskPrivatePaths(id)).toBe(id);
+  });
+
+  it("returns quickly for long text without an order path", () => {
+    // Not hex ("a" would be one long hex run, masked as a token).
+    const text = "z".repeat(200_000);
+    const started = performance.now();
+    expect(maskPrivatePaths(text)).toBe(text);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+});

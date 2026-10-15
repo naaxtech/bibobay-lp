@@ -182,20 +182,45 @@ describe("shared Sentry options", () => {
     expect(typeof options.beforeSendTransaction).toBe("function");
   });
 
-  it("samples traces at 0.1 in production and 1.0 in preview and development, and the rate is configurable", () => {
+  it("keeps the old trace rates on record, unused (ruling R86)", () => {
     expect(tracesSampleRateFor("production")).toBe(0.1);
     expect(tracesSampleRateFor("preview")).toBe(1);
-    expect(tracesSampleRateFor("development")).toBe(1);
-    expect(sentryOptions({ dsn: DSN, environment: "production" }).tracesSampleRate).toBe(0.1);
-    expect(sentryOptions({ dsn: DSN, environment: "preview" }).tracesSampleRate).toBe(1);
-    expect(sentryOptions({ dsn: DSN, environment: "production", tracesSampleRate: 0.25 }).tracesSampleRate).toBe(0.25);
+  });
+
+  // Ruling R86 (Task 7b re-review): SDK 11 streams traces as spans and never runs
+  // beforeSendTransaction on them, so a trace carried URLs with their query and private order
+  // tokens. Error reports are all this site needs: tracing is off.
+  it("sends error reports only: tracing is off in every environment", () => {
+    for (const environment of ["production", "preview", "development"]) {
+      const options = sentryOptions({ dsn: DSN, environment });
+      expect(options).not.toHaveProperty("tracesSampleRate");
+      expect(options).not.toHaveProperty("tracesSampler");
+    }
+  });
+
+  // SDK 11 has no sendDefaultPii: what it collects is set by dataCollection, which defaults to
+  // everything (headers, bodies, query strings, user info, local variables in stack frames).
+  it("collects the least data SDK 11 allows", () => {
+    expect(sentryOptions({ dsn: DSN, environment: "production" }).dataCollection).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: { allow: ["user-agent"] }, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+    });
   });
 
   it("never adds session replay, even if a default set offered it", () => {
     const options = sentryOptions({ dsn: DSN, environment: "production" });
     const offered = [{ name: "Replay" }, { name: "ReplayCanvas" }, { name: "BrowserTracing" }, { name: "Dedupe" }] as Integration[];
     const integrations = options.integrations as (defaults: Integration[]) => Integration[];
-    expect(integrations(offered).map((integration) => integration.name)).toEqual(["BrowserTracing", "Dedupe"]);
+    // Ruling R86: no browser tracing either.
+    expect(integrations(offered).map((integration) => integration.name)).toEqual(["Dedupe"]);
   });
 });
 
@@ -253,5 +278,32 @@ describe("private order links in transaction trace data (Task 7b review)", () =>
     loop.self = loop;
     const scrubbed = scrubEvent({ contexts: { custom: loop } } as unknown as Parameters<typeof scrubEvent>[0]);
     expect(JSON.stringify(scrubbed.contexts?.custom, (key, value) => (key === "self" && typeof value === "object" ? "[cut]" : value))).not.toContain(TOKEN);
+  });
+});
+
+describe("what else the scrubber removes (Task 7b re-review)", () => {
+  it("drops local variable values from every stack frame", () => {
+    const scrubbed = scrubEvent(errorEvent({
+      exception: { values: [{ type: "Error", value: "boom", stacktrace: { frames: [{ function: "submit", vars: { email: "parent@example.com", city: "Cebu" }, lineno: 3 }] } }] },
+    }));
+    const frame = scrubbed.exception?.values?.[0]?.stacktrace?.frames?.[0];
+    expect(frame).not.toHaveProperty("vars");
+    expect(frame?.function).toBe("submit");
+    expect(JSON.stringify(scrubbed)).not.toContain("parent@example.com");
+  });
+
+  it("keeps an Error in breadcrumb data as its cleaned message, not an empty object", () => {
+    const crumb = scrubBreadcrumb({ category: "console", data: { arguments: [new Error("lookup failed for parent@example.com")] } });
+    expect(crumb.data?.arguments).toEqual(["Error: lookup failed for [email]"]);
+  });
+
+  it("removes a query string from the middle of free text", () => {
+    const scrubbed = scrubEvent(errorEvent({ message: "Could not fetch /api/x?email=parent%40example.com then gave up; GET https://bibo.example/shop?utm_source=news ok" }));
+    expect(scrubbed.message).toBe("Could not fetch /api/x then gave up; GET https://bibo.example/shop ok");
+  });
+
+  it("cuts very long strings before masking them, so a huge value cannot stall the page", () => {
+    const crumb = scrubBreadcrumb({ message: `${"word ".repeat(40_000)}end` });
+    expect(crumb.message!.length).toBeLessThanOrEqual(2_001);
   });
 });

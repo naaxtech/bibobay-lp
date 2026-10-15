@@ -19,10 +19,19 @@ export interface Integration {
 
 const EMAIL = /[^\s@<>"'(),;:/?#=&]+@[^\s@<>"'(),;:/?#=&]+\.[A-Za-z]{2,}/g;
 const MASK = "[email]";
+/**
+ * The longest string sent, in characters (Task 7b re-review): the masking patterns cost more on
+ * long unbroken text, and this runs on the browser's main thread for console breadcrumbs.
+ */
+const MAX_TEXT = 2_000;
+/** A path or URL followed by a query, anywhere in free text (Task 7b re-review O3). */
+const QUERY_IN_TEXT = /((?:[a-z][a-z0-9+.-]*:\/\/[^\s/?#"'<>]+)?\/[^\s?#"'<>]*)\?[^\s#"'<>]*/gi;
 
-const maskEmails = (value: string) => value.replace(EMAIL, MASK);
-/** Free text: email addresses and private order tokens masked. */
-const maskText = (value: string) => maskPrivatePaths(maskEmails(value));
+const cap = (value: string) => (value.length > MAX_TEXT ? `${value.slice(0, MAX_TEXT)}…` : value);
+const maskEmails = (value: string) => (value.includes("@") ? value.replace(EMAIL, MASK) : value);
+const stripQueries = (value: string) => (value.includes("?") ? value.replace(QUERY_IN_TEXT, "$1") : value);
+/** Free text: cut to MAX_TEXT, queries removed, email addresses and private order tokens masked. */
+const maskText = (value: string) => maskPrivatePaths(maskEmails(stripQueries(cap(value))));
 
 /** A URL or path without its query string and fragment; other strings unchanged. */
 function withoutQuery(value: string): string {
@@ -50,8 +59,13 @@ const MAX_DEPTH = 6;
 function cleanValue(value: unknown, depth: number): unknown {
   if (typeof value === "string") return cleanString(value);
   if (!value || typeof value !== "object") return value;
+  // An Error (e.g. a console.error argument) keeps its cleaned message; other class instances
+  // their cleaned text form. Only plain objects and arrays are walked.
+  if (value instanceof Error) return cleanString(`${value.name}: ${value.message}`);
   if (depth >= MAX_DEPTH) return undefined;
   if (Array.isArray(value)) return value.map((entry) => cleanValue(entry, depth + 1));
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype !== Object.prototype && prototype !== null) return cleanString(String(value));
   return cleanRecord(value as Record<string, unknown>, depth + 1);
 }
 
@@ -91,7 +105,20 @@ export function scrubEvent<T extends Event>(event: T): T {
   if (typeof clean.message === "string") clean.message = maskText(clean.message);
   if (clean.logentry?.message) clean.logentry = { ...clean.logentry, message: maskText(clean.logentry.message) };
   if (clean.exception?.values) {
-    clean.exception = { ...clean.exception, values: clean.exception.values.map((value) => (value.value ? { ...value, value: maskText(value.value) } : value)) };
+    clean.exception = {
+      ...clean.exception,
+      values: clean.exception.values.map((entry) => {
+        const value = entry.value ? { ...entry, value: maskText(entry.value) } : { ...entry };
+        // Local variable values in stack frames can hold anything a function had (an email, an
+        // address): never sent, whatever the SDK collected.
+        if (value.stacktrace?.frames) value.stacktrace = { ...value.stacktrace, frames: value.stacktrace.frames.map((frame) => {
+          const kept = { ...frame };
+          delete kept.vars;
+          return kept;
+        }) };
+        return value;
+      }),
+    };
   }
   if (clean.tags) clean.tags = Object.fromEntries(Object.entries(clean.tags).map(([key, value]) => [key, typeof value === "string" ? maskText(value) : value]));
   if (clean.contexts) {
@@ -109,27 +136,56 @@ export function scrubEvent<T extends Event>(event: T): T {
   return clean;
 }
 
-/** Traces: 0.1 in production, every one elsewhere (preview, development). */
+/**
+ * UNUSED since ruling R86 (Task 7b re-review, 2026-10-16): the trace sample rates of Task 10M-a
+ * (commit 825d525), 0.1 in production and every trace elsewhere. Tracing is now off: SDK 11
+ * streams traces as spans and never runs beforeSendTransaction on them, so they left with URL
+ * queries and private order tokens. Kept, not deleted (owner's rule): use it only together with a
+ * `beforeSendSpan` scrubber that masks every span attribute, proven by e2e/observability.
+ */
 export function tracesSampleRateFor(environment: string): number {
   return environment === "production" ? 0.1 : 1;
 }
 
+/**
+ * The least data SDK 11 collects. It has no `sendDefaultPii`; `dataCollection` decides, and its
+ * defaults collect headers, bodies, query strings, user info and stack-frame variables.
+ * src: node_modules/@sentry/core/build/types/types/datacollection.d.ts · @sentry/core 11.8.0 · 2026-10-16
+ */
+export const MINIMAL_DATA_COLLECTION = {
+  userInfo: false,
+  cookies: false,
+  httpHeaders: { request: { allow: ["user-agent"] }, response: false },
+  httpBodies: [],
+  urlQueryParams: false,
+  graphQL: { document: false, variables: false },
+  genAI: { inputs: false, outputs: false },
+  databaseQueryData: false,
+  queues: false,
+  stackFrameVariables: false,
+};
+
 export interface SentrySettings {
   dsn: string;
   environment: string;
-  tracesSampleRate?: number;
 }
 
-export function sentryOptions({ dsn, environment, tracesSampleRate }: SentrySettings) {
+/**
+ * Error reports only (ruling R86): no `tracesSampleRate` or `tracesSampler`, so the SDK traces
+ * nothing, and no browser tracing or replay integration.
+ */
+export function sentryOptions({ dsn, environment }: SentrySettings) {
   return {
     dsn,
     environment,
+    // SDK 10's switch; SDK 11 ignores it (dataCollection below replaces it). Kept for readers of the old docs.
     sendDefaultPii: false,
-    tracesSampleRate: tracesSampleRate ?? tracesSampleRateFor(environment),
+    dataCollection: MINIMAL_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent) => scrubEvent(event),
+    // Runs only with traceLifecycle "static", and tracing is off; kept so a trace could never skip the scrubber.
     beforeSendTransaction: (event: TransactionEvent) => scrubEvent(event),
     beforeBreadcrumb: (crumb: Breadcrumb) => scrubBreadcrumb(crumb),
-    // Never session replay, even if a default integration set offered it.
-    integrations: (defaults: Integration[]) => defaults.filter((integration) => !/^Replay/.test(integration.name)),
+    // Never session replay or browser tracing, even if a default integration set offered them.
+    integrations: (defaults: Integration[]) => defaults.filter((integration) => !/^(Replay|BrowserTracing)/.test(integration.name)),
   };
 }
