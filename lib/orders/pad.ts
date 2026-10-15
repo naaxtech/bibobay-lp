@@ -18,6 +18,9 @@ export interface OrderPadLine {
 const PRODUCT_ID = /^(?!drafts\.|versions\.)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 const isProductId = (value: unknown): value is string => typeof value === "string" && PRODUCT_ID.test(value);
+
+/** True for an id the pad accepts: a published Sanity document id. */
+export const isOrderPadProductId = isProductId;
 const isQuantity = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1;
 const capped = (quantity: number) => Math.min(quantity, ORDER_PAD_MAX_QUANTITY);
 

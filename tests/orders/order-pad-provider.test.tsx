@@ -263,4 +263,101 @@ describe("while commerce is enabled", () => {
     const summary = screen.getByRole("region", { name: UI_COPY.orderPad.title });
     expect((within(summary).getByRole("spinbutton", { name: `${UI_COPY.orderPad.quantity}: Tula plush` }) as HTMLInputElement).value).toBe("2");
   });
+
+  it("trusts the device again when another tab writes after this one was refused (re-review N1)", async () => {
+    shop();
+    await settle();
+    const refuse = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` }));
+    refuse.mockRestore();
+    // Another tab sends its order and empties the pad.
+    window.localStorage.removeItem(ORDER_PAD_STORAGE_KEY);
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent("storage", { key: ORDER_PAD_STORAGE_KEY }));
+    });
+    expect(within(screen.getByRole("region", { name: UI_COPY.orderPad.title })).getByText(UI_COPY.orderPad.empty)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Bubble breathing book` }));
+    expect(storedLines()).toEqual({ lines: [{ productId: "book-bubbles", quantity: 1 }] });
+  });
+
+  it("empties this page's own copy too when the pad is cleared (re-review N2)", async () => {
+    shop();
+    await settle();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(within(screen.getByRole("region", { name: UI_COPY.orderPad.title })).getByText(UI_COPY.orderPad.empty)).toBeTruthy();
+  });
+
+  it("says the pad lasts only for this page when the browser could not save it", async () => {
+    shop();
+    await settle();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` }));
+    expect(statuses()).toContain(`${UI_COPY.orderPad.added(1)} ${UI_COPY.orderPad.notSaved}`);
+  });
+
+  it("does not prune with an empty catalogue: that means the list failed to load", async () => {
+    window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: [{ productId: "plush-tula", quantity: 2 }] }));
+    const pads: Array<ReturnType<typeof useOrderPad>> = [];
+    function Grab() {
+      const pad = useOrderPad();
+      useEffect(() => {
+        pads.push(pad);
+      });
+      return null;
+    }
+    render(
+      <OrderPadProvider commerceEnabled>
+        <Grab />
+      </OrderPadProvider>,
+    );
+    await settle();
+    act(() => pads.at(-1)!.keepListed(new Set()));
+    expect(storedLines()).toEqual({ lines: [{ productId: "plush-tula", quantity: 2 }] });
+  });
+
+  it("says nothing for a product id the pad refuses, even on a full pad (re-review N2)", async () => {
+    const full = Array.from({ length: 40 }, (_, index) => ({ productId: `product-${index}`, quantity: 1 }));
+    for (const lines of [[], full]) {
+      cleanup();
+      window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines }));
+      render(
+        <OrderPadProvider commerceEnabled>
+          <AddToOrder productId="drafts.plush-tula" productName="Tula plush" />
+        </OrderPadProvider>,
+      );
+      await settle();
+      fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` }));
+      expect(statuses()).toEqual([""]);
+    }
+  });
+
+  it("announces a repeated message again by clearing it first (re-review N3)", async () => {
+    window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: [{ productId: "plush-tula", quantity: ORDER_PAD_MAX_QUANTITY }] }));
+    vi.useFakeTimers();
+    try {
+      shop();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const button = screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` });
+      fireEvent.click(button);
+      act(() => vi.runAllTimers());
+      expect(statuses()).toContain(UI_COPY.orderPad.atMost(ORDER_PAD_MAX_QUANTITY));
+      fireEvent.click(button);
+      expect(statuses()).not.toContain(UI_COPY.orderPad.atMost(ORDER_PAD_MAX_QUANTITY));
+      act(() => vi.runAllTimers());
+      expect(statuses()).toContain(UI_COPY.orderPad.atMost(ORDER_PAD_MAX_QUANTITY));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+

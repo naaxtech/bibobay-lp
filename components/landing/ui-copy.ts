@@ -32,6 +32,7 @@ export const UI_COPY = {
     add: "Add to order",
     /** Names the new quantity, so a repeated add is announced again. */
     added: (quantity: number) => (quantity === 1 ? "Added to your order." : `Added to your order: ${quantity} now.`),
+    notSaved: "This browser could not save it, so it lasts only while this page is open.",
     atMost: (quantity: number) => `Your order already has ${quantity} of this, the most one order can hold.`,
     full: (lines: number) => `Your order already holds ${lines} different products, the most it can. Remove one to add another.`,
     title: "Your order",
