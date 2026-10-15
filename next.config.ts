@@ -1,5 +1,7 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
+import { sentryDsnFrom } from "./lib/observability/monitoring-env";
 import { API_CONTENT_SECURITY_POLICY, securityEnvironment, staticSecurityHeaders } from "./lib/security/headers";
 
 const nextConfig: NextConfig = {
@@ -35,4 +37,24 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/*
+ * Task 10M-a: wrapped for Sentry only when the build has a DSN. Source maps are uploaded (and then
+ * deleted from the deployment) only with SENTRY_AUTH_TOKEN; without it nothing is uploaded and no
+ * browser source maps are published. Keyless builds are the plain config above.
+ */
+const sentryBuild = sentryDsnFrom(process.env.NEXT_PUBLIC_SENTRY_DSN) !== null;
+const sentryToken = process.env.SENTRY_AUTH_TOKEN?.trim();
+
+const config: NextConfig = sentryBuild
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: sentryToken,
+      silent: true,
+      telemetry: false,
+      widenClientFileUpload: true,
+      sourcemaps: { disable: !sentryToken },
+    })
+  : nextConfig;
+
+export default config;

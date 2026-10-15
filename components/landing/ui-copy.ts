@@ -27,6 +27,13 @@ export const UI_COPY = {
   watchStory: "Watch the story",
   /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
   watchOnYouTube: "Watch on YouTube",
+  /** The last-resort error page (app/global-error.tsx): no internal detail. */
+  globalError: {
+    title: "Something went wrong",
+    body: "Sorry, this page could not be shown just now. Please try again in a moment.",
+    retry: "Try again",
+    home: "Back to Bibo Bay",
+  },
   /** Visit statistics (ruling R70): the footer's choices dialog. */
   analytics: {
     choices: "Analytics choices",

@@ -36,6 +36,8 @@ describe("lead environment names", () => {
       "NEXT_PUBLIC_SANITY_API_VERSION",
       "NEXT_PUBLIC_SANITY_DATASET",
       "NEXT_PUBLIC_SANITY_PROJECT_ID",
+      // Task 10M-a (error monitoring), not leads.
+      "NEXT_PUBLIC_SENTRY_DSN",
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_SUPABASE_URL",
     ]);

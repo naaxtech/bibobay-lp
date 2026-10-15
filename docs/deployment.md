@@ -24,6 +24,10 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `NEXT_PUBLIC_SUPABASE_URL` | public | for lead storage | Supabase project | Project URL (https; http only for a local stack). |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | not used yet | Supabase project | Reserved for staff sign-in (Task 8); nothing reads it today. A secret key here is refused. |
 | `NEXT_PUBLIC_POSTHOG_KEY` | public | for visit statistics | PostHog project (BIBO Bay owner account) | Project key (`phc_…`). Empty: no analytics, no request to PostHog, no "Analytics choices" link. A personal API key (`phx_…`) is refused. See `docs/observability.md`. |
+| `NEXT_PUBLIC_SENTRY_DSN` | public | for error monitoring | Sentry project (BIBO Bay owner account) | Project DSN (https, public key only). Empty: no Sentry, no request, no SDK download in the browser. The ingest host is added to CSP `connect-src`. See `docs/observability.md`. |
+| `SENTRY_AUTH_TOKEN` | server | optional (build) | Sentry organisation | Uploads source maps at build time, then removes them from the deployment. Without it nothing is uploaded and no browser source maps are published. Never public. |
+| `SENTRY_ORG` | server | with `SENTRY_AUTH_TOKEN` | Sentry organisation | Organisation slug for the upload. |
+| `SENTRY_PROJECT` | server | with `SENTRY_AUTH_TOKEN` | Sentry project | Project slug for the upload. |
 | `NEXT_PUBLIC_POSTHOG_HOST` | public | optional | PostHog project | Exact https origin events go to; default `https://us.i.posthog.com` (EU: `https://eu.i.posthog.com`). Added to CSP `connect-src` only. |
 | `SANITY_API_READ_TOKEN` | server | for Studio draft preview | Sanity project (Viewer token) | Lets `/api/draft-mode/enable` check the preview secret and read drafts. Without it that route answers 503. |
 | `SANITY_WRITE_TOKEN` | server | only to run the Studio seed | Sanity project (Editor token) | Used by `npm --prefix studio run seed`, never by the website. Do not set it on Vercel. |

@@ -1,4 +1,6 @@
+import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { createLeadDependencies } from "@/lib/leads/dependencies";
+import { reportError } from "@/lib/observability/report";
 import { isJsonRequest, readBodyWithLimit } from "@/lib/leads/http";
 import { submitLead, type LeadApiBody } from "@/lib/leads/submit";
 
@@ -22,6 +24,17 @@ function respond(status: number, body: LeadApiBody, retryAfterSeconds?: number) 
 }
 
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (error) {
+    // Task 10M-a rule 6: an unexpected failure goes to Sentry (tags only); the visitor gets the
+    // repository's generic error copy, since the CMS copy may be what failed to load.
+    reportError(error, { area: "leads", event: "lead_route_failed" });
+    return respond(500, { ok: false, persisted: false, acknowledgementQueued: false, message: SAFE_FALLBACK_CONTENT.lead.errorMessage });
+  }
+}
+
+async function handle(request: Request) {
   const dependencies = await createLeadDependencies(request);
   const refuse = (status: number) => respond(status, { ok: false, persisted: false, acknowledgementQueued: false, message: dependencies.copy.errorMessage });
 

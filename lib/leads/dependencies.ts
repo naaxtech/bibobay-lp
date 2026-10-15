@@ -9,6 +9,7 @@ import { createSupabaseAdminClient, getSupabaseAdminEnvironment } from "@/lib/su
 import { createSupabaseLeadRepository } from "@/lib/supabase/leads";
 import { absoluteFileUrl } from "@/lib/content/freebie";
 import { getLandingPage, getLegalSettings, getSiteSettings } from "@/lib/sanity/fetch";
+import { reportEvent } from "@/lib/observability/report";
 import { seoEnvironment } from "@/lib/seo/metadata";
 import { clientKeyFromHeaders } from "./http";
 import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } from "./submit";
@@ -66,11 +67,21 @@ export function ackSendLimitPerHour(env: Record<string, string | undefined> = pr
   return value <= 10_000 ? value : ACK_SEND_LIMIT.defaultPerHour;
 }
 
-/** Structured operational log: event names and codes only, never an address, name or email. */
+const WARNING_EVENT = /_(failed|unavailable|unconfigured|invalid)$/;
+
+/**
+ * Structured operational log: event names and codes only, never an address, name or email.
+ * Warnings and the send-cap hit also go to Sentry as warning messages (ruling R52), tagged with the
+ * event, kind and code only.
+ */
 export function logLeadEvent(entry: LeadLogEvent): void {
   const line = JSON.stringify({ scope: "leads", ...entry });
-  if (/_(failed|unavailable|unconfigured|invalid)$/.test(entry.event)) console.warn(line);
+  const warning = WARNING_EVENT.test(entry.event);
+  if (warning) console.warn(line);
   else console.info(line);
+  if (warning || entry.event === "delivery_send_capped") {
+    reportEvent(entry.event, { ...("kind" in entry ? { kind: entry.kind } : {}), ...("code" in entry ? { code: entry.code } : {}) });
+  }
 }
 
 export async function createLeadDependencies(request: Request, env: Record<string, string | undefined> = process.env): Promise<LeadSubmissionDependencies> {

@@ -29,7 +29,23 @@ const allowedPublicNames = new Set([
   // refused under this name below.
   "NEXT_PUBLIC_POSTHOG_KEY",
   "NEXT_PUBLIC_POSTHOG_HOST",
+  // Task 10M-a: a Sentry DSN can only submit events. Its server names (SENTRY_AUTH_TOKEN,
+  // SENTRY_ORG, SENTRY_PROJECT) are refused here under NEXT_PUBLIC_.
+  "NEXT_PUBLIC_SENTRY_DSN",
+  // Vercel's own framework-prefixed System Environment Variables, set on every Next.js build.
+  // src: https://raw.githubusercontent.com/vercel/vercel/main/packages/build-utils/src/get-prefixed-env-vars.ts · read 2026-10-16
+  "NEXT_PUBLIC_VERCEL_URL",
+  "NEXT_PUBLIC_VERCEL_ENV",
+  "NEXT_PUBLIC_VERCEL_TARGET_ENV",
+  "NEXT_PUBLIC_VERCEL_REGION",
+  "NEXT_PUBLIC_VERCEL_BRANCH_URL",
+  "NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL",
+  "NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID",
+  "NEXT_PUBLIC_VERCEL_PROJECT_ID",
 ]);
+
+/** Vercel also adds every VERCEL_GIT_* variable with the framework prefix (same source). */
+const VERCEL_GIT_PUBLIC = /^NEXT_PUBLIC_VERCEL_GIT_[A-Z_]+$/;
 
 /**
  * The only names the browser may see. scripts/verify-bundle-secrets.ts reads this same set, so a
@@ -63,7 +79,7 @@ export function verifyEnvironment(
   );
   const forbiddenPublic = Object.keys(env)
     .filter((name) => name.startsWith("NEXT_PUBLIC_") && (
-      !allowedPublicNames.has(name) ||
+      !(allowedPublicNames.has(name) || VERCEL_GIT_PUBLIC.test(name)) ||
       /^sb_secret_/i.test(env[name]?.trim() ?? "") ||
       (name === "NEXT_PUBLIC_POSTHOG_KEY" && /^phx_/i.test(env[name]?.trim() ?? "")) ||
       privateValues.has(env[name]?.trim())

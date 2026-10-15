@@ -44,9 +44,18 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/Supabase/);
     expect(privacy).toMatch(/Resend/);
     expect(privacy).toMatch(/Sanity/);
-    // Ruling R70: PostHog counts visits when it is configured; nothing else watches visitors.
+    // Ruling R70: PostHog counts visits when it is configured; Task 10M-a: Sentry receives error
+    // reports when it is configured. Nothing else watches visitors.
     expect(privacy).toMatch(/PostHog/);
-    expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe|Sentry/i);
+    expect(privacy).toMatch(/Sentry/);
+    expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe/i);
+  });
+
+  it("describes error reports exactly as the scrubber sends them (Task 10M-a)", () => {
+    expect(privacy).toMatch(/only when error reporting is switched on/i);
+    expect(privacy).toMatch(/no form details/i);
+    expect(privacy).toMatch(/no cookies/i);
+    expect(privacy).toMatch(/question mark/i);
   });
 
   it("describes the visit statistics exactly as the code runs them (ruling R70)", () => {

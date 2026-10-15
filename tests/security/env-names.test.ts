@@ -37,3 +37,20 @@ describe("Task 9 environment names", () => {
     expect(JSON.stringify(report)).not.toContain(secret);
   });
 });
+
+describe("Vercel's own public variables", () => {
+  // src: https://raw.githubusercontent.com/vercel/vercel/main/packages/build-utils/src/get-prefixed-env-vars.ts · read 2026-10-16
+  // Vercel adds these to every Next.js build (System Environment Variables with the framework prefix).
+  // Refusing them would fail the first Vercel build at `npm run build`'s verify:env step.
+  const VERCEL_PUBLIC = ["NEXT_PUBLIC_VERCEL_URL", "NEXT_PUBLIC_VERCEL_ENV", "NEXT_PUBLIC_VERCEL_TARGET_ENV", "NEXT_PUBLIC_VERCEL_REGION", "NEXT_PUBLIC_VERCEL_BRANCH_URL", "NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL", "NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID", "NEXT_PUBLIC_VERCEL_PROJECT_ID", "NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA", "NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF", "NEXT_PUBLIC_VERCEL_GIT_REPO_SLUG"];
+
+  it("accepts the names Vercel itself sets on a build", () => {
+    const env = Object.fromEntries(VERCEL_PUBLIC.map((name) => [name, "value"]));
+    expect(verifyEnvironment(env, "production").forbiddenPublic).toEqual([]);
+  });
+
+  it("still refuses an invented NEXT_PUBLIC_VERCEL_ name and any secret value under these names", () => {
+    expect(verifyEnvironment({ NEXT_PUBLIC_VERCEL_TOKEN: "value" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_VERCEL_TOKEN"]);
+    expect(verifyEnvironment({ SUPABASE_SERVICE_ROLE_KEY: "secret-value", NEXT_PUBLIC_VERCEL_URL: "secret-value" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_VERCEL_URL"]);
+  });
+});

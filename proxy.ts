@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { analyticsConfig } from "./lib/analytics/config";
+import { monitoringConnectSources } from "./lib/observability/monitoring-env";
 import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironment } from "./lib/security/headers";
 
 /**
@@ -12,9 +12,9 @@ import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironm
  */
 export function proxy(request: NextRequest) {
   const nonce = createNonce();
-  // Ruling R70: events go to the configured PostHog host (connect-src only; the SDK is bundled).
-  const analyticsHost = analyticsConfig()?.apiHost;
-  const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment(), extraConnectSources: analyticsHost ? [analyticsHost] : [] });
+  // Monitoring hosts, connect-src only (Task 10M-a, ruling R70): the Sentry ingest origin and the
+  // PostHog host, each only when configured. The SDKs are bundled; script-src stays nonce-only.
+  const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment(), extraConnectSources: monitoringConnectSources() });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_HEADER, nonce);

@@ -1,8 +1,8 @@
-# Observability: visit statistics
+# Observability: visit statistics and error reports
 
-How the site counts visits and what it never collects. Ruling R70 (owner request, 2026-10-16:
-"track all website users, what they do and where they come from"). Error monitoring (Sentry) is
-not wired yet; it will get its own section here.
+How the site counts visits (PostHog, ruling R70: owner request 2026-10-16, "track all website
+users, what they do and where they come from") and how it reports errors (Sentry, Task 10M-a), and
+what neither ever collects. Both are off until their environment variables are set.
 
 ## What is counted
 
@@ -83,3 +83,55 @@ in step with the code, and have the owner and a lawyer review it before launch.
   (Playwright answers that host itself; no real request is made). It checks that events reach the
   host with trimmed addresses, that nothing is written to cookies or storage, and that GPC and the
   footer switch stop all requests.
+
+## Error reports (Sentry)
+
+Sentry runs when `NEXT_PUBLIC_SENTRY_DSN` holds a valid DSN (https, public key only, numeric
+project); otherwise nothing loads and nothing is sent.
+
+- **Server and edge:** `instrumentation.ts` loads `sentry.server.config.ts` / `sentry.edge.config.ts`;
+  request errors Next catches reach Sentry through `onRequestError = captureRequestError`.
+- **Browser:** `instrumentation-client.ts` loads the SDK as its own chunk only when a DSN is set, so
+  a site without Sentry ships none of it. `app/global-error.tsx` shows a calm branded page and
+  reports the error.
+- **App code** reaches Sentry only through `lib/observability/report.ts`: `reportError(error, {area,
+  event})` and `reportEvent(event, {kind, code})`. Tags must be plain identifiers (`lead_route_failed`,
+  `acknowledgement`, `PGRST301`); anything else, such as an address or a name, is dropped.
+- **Scrubbing** (`lib/observability/sentry-config.ts`, every event, transaction and breadcrumb):
+  `sendDefaultPii: false`; the request keeps its method, its URL without the query and the user
+  agent only; the user and all extra data are removed; email-shaped text becomes `[email]`;
+  breadcrumb and span URLs lose their queries. No session replay. Traces: 0.1 in production, all in
+  preview and development.
+- **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.
+  There is no `SENTRY_ENVIRONMENT` setting: Sentry's browser SDK reads that name itself, so listing
+  it in `.env.example` would make `verify:bundle` flag the SDK chunk.
+- **Source maps:** uploaded only with `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) and then
+  deleted from the deployment; without the token nothing is uploaded and no browser maps are served.
+
+### Alerts from the signup flow (ruling R52)
+
+`logLeadEvent` keeps its structured log line and also sends these as warning messages, tagged with
+the event, delivery kind and error code only (never an address or a lead id):
+`delivery_send_capped` (the hourly send cap was hit: emails wait in the outbox),
+`delivery_send_cap_unavailable`, `delivery_enqueue_failed`, `lead_store_failed`,
+`lead_rate_limit_unavailable`, `lead_storage_unconfigured` and `lead_config_invalid`. An unexpected
+failure of `/api/leads` is reported as `lead_route_failed` and answered with the generic error copy.
+
+Set a Sentry alert on `delivery_send_capped` and `lead_store_failed`.
+
+### Notes for staff reading lead records
+
+- `rejoin_requested_at` can be set by anyone who submits a listed address again, so it is not proof
+  that the person themselves asked to rejoin.
+- When the CMS consent copy version is invalid, the stored consent evidence is the fallback version
+  `"1"` (the event `lead_config_invalid` is reported when that happens).
+
+### Setting it up (provisioning task)
+
+1. Create the Sentry project (Next.js) under the BIBO Bay owner account.
+2. Project settings → Security & Privacy: turn on **Prevent storing of IP addresses** and keep the
+   default data scrubbers on.
+3. Set `NEXT_PUBLIC_SENTRY_DSN` in Vercel. Optionally create an organisation token and set
+   `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for readable stack traces.
+4. Redeploy, then check an event arrives (for example from a preview deployment).
+

@@ -11,8 +11,8 @@ import type { PortableContent } from "./types";
  * contact email; /privacy adds the contact address from site settings when one is configured.
  *
  * Update it whenever behaviour changes. Visit statistics (ruling R70, lib/analytics) are described
- * below. Known follow-ups: error monitoring (Sentry) must add that processor; Task 7 (manual orders)
- * must update the "nothing is for sale" lines before commerce is switched on.
+ * below, and so are error reports (Task 10M-a, lib/observability). Known follow-up: Task 7 (manual
+ * orders) must update the "nothing is for sale" lines before commerce is switched on.
  *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
  * default, which tells pages that Sanity has no text) stays unchanged.
@@ -71,6 +71,9 @@ const privacy: PortableContent = [
   paragraph("Supabase hosts the database where signups are stored."),
   paragraph("Resend delivers the emails described above."),
   paragraph("PostHog receives the visit statistics described above, when they are switched on."),
+  paragraph(
+    "Sentry receives error reports, only when error reporting is switched on for this website: what went wrong and where in the code, the page address without anything after a question mark, your browser type, and the website's own short labels for the problem. Error reports carry no form details and no cookies, and the website does not add your network address to them.",
+  ),
   paragraph(
     "For each email, the database keeps a delivery record: which email it was, whether it was sent, how many attempts were made and when, the email service's message reference, and a short error code if sending failed. It does not keep a copy of the email.",
   ),
