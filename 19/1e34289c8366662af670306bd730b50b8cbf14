@@ -1,0 +1,66 @@
+README.md
+  h_0549c11fec2ab0 73
+components/landing/FreebieCard.tsx
+  h_0549c11fec2ab0 1-60
+components/landing/LeadCapture.tsx
+  h_0549c11fec2ab0 6,61-63
+components/landing/landing.css
+  h_0549c11fec2ab0 1683-1773
+components/landing/ui-copy.ts
+  h_0549c11fec2ab0 30-33
+docs/cms-operations.md
+  h_0549c11fec2ab0 99-117
+e2e/landing/contrast.spec.ts
+  h_0549c11fec2ab0 152,154-155,202-209,227-230,234-235
+e2e/landing/freebie-youtube.spec.ts
+  h_0549c11fec2ab0 1-92
+lib/content/activity-pack.manifest.json
+  h_0549c11fec2ab0 1-118
+lib/content/fallback.ts
+  h_0549c11fec2ab0 1,96,111
+lib/content/freebie.ts
+  h_0549c11fec2ab0 1-46
+lib/content/normalize.ts
+  h_0549c11fec2ab0 1,12-23,108
+lib/leads/dependencies.ts
+  h_0549c11fec2ab0 10-12,78,81-85
+public/freebies/bibo-bay-activity-pack.pdf
+  h_0549c11fec2ab0 1-749
+scripts/freebie/build_activity_pack.py
+  h_0549c11fec2ab0 1-984
+scripts/freebie/export-content.ts
+  h_0549c11fec2ab0 1-17
+studio/schemaTypes/documents/collections.ts
+  h_0549c11fec2ab0 43-49
+studio/scripts/seed-data.ts
+  h_0549c11fec2ab0 66-67,74,97
+tests/content/content-fallback.test.ts
+  h_0549c11fec2ab0 56
+tests/content/content-normalization.test.ts
+  h_0549c11fec2ab0 86-108
+tests/content/public-seed-integration.test.ts
+  h_0549c11fec2ab0 16
+tests/content/studio-contract.test.ts
+  h_0549c11fec2ab0 80-83,93-94
+tests/freebie/activity-pack.test.ts
+  h_0549c11fec2ab0 1-101
+tests/landing/accessibility-contracts.test.tsx
+  h_0549c11fec2ab0 375-376
+tests/landing/brand-art-slots.test.tsx
+  h_0549c11fec2ab0 89,97-98
+tests/landing/section-renderer.test.tsx
+  h_0549c11fec2ab0 251-262,264-267,272,274,276-278
+tests/leads/lead-dependencies.test.ts
+  h_0549c11fec2ab0 3,14,114-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "191e34289c8366662af670306bd730b50b8cbf14",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
