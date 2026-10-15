@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 
+import { youtubeVideoId } from "@/lib/content/brand-art";
 import type { EpisodePreview, LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage, CmsArt } from "./CmsArt";
 import { PaperMood, moodAccent } from "./PaperMood";
@@ -25,16 +26,32 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
   describedBy?: string;
 }) {
   const isConcept = story.status === "concept";
+  const watchHref = !isConcept && story.mediaUrl ? story.mediaUrl : null;
+  const cover = (
+    <>
+      {art ? (
+        <ArtImage art={art} sizes="(min-width: 80rem) 50rem, (min-width: 64rem) 62vw, 100vw" />
+      ) : (
+        <PaperMood variant={index + COVER_OFFSET} accent={moodAccent(undefined, index + COVER_OFFSET)} />
+      )}
+      {isConcept ? <p className="paper-stamp storybook__stamp">{conceptLabel}</p> : null}
+    </>
+  );
   return (
     <div {...panelProps} aria-describedby={describedBy} className="storybook">
-      <div className="storybook__cover">
-        {art ? (
-          <ArtImage art={art} sizes="(min-width: 80rem) 38rem, (min-width: 48rem) 50vw, 100vw" />
-        ) : (
-          <PaperMood variant={index + COVER_OFFSET} accent={moodAccent(undefined, index + COVER_OFFSET)} />
-        )}
-        {isConcept ? <p className="paper-stamp storybook__stamp">{conceptLabel}</p> : null}
-      </div>
+      {/* A published video's cover is its one way out to the video: it opens on YouTube in a new tab. */}
+      {watchHref ? (
+        <a href={watchHref} className="storybook__cover storybook__watch" target="_blank" rel="noopener noreferrer">
+          {cover}
+          <span className="storybook__play" aria-hidden="true" />
+          <span className="storybook__watch-label">
+            {youtubeVideoId(watchHref) ? UI_COPY.watchOnYouTube : UI_COPY.watchStory}
+            <span className="sr-only"> {UI_COPY.opensInNewTab}</span>
+          </span>
+        </a>
+      ) : (
+        <div className="storybook__cover">{cover}</div>
+      )}
       <div className="storybook__page">
         <h3 className="font-display text-h2 font-semibold">{story.title}</h3>
         {story.summary ? <p className="mt-4 text-lead">{story.summary}</p> : null}
@@ -63,14 +80,6 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
             <p className="detail-label">{UI_COPY.tryTogether}</p>
             <p className="mt-1">{story.offlinePrompt}</p>
           </div>
-        ) : null}
-        {!isConcept && story.mediaUrl ? (
-          <p className="mt-6">
-            <a href={story.mediaUrl} className="text-link" target="_blank" rel="noopener noreferrer">
-              {UI_COPY.watchStory}
-              <span className="sr-only"> {UI_COPY.opensInNewTab}</span>
-            </a>
-          </p>
         ) : null}
       </div>
     </div>
@@ -112,9 +121,10 @@ function StoryProgress({ count, selected, countId }: { count: number; selected: 
 }
 
 /**
- * Story concepts as an open storybook: titles as bookmarks above, the chosen concept on the
- * spread, a quiet marker of which concept is open between them. Every unfinished story says it
- * is a concept; there is no play control or running time.
+ * The channel's videos as a player and playlist: the open video's cover, words and way out to
+ * YouTube on the left, every video listed with its thumbnail on the right (a scrolling row on a
+ * phone), and a quiet marker of which one is open. Nothing plays in the page: no embed, no
+ * third-party request (ruling R57). A story the CMS keeps as a concept says so and links nowhere.
  */
 export function Episodes({ section, intro, episodes, art, introArt }: EpisodesProps) {
   const tabs = useRovingTabs(episodes.length);
@@ -135,17 +145,28 @@ export function Episodes({ section, intro, episodes, art, introArt }: EpisodesPr
             <CmsArt frame="print" art={introArt} sizes="(min-width: 64rem) 20rem, 90vw" className="max-w-[20rem] lg:col-span-4 lg:col-start-9" />
           ) : null}
         </div>
-        <div role="tablist" aria-labelledby="episodes-heading" className="story-tabs mt-10 lg:mt-14">
-          {episodes.map((story, index) => (
-            <button key={story.id} {...tabs.tabProps(index)} className="story-tab">
-              <span className="story-tab__title">{story.title}</span>{" "}
-              {story.status === "concept" ? <span className="story-tab__status">{intro.conceptLabel}</span> : null}
-            </button>
-          ))}
-        </div>
-        {showProgress ? <StoryProgress count={episodes.length} selected={tabs.selected} countId={countId} /> : null}
-        {/* Every storybook shares one spread, so the section keeps its height whichever is open. */}
-        <div className="storybooks">
+        {/* A player and its playlist: the open video large, every video listed beside it with its thumbnail. */}
+        <div className="watch-layout mt-10 lg:mt-14">
+          <div role="tablist" aria-labelledby="episodes-heading" className="story-tabs">
+            {episodes.map((story, index) => {
+              const thumb = art[story.id];
+              return (
+                <button key={story.id} {...tabs.tabProps(index)} className="story-tab" data-thumb={thumb ? "" : undefined}>
+                  {/* The thumbnail pictures the title beside it, so it is announced as nothing. */}
+                  {thumb ? (
+                    <span className="story-tab__thumb">
+                      <ArtImage art={{ ...thumb, alt: "" }} sizes="(min-width: 64rem) 8rem, 12rem" />
+                    </span>
+                  ) : null}
+                  <span className="story-tab__title">{story.title}</span>{" "}
+                  {story.status === "concept" ? <span className="story-tab__status">{intro.conceptLabel}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          {showProgress ? <StoryProgress count={episodes.length} selected={tabs.selected} countId={countId} /> : null}
+          {/* Every storybook shares one spread, so the section keeps its height whichever is open. */}
+          <div className="storybooks">
           {episodes.map((story, index) => (
             <Storybook
               key={story.id}
@@ -157,6 +178,7 @@ export function Episodes({ section, intro, episodes, art, introArt }: EpisodesPr
               describedBy={showProgress && index === tabs.selected ? countId : undefined}
             />
           ))}
+          </div>
         </div>
       </div>
     </SectionShell>

@@ -164,8 +164,8 @@ describe("character selector", () => {
     expect(visiblePanelHeading("characters")).toBe("Lumi");
   });
 
-  it("draws an abstract placeholder rather than pretend character art", () => {
-    renderPage();
+  it("draws an abstract placeholder for a friend with no art, rather than pretend character art", () => {
+    renderPage(landingContent((draft) => { draft.characters[0] = { ...draft.characters[0]!, id: "character-pip", name: "Pip the Little Squid" }; }));
     const panel = within(section("characters")).getByRole("tabpanel");
     expect(panel.querySelector("img")).toBeNull();
     const art = panel.querySelector("svg");
@@ -181,6 +181,8 @@ describe("video selector", () => {
   it("names each video tab by its title, and marks only an unfinished story as a concept", () => {
     renderPage();
     expect(storyTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual(videos.map((video) => video.title));
+    // Thumbnails on the tabs are pictures of the words beside them: nothing more is announced.
+    for (const tab of storyTabs()) expect(within(tab).queryAllByRole("img")).toEqual([]);
     expect(visiblePanelHeading("episodes")).toBe(videos[0]!.title);
   });
 

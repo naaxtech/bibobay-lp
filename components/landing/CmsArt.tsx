@@ -20,12 +20,31 @@ interface ArtImageProps {
 }
 
 /**
- * Approved Sanity art filling its frame. The URL is resolved on the server at the slot's width
+ * Art filling its frame. Approved Sanity art: the URL is resolved on the server at the slot's width
  * (lib/sanity/image.ts, with the editor's crop); Sanity's CDN already sizes and encodes it, so Next
- * serves it as-is. The editor's hotspot stays in view when the frame crops further. Decorative art
- * carries an empty alt and is announced to nobody.
+ * serves it as-is. Repository brand art carries its pre-sized files (`srcSet`, ruling R65) and is a
+ * plain responsive image: the browser picks the file for the slot's width, nothing resizes at
+ * request time. The editor's hotspot (or the still's own focus) stays in view when the frame crops
+ * further. Decorative art carries an empty alt and is announced to nobody.
  */
 export function ArtImage({ art, sizes, priority = false }: ArtImageProps) {
+  if (art.srcSet) {
+    return (
+      // Pre-sized static files (ruling R65): next/image would route them through the runtime optimiser.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={art.src}
+        srcSet={art.srcSet}
+        sizes={sizes}
+        alt={art.alt}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+        className="art-fill object-cover"
+        style={art.position ? { objectPosition: art.position } : undefined}
+      />
+    );
+  }
   return (
     <Image
       src={art.src}

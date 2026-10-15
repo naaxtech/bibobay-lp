@@ -316,7 +316,7 @@ describe("content stays visible and server-rendered", () => {
     expect(within(promise).getByRole("link", { name: "privacy notes" }).getAttribute("href")).toBe("/privacy");
   });
 
-  it("shows approved Sanity art for friends and stories, and honest abstract shapes otherwise", () => {
+  it("shows approved Sanity art for friends and stories in place of the channel art", () => {
     vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "abcdefgh");
     vi.stubEnv("NEXT_PUBLIC_SANITY_DATASET", "production");
     renderPage(landingContent((draft) => {
@@ -327,7 +327,9 @@ describe("content stays visible and server-rendered", () => {
     expect(ollie.getAttribute("src")).toContain("https://cdn.sanity.io/images/abcdefgh/production/ollie-1200x1000.png");
     const coral = within(section("episodes")).getByRole("img", { name: "Letter stones on a coral reef" });
     expect(coral.getAttribute("src")).toContain("https://cdn.sanity.io/images/abcdefgh/production/coral-1600x900.jpg");
-    // The other five friends keep their abstract placeholder: no <img>, nothing announced.
-    expect(section("characters").querySelectorAll("img")).toHaveLength(1);
+    // The other friends keep their channel portraits, served by this site.
+    const portraits = Array.from(section("characters").querySelectorAll(".friend-stage__art img"), (image) => decodeURIComponent(image.getAttribute("src") ?? ""));
+    expect(portraits).toHaveLength(3);
+    expect(portraits.filter((src) => src.includes("/brand/art/friend-"))).toHaveLength(2);
   });
 });

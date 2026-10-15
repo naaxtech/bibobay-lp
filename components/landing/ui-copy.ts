@@ -25,6 +25,8 @@ export const UI_COPY = {
   themes: "Themes",
   tryTogether: "Try together",
   watchStory: "Watch the story",
+  /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
+  watchOnYouTube: "Watch on YouTube",
   /** Which story concept of how many is open (read by assistive technology with the open story). */
   storyPosition: (current: number, total: number) => `${current} of ${total}`,
   socialPlatforms: {

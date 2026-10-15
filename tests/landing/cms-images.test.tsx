@@ -9,7 +9,8 @@ import { landingContent, siteSettings } from "./fixtures";
 vi.mock("server-only", () => ({}));
 
 // Spec §8: every landing image is CMS-controlled. An image an editor supplies must reach the page,
-// resolved through lib/sanity/image.ts; without one, the illustrated fallback stays.
+// resolved through lib/sanity/image.ts; without one, the slot shows the repository's channel art
+// (ruling R58, tests/landing/brand-art-slots.test.tsx), and the reef stays drawn around it.
 
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "abcdefgh");
@@ -35,8 +36,11 @@ const section = (id: SectionId) => {
 const art = (name: string, alt: string): ImageWithAlt => ({ asset: { _ref: `image-${name}-1600x1200-jpg` }, alt });
 const cdnPath = (name: string) => `https://cdn.sanity.io/images/abcdefgh/production/${name}-1600x1200.jpg`;
 
-/** Images inside the page content; the header and footer logos are not CMS art. */
-const contentImages = () => Array.from(document.querySelectorAll("main img"));
+/** Editor images inside the page content: Sanity's CDN serves them (repository art is served by this site). */
+const contentImages = () => Array.from(document.querySelectorAll<HTMLImageElement>("main img")).filter((image) => image.getAttribute("src")?.startsWith("https://cdn.sanity.io/"));
+/** The repository still for a slot, wherever it is shown (as is or through the image optimiser). */
+const showsRepositoryArt = (root: Element, file: string) =>
+  Array.from(root.querySelectorAll("img")).some((image) => decodeURIComponent(image.getAttribute("src") ?? "").includes(file));
 
 const INTROS: ReadonlyArray<[SectionId, (draft: LandingPageContent) => SectionIntro]> = [
   ["trust", (draft) => draft.trust],
@@ -52,7 +56,7 @@ const INTROS: ReadonlyArray<[SectionId, (draft: LandingPageContent) => SectionIn
 ];
 
 describe("CMS images", () => {
-  it("keeps every illustrated fallback when the CMS supplies no images", () => {
+  it("asks Sanity for nothing when the CMS supplies no images, and keeps the drawn reef around the channel art", () => {
     renderPage();
     expect(contentImages()).toHaveLength(0);
     expect(within(section("hero")).getByRole("img", { name: landingContent().hero.artworkDescription })).toBeTruthy();
@@ -69,8 +73,8 @@ describe("CMS images", () => {
     expect(image.getAttribute("src")).toContain(cdnPath("hero"));
     expect(image.closest(".hero-postcard")).not.toBeNull();
     expect(image.getAttribute("fetchpriority")).toBe("high");
-    // The image replaces the default artwork; the artwork's description no longer names anything.
-    expect(hero.querySelector("[data-bay-layer]")).toBeNull();
+    // The image replaces the channel art; the artwork's description no longer names anything.
+    expect(showsRepositoryArt(hero, "/brand/art/hero-trio.webp")).toBe(false);
     expect(within(hero).queryByRole("img", { name: landingContent().hero.artworkDescription })).toBeNull();
     expect(contentImages()).toHaveLength(1);
   });
@@ -100,12 +104,14 @@ describe("CMS images", () => {
     expect(image.getAttribute("src")).toContain(cdnPath("voices"));
   });
 
-  it("swaps the closing horizon for the closing image, and keeps the loop drawn around its image", () => {
+  it("puts the closing image in place of the channel's reef scene, and keeps the loop drawn around its image", () => {
     renderPage(landingContent((draft) => {
       draft.finalCta.image = art("close", "Footprints along the shore");
       draft.offline.image = art("loop", "A child's paper boat");
     }));
-    expect(section("finalCta").querySelector("[data-bay-layer]")).toBeNull();
+    const closing = section("finalCta");
+    expect(within(closing).getByRole("img", { name: "Footprints along the shore" }).getAttribute("src")).toContain(cdnPath("close"));
+    expect(showsRepositoryArt(closing, "/brand/art/finale-reef.webp")).toBe(false);
     const loop = section("offline");
     expect(loop.querySelector("[data-loop-path]")).not.toBeNull();
     expect(within(loop).getByRole("img", { name: "A child's paper boat" })).toBeTruthy();
@@ -151,7 +157,7 @@ describe("CMS images", () => {
     expect(ollie.style.objectPosition).toBe("25% 80%");
   });
 
-  it("keeps the placeholder when the image cannot be resolved because Sanity is not configured", () => {
+  it("falls back to the channel art when the image cannot be resolved because Sanity is not configured", () => {
     vi.unstubAllEnvs();
     vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "");
     vi.stubEnv("NEXT_PUBLIC_SANITY_DATASET", "");
@@ -160,7 +166,8 @@ describe("CMS images", () => {
       draft.pillars[0]!.image = art("bright", "A magnifying glass");
     }));
     expect(contentImages()).toHaveLength(0);
-    expect(section("hero").querySelector("[data-bay-layer]")).not.toBeNull();
+    expect(showsRepositoryArt(section("hero"), "/brand/art/hero-trio.webp")).toBe(true);
+    expect(showsRepositoryArt(section("pillars"), "/brand/art/pillar-bright.webp")).toBe(true);
   });
 });
 

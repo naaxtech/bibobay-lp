@@ -1,19 +1,23 @@
 import type { Cta, ImageWithAlt, LandingPageContent, SectionConfig, SectionId, SectionTheme, SiteSettings, Testimonial } from "@/lib/content/types";
 
-/** The paper and accent each section is printed on unless its CMS theme says otherwise. */
+/**
+ * The ground and accent each section is printed on unless its CMS theme says otherwise: the page
+ * dives from the sunlit water at the top, over the sand, down to the deep-sea screening room where
+ * the videos play, and back up into the light (rebrand 2026-10-15, ruling R55).
+ */
 const DEFAULT_SECTION_THEMES: Record<SectionId, Required<SectionTheme>> = {
-  hero: { background: "paper", accent: "yellow" },
-  trust: { background: "paper", accent: "yellow" },
+  hero: { background: "sea", accent: "yellow" },
+  trust: { background: "sand", accent: "orange" },
   promise: { background: "paper", accent: "orange" },
   characters: { background: "sea", accent: "teal" },
-  episodes: { background: "paper", accent: "purple" },
+  episodes: { background: "navy", accent: "yellow" },
   offline: { background: "sand", accent: "orange" },
   pillars: { background: "paper", accent: "teal" },
   ecosystem: { background: "navy", accent: "yellow" },
   testimonials: { background: "paper", accent: "purple" },
   lead: { background: "sea", accent: "teal" },
   faq: { background: "paper", accent: "purple" },
-  finalCta: { background: "paper", accent: "yellow" },
+  finalCta: { background: "sea", accent: "yellow" },
 };
 
 export function sectionTheme(section: SectionConfig): Required<SectionTheme> {
@@ -72,6 +76,12 @@ export interface StageArt {
    * (`"75% 33.33%"`). Absent without a hotspot: the image stays centred.
    */
   position?: string;
+  /**
+   * Repository brand art (lib/content/brand-art.ts, rulings R58 and R65): its pre-sized files as an
+   * `<img srcset>`, so the browser picks one for the slot's width. Sanity art arrives sized by its
+   * CDN and has none.
+   */
+  srcSet?: string;
 }
 
 const share = (value: number) => `${Number((Math.min(1, Math.max(0, value)) * 100).toFixed(2))}%`;

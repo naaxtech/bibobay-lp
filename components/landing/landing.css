@@ -8,9 +8,14 @@
  * only when a section's rules grow past what one banner can hold.
  *
  * Shape rule (one radius per kind of thing, used everywhere): anything you press or that labels a
- * state (buttons, chips, status tags, nav links) is a pill; a large paper surface (the hero
- * postcard, friend stage, storybook, editor prints) is a sticker (2rem); a tab is paper (1.25rem);
- * a small note or thumbnail is soft (0.75rem). Round cut-outs stay round.
+ * state (buttons, chips, status tags, nav links, section labels) is a pill; a large surface (the
+ * hero window, friend stage, video player, editor prints) is a sticker (2rem) with a white
+ * die-cut border like the logo's; a tab is paper (1.25rem); a small note or video thumbnail is
+ * soft (0.75rem). Round cut-outs (faces, value stickers, the loop's heart) stay round.
+ *
+ * Rebrand 2026-10-15 (ruling R55): the page is Bibo Bay's sunlit reef. Grounds are water (light at
+ * the top of the page, deep where the videos play) and sand; the channel's own stills fill the art
+ * slots (R58), and the paper motifs that remain are the white sticker borders of the logo.
  */
 
 /*
@@ -52,6 +57,14 @@
 
   /* ---------- Editor art (CMS images) in its paper frame ---------- */
 
+  /* A pre-sized still filling its frame, as next/image's `fill` does for CMS art. */
+  .art-fill {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
   .cms-art {
     position: relative;
     overflow: hidden;
@@ -78,12 +91,14 @@
     rotate: -4deg;
   }
 
+  /* A value's sticker: a round die-cut of a channel still, like the faces on the friend tabs. */
   .cms-art--thumb {
     flex: none;
-    inline-size: 4.5rem;
+    inline-size: clamp(4rem, 3.4rem + 2vw, 5.25rem);
     aspect-ratio: 1;
     border-width: 0.25rem;
-    border-radius: var(--bibo-radius-soft);
+    border-radius: 50%;
+    rotate: -4deg;
   }
 
   /* At the heart of the screen-to-life loop, exactly where the paper sun sits without it. */
@@ -99,8 +114,14 @@
 
   /* ---------- Grounds and accents: the CMS section theme picks the paper and the ink ---------- */
 
+  /*
+   * "paper": clear shallow water, nearly white. "sea": sunlit lagoon water, lighter towards the
+   * surface. "sand": the sea floor. "navy": the deep sea, lit from the surface above. Navy text on
+   * every light ground and cream text on the deep keep AA contrast at body size.
+   */
   [data-ground] {
-    --ground: var(--bibo-color-cream);
+    --ground: color-mix(in srgb, var(--bibo-color-lagoon) 7%, var(--bibo-color-paper));
+    --ground-top: var(--ground);
     --ink: var(--bibo-color-navy);
     --ink-soft: var(--bibo-color-navy-soft);
   }
@@ -110,13 +131,23 @@
   }
 
   [data-ground="sea"] {
-    --ground: color-mix(in srgb, var(--bibo-color-teal) 16%, var(--bibo-color-cream));
+    --ground: color-mix(in srgb, var(--bibo-color-lagoon) 34%, var(--bibo-color-paper));
+    --ground-top: color-mix(in srgb, var(--bibo-color-lagoon) 14%, var(--bibo-color-paper));
   }
 
   [data-ground="navy"] {
-    --ground: var(--bibo-color-navy);
+    --ground: color-mix(in srgb, var(--bibo-color-ocean-deep) 42%, var(--bibo-color-navy));
     --ink: var(--bibo-color-cream);
-    --ink-soft: color-mix(in srgb, var(--bibo-color-cream) 80%, var(--bibo-color-navy));
+    --ink-soft: color-mix(in srgb, var(--bibo-color-cream) 84%, var(--bibo-color-navy));
+  }
+
+  /* Water is lighter towards the surface: sea sections fade down from it, the deep is lit from above. */
+  .landing-section[data-ground="sea"] {
+    background-image: linear-gradient(to bottom, var(--ground-top), var(--ground));
+  }
+
+  .landing-section[data-ground="navy"] {
+    background-image: radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--bibo-color-ocean) 32%, transparent), transparent 70%);
   }
 
   [data-accent="teal"] {
@@ -145,33 +176,48 @@
 
   /* ---------- Paper primitives ---------- */
 
-  /* A section's eyebrow on a strip of torn paper tape. */
+  /*
+   * A section's label (the class keeps its paper-tape name): a white bubble pill with a bead of the
+   * section's accent, in the display face. Sentence case, no tracking: a label, not a shouted eyebrow.
+   */
   .paper-tape {
-    display: inline-block;
-    padding: 0.35rem 1.15rem 0.4rem;
-    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-yellow)) 30%, var(--bibo-color-paper));
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.3rem 1rem 0.35rem 0.7rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--bibo-color-teal)) 45%, transparent), var(--bibo-shadow-paper);
     color: var(--bibo-color-navy);
     font-family: var(--bibo-font-display);
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.25;
-    rotate: -2deg;
-    clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 22%, 100% 44%, calc(100% - 4px) 66%, 100% 86%, calc(100% - 2px) 100%, 0 100%, 5px 78%, 0 56%, 4px 34%, 0 14%);
   }
 
-  /* A rubber-stamp status mark: concept, story concept. */
+  .paper-tape::before {
+    flex: none;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    border-radius: 50%;
+    background-color: var(--accent, var(--bibo-color-teal));
+    box-shadow: inset -0.15rem -0.15rem 0 rgb(40 59 99 / 0.18);
+    content: "";
+  }
+
+  /* A status mark (concept, story concept): an outlined pill on white. */
   .paper-stamp {
     display: inline-block;
-    padding: 0.2rem 0.7rem;
+    padding: 0.2rem 0.75rem;
     border: 2px solid currentColor;
-    border-radius: var(--bibo-radius-soft);
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
     color: var(--accent-ink, var(--bibo-color-navy));
     font-family: var(--bibo-font-display);
     font-size: var(--bibo-text-small);
     font-weight: 600;
     line-height: 1.2;
     letter-spacing: 0.02em;
-    rotate: -5deg;
   }
 
   .detail-label {
@@ -201,7 +247,7 @@
     inset-block-end: calc(100% - 1px);
     inline-size: 100%;
     block-size: clamp(1rem, 0.6rem + 1.8vw, 2.25rem);
-    color: var(--ground);
+    color: var(--ground-top, var(--ground));
     fill: currentColor;
     pointer-events: none;
   }
@@ -242,10 +288,19 @@
     transition-duration: var(--bibo-duration-press);
   }
 
+  /*
+   * The primary button is a chunky yellow toy key, the I of the logo: a lip of deeper amber below
+   * it that a press flattens. Navy on yellow is 6.5:1. It is the same on every ground.
+   */
   .btn-primary {
-    background-color: var(--bibo-color-navy);
-    color: var(--bibo-color-cream);
-    box-shadow: var(--bibo-shadow-paper);
+    --btn-lip: color-mix(in srgb, var(--bibo-color-orange) 55%, var(--bibo-color-yellow));
+    background-color: var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+    box-shadow: 0 0.25rem 0 var(--btn-lip), 0 0.5rem 1.25rem rgb(11 92 184 / 0.18);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0.375rem 0 var(--btn-lip), 0 0.75rem 1.5rem rgb(11 92 184 / 0.22);
   }
 
   [data-surface="navy"] .btn-primary {
@@ -253,11 +308,11 @@
     color: var(--bibo-color-navy);
   }
 
-  /* White die-cut paper, like the logo's sticker borders. */
+  /* White die-cut, like the logo's sticker borders, with a ring of the reef's teal. */
   .btn-paper {
     background-color: var(--bibo-color-paper);
     color: var(--bibo-color-navy);
-    box-shadow: var(--bibo-shadow-paper);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--bibo-color-teal) 55%, transparent), 0 0.25rem 0 color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
   }
 
   /*
@@ -330,9 +385,9 @@
     inset-block-start: 0;
     z-index: 40;
     block-size: var(--site-header-height);
-    background-color: var(--bibo-color-cream);
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 6%, var(--bibo-color-paper));
     color: var(--bibo-color-navy);
-    box-shadow: 0 1px 0 color-mix(in srgb, var(--bibo-color-navy) 10%, transparent);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--bibo-color-ocean) 14%, transparent);
   }
 
   .site-header__home {
@@ -401,7 +456,7 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    background-color: var(--bibo-color-cream);
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 6%, var(--bibo-color-paper));
     color: var(--bibo-color-navy);
   }
 
@@ -442,18 +497,80 @@
     margin-block-start: auto;
   }
 
-  /* ---------- Hero ---------- */
+  /* ---------- Hero: the friends in the sunlit Bay ---------- */
 
   /*
-   * The opening headline: five words on two lines on a desktop screen (balanced, so neither line is
-   * a stub), at most 72px. Smaller than the section display size so the promise, both CTAs and the
-   * Bay postcard share the first viewport.
+   * The opening sits in sunlit water: the reef (sunbeams, bubbles, sand) is drawn behind everything
+   * and its sand runs off the bottom into the sand band below. Room is left beneath the window for
+   * the sand to show.
+   */
+  .hero {
+    isolation: isolate;
+    padding-block: clamp(1.75rem, 1rem + 2.5vw, 3.25rem) clamp(7.5rem, 4.5rem + 7vw, 11.5rem);
+  }
+
+  .hero__reef {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+  }
+
+  .hero__grid {
+    display: grid;
+    align-items: center;
+    gap: 2.75rem 3rem;
+  }
+
+  @media (min-width: 64rem) {
+    .hero__grid {
+      grid-template-columns: minmax(0, 11fr) minmax(0, 13fr);
+    }
+  }
+
+  /*
+   * The tagline as the channel sets it: each sentence on its own line, in the logo's teal, orange and
+   * purple inks (each over 4.5:1 on the lightest water). Sized so three short lines, the promise and
+   * both CTAs share the first viewport with the friends.
    */
   .hero-title {
-    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    font-size: clamp(2.5rem, 1.5rem + 3vw, 4.1rem);
     line-height: 1.04;
     letter-spacing: -0.015em;
-    text-wrap: balance;
+  }
+
+  .hero-title__line {
+    display: block;
+  }
+
+  .hero-title__line[data-ink="0"] {
+    color: var(--bibo-color-teal-ink);
+  }
+
+  .hero-title__line[data-ink="1"] {
+    color: var(--bibo-color-orange-ink);
+  }
+
+  .hero-title__line[data-ink="2"] {
+    color: var(--bibo-color-purple-ink);
+  }
+
+  .hero__lead {
+    max-inline-size: 36ch;
+    margin-block-start: 1.5rem;
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-lead);
+    line-height: var(--bibo-leading-lead);
+  }
+
+  .hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-block-start: 2.25rem;
   }
 
   .hero-postcard {
@@ -461,24 +578,39 @@
     margin: 0;
   }
 
+  /* The friends' window: the still's own wide shape, in the logo's white die-cut border. */
   .hero-postcard__art {
     position: relative;
     overflow: hidden;
-    /* Landscape like a postcard: the Bay's clouds sit whole in frame instead of as slivers at its edge. */
-    aspect-ratio: 4 / 3;
-    border: clamp(0.5rem, 0.3rem + 0.7vw, 0.875rem) solid var(--bibo-color-paper);
+    aspect-ratio: 1600 / 880;
+    border: clamp(0.5rem, 0.3rem + 0.6vw, 0.8rem) solid var(--bibo-color-paper);
     border-radius: var(--bibo-radius-sticker);
-    background-color: color-mix(in srgb, var(--bibo-color-ocean) 14%, var(--bibo-color-paper));
-    box-shadow: var(--bibo-shadow-lifted);
-    rotate: 1.5deg;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+    box-shadow: 0 1.5rem 3rem -1rem rgb(11 92 184 / 0.45), 0 0.3rem 0 color-mix(in srgb, var(--bibo-color-lagoon) 35%, var(--bibo-color-paper));
   }
 
+  @media (min-width: 64rem) {
+    .hero-postcard__art {
+      rotate: 1.25deg;
+    }
+  }
+
+  /* The CMS greeting as a yellow bubble label stuck on the window's corner. */
   .hero-postcard__label {
     position: absolute;
     z-index: 1;
-    inset-block-start: -1rem;
-    inset-inline-start: 1.5rem;
-    rotate: -4deg;
+    inset-block-start: -1.15rem;
+    inset-inline-start: 1.25rem;
+    padding: 0.4rem 1.1rem 0.45rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-yellow);
+    box-shadow: 0 0 0 3px var(--bibo-color-paper), var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.2;
+    rotate: -3deg;
   }
 
   /* ---------- Trust strip: one band of masking tape ---------- */
@@ -488,13 +620,14 @@
     isolation: isolate;
   }
 
+  /* A band of pale sand lifted off the sea floor (the clip keeps its pebbled edges). */
   .trust-band::before {
     position: absolute;
     z-index: -1;
     inset: 0 -3rem;
-    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-yellow)) 24%, var(--bibo-color-cream));
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 55%, var(--ground));
     content: "";
-    rotate: -1.2deg;
+    rotate: -0.8deg;
     clip-path: polygon(
       0% 4px, 4% 0, 9% 5px, 14% 1px, 20% 6px, 26% 0, 31% 4px, 37% 1px, 43% 6px, 49% 2px, 55% 5px, 61% 0, 67% 4px,
       73% 1px, 79% 6px, 85% 2px, 91% 5px, 96% 0, 100% 4px,
@@ -607,8 +740,41 @@
 
   .friend-tab[aria-selected="true"] {
     background-color: var(--bibo-color-paper);
-    box-shadow: var(--bibo-shadow-paper);
+    box-shadow: 0 0 0 3px var(--friend-accent), var(--bibo-shadow-paper);
     rotate: -0.75deg;
+  }
+
+  /* A tab with the friend's face: the round face beside the name and role. */
+  .friend-tab[data-avatar] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.1rem 0.85rem;
+    padding: 0.6rem 1rem 0.6rem 0.6rem;
+  }
+
+  .friend-tab__avatar {
+    position: relative;
+    grid-row: span 3;
+    overflow: hidden;
+    inline-size: 3.5rem;
+    aspect-ratio: 1;
+    border: 3px solid var(--bibo-color-paper);
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+    box-shadow: 0 0 0 2px var(--friend-accent);
+  }
+
+  .friend-tab[data-avatar] .friend-tab__name::before {
+    display: none;
+  }
+
+  .friend-tab[data-avatar] .friend-tab__role {
+    padding-inline-start: 0;
+  }
+
+  .friend-tab[data-avatar] .friend-tab__status {
+    justify-self: start;
   }
 
   .friend-tab__name {
@@ -711,10 +877,17 @@
     /* On a phone the art keeps its shape; a panel stretched to the tallest friend grows its text side. */
     grid-template-rows: auto 1fr;
     overflow: hidden;
+    border: 0.5rem solid var(--bibo-color-paper);
     border-radius: var(--bibo-radius-sticker);
     background-color: var(--bibo-color-paper);
     color: var(--bibo-color-navy);
-    box-shadow: var(--bibo-shadow-lifted);
+    box-shadow: 0 1.5rem 3rem -1.25rem rgb(11 92 184 / 0.45);
+  }
+
+  .friend-stage__art {
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
   }
 
   .friend-stage__art {
@@ -929,6 +1102,201 @@
     /* The fold of the open book, shading the right-hand page. */
     .storybook__page {
       box-shadow: inset 1.25rem 0 1.5rem -1.25rem rgb(40 59 99 / 0.16);
+    }
+  }
+
+  /* ---------- Watch now: a player and its playlist in the deep-sea screening room ---------- */
+
+  .watch-layout {
+    display: grid;
+    grid-template-areas: "tabs" "progress" "books";
+    gap: 1.25rem;
+  }
+
+  .watch-layout > .story-tabs {
+    grid-area: tabs;
+  }
+
+  .watch-layout > .story-progress {
+    grid-area: progress;
+    margin-block-start: 0;
+  }
+
+  .watch-layout > .storybooks {
+    grid-area: books;
+  }
+
+  /* On a phone and tablet the playlist is a row of thumbnails that scrolls sideways. */
+  .watch-layout .story-tabs {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--bibo-space-gutter));
+    padding: 0.35rem var(--bibo-space-gutter) 0.85rem;
+    scroll-padding-inline: var(--bibo-space-gutter);
+    scroll-snap-type: x proximity;
+  }
+
+  .watch-layout .story-tab {
+    flex: 0 0 12.5rem;
+    padding: 0.55rem 0.55rem 0.8rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bibo-color-paper) 22%, transparent);
+    color: var(--ink);
+    scroll-snap-align: start;
+  }
+
+  .watch-layout .story-tab:hover {
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 18%, transparent);
+  }
+
+  .watch-layout .story-tab[aria-selected="true"] {
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 3px var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+    translate: none;
+  }
+
+  .watch-layout .story-tab__title {
+    padding-inline: 0.2rem;
+    font-size: 1.0625rem;
+  }
+
+  .story-tab__thumb {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 14%, transparent);
+  }
+
+  .watch-layout .story-progress__stop {
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 22%, transparent);
+    box-shadow: none;
+  }
+
+  .watch-layout .story-progress__stop[data-state="past"] {
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 45%, transparent);
+  }
+
+  .watch-layout .story-progress__stop[data-state="current"] {
+    background-color: var(--bibo-color-yellow);
+  }
+
+  /* The player: the cover full width on top, the words below, at every width. */
+  .watch-layout .storybook {
+    grid-template-columns: none;
+    grid-template-rows: auto 1fr;
+    margin-block-start: 0;
+    border: 0.5rem solid var(--bibo-color-paper);
+    box-shadow: 0 2rem 3.5rem -1.5rem rgb(3 20 45 / 0.6);
+  }
+
+  .watch-layout .storybook__cover {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    min-block-size: 0;
+    border-radius: 1.5rem;
+  }
+
+  .watch-layout .storybook__page {
+    align-content: start;
+    padding: clamp(1.25rem, 0.9rem + 1.5vw, 2.25rem);
+    box-shadow: none;
+  }
+
+  .storybook__watch {
+    display: block;
+    color: var(--bibo-color-navy);
+    text-decoration: none;
+  }
+
+  /* The play disc: the yellow of the primary button, ringed in white, with a navy triangle. */
+  .storybook__play {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: clamp(3.5rem, 2.6rem + 3vw, 5rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: var(--bibo-color-yellow);
+    box-shadow: 0 0 0 0.375rem rgb(255 255 255 / 0.85), 0 0.75rem 1.5rem rgb(3 20 45 / 0.35);
+    translate: -50% -50%;
+    transition: scale var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .storybook__play::after {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    inline-size: 34%;
+    block-size: 38%;
+    background-color: var(--bibo-color-navy);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    content: "";
+    translate: 12% 0;
+  }
+
+  .storybook__watch:hover .storybook__play {
+    scale: 1.08;
+  }
+
+  .storybook__watch-label {
+    position: absolute;
+    inset-block-end: 1rem;
+    inset-inline-start: 1rem;
+    padding: 0.45rem 1.05rem 0.5rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    box-shadow: var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  @media (min-width: 48rem) {
+    .watch-layout .storybook__facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* A desktop: the player on the left, the playlist as a column of thumbnails and titles beside it. */
+  @media (min-width: 64rem) {
+    .watch-layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+      grid-template-areas: "books tabs" "progress tabs";
+      align-items: start;
+      gap: 1rem 2rem;
+    }
+
+    .watch-layout .story-tabs {
+      display: grid;
+      grid-auto-flow: row;
+      gap: 0.6rem;
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+    }
+
+    .watch-layout .story-tab {
+      display: grid;
+      grid-template-columns: 7.5rem minmax(0, 1fr);
+      align-items: center;
+      gap: 0.25rem 0.85rem;
+      padding: 0.45rem 0.85rem 0.45rem 0.45rem;
+    }
+
+    .watch-layout .story-tab__thumb {
+      grid-row: span 2;
+    }
+
+    .watch-layout .story-tab__title {
+      padding-inline: 0;
+      font-size: 1rem;
     }
   }
 
@@ -1297,12 +1665,32 @@
   /* An editor's closing panorama fills the same wide frame; a phone keeps a taller crop of it. */
   .final-bay--art {
     overflow: hidden;
-    min-block-size: 14rem;
+    aspect-ratio: 16 / 9;
+  }
+
+  @media (min-width: 48rem) {
+    .final-bay--art {
+      aspect-ratio: 1440 / 600;
+    }
+  }
+
+  /* The closing scene stops short of the sand drawn over its foot, so the friends stand above it. */
+  .final-bay__scene {
+    position: absolute;
+    inset: 0 0 12% 0;
+  }
+
+  .final-bay__reef {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
   }
 
   .site-footer {
-    --footer-ink-soft: color-mix(in srgb, var(--bibo-color-cream) 80%, var(--bibo-color-navy));
-    background-color: var(--bibo-color-navy);
+    --footer-ink-soft: color-mix(in srgb, var(--bibo-color-cream) 84%, var(--bibo-color-navy));
+    background-color: color-mix(in srgb, var(--bibo-color-ocean-deep) 30%, var(--bibo-color-navy));
     color: var(--bibo-color-cream);
   }
 

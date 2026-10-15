@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 
 import type { ImageWithAlt, LandingPageContent, SectionConfig, SiteSettings } from "@/lib/content/types";
+import { BRAND_ART, friendArt, pillarArt, videoArt, type BrandArt } from "@/lib/content/brand-art";
 import { sanityImageUrl } from "@/lib/sanity/image";
 import { Characters } from "./Characters";
 import { Ecosystem } from "./Ecosystem";
@@ -24,7 +25,7 @@ import { TrustStrip } from "./TrustStrip";
 const ART_WIDTH = { stage: 1200, print: 800, thumb: 240 } as const;
 type ArtSize = keyof typeof ART_WIDTH;
 
-/** Approved Sanity art resolved on the server; without a usable asset (or Sanity) there is none and the placeholder stays. */
+/** Approved Sanity art resolved on the server; without a usable asset (or Sanity) there is none. */
 function resolveArt(image: ImageWithAlt | undefined, size: ArtSize): StageArt | undefined {
   const src = sanityImageUrl(image, ART_WIDTH[size]);
   if (!src || !image) return undefined;
@@ -32,15 +33,32 @@ function resolveArt(image: ImageWithAlt | undefined, size: ArtSize): StageArt | 
   return { src, alt: image.decorative ? "" : image.alt, ...(position ? { position } : {}) };
 }
 
+/** Repository brand art for a slot the CMS leaves empty (ruling R58); `alt` overrides the still's own. */
+function brandArt(art: BrandArt | undefined, alt?: string): StageArt | undefined {
+  if (!art) return undefined;
+  return { src: art.src, srcSet: art.srcSet, alt: alt ?? art.alt, ...(art.position ? { position: art.position } : {}) };
+}
+
+/** A slot's art: the editor's image, else the repository's, else none (the drawn placeholder stays). */
+function slotArt(image: ImageWithAlt | undefined, size: ArtSize, fallback: BrandArt | undefined, alt?: string): StageArt | undefined {
+  return resolveArt(image, size) ?? brandArt(fallback, alt);
+}
+
 /** Art for each entry of a collection that has some, by entry id. */
-function artById(entries: ReadonlyArray<{ id: string; image?: ImageWithAlt }>, size: ArtSize = "stage"): Record<string, StageArt> {
+function artById<T extends { id: string; image?: ImageWithAlt }>(
+  entries: readonly T[],
+  size: ArtSize = "stage",
+  fallback: (entry: T) => BrandArt | undefined = () => undefined,
+): Record<string, StageArt> {
   const art: Record<string, StageArt> = {};
   for (const entry of entries) {
-    const resolved = resolveArt(entry.image, size);
+    const resolved = slotArt(entry.image, size, fallback(entry));
     if (resolved) art[entry.id] = resolved;
   }
   return art;
 }
+
+const SCENES = BRAND_ART.sections;
 
 interface RenderContext {
   content: LandingPageContent;
@@ -51,18 +69,18 @@ interface RenderContext {
 function renderSection(section: SectionConfig, { content, links, leadForm }: RenderContext): ReactNode {
   switch (section.id) {
     case "hero":
-      return <Hero section={section} hero={content.hero} links={links} art={resolveArt(content.hero.image, "stage")} />;
+      return <Hero section={section} hero={content.hero} links={links} art={slotArt(content.hero.image, "stage", SCENES.hero, content.hero.artworkDescription || undefined)} />;
     case "trust":
       return <TrustStrip section={section} trust={content.trust} art={resolveArt(content.trust.image, "thumb")} />;
     case "promise":
-      return <PromiseSection section={section} promise={content.promise} art={resolveArt(content.promise.image, "print")} />;
+      return <PromiseSection section={section} promise={content.promise} art={slotArt(content.promise.image, "print", SCENES.promise)} />;
     case "characters":
       return (
         <Characters
           section={section}
           intro={content.charactersIntro}
           characters={content.characters}
-          art={artById(content.characters)}
+          art={artById(content.characters, "stage", friendArt)}
           introArt={resolveArt(content.charactersIntro.image, "print")}
         />
       );
@@ -72,20 +90,20 @@ function renderSection(section: SectionConfig, { content, links, leadForm }: Ren
           section={section}
           intro={content.episodesIntro}
           episodes={content.episodes}
-          art={artById(content.episodes)}
+          art={artById(content.episodes, "stage", (episode) => videoArt(episode.mediaUrl))}
           introArt={resolveArt(content.episodesIntro.image, "print")}
         />
       );
     case "offline":
-      return <OfflineLoop section={section} offline={content.offline} art={resolveArt(content.offline.image, "print")} />;
+      return <OfflineLoop section={section} offline={content.offline} art={slotArt(content.offline.image, "print", SCENES.offline)} />;
     case "pillars":
       return (
         <Pillars
           section={section}
           intro={content.pillarsIntro}
           pillars={content.pillars}
-          art={artById(content.pillars, "thumb")}
-          introArt={resolveArt(content.pillarsIntro.image, "print")}
+          art={artById(content.pillars, "thumb", pillarArt)}
+          introArt={slotArt(content.pillarsIntro.image, "print", SCENES.pillars)}
         />
       );
     case "ecosystem":
@@ -109,11 +127,11 @@ function renderSection(section: SectionConfig, { content, links, leadForm }: Ren
         />
       );
     case "lead":
-      return <LeadCapture section={section} lead={content.lead} form={leadForm} art={resolveArt(content.lead.image, "print")} />;
+      return <LeadCapture section={section} lead={content.lead} form={leadForm} art={slotArt(content.lead.image, "print", SCENES.lead)} />;
     case "faq":
       return <Faq section={section} intro={content.faqIntro} faqs={content.faqs} introArt={resolveArt(content.faqIntro.image, "print")} />;
     case "finalCta":
-      return <FinalCta section={section} finalCta={content.finalCta} links={links} art={resolveArt(content.finalCta.image, "stage")} />;
+      return <FinalCta section={section} finalCta={content.finalCta} links={links} art={slotArt(content.finalCta.image, "stage", SCENES.finalCta)} />;
   }
 }
 

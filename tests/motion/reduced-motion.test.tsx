@@ -250,35 +250,35 @@ describe("the landing page with motion allowed", () => {
     expect(inlineMotionStyles()).toEqual([]);
   });
 
-  it("moves the hero's bay layers by depth as the hero scrolls away: farther layers drift, the shore holds", () => {
+  it("moves the hero's reef layers by depth as the hero scrolls away: the light drifts most, the sand holds", () => {
     emulateMotionPreference("no-preference");
     renderPage();
-    expect(layerY(bayLayer("hero", "sun"))).toBe(0);
+    expect(layerY(bayLayer("hero", "rays"))).toBe(0);
 
     scrollPageTo(BOX_HEIGHT / 2);
 
-    const sun = layerY(bayLayer("hero", "sun"));
-    const farSea = layerY(bayLayer("hero", "far-sea"));
-    const nearSea = layerY(bayLayer("hero", "near-sea"));
-    expect(sun).toBeGreaterThan(farSea);
-    expect(farSea).toBeGreaterThan(nearSea);
-    expect(nearSea).toBeGreaterThan(0);
-    expect(layerY(bayLayer("hero", "shore"))).toBe(0);
-    expect(sun, "a calm drift, not a slide").toBeLessThanOrEqual(48);
+    const rays = layerY(bayLayer("hero", "rays"));
+    const farBubbles = layerY(bayLayer("hero", "far-bubbles"));
+    const nearBubbles = layerY(bayLayer("hero", "near-bubbles"));
+    expect(rays).toBeGreaterThan(farBubbles);
+    expect(farBubbles).toBeGreaterThan(nearBubbles);
+    expect(nearBubbles).toBeGreaterThan(0);
+    expect(layerY(bayLayer("hero", "sand"))).toBe(0);
+    expect(rays, "a calm drift, not a slide").toBeLessThanOrEqual(48);
   });
 
-  it("settles the closing horizon into its drawn position once it has fully scrolled in", () => {
+  it("settles the closing reef into its drawn position once it has fully scrolled in", () => {
     emulateMotionPreference("no-preference");
     renderPage();
-    const sun = bayLayer("finalCta", "sun");
-    const bay = sun.closest("svg")!;
-    const arrived = documentTop(bay) + BOX_HEIGHT - window.innerHeight;
+    const rays = bayLayer("finalCta", "rays");
+    const reef = rays.closest("svg")!;
+    const arrived = documentTop(reef) + BOX_HEIGHT - window.innerHeight;
 
     scrollPageTo(arrived - BOX_HEIGHT / 2);
-    expect(Math.abs(layerY(sun))).toBeGreaterThan(0);
+    expect(Math.abs(layerY(rays))).toBeGreaterThan(0);
     scrollPageTo(arrived);
-    expect(layerY(sun)).toBe(0);
-    expect(layerY(bayLayer("finalCta", "shore"))).toBe(0);
+    expect(layerY(rays)).toBe(0);
+    expect(layerY(bayLayer("finalCta", "sand"))).toBe(0);
   });
 
   it("draws the screen-to-life loop in step order when it scrolls in, and leaves it fully drawn", async () => {

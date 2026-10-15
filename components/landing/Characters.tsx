@@ -70,10 +70,10 @@ export interface CharactersProps {
 }
 
 /**
- * Meet the Bay friends: one friend at a time on a large paper stage, chosen from six named tabs.
- * Every friend is labelled with role and concept status; no pretend character art. The heading
- * and its line of context read as one stacked block; the right of the header is the section's
- * own art when the CMS has some.
+ * Meet the Bay friends: one friend at a time on a large stage, chosen from named tabs that carry
+ * each friend's face. A concept friend is labelled so; a friend without art keeps an abstract
+ * placeholder, never pretend character art. The heading and its line of context read as one
+ * stacked block; the right of the header is the section's own art when the CMS has some.
  */
 export function Characters({ section, intro, characters, art, introArt }: CharactersProps) {
   const tabs = useRovingTabs(characters.length);
@@ -101,8 +101,21 @@ export function Characters({ section, intro, characters, art, introArt }: Charac
           >
             {characters.map((friend, index) => {
               const status = friend.status === "concept" ? UI_COPY.characterStatus.concept : null;
+              const portrait = art[friend.id];
               return (
-                <button key={friend.id} {...tabs.tabProps(index)} className="friend-tab" style={accentStyle(moodAccent(friend.accentColor, index))}>
+                <button
+                  key={friend.id}
+                  {...tabs.tabProps(index)}
+                  className="friend-tab"
+                  data-avatar={portrait ? "" : undefined}
+                  style={accentStyle(moodAccent(friend.accentColor, index))}
+                >
+                  {/* The friend's face beside their name: a picture of the words, so announced as nothing. */}
+                  {portrait ? (
+                    <span className="friend-tab__avatar">
+                      <ArtImage art={{ ...portrait, alt: "" }} sizes="3.5rem" />
+                    </span>
+                  ) : null}
                   <span className="friend-tab__name">{friend.name}</span>{" "}
                   {friend.role ? <span className="friend-tab__role">{friend.role}</span> : null}{" "}
                   {status ? <span className="friend-tab__status">{status}</span> : null}

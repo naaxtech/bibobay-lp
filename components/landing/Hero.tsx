@@ -1,4 +1,5 @@
 import { BayBackdrop } from "@/components/brand/BayBackdrop";
+import { ReefBackdrop } from "@/components/brand/ReefBackdrop";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage } from "./CmsArt";
 import { CtaLink } from "./CtaLink";
@@ -9,40 +10,64 @@ export interface HeroProps {
   section: SectionConfig;
   hero: LandingPageContent["hero"];
   links: LinkContext;
-  /** The CMS hero image, resolved on the server: it takes the postcard in place of the illustrated Bay. */
+  /**
+   * The hero art, resolved on the server: the CMS image, else the channel's own trio (ruling R58).
+   * Without either, the illustrated Bay stands in, named by the CMS artwork description.
+   */
   art?: StageArt;
 }
 
 /**
- * Asymmetric opening: the promise in large type on the left, the Bay as a die-cut paper postcard
- * on the right, captioned with the CMS greeting. The illustrated Bay is named by its CMS
- * description; an approved CMS image replaces it, carries its own alt text and loads first.
- * The headline is sized to sit on two lines on a desktop screen and the opening keeps its natural
- * height, so the promise, both CTAs and the Bay share the first viewport with no floating gap.
+ * The headline split into its sentences, one per line in the logo's inks (teal, orange, purple),
+ * like the channel's own tagline card. The words and spaces are the CMS title's, so the heading
+ * reads exactly as written.
+ */
+function HeroTitle({ title }: { title: string }) {
+  const sentences = title.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length < 2) return <>{title}</>;
+  return (
+    <>
+      {sentences.map((sentence, index) => (
+        <span key={index} className="hero-title__line" data-ink={index % 3}>
+          {index > 0 ? " " : null}
+          {sentence}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Asymmetric opening in the sunlit water of the Bay: the promise in large type on the left, the
+ * friends on the reef in a white-bordered window on the right, captioned with the CMS greeting.
+ * Sunbeams, bubbles and the sandy floor are drawn behind (decorative); the sand meets the section
+ * below. The opening keeps its natural height, so the promise, both CTAs and the friends share the
+ * first viewport.
  */
 export function Hero({ section, hero, links, art }: HeroProps) {
   const primary = isReachable(hero.primaryCta.href, links) ? hero.primaryCta : null;
   const secondary = isReachable(hero.secondaryCta.href, links) ? hero.secondaryCta : null;
   return (
-    <SectionShell section={section} headingId="hero-heading" className="overflow-x-clip" bay={art ? undefined : "drift"}>
-      <div className="landing-container grid items-center gap-x-10 gap-y-12 pb-section pt-10 sm:pt-14 lg:grid-cols-12 lg:pb-24 lg:pt-16">
-        <div className="lg:col-span-7">
+    <SectionShell section={section} headingId="hero-heading" className="hero overflow-x-clip" bay="drift">
+      <ReefBackdrop className="hero__reef" />
+      <div className="landing-container hero__grid">
+        <div className="hero__copy">
           <h1 id="hero-heading" className="hero-title font-display font-semibold">
-            {hero.title}
+            <HeroTitle title={hero.title} />
           </h1>
-          <p className="mt-6 max-w-[38ch] text-lead text-(--ink-soft)">{hero.description}</p>
+          <p className="hero__lead">{hero.description}</p>
           {primary || secondary ? (
-            <div className="mt-9 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="hero__ctas">
               {primary ? <CtaLink cta={primary} variant="primary" /> : null}
               {secondary ? <CtaLink cta={secondary} variant="paper" /> : null}
             </div>
           ) : null}
         </div>
-        <figure className="hero-postcard lg:col-span-5 lg:col-start-8">
-          {hero.eyebrow ? <figcaption className="paper-tape hero-postcard__label">{hero.eyebrow}</figcaption> : null}
+        <figure className="hero-postcard">
+          {hero.eyebrow ? <figcaption className="hero-postcard__label">{hero.eyebrow}</figcaption> : null}
           {art ? (
             <div className="hero-postcard__art">
-              <ArtImage art={art} sizes="(min-width: 80rem) 30rem, (min-width: 64rem) 40vw, 100vw" priority />
+              <ArtImage art={art} sizes="(min-width: 80rem) 44rem, (min-width: 64rem) 56vw, 100vw" priority />
             </div>
           ) : (
             <div className="hero-postcard__art" role="img" aria-label={hero.artworkDescription}>

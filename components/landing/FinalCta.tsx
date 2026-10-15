@@ -1,4 +1,5 @@
 import { BayBackdrop } from "@/components/brand/BayBackdrop";
+import { ReefBackdrop } from "@/components/brand/ReefBackdrop";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage } from "./CmsArt";
 import { CtaLink } from "./CtaLink";
@@ -9,18 +10,20 @@ export interface FinalCtaProps {
   section: SectionConfig;
   finalCta: LandingPageContent["finalCta"];
   links: LinkContext;
-  /** The section's CMS image: the closing panorama, in place of the illustrated Bay horizon. */
+  /** The closing scene: the CMS image, else the channel's reef (ruling R58); without either, the drawn Bay horizon. */
   art?: StageArt;
 }
 
 /**
- * The close of the story: one invitation above the whole Bay, the horizon the page began with.
- * Centred on purpose: it is the page's one closing invitation, and the horizon beneath it runs edge to edge.
+ * The close of the story: one invitation above the whole reef, the water the page began in.
+ * Centred on purpose: it is the page's one closing invitation, and the scene beneath it runs edge
+ * to edge. Bubbles and the sandy floor are drawn over the scene's foot and settle into place as it
+ * scrolls in; the sand leads into the footer.
  */
 export function FinalCta({ section, finalCta, links, art }: FinalCtaProps) {
   const cta = isReachable(finalCta.cta.href, links) ? finalCta.cta : null;
   return (
-    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section" bay={art ? undefined : "settle"}>
+    <SectionShell section={section} headingId="finalCta-heading" className="overflow-x-clip pt-section" bay="settle">
       <div className="landing-container flex flex-col items-center text-center">
         {finalCta.eyebrow ? <Tape>{finalCta.eyebrow}</Tape> : null}
         <h2 id="finalCta-heading" className="mt-4 max-w-[16ch] font-display text-h1 font-semibold">
@@ -30,7 +33,14 @@ export function FinalCta({ section, finalCta, links, art }: FinalCtaProps) {
         {cta ? <CtaLink cta={cta} variant="primary" className="mt-9" /> : null}
       </div>
       <div className={art ? "final-bay final-bay--art" : "final-bay"}>
-        {art ? <ArtImage art={art} sizes="100vw" /> : <BayBackdrop className="absolute inset-0" />}
+        {art ? (
+          <div className="final-bay__scene">
+            <ArtImage art={art} sizes="100vw" />
+          </div>
+        ) : (
+          <BayBackdrop className="absolute inset-0" />
+        )}
+        {art ? <ReefBackdrop className="final-bay__reef" /> : null}
       </div>
     </SectionShell>
   );
