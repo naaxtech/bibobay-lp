@@ -1,0 +1,50 @@
+components/brand/ReefBackdrop.tsx
+  h_0549c11fec2ab0 1-125
+components/landing/Characters.tsx
+  h_0549c11fec2ab0 73-76,104,106-118
+components/landing/CmsArt.tsx
+  h_0549c11fec2ab0 23,25-28,31-47
+components/landing/Episodes.tsx
+  h_0549c11fec2ab0 5,29-39,42-54,124-127,148-169,181
+components/landing/FinalCta.tsx
+  h_0549c11fec2ab0 2,13,18-21,26,36-43
+components/landing/Hero.tsx
+  h_0549c11fec2ab0 2,13-16,21-45,51-54,56,58,60,66-67,70
+components/landing/SectionRenderer.tsx
+  h_0549c11fec2ab0 4,28,36-46,48-52,55,61-62,72,76,83,93,98,105-106,130,134
+components/landing/landing.css
+  h_0549c11fec2ab0 11-18,60-67,94,97,100-101,117-121,123-124,134-135,139,141-150,179-182,184-190,194,198-208,211,213-214,250,291-294,296-303,311,315,388,390,459,500,503-536,539,542-573,581,585-586,588-595,598,602-613,623,628,630,743,747-779,880,884-890,1108-1302,1668-1688,1692-1693
+components/landing/sections.ts
+  h_0549c11fec2ab0 3-7,9-10,13,20,79-84
+components/landing/ui-copy.ts
+  h_0549c11fec2ab0 28-29
+e2e/landing/brand-art.spec.ts
+  h_0549c11fec2ab0 1-59
+lib/content/brand-art.ts
+  h_0549c11fec2ab0 1-137
+tests/brand/brand-art.test.ts
+  h_0549c11fec2ab0 1-99
+tests/brand/reef-backdrop.test.tsx
+  h_0549c11fec2ab0 1-63
+tests/landing/accessibility-contracts.test.tsx
+  h_0549c11fec2ab0 167-168,184-185
+tests/landing/brand-art-slots.test.tsx
+  h_0549c11fec2ab0 1-125
+tests/landing/cms-images.test.tsx
+  h_0549c11fec2ab0 12-13,39-43,59,76-77,107,112-114,160,169-170
+tests/landing/section-renderer.test.tsx
+  h_0549c11fec2ab0 319,330-333
+tests/motion/reduced-motion.test.tsx
+  h_0549c11fec2ab0 253,256,260-267,270,273-275,278,280-281
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "797aec275b9d87df05be53e1ac045db058949c8a",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
