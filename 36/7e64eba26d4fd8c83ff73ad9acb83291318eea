@@ -1,0 +1,35 @@
+app/icon.svg
+  s_a9e34acb796733::t_3b3744ee8e9f88 1,5-13,16-17,19-20,22-24,26-27,29-32,34
+public/brand/bibo-logo-monochrome.svg
+  s_a9e34acb796733::t_e5f200075bbeab 1,4,6,9,11,13,16,18-21,23
+public/brand/bibo-mark.svg
+  s_a9e34acb796733::t_64dcdd0c597577 1,6,10-18,21-22,24-25,27-29,31-32,34-37,39
+lib/brand/tokens.ts
+  s_deed703217db6f::t_2cab09d4847790 11,13-22,27-35,64-66
+tests/brand/brand-assets.test.ts
+  s_deed703217db6f::t_ff7d7147f2b334 9-10,56-58,62,69-70,80-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "367e64eba26d4fd8c83ff73ad9acb83291318eea",
+  "prompts": {},
+  "sessions": {
+    "s_a9e34acb796733": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4c1acfa-216a-4df0-9f98-0d887690e025",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_deed703217db6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3504e079468593a6",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
