@@ -27,6 +27,17 @@ export const UI_COPY = {
   watchStory: "Watch the story",
   /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
   watchOnYouTube: "Watch on YouTube",
+  /** The order pad (Task 6): shown only while commerce is enabled. */
+  orderPad: {
+    add: "Add to order",
+    added: "Added to your order.",
+    full: "Your order already holds 40 different products, the most it can. Remove one to add another.",
+    title: "Your order",
+    empty: "Nothing on your order yet.",
+    quantity: "Quantity",
+    remove: "Remove",
+    review: "Review your order",
+  },
   /** The last-resort error page (app/global-error.tsx): no internal detail. */
   globalError: {
     title: "Something went wrong",
