@@ -87,6 +87,7 @@ describe("reading a corrupted or tampered pad", () => {
         line("product-a", 2),
         { productId: "", quantity: 1 },
         { productId: "drafts.product-b", quantity: 1 },
+        { productId: "versions.spring-launch.product-b", quantity: 1 },
         { productId: "../etc/passwd", quantity: 1 },
         { productId: "product-c", quantity: 0 },
         { productId: "product-d", quantity: -3 },
@@ -150,6 +151,7 @@ describe("changing the pad", () => {
   it.each([
     ["an empty id", "", 1],
     ["a draft id", "drafts.product-a", 1],
+    ["a release version id", "versions.spring-launch.product-a", 1],
     ["zero", "product-a", 0],
     ["a fraction", "product-a", 0.5],
     ["a negative quantity", "product-a", -1],

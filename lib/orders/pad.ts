@@ -14,8 +14,8 @@ export interface OrderPadLine {
   quantity: number;
 }
 
-/** A published Sanity document id: no `drafts.` prefix, no path characters. */
-const PRODUCT_ID = /^(?!drafts\.)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+/** A published Sanity document id: no `drafts.` or release `versions.` prefix, no path characters. */
+const PRODUCT_ID = /^(?!drafts\.|versions\.)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 const isProductId = (value: unknown): value is string => typeof value === "string" && PRODUCT_ID.test(value);
 const isQuantity = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1;

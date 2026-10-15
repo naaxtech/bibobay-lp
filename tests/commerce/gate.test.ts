@@ -11,7 +11,9 @@ import { SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 describe("the commerce gate", () => {
   it("is off in the repository fallback, which ships with commerce disabled", () => {
     expect(SAFE_FALLBACK_SETTINGS.commerceEnabled).toBe(false);
+    expect(SAFE_FALLBACK_SETTINGS.trackingEnabled).toBe(false);
     expect(isCommerceEnabled(SAFE_FALLBACK_SETTINGS)).toBe(false);
+    expect(isTrackingEnabled(SAFE_FALLBACK_SETTINGS)).toBe(false);
   });
 
   it.each([

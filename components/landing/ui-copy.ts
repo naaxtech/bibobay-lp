@@ -30,8 +30,10 @@ export const UI_COPY = {
   /** The order pad (Task 6): shown only while commerce is enabled. */
   orderPad: {
     add: "Add to order",
-    added: "Added to your order.",
-    full: "Your order already holds 40 different products, the most it can. Remove one to add another.",
+    /** Names the new quantity, so a repeated add is announced again. */
+    added: (quantity: number) => (quantity === 1 ? "Added to your order." : `Added to your order: ${quantity} now.`),
+    atMost: (quantity: number) => `Your order already has ${quantity} of this, the most one order can hold.`,
+    full: (lines: number) => `Your order already holds ${lines} different products, the most it can. Remove one to add another.`,
     title: "Your order",
     empty: "Nothing on your order yet.",
     quantity: "Quantity",
