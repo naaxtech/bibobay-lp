@@ -47,7 +47,11 @@ export const landingSection = defineType({ name: "landingSection", title: "Order
 ], preview: { select: { title: "id", visible: "visible" }, prepare: ({ title, visible }) => ({ title, subtitle: visible === false ? "Hidden" : "Visible" }) } });
 export const heroSection = section("heroSection", "Hero", [
   defineField({ name: "title", type: "string" }), defineField({ name: "primaryCta", type: "cta" }),
-  defineField({ name: "secondaryCta", type: "cta" }), defineField({ name: "artworkDescription", type: "text" }),
+  defineField({ name: "secondaryCta", type: "cta" }), defineField({
+    name: "artworkDescription",
+    type: "text",
+    description: "Names the drawn Bay scene, which shows only when the hero has neither an image of its own nor the channel's art (the channel's trio fills it by default). An uploaded image carries its own alt text.",
+  }),
 ]);
 export const trustSection = section("trustSection", "Trust strip", [copyList("items", "Factual principles")]);
 export const promiseSection = section("promiseSection", "The BIBO promise", [defineField({ name: "quote", type: "string" }), defineField({ name: "body", type: "portableContent" })]);

@@ -89,3 +89,11 @@ describe("claim-safe editorial seed", () => {
     expect(JSON.stringify(docs)).not.toMatch(/"(?:price|currency|canonicalUrl|studioUrl|contactEmail|fileUrl)"\s*:/);
   });
 });
+
+describe("hero artwork description (rebrand re-review N3)", () => {
+  it("tells editors when the description is used, since channel art normally fills the hero", () => {
+    const field = (types.get("heroSection")?.fields as Array<Field & { description?: string }> | undefined)?.find((f) => f.name === "artworkDescription");
+    expect(field?.description).toMatch(/only when/i);
+    expect(field?.description).toMatch(/channel/i);
+  });
+});

@@ -54,6 +54,15 @@ for (const { name, use } of VIEWPORTS) {
       await expect(watch).toHaveAttribute("target", "_blank");
       await expect(watch).toHaveAttribute("rel", /noopener/);
       expect(await page.locator("iframe, video, audio").count()).toBe(0);
+      // Rebrand re-review N2: on a phone the words would cover the title printed on the thumbnail, so
+      // only the play disc shows there; the link keeps its full name for assistive technology.
+      const label = player.locator(".storybook__watch-label");
+      const area = await label.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.width * box.height;
+      });
+      if (name === "mobile") expect(area, "label box on a phone").toBeLessThanOrEqual(1);
+      else expect(area, "label box on a desktop").toBeGreaterThan(100);
     });
   });
 }

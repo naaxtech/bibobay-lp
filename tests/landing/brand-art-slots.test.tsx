@@ -168,3 +168,13 @@ describe("rebrand review fixes", () => {
     expect(section("finalCta").querySelector(".reef-backdrop")).toBeNull();
   });
 });
+
+describe("rebrand re-review fixes", () => {
+  it("builds each video link's name from interface copy, not a string fixed in the component (N4)", async () => {
+    const { UI_COPY } = await import("@/components/landing/ui-copy");
+    renderPage();
+    const video = landingContent().episodes[0]!;
+    const link = within(within(section("episodes")).getByRole("tabpanel")).getByRole("link", { name: /Watch on YouTube/ });
+    expect(link.textContent).toBe(`${UI_COPY.watchOnYouTube}${UI_COPY.videoLinkTitle(video.title)} ${UI_COPY.opensInNewTab}`);
+  });
+});

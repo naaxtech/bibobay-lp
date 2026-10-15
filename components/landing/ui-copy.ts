@@ -27,6 +27,8 @@ export const UI_COPY = {
   watchStory: "Watch the story",
   /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
   watchOnYouTube: "Watch on YouTube",
+  /** Joins a video's title to its way out, for assistive technology ("Watch on YouTube: <title>"). */
+  videoLinkTitle: (title: string) => `: ${title}`,
   /** Which story concept of how many is open (read by assistive technology with the open story). */
   storyPosition: (current: number, total: number) => `${current} of ${total}`,
   socialPlatforms: {

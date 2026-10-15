@@ -84,6 +84,8 @@ describe("rebrand docs (rebrand review C1, M3)", () => {
     expect(images).toContain("lib/content/brand-art.ts");
     expect(images).toMatch(/first name/i);
     expect(images).toMatch(/YouTube/);
+    // Rebrand re-review N3: the hero's artwork description only names the drawn fallback scene.
+    expect(images).toMatch(/artwork description/i);
     const map = read("docs/architecture.md");
     for (const name of ["public/brand/art/", "lib/content/brand-art.ts", "ReefBackdrop"]) expect(map, name).toContain(name);
   });

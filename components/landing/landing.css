@@ -185,11 +185,12 @@
   /*
    * Rebrand review I1: yellow ink is for text on the deep-sea ground itself. White surfaces inside a
    * deep-sea section (the video player, a friend's stage, a chosen tab, a status stamp) take the
-   * accent's paper ink again, so their labels keep AA contrast on white.
+   * accent's paper ink again, so their labels keep AA contrast on white. The focus colour stays sun
+   * yellow (re-review N1): these surfaces' own rings are drawn outside them, on the deep sea, and the
+   * one link inside a white surface (a video's cover) draws its own navy ring.
    */
   [data-ground="navy"] :is(.storybook, .friend-stage, .friend-tab, .story-tab[aria-selected="true"], .paper-stamp) {
     --accent-ink: var(--accent-ink-paper, var(--bibo-color-navy));
-    --bibo-focus-color: var(--bibo-color-navy);
   }
 
   /* ---------- Paper primitives ---------- */
@@ -1286,19 +1287,19 @@
     scale: 1.08;
   }
 
-  /* On a phone the label sits top-left, clear of the title printed along a thumbnail's foot. */
+  /*
+   * On a phone the cover is small and its thumbnail's printed title runs across most of it, so the
+   * words "Watch on YouTube" are for assistive technology only there (re-review N2): the play disc
+   * shows it is a video, and the section's own intro says every video opens on YouTube. From 48rem
+   * the label is a white pill in the cover's lower-left corner.
+   */
   .storybook__watch-label {
     position: absolute;
-    inset-block-start: 0.75rem;
-    inset-inline-start: 0.75rem;
-    padding: 0.45rem 1.05rem 0.5rem;
-    border-radius: var(--bibo-radius-pill);
-    background-color: var(--bibo-color-paper);
-    box-shadow: var(--bibo-shadow-paper);
-    color: var(--bibo-color-navy);
-    font-family: var(--bibo-font-display);
-    font-weight: 600;
-    line-height: 1.2;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    white-space: nowrap;
+    clip-path: inset(50%);
   }
 
   @media (min-width: 48rem) {
@@ -1309,6 +1310,19 @@
     .storybook__watch-label {
       inset-block: auto 1rem;
       inset-inline-start: 1rem;
+      overflow: visible;
+      inline-size: auto;
+      block-size: auto;
+      padding: 0.45rem 1.05rem 0.5rem;
+      border-radius: var(--bibo-radius-pill);
+      background-color: var(--bibo-color-paper);
+      box-shadow: var(--bibo-shadow-paper);
+      color: var(--bibo-color-navy);
+      font-family: var(--bibo-font-display);
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: normal;
+      clip-path: none;
     }
   }
 

@@ -144,3 +144,87 @@ for (const { name, use } of VIEWPORTS) {
     });
   });
 }
+
+/**
+ * The colour change a keyboard focus ring makes at `point` (page coordinates): the contrast between
+ * the pixel there before and after the element takes focus. WCAG 2.4.11/1.4.11 want at least 3:1.
+ */
+async function ringChange(page: Page, focus: () => Promise<void>, point: { x: number; y: number }) {
+  const sample = async () => {
+    const clip = { x: Math.max(0, Math.round(point.x) - 1), y: Math.max(0, Math.round(point.y) - 1), width: 3, height: 3 };
+    const png = (await page.screenshot({ clip, animations: "disabled" })).toString("base64");
+    return page.evaluate(async (data) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${data}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      [canvas.width, canvas.height] = [image.width, image.height];
+      const context = canvas.getContext("2d")!;
+      context.drawImage(image, 0, 0);
+      return Array.from(context.getImageData(1, 1, 1, 1).data.slice(0, 3));
+    }, png);
+  };
+  const before = await sample();
+  await focus();
+  const after = await sample();
+  const luminance = (c: number[]) => {
+    const channel = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channel(c[0]!) + 0.7152 * channel(c[1]!) + 0.0722 * channel(c[2]!);
+  };
+  const [x, y] = [luminance(before), luminance(after)];
+  return { before, after, ratio: Number(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2)) };
+}
+
+/** Tab from the page top until `target` has keyboard focus. */
+async function tabTo(page: Page, target: string) {
+  const locator = page.locator(target);
+  for (let press = 0; press < 80 && !(await locator.evaluate((element) => element === document.activeElement)); press += 1) await page.keyboard.press("Tab");
+  await expect(locator).toBeFocused();
+}
+
+for (const { name, use } of VIEWPORTS) {
+  test.describe(`focus rings on the deep-sea ground on ${name} (rebrand re-review N1)`, () => {
+    test.use({ ...use, reducedMotion: "reduce" });
+
+    const STOPS = [
+      ["the chosen video tab", "#episodes [role='tab'][aria-selected='true']"],
+      ["the open video panel", "#episodes [role='tabpanel']:not([inert])"],
+    ] as const;
+
+    for (const [label, selector] of STOPS) {
+      test(`shows a ring with at least 3:1 change on ${label}`, async ({ page }) => {
+        await page.goto("/");
+        const element = page.locator(selector);
+        await element.scrollIntoViewIfNeeded();
+        const box = (await element.boundingBox())!;
+        // Just outside the element's left edge, halfway down: where the 3px ring sits 3px out.
+        const point = { x: box.x - 4.5, y: box.y + box.height / 2 };
+        const change = await ringChange(page, () => tabTo(page, selector), point);
+        expect(change.ratio, `${label}: ${change.before} -> ${change.after}`).toBeGreaterThanOrEqual(3);
+      });
+    }
+
+    test("keeps the rings visible when an editor puts the friends on the deep-sea ground", async ({ page }) => {
+      await page.goto("/");
+      await page.evaluate(() => {
+        const friends = document.getElementById("characters")!;
+        friends.dataset.ground = "navy";
+        friends.dataset.surface = "navy";
+      });
+      for (const selector of ["#characters [role='tab'][aria-selected='true']", "#characters [role='tabpanel']:not([inert])"]) {
+        await page.locator("body").focus();
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        await page.mouse.click(1, 1);
+        const element = page.locator(selector);
+        await element.scrollIntoViewIfNeeded();
+        const box = (await element.boundingBox())!;
+        const point = { x: box.x - 4.5, y: box.y + box.height / 2 };
+        const change = await ringChange(page, async () => {
+          await page.locator("#characters [role='tab'][aria-selected='true']").focus();
+          if (selector.includes("tabpanel")) await tabTo(page, selector);
+        }, point);
+        expect(change.ratio, `${selector}: ${change.before} -> ${change.after}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+}

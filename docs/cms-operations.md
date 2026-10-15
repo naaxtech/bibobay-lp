@@ -89,7 +89,8 @@ eyebrow renders nothing.
   thumbnail when its media link is a YouTube link to one of the channel's videos; the section scenes
   (hero, promise, loop, values, signup, closing) always have one. Upload an image to replace a
   slot's channel art; it cannot be switched off from the Studio. A slot with neither keeps its drawn
-  placeholder.
+  placeholder. The hero's **Artwork description** names only that drawn scene; channel art and an
+  uploaded image carry their own alt text, so today the field does not appear on the page.
 - Editors' images are served from Sanity's CDN (`cdn.sanity.io`), the only image host the site
   allows. Channel art is served by the site itself.
 
