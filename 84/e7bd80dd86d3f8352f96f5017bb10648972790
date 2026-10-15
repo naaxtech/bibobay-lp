@@ -1,0 +1,32 @@
+components/landing/Episodes.tsx
+  h_0549c11fec2ab0 50
+components/landing/landing.css
+  h_0549c11fec2ab0 188-190,1290-1295,1298-1302,1313-1325
+components/landing/ui-copy.ts
+  h_0549c11fec2ab0 30-31
+docs/cms-operations.md
+  h_0549c11fec2ab0 92-93
+e2e/landing/brand-art.spec.ts
+  h_0549c11fec2ab0 57-65
+e2e/landing/contrast.spec.ts
+  h_0549c11fec2ab0 147-230
+studio/schemaTypes/objects/index.ts
+  h_0549c11fec2ab0 50-54
+tests/content/studio-contract.test.ts
+  h_0549c11fec2ab0 92-99
+tests/landing/brand-art-slots.test.tsx
+  h_0549c11fec2ab0 171-180
+tests/scripts/docs-claims.test.ts
+  h_0549c11fec2ab0 87-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84e7bd80dd86d3f8352f96f5017bb10648972790",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
