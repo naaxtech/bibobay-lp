@@ -1,0 +1,22 @@
+components/landing/ui-copy.ts
+  h_0549c11fec2ab0 35
+components/shop/AddToOrder.tsx
+  h_0549c11fec2ab0 3,13-14,19-20,22-31,33-37
+components/shop/OrderPadProvider.tsx
+  h_0549c11fec2ab0 5-6,17,24-25,27-30,59-66,68,71,89-90,92,101,104,120,125-126,128-130,138
+lib/orders/pad.ts
+  h_0549c11fec2ab0 21-23
+tests/orders/order-pad-provider.test.tsx
+  h_0549c11fec2ab0 266-361,363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a1f929a5e8928f333be2af878fe4e994a75e4cb",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
