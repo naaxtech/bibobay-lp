@@ -13,6 +13,14 @@ import type { Character, EpisodePreview, LandingPageContent, LegalSettings, Site
 /** The channel this site belongs to; the only social link, confirmed by the owner on 2026-10-15. */
 export const BIBO_YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@bibobay-tv";
 
+/**
+ * The same channel by its id (the canonical /channel/ URL behind @bibobay-tv, read 2026-10-15) with
+ * YouTube's subscribe prompt. The prompt is only reliable on /channel/<id> URLs, not on @handles.
+ * The owner's directive (2026-10-15): YouTube is where Bibo Bay is watched, so the page's calls to
+ * action lead there.
+ */
+export const BIBO_YOUTUBE_SUBSCRIBE_URL = "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1";
+
 /** The real, published Bibo Bay videos the fallback links to (each checked on the channel, 2026-10-15). */
 export const BIBO_VIDEO_IDS = {
   friendsInTheBay: "3birY6XZ3_c",
@@ -36,6 +44,7 @@ const sectionIds: SectionId[] = ["hero", "trust", "promise", "characters", "epis
 export const DEFAULT_SECTION_IDS = sectionIds;
 
 const watchOnYouTube = { label: "Watch on YouTube", href: BIBO_YOUTUBE_CHANNEL_URL, external: true };
+const subscribeOnYouTube = { label: "Subscribe on YouTube", href: BIBO_YOUTUBE_SUBSCRIBE_URL, external: true };
 
 export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
   sections: sectionIds.map((id) => ({ id, visible: id !== "testimonials" })),
@@ -44,7 +53,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
     eyebrow: "Welcome to BIBO Bay",
     heading: "Bright minds. Kind hearts. Big adventures.",
     title: "Bright minds. Kind hearts. Big adventures.",
-    description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi under the sea.",
+    description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi under the sea: free to watch on YouTube.",
     artworkDescription: "Tula the turtle, Bob the clownfish and Lumi the octopus on the sandy floor of a sunlit coral reef.",
     primaryCta: watchOnYouTube,
     secondaryCta: { label: "Meet Tula, Bob & Lumi", href: "#characters" },
@@ -57,7 +66,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
     character("bob", "Bob the Fish", "Clownfish", "The little spotter", "In Twinkle Twinkle Little Star Under the Sea, Bob spots tiny lights glowing in the water and calls his friends over to look.", ["Noticing", "Friendship", "Slow breaths"], "#f06b32"),
     character("lumi", "Lumi", "Octopus", "The song and dance friend", "Lumi loves to sing and dance with friends, from wiggly songs in the sunshine to gentle songs under the stars.", ["Songs and rhymes", "Moving to music", "Bedtime calm"], "#9467aa"),
   ],
-  episodesIntro: { eyebrow: "Watch now", heading: "Songs and adventures to watch together.", description: "Sing, count, breathe and wind down with the friends of Bibo Bay. Every video opens on YouTube.", conceptLabel: "Story concept" },
+  episodesIntro: { eyebrow: "Watch now", heading: "Songs and adventures to watch together.", description: "Sing, count, breathe and wind down with the friends of Bibo Bay. Every video opens on YouTube.", conceptLabel: "Story concept", cta: subscribeOnYouTube },
   episodes: [
     video("friends-in-the-bay", BIBO_VIDEO_IDS.friendsInTheBay, "Dance with the Sea Friends", "Dance, wiggle and move along with Tula, Lumi and Bob as they explore the colourful underwater world of Bibo Bay.", "Tula, Lumi and Bob", ["Moving to music", "Rhythm"], "Dance along together: wiggle like Bob and glide like Tula."),
     video("twinkle-under-the-sea", BIBO_VIDEO_IDS.twinkleUnderTheSea, "Twinkle Twinkle Little Star Under the Sea", "Bob spots tiny lights in Bibo Bay and calls Lumi and Tula over to investigate: a gentle underwater adventure and a familiar song before bedtime.", "Bob, Lumi and Tula", ["Nursery rhymes", "Bedtime"], "Look for the first star tonight and sing it softly together."),
@@ -91,14 +100,14 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
     { id: "ages", question: "Who is it for?", answer: "Little learners ages 2–6, and the grown-ups watching with them." },
     { id: "signup", question: "What happens when I join?", answer: "Your request to join the founding-family list is recorded when the signup service accepts it. This does not guarantee an email or download." },
   ],
-  finalCta: { eyebrow: "Come say hello", heading: "Dive into Bibo Bay.", description: "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", cta: watchOnYouTube },
+  finalCta: { eyebrow: "Come say hello", heading: "Dive into Bibo Bay.", description: "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", cta: subscribeOnYouTube },
 };
 
 export const SAFE_FALLBACK_SETTINGS: SiteSettings = {
   title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.", seo: SAFE_FALLBACK_CONTENT.seo,
   commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false,
   socialLinks: [{ platform: "youtube", url: BIBO_YOUTUBE_CHANNEL_URL, verified: true }],
-  navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }], primaryCta: { label: "Join the list", href: "#lead" }, commerceLabel: "Shop" },
+  navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Join the list", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
   footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact" },
 };
 export const SAFE_FALLBACK_LEGAL: LegalSettings = { privacy: [], terms: [], consentCopyVersion: "1" };

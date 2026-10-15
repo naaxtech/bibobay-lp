@@ -55,7 +55,10 @@ export const heroSection = section("heroSection", "Hero", [
 ]);
 export const trustSection = section("trustSection", "Trust strip", [copyList("items", "Factual principles")]);
 export const promiseSection = section("promiseSection", "The BIBO promise", [defineField({ name: "quote", type: "string" }), defineField({ name: "body", type: "portableContent" })]);
-export const episodesSectionIntro = section("episodesSectionIntro", "Story preview introduction", [defineField({ name: "conceptLabel", type: "string" })]);
+export const episodesSectionIntro = section("episodesSectionIntro", "Story preview introduction", [
+  defineField({ name: "conceptLabel", type: "string" }),
+  defineField({ name: "cta", title: "Call to action", type: "cta", description: "Shown under the section heading; by default the channel's subscribe link." }),
+]);
 export const offlineStep = defineType({ name: "offlineStep", title: "Screen to real-life step", type: "object", fields: [
   defineField({ name: "title", type: "string" }), defineField({ name: "description", type: "text" }),
 ] });

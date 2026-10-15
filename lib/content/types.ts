@@ -31,7 +31,7 @@ export interface LandingPageContent {
   trust: SectionIntro & { items: string[] };
   promise: SectionIntro & { quote: string; body: PortableContent };
   charactersIntro: SectionIntro; characters: Character[];
-  episodesIntro: SectionIntro & { conceptLabel: string }; episodes: EpisodePreview[];
+  episodesIntro: SectionIntro & { conceptLabel: string; cta: Cta }; episodes: EpisodePreview[];
   offline: SectionIntro & { steps: Array<{ title: string; description: string }> };
   pillarsIntro: SectionIntro; pillars: BrandPillar[];
   ecosystemIntro: SectionIntro; ecosystem: EcosystemEntry[];

@@ -75,3 +75,11 @@ describe("untrusted editorial content", () => {
     expect(normalizeLegalSettings({ privacy: blocks, terms: blocks }).terms).toEqual(expected);
   });
 });
+
+describe("the watch section's call to action (YouTube-first)", () => {
+  it("normalises an editor's own CTA and falls back to the channel's subscribe link", () => {
+    expect(normalizeLandingContent({ episodesIntro: { heading: "Watch" } }).episodesIntro.cta).toEqual(SAFE_FALLBACK_CONTENT.episodesIntro.cta);
+    expect(normalizeLandingContent({ episodesIntro: { cta: { label: "Our playlists", href: "https://www.youtube.com/@bibobay-tv/playlists", external: true } } }).episodesIntro.cta)
+      .toEqual({ label: "Our playlists", href: "https://www.youtube.com/@bibobay-tv/playlists", external: true });
+  });
+});

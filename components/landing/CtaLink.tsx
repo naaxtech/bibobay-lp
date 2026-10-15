@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
 import type { Cta } from "@/lib/content/types";
 import { UI_COPY } from "./ui-copy";
 
@@ -38,6 +39,7 @@ export function CtaLink({ cta, variant = "plain", className, onClick, children }
   if (cta.external) {
     return (
       <a href={cta.href} className={classes} target="_blank" rel="noopener noreferrer" onClick={onClick}>
+        {isYouTubeHref(cta.href) ? <YouTubeMark /> : null}
         {label}
         <span className="sr-only"> {UI_COPY.opensInNewTab}</span>
       </a>

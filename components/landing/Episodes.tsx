@@ -5,6 +5,7 @@ import { useId } from "react";
 import { youtubeVideoId } from "@/lib/content/brand-art";
 import type { EpisodePreview, LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage, CmsArt } from "./CmsArt";
+import { CtaLink } from "./CtaLink";
 import { PaperMood, moodAccent } from "./PaperMood";
 import { SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
@@ -43,7 +44,7 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
       {watchHref ? (
         <a href={watchHref} className="storybook__cover storybook__watch" target="_blank" rel="noopener noreferrer">
           {cover}
-          <span className="storybook__play" aria-hidden="true" />
+          <span className="storybook__play" aria-hidden="true" data-youtube-mark />
           <span className="storybook__watch-label">
             {youtubeVideoId(watchHref) ? UI_COPY.watchOnYouTube : UI_COPY.watchStory}
             {/* The title tells the seven ways out apart in a screen reader's list of links. */}
@@ -141,6 +142,8 @@ export function Episodes({ section, intro, episodes, art, introArt }: EpisodesPr
               {intro.heading}
             </h2>
             {intro.description ? <p className="mt-4 max-w-[46ch] text-(--ink-soft)">{intro.description}</p> : null}
+            {/* The channel is where Bibo Bay is watched: the section's own way there (by default, subscribe). */}
+            <CtaLink cta={intro.cta} variant="primary" className="mt-7" />
           </div>
           {introArt ? (
             <CmsArt frame="print" art={introArt} sizes="(min-width: 64rem) 20rem, 90vw" className="max-w-[20rem] lg:col-span-4 lg:col-start-9" />

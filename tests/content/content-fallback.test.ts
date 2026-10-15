@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
+import { BIBO_YOUTUBE_SUBSCRIBE_URL, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 
 /*
  * The fallback copy follows the Bibo Bay YouTube channel (ruling R55). These ids are the channel's
@@ -34,9 +34,21 @@ describe("truthful offline content", () => {
 
   it("lists the owner-confirmed YouTube channel as its only social link", () => {
     expect(SAFE_FALLBACK_SETTINGS.socialLinks).toEqual([{ platform: "youtube", url: CHANNEL, verified: true }]);
-    for (const cta of [SAFE_FALLBACK_CONTENT.hero.primaryCta, SAFE_FALLBACK_CONTENT.finalCta.cta]) {
-      expect(cta).toEqual({ label: "Watch on YouTube", href: CHANNEL, external: true });
-    }
+    expect(SAFE_FALLBACK_CONTENT.hero.primaryCta).toEqual({ label: "Watch on YouTube", href: CHANNEL, external: true });
+  });
+
+  it("sends the page's calls to action to YouTube, where Bibo Bay is watched (owner directive 2026-10-15)", () => {
+    // The channel id behind @bibobay-tv (its canonical /channel/ URL, read 2026-10-15). YouTube's
+    // subscribe prompt is only reliable on /channel/<id> URLs, not on @handles.
+    expect(BIBO_YOUTUBE_SUBSCRIBE_URL).toBe("https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1");
+    const subscribe = { label: "Subscribe on YouTube", href: BIBO_YOUTUBE_SUBSCRIBE_URL, external: true };
+    expect(SAFE_FALLBACK_SETTINGS.navigation.primaryCta).toEqual(subscribe);
+    expect(SAFE_FALLBACK_CONTENT.episodesIntro.cta).toEqual(subscribe);
+    expect(SAFE_FALLBACK_CONTENT.finalCta.cta).toEqual(subscribe);
+    // One label per intent: every way to the channel says "Watch on YouTube", every subscribe link "Subscribe on YouTube".
+    const ctas = JSON.stringify([SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS]).match(/"label":"[^"]*YouTube[^"]*"/g) ?? [];
+    expect(new Set(ctas)).toEqual(new Set(['"label":"Watch on YouTube"', '"label":"Subscribe on YouTube"']));
+    expect(SAFE_FALLBACK_CONTENT.hero.description).toMatch(/free to watch on YouTube/);
   });
 
   it("does not fabricate audience size, view counts, delivery, expert proof, or testimonials", () => {

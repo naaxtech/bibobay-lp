@@ -70,12 +70,15 @@ describe("landmarks and headings", () => {
     const hide = (ids: SectionId[]) => landingContent((draft) => {
       for (const entry of draft.sections) if (ids.includes(entry.id)) entry.visible = false;
     });
-    const { unmount } = renderPage(hide(["characters", "episodes"]));
+    const { unmount } = renderPage(hide(["characters", "episodes", "lead"]));
     expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
-    // The founding-family call to action still lives in the menu.
+    // The channel's subscribe link still lives in the menu: YouTube is always somewhere to go.
     expect(within(screen.getByRole("banner")).getByRole("button", { name: "Menu" })).toBeTruthy();
     unmount();
-    renderPage(hide(["characters", "episodes", "lead"]));
+    // An editor who points the header's call to action at a hidden section leaves the menu nothing.
+    renderPage(hide(["characters", "episodes", "lead"]), siteSettings((draft) => {
+      draft.navigation.primaryCta = { label: "Join the list", href: "#lead" };
+    }));
     expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
     expect(within(screen.getByRole("banner")).queryByRole("button", { name: "Menu" })).toBeNull();
   });

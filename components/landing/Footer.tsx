@@ -1,4 +1,5 @@
 import { BiboLogo } from "@/components/brand/BiboLogo";
+import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
 import type { SiteSettings } from "@/lib/content/types";
 import { CtaLink } from "./CtaLink";
 import { UI_COPY } from "./ui-copy";
@@ -36,7 +37,8 @@ export function Footer({ settings }: FooterProps) {
             <ul className="grid gap-1">
               {socialLinks.map((link) => (
                 <li key={link.url}>
-                  <a href={link.url} className="footer-link" target="_blank" rel="me noopener noreferrer">
+                  <a href={link.url} className="footer-link footer-link--social" target="_blank" rel="me noopener noreferrer">
+                    {isYouTubeHref(link.url) ? <YouTubeMark /> : null}
                     {UI_COPY.socialPlatforms[link.platform]}
                     <span className="sr-only"> {UI_COPY.opensInNewTab}</span>
                   </a>

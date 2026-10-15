@@ -230,16 +230,21 @@ describe("lead capture", () => {
     expect(within(section("lead")).getByRole("form", { name: "Founding family signup" })).toBeTruthy();
   });
 
-  it("keeps the founding-family list one tap away and sends the opening and closing calls to the channel", () => {
+  it("keeps the founding-family list one tap away and sends the page's calls to action to YouTube", () => {
     renderPage();
     const toLead = Array.from(document.querySelectorAll('a[href="#lead"]')).map((link) => link.textContent?.trim());
-    expect(toLead).toContain("Join the list");
-    for (const id of ["hero", "finalCta"] as const) {
-      const watch = within(section(id)).getByRole("link", { name: /Watch on YouTube/ });
-      expect(watch.getAttribute("href")).toBe("https://www.youtube.com/@bibobay-tv");
-      expect(watch.getAttribute("target")).toBe("_blank");
-      expect(watch.getAttribute("rel")).toContain("noopener");
-    }
+    expect(toLead.length).toBeGreaterThan(0);
+    const external = (link: HTMLElement, href: string) => {
+      expect(link.getAttribute("href")).toBe(href);
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    };
+    external(within(section("hero")).getByRole("link", { name: /Watch on YouTube/ }), "https://www.youtube.com/@bibobay-tv");
+    const subscribe = "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1";
+    // The header's one call to action, the watch section and the closing invitation all subscribe.
+    external(within(screen.getByRole("banner")).getAllByRole("link", { name: /Subscribe on YouTube/ })[0]!, subscribe);
+    external(within(section("episodes")).getByRole("link", { name: /Subscribe on YouTube/ }), subscribe);
+    external(within(section("finalCta")).getByRole("link", { name: /Subscribe on YouTube/ }), subscribe);
     expect(within(section("hero")).getByRole("link", { name: "Meet Tula, Bob & Lumi" }).getAttribute("href")).toBe("#characters");
   });
 
@@ -331,5 +336,20 @@ describe("content stays visible and server-rendered", () => {
     const portraits = Array.from(section("characters").querySelectorAll(".friend-stage__art img"), (image) => decodeURIComponent(image.getAttribute("src") ?? ""));
     expect(portraits).toHaveLength(3);
     expect(portraits.filter((src) => src.includes("/brand/art/friend-"))).toHaveLength(2);
+  });
+});
+
+describe("YouTube-first calls to action", () => {
+  it("marks every link to the channel or a video with YouTube's play mark, hidden from assistive technology", () => {
+    renderPage();
+    const toYouTube = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]")).filter((link) => new URL(link.href, "https://bibobay.example").hostname.endsWith("youtube.com"));
+    expect(toYouTube.length).toBeGreaterThanOrEqual(5);
+    for (const link of toYouTube) {
+      const mark = link.querySelector("[data-youtube-mark]");
+      expect(mark, `${link.textContent} carries the mark`).not.toBeNull();
+      expect(mark!.getAttribute("aria-hidden")).toBe("true");
+    }
+    // Links elsewhere carry no mark.
+    expect(document.querySelectorAll("a[href^='#'] [data-youtube-mark]").length).toBe(0);
   });
 });

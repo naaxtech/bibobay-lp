@@ -14,6 +14,9 @@ const seo = (title: string, description: string) => ({ _type: "seo", title, desc
 const CHANNEL = "https://www.youtube.com/@bibobay-tv";
 const watch = (videoId: string) => `https://www.youtube.com/watch?v=${videoId}`;
 const watchOnYouTube = () => cta("Watch on YouTube", CHANNEL, true);
+/** The channel by id with YouTube's subscribe prompt (reliable only on /channel/<id> URLs). */
+const SUBSCRIBE = "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1";
+const subscribeOnYouTube = () => cta("Subscribe on YouTube", SUBSCRIBE, true);
 const SEO = ["BIBO Bay | Bright minds. Kind hearts. Big adventures.", "A gentle underwater world of mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi."] as const;
 
 const names = [
@@ -66,19 +69,19 @@ export function buildSeedDocuments(): SeedDocument[] {
     seo: seo(...SEO),
     commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false,
     socialLinks: [{ _type: "socialLink", _key: "youtube", platform: "youtube", url: CHANNEL, verified: true }],
-    navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: cta("Join the list", "#lead"), commerceLabel: "Shop" },
+    navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes"), cta("Join the list", "#lead")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: subscribeOnYouTube(), commerceLabel: "Shop" },
     footer: { _type: "footerSettings", text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [cta("Privacy", "/privacy"), cta("Terms", "/terms")].map((item, index) => ({ ...item, _key: `legal-${index}` })), contactLabel: "Contact" },
   };
   const landingPage: SeedDocument = {
     _id: "landingPage", _type: "landingPage",
     sections: sectionIds.map((id) => ({ _type: "landingSection", _key: id, id, visible: id !== "testimonials" })),
     seo: seo(...SEO),
-    hero: { ...intro("Welcome to BIBO Bay", "Bright minds. Kind hearts. Big adventures.", "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi under the sea.", "heroSection"), title: "Bright minds. Kind hearts. Big adventures.", artworkDescription: "Tula the turtle, Bob the clownfish and Lumi the octopus on the sandy floor of a sunlit coral reef.", primaryCta: watchOnYouTube(), secondaryCta: cta("Meet Tula, Bob & Lumi", "#characters") },
+    hero: { ...intro("Welcome to BIBO Bay", "Bright minds. Kind hearts. Big adventures.", "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi under the sea: free to watch on YouTube.", "heroSection"), title: "Bright minds. Kind hearts. Big adventures.", artworkDescription: "Tula the turtle, Bob the clownfish and Lumi the octopus on the sandy floor of a sunlit coral reef.", primaryCta: watchOnYouTube(), secondaryCta: cta("Meet Tula, Bob & Lumi", "#characters") },
     trust: { ...intro("Made with purpose", "Screen time is part of childhood. Let’s make it count.", "A calmer alternative to frantic, empty entertainment.", "trustSection"), items: ["For ages 2–6", "Calm, gentle pacing", "Playful learning, no pressure", "Lessons for everyday life"] },
     promise: { ...intro("The BIBO promise", "Content children enjoy, and parents can trust.", "Too often, children’s videos are noisy, overstimulating or made simply to keep little eyes watching. BIBO is creating something better.", "promiseSection"), quote: "Bright minds. Kind hearts. Big adventures.", body: [] },
     charactersIntro: intro("Meet the Bay friends", "Say hello to Tula, Bob and Lumi.", "Three friends who learn and grow with your little one in the gentle underwater world of Bibo Bay."),
     characters: names.map(([id]) => ref("character", id)),
-    episodesIntro: { ...intro("Watch now", "Songs and adventures to watch together.", "Sing, count, breathe and wind down with the friends of Bibo Bay. Every video opens on YouTube.", "episodesSectionIntro"), conceptLabel: "Story concept" },
+    episodesIntro: { ...intro("Watch now", "Songs and adventures to watch together.", "Sing, count, breathe and wind down with the friends of Bibo Bay. Every video opens on YouTube.", "episodesSectionIntro"), conceptLabel: "Story concept", cta: subscribeOnYouTube() },
     episodes: videos.map(([id]) => ref("episodePreview", id)),
     offline: { ...intro("Beyond the screen", "Watch. Wonder. Make. Explore.", "Carry lessons from the screen into everyday life.", "offlineSection"), steps: [
       ["Watch", "Enjoy a Bibo Bay song together."], ["Wonder", "Ask what Tula, Bob or Lumi might discover next."],
@@ -92,7 +95,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     lead: { ...intro("Founding families", "Be first to hear about new adventures.", "Adults can join the list for updates about BIBO Bay. Joining does not promise a download or an email delivery.", "leadSection"), buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates. I can unsubscribe at any time.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again." },
     faqIntro: intro("Questions", "A little more about the Bay.", "What families ask about BIBO Bay."),
     faqs: questions.map(([id]) => ref("faqItem", id)),
-    finalCta: { ...intro("Come say hello", "Dive into Bibo Bay.", "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", "finalCtaSection"), cta: watchOnYouTube() },
+    finalCta: { ...intro("Come say hello", "Dive into Bibo Bay.", "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", "finalCtaSection"), cta: subscribeOnYouTube() },
   };
   const legalSettings: SeedDocument = { _id: "legalSettings", _type: "legalSettings", privacy: [], terms: [], consentCopyVersion: "1" };
   return [...collections, siteSettings, landingPage, legalSettings];

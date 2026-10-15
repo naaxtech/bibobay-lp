@@ -34,6 +34,7 @@ describe("Studio content model", () => {
     covers("seo", ["title", "description", "image", "noIndex"]);
     covers("landingSection", ["id", "visible", "theme"]);
     covers("heroSection", ["eyebrow", "heading", "description", "image", "title", "primaryCta", "secondaryCta", "artworkDescription"]);
+    covers("episodesSectionIntro", ["eyebrow", "heading", "description", "image", "conceptLabel", "cta"]);
     covers("trustSection", ["eyebrow", "heading", "description", "image", "items"]);
     covers("promiseSection", ["eyebrow", "heading", "description", "image", "quote", "body"]);
     covers("leadSection", ["eyebrow", "heading", "description", "image", "buttonLabel", "consentCopy", "successMessage", "errorMessage", "leadMagnet"]);
