@@ -1,0 +1,14 @@
+tests/scripts/docs-claims.test.ts
+  h_0549c11fec2ab0 13,17-18,37-39,44,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6674d3365c03c0c237afdb454eb12049294e5365",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
