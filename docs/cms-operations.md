@@ -42,14 +42,14 @@ Collections:
 | `testimonial` (Verified experience) | Only when `testimonialsEnabled` is on and the entry is marked verified |
 | `faqItem` | FAQ section |
 | `leadMagnet` (Download) | A download link in the signup section, only when real (see below) |
-| `productCategory`, `product` | Not shown anywhere yet: the shop pages are not built yet (Task 7b). An order request reloads each listed product and stores its name, SKU, variant and pack as they are at that moment (Task 7a). |
+| `productCategory`, `product` | Shown on `/shop` and `/shop/<slug>` only while commerce is on (Task 7b). A `listed` product appears in the catalogue, grouped under its category (categories in their `order`); a `sold-out` product keeps its own page, marked sold out, with no way to add it; a `draft` has no page. Each product shows its first picture in the catalogue and all of them on its page, with the alt text you give; its SEO title and description head its page, and "no index" keeps it out of search results and the sitemap. No price is ever shown. An order request reloads each listed product and stores its name, SKU, variant and pack as they are at that moment (Task 7a). |
 
 ## Feature toggles (site settings)
 
 | Toggle | Default | Effect today |
 |---|---|---|
-| `commerceEnabled` | `false` | Adds the shop link to the header, lets `/shop` links render and opens the order API (`/api/orders`). The shop pages are not built yet (Task 7b) and nobody can manage orders yet (Task 8), so leave it off. |
-| `trackingEnabled` | `false` | With commerce on, opens the tracking API (`/api/orders/track`). The tracking pages are not built yet (Task 7b). |
+| `commerceEnabled` | `false` | Adds the shop link (labelled with the navigation's shop label) to the header and footer, opens `/shop` and the product pages (Task 7b), lists them in the sitemap, switches the privacy and terms fallback text to its order-request version, and opens the order API (`/api/orders`). The order page is not built yet (Task 7c) and nobody can manage orders yet (Task 8), so leave it off. |
+| `trackingEnabled` | `false` | With commerce on, opens the tracking API (`/api/orders/track`). The tracking pages are not built yet (Task 7c). |
 | `testimonialsEnabled` | `false` | Allows the testimonials section to render, and then only entries marked verified. |
 | `canonicalUrlVerified` | `false` | The canonical URL is used (canonical tags, sitemap, structured data) only when this is on. Turn it on only after the domain is verified. |
 

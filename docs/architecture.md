@@ -25,13 +25,15 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 | `components/landing/` | One component per landing section, the section renderer, `ui-copy.ts` (interface labels not held in Sanity) |
 | `components/brand/` | The logo renderer and the drawn scenery: `ReefBackdrop` (sunbeams, bubbles and the sandy sea floor behind the hero and the closing scene) and `BayBackdrop` (the earlier paper horizon, kept for a slot with no art at all) |
 | `components/forms/` | The founding-family form (`LeadForm.tsx`) and its copy |
-| `components/legal/`, `components/preview/` | Privacy, terms and thank-you page shells; the draft-preview notice |
+| `components/shop/` | The shop (Task 7b): product card and picture, catalogue grouping, `ShopFrame`, `shop.css`; the order pad (`OrderPadProvider`, mounted by the root layout through `OrderPadMount` only while commerce is on), `AddToOrder` and `OrderPadSummary` |
+| `components/legal/`, `components/preview/` | `SiteFrame` (header, main, footer for every page but the landing page), privacy, terms and thank-you page shells; the draft-preview notice |
 | `components/motion/` | GSAP provider, reduced-motion hook, section reveals |
 | `lib/content/` | Content types, normalisation, repository fallback content, fallback legal text, and `lib/content/brand-art.ts`: the registry of repository brand art (each still's size, srcset, alt text and source video) |
 | `public/brand/art/` | Stills cut from the Bibo Bay channel's own videos and their thumbnails, each pre-sized at standard widths for a srcset; static files, never resized at request time |
 | `lib/sanity/` | Client, queries, cached fetches, image URLs, draft mode |
 | `lib/leads/`, `lib/email/`, `lib/supabase/` | Lead submission, Resend adapter and emails, Supabase adapters |
 | `lib/security/` | Security headers and CSP, rate limiter, webhook signature check |
+| `lib/privacy/` | Private-link masking: the token of a `/orders/<token>` link never reaches statistics or error reports (Task 7b) |
 | `lib/seo/`, `lib/ops/` | Metadata, robots, sitemap, structured data; readiness checks |
 | `proxy.ts` | Per-request CSP nonce (Next 16 "proxy", formerly middleware) |
 | `scripts/` | `verify-env.ts`, `verify-bundle-secrets.ts`, `verify-deployment.ts`, `generate-brand-assets.ts` |
@@ -48,6 +50,7 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/` | ƒ | The landing page (CMS sections, founding-family form) |
 | `/privacy`, `/terms` | ƒ | Legal pages: Sanity text, or the plain-language repository fallback (then noindex) |
 | `/thank-you` | ƒ | Neutral page explaining the list; never claims a signup happened; noindex |
+| `/shop`, `/shop/[slug]` | ƒ | Catalogue and product pages, with no price anywhere; 404 unless commerce is enabled in the CMS, decided before the catalogue is read (Task 7b). A sold-out product keeps its page, marked sold out and noindex; a draft or unknown slug is a 404 |
 | `/_not-found` | ƒ | 404 page |
 | `/studio` | ƒ | 307 to the Studio URL from site settings when it is https; 404 otherwise |
 | `/api/leads` | ƒ | POST: founding-family signup |
@@ -63,19 +66,21 @@ Planned, not in the code:
 
 | Route | State |
 |---|---|
-| `/shop`, `/shop/[slug]` | not built yet (Task 7b): catalogue, gated by `commerceEnabled` on the server |
-| `/order` | not built yet (Task 7b): order request form |
-| `/track`, `/orders/[token]` | not built yet (Task 7b): order tracking pages |
+| `/order` | not built yet (Task 7c): order request form; noindex |
+| `/track`, `/orders/[token]` | not built yet (Task 7c): order tracking pages; noindex, and `/orders/*` already sends `Referrer-Policy: no-referrer` |
 | `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8): staff order administration |
 
 The robots rules already keep crawlers out of those future private paths (`ROBOTS_DISALLOW` in
-`lib/seo/metadata.ts`), and the header hides the shop link unless commerce is enabled.
+`lib/seo/metadata.ts`). The header and footer show the shop link (the CMS label
+`navigation.commerceLabel`) only while commerce is enabled, and the sitemap lists `/shop` and the
+listed product pages only then.
 
 ## Server and client boundary
 
 - Pages and sections are React Server Components by default. Client components are only:
   `LeadForm`, `Navbar` (mobile menu), `Characters` and `Episodes` (tab selectors), `SectionShell`
-  (reveals), `GsapProvider` and `Dialog`.
+  (reveals), `GsapProvider` and `Dialog`, plus the shop's `OrderPadProvider`, `AddToOrder` and
+  `OrderPadSummary`, which do nothing unless the root layout mounted the pad (commerce on).
 - Every module that reads a server setting or talks to Sanity with a token, Supabase or Resend
   imports `server-only`, so importing it from a client component is a build error:
   `lib/sanity/{client,fetch,image}.ts`, `lib/leads/{submit,dependencies,http}.ts`,
@@ -163,6 +168,8 @@ upgrade-insecure-requests            (Vercel deployments only)
   `X-Content-Type-Options: nosniff`, a restrictive `Permissions-Policy`,
   `Cross-Origin-Opener-Policy: same-origin`, and no `X-Powered-By`. HSTS
   (`max-age=63072000; includeSubDomains`, no `preload`) is sent only by the production Vercel deployment.
+- `/orders/*` (the private order pages, Task 7c) sends `Referrer-Policy: no-referrer` instead, so
+  the tracking token in their address never leaves them (`PRIVATE_LINK_HEADER_RULE`).
 - **Why every page is rendered per request:** the HTML carries inline React Server Components
   scripts, and Next can stamp the nonce on them only when it renders the page for that request.
   The root layout awaits `connection()`; that keeps the Sanity reads in the Data Cache, so a request

@@ -48,10 +48,15 @@ export function FreebieCard({ magnet }: { magnet: LeadMagnet & { fileUrl: string
       <div className="freebie-card__body">
         <h3 className="freebie-card__title">{magnet.title}</h3>
         {magnet.description ? <p className="freebie-card__description">{magnet.description}</p> : null}
-        <a href={magnet.fileUrl} className="btn btn-primary freebie-card__download" {...(ours ? { download: "" } : {})}>
+        {/* One label, starting with the visible words: a hidden span would be block-level, and Chromium then names it "… : <title>". */}
+        <a
+          href={magnet.fileUrl}
+          className="btn btn-primary freebie-card__download"
+          aria-label={`${UI_COPY.downloadFreebie}: ${magnet.title}`}
+          {...(ours ? { download: "" } : {})}
+        >
           <DownloadGlyph />
           {UI_COPY.downloadFreebie}
-          <span className="sr-only">: {magnet.title}</span>
         </a>
         {ours ? <p className="freebie-card__meta">{UI_COPY.freebieMeta(ACTIVITY_PACK.pages, ACTIVITY_PACK.bytes)}</p> : null}
       </div>

@@ -1,7 +1,11 @@
+import { maskPrivatePaths } from "../privacy/private-links";
+
 /**
  * What may leave the browser (ruling R70). The owner wants every visit counted, with what visitors
  * do and where they come from; nothing that identifies a person goes with it. Every event passes
- * through `cleanCapture`, PostHog's `before_send`, so this file is the single gate.
+ * through `cleanCapture`, PostHog's `before_send`, so this file is the single gate. A private order
+ * link's token (Task 7b) never leaves either: every address, path and label carries
+ * `/orders/[token]` instead.
  */
 
 /** The page actions counted, and the properties each may carry. */
@@ -62,7 +66,7 @@ function plainValue(value: unknown): AnalyticsValue | undefined {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   if (typeof value === "string") {
-    const text = value.trim();
+    const text = maskPrivatePaths(value.trim());
     return text && !holdsEmail(text) ? text.slice(0, MAX_TEXT) : undefined;
   }
   return undefined;
@@ -90,7 +94,7 @@ function pageAddress(value: unknown): string | undefined {
       if (tagValue && !holdsEmail(tagValue)) kept.set(tag, tagValue.slice(0, MAX_TEXT));
     }
     const query = kept.toString();
-    const path = holdsEmail(url.pathname) ? "/" : url.pathname;
+    const path = holdsEmail(url.pathname) ? "/" : maskPrivatePaths(url.pathname);
     return `${url.origin}${path}${query ? `?${query}` : ""}`;
   } catch {
     return undefined;
@@ -142,7 +146,7 @@ export function cleanCapture<T extends CaptureLike>(capture: T): T | null {
     }
     if (name.startsWith("$") || CAMPAIGN_TAGS.includes(name) || SDK_FIELDS.has(name)) {
       if (typeof value === "string" && holdsEmail(value)) continue;
-      properties[name] = value;
+      properties[name] = typeof value === "string" ? maskPrivatePaths(value) : value;
       continue;
     }
     if (!allowed.has(name)) continue;

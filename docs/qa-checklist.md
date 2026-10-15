@@ -67,7 +67,7 @@ must all be configured). No deployment exists yet (Task 11).
 | 3 | All visible landing content is editable in Sanity with safe fallbacks | `tests/content/`, `tests/landing/`; edit a section in the Studio preview | Yes in code; no live dataset yet |
 | 4 | One canonical logo matching the reference's sticker treatment | `tests/brand/`, `e2e/visual/logo.spec.ts` | Yes |
 | 5 | Signup persists to Supabase and never fabricates delivery | `tests/leads/`; one real signup on the preview after provisioning, labelled as QA (below) | Code yes; no live database yet |
-| 6 | Commerce disabled by default and server-enforced | Feature-default tests | Default off; commerce routes not built yet (Tasks 6 and 7) |
+| 6 | Commerce disabled by default and server-enforced | Feature-default tests; `tests/shop/`; `e2e/shop/commerce-off.spec.ts` | Default off; `/shop` and `/shop/<slug>` answer 404 before any catalogue read, no shop link or sitemap entry; order and tracking pages not built yet (Task 7c) |
 | 7 | Manual ordering works end to end in a controlled test environment | Task 12 | Not built yet (Tasks 6 to 8) |
 | 8 | RLS and function grants prevent anonymous/private data reads | `tests/leads/migration-database.test.ts` (pgTAP in PGlite); `supabase test db` on the real project | PGlite yes; real project not yet (Task 11) |
 | 9 | No service-role or secret value in the client bundle or repository | `npm run verify:bundle` (client JavaScript); `npm run verify:deployment -- <url>` (the rendered pages, which the build output does not hold); `npm run verify:env` | Yes locally; secret values are checked for real on the first Vercel build (Task 11) |

@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import RootLayout from "@/app/layout";
 import { brandCssVariables, brandReducedMotionCssVariables, brandTokens } from "@/lib/brand/tokens";
 import { inheritedAttribute, paintedColours, readSvg, readText } from "./svg-geometry";
+
+// The root layout mounts the order pad from the server (Task 7b), which reads CMS settings.
+vi.mock("server-only", () => ({}));
 
 type ColourName = keyof typeof brandTokens.color;
 

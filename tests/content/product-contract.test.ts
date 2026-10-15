@@ -48,6 +48,22 @@ describe("public catalogue never contains prices", () => {
     expect(bare).not.toHaveProperty("variant");
   });
 
+  it("keeps a sold-out product for its own page, marked sold out, but never lists it (Task 7b)", async () => {
+    const soldOut = { id: "p-sold", name: "Lumi night light", slug: "lumi-night-light", status: "sold-out", description: "A soft glow" };
+    fetch.mockImplementation((query: string) => query.includes("siteSettings") ? { commerceEnabled: true } : query.includes("$slug") ? soldOut : [soldOut]);
+    expect(await getProductBySlug("lumi-night-light")).toMatchObject({ id: "p-sold", status: "sold-out" });
+    // Even if a list response carried one, the catalogue holds listed products only.
+    expect(await getListedProducts()).toEqual([]);
+    expect(LISTED_PRODUCTS_QUERY).toMatch(/status == "listed"/);
+  });
+
+  it("finds no page for a draft, or for a product with no status at all", async () => {
+    for (const status of ["draft", undefined, "archived"]) {
+      fetch.mockImplementation((query: string) => query.includes("siteSettings") ? { commerceEnabled: true } : { id: "p", name: "Concept", slug: "concept", status });
+      expect(await getProductBySlug("concept"), String(status)).toBeNull();
+    }
+  });
+
   it("retains a safe editor-authored product notice CTA and image caption", async () => {
     fetch.mockImplementation((query: string) => query.includes("siteSettings")
       ? { commerceEnabled: true }

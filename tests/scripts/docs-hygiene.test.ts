@@ -186,17 +186,35 @@ describe("documentation matches the code", () => {
   it("states that manual checkout is not built yet, and promises no procedure", () => {
     const text = read("docs/manual-checkout-operations.md");
     expect(text).toMatch(/not built yet/i);
-    expect(text).toMatch(/Task 7/);
+    expect(text).toMatch(/Task 7c/);
     expect(text).toMatch(/Task 8/);
   });
 
-  it("never documents a commerce, tracking or admin route as present", () => {
+  it("never documents an order, tracking or admin route as present", () => {
     const architecture = read("docs/architecture.md");
-    for (const route of ["/shop", "/order", "/track", "/admin"]) {
-      for (const line of architecture.split(/\r?\n/).filter((entry) => entry.includes(`\`${route}`))) {
+    // The route tables: a row starting with the route. `/order` also covers `/orders/[token]`; the
+    // order APIs (`/api/orders`) are built, and prose may mention the coming pages (their headers).
+    for (const route of ["/order", "/track", "/admin"]) {
+      for (const line of architecture.split(/\r?\n/).filter((entry) => entry.startsWith(`| \`${route}`))) {
         expect(line, line).toMatch(/not built yet/i);
       }
     }
+  });
+
+  it("documents the shop as built, behind the commerce switch, and the coming order pages as noindex (Task 7b)", () => {
+    const lines = read("docs/architecture.md").split(/\r?\n/);
+    const shop = lines.find((line) => line.startsWith("| `/shop`, `/shop/[slug]` |")) ?? "";
+    expect(shop).not.toMatch(/not built yet/i);
+    expect(shop).toContain("ƒ");
+    expect(shop).toMatch(/404 unless commerce is enabled/);
+    for (const route of ["`/order`", "`/track`, `/orders/[token]`"]) {
+      const line = lines.find((entry) => entry.startsWith(`| ${route} |`)) ?? "";
+      expect(line, route).toMatch(/not built yet \(Task 7c\)/);
+      expect(line, route).toMatch(/noindex/);
+    }
+    const readme = read("README.md").split(/\r?\n/);
+    expect(readme.find((line) => line.includes("`/shop`")) ?? "", "README shop row").toMatch(/\| built \(Task 7b/);
+    expect(readme.find((line) => line.startsWith("| Order and tracking pages")) ?? "", "README order row").toMatch(/not built yet \(Task 7c\)/);
   });
 
   it("keeps Next's managed agent block in AGENTS.md current and intact", () => {

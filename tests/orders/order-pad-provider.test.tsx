@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UI_COPY } from "@/components/landing/ui-copy";
 import { AddToOrder } from "@/components/shop/AddToOrder";
-import { OrderPadProvider, resetOrderPadForTests } from "@/components/shop/OrderPadProvider";
+import { OrderPadProvider } from "@/components/shop/OrderPadProvider";
 import { OrderPadSummary } from "@/components/shop/OrderPadSummary";
 import { ORDER_PAD_MAX_LINES, ORDER_PAD_MAX_QUANTITY, ORDER_PAD_STORAGE_KEY } from "@/lib/orders/constants";
 import { useOrderPad } from "@/components/shop/OrderPadProvider";
@@ -35,9 +35,9 @@ const settle = () => act(async () => {
 
 const storedLines = () => JSON.parse(window.localStorage.getItem(ORDER_PAD_STORAGE_KEY) ?? "null") as { lines: Array<{ productId: string; quantity: number }> } | null;
 
+// Each test mounts its own provider, and each mount has its own store (no reset hook needed).
 beforeEach(() => {
   window.localStorage.clear();
-  resetOrderPadForTests();
 });
 
 afterEach(() => {
@@ -45,36 +45,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("while commerce is disabled", () => {
-  it("mounts no order pad: nothing is read or written, and the controls render nothing", async () => {
+/**
+ * While commerce is disabled no provider is mounted at all (components/shop/OrderPadMount.tsx,
+ * tests/shop/order-pad-mount.test.tsx), so the controls must render nothing on their own.
+ */
+describe("without an order pad (commerce disabled)", () => {
+  it("renders no controls and reads nothing from the device", async () => {
     window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: [{ productId: "plush-tula", quantity: 2 }] }));
     const getItem = vi.spyOn(Storage.prototype, "getItem");
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
     render(
-      <OrderPadProvider commerceEnabled={false}>
-        <p>Shop closed</p>
+      <>
         <AddToOrder productId="plush-tula" productName="Tula plush" />
         <OrderPadSummary listed={LISTED} />
-      </OrderPadProvider>,
+      </>,
     );
     await settle();
-    expect(screen.getByText("Shop closed")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByRole("region", { name: UI_COPY.orderPad.title })).toBeNull();
     expect(getItem).not.toHaveBeenCalled();
-    expect(setItem).not.toHaveBeenCalled();
-  });
-
-  it("renders no controls outside a provider either", () => {
-    render(<AddToOrder productId="plush-tula" productName="Tula plush" />);
-    expect(screen.queryByRole("button")).toBeNull();
   });
 });
 
 describe("while commerce is enabled", () => {
   const shop = () =>
     render(
-      <OrderPadProvider commerceEnabled>
+      <OrderPadProvider>
         <AddToOrder productId="plush-tula" productName="Tula plush" />
         <AddToOrder productId="book-bubbles" productName="Bubble breathing book" />
         <OrderPadSummary listed={LISTED} />
@@ -152,7 +147,7 @@ describe("while commerce is enabled", () => {
       return null;
     }
     render(
-      <OrderPadProvider commerceEnabled>
+      <OrderPadProvider>
         <Grab />
       </OrderPadProvider>,
     );
@@ -169,7 +164,7 @@ describe("while commerce is enabled", () => {
     const { renderToString } = await import("react-dom/server");
     window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: [{ productId: "plush-tula", quantity: 3 }] }));
     const html = renderToString(
-      <OrderPadProvider commerceEnabled>
+      <OrderPadProvider>
         <OrderPadSummary listed={LISTED} />
       </OrderPadProvider>,
     );
@@ -226,7 +221,7 @@ describe("while commerce is enabled", () => {
     const full = Array.from({ length: 40 }, (_, index) => ({ productId: `product-${index}`, quantity: 1 }));
     window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: full }));
     render(
-      <OrderPadProvider commerceEnabled>
+      <OrderPadProvider>
         <AddToOrder productId="plush-tula" productName="Tula plush" />
       </OrderPadProvider>,
     );
@@ -293,6 +288,23 @@ describe("while commerce is enabled", () => {
     expect(within(screen.getByRole("region", { name: UI_COPY.orderPad.title })).getByText(UI_COPY.orderPad.empty)).toBeTruthy();
   });
 
+  it("starts every mount from the device: a page copy an earlier mount kept is gone (Task 6 review Minor 10)", async () => {
+    const first = shop();
+    await settle();
+    const refuse = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` }));
+    first.unmount();
+    refuse.mockRestore();
+    window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: [{ productId: "book-bubbles", quantity: 4 }] }));
+    shop();
+    await settle();
+    const summary = screen.getByRole("region", { name: UI_COPY.orderPad.title });
+    expect((within(summary).getByRole("spinbutton", { name: `${UI_COPY.orderPad.quantity}: Bubble breathing book` }) as HTMLInputElement).value).toBe("4");
+    expect(within(summary).queryByText("Tula plush")).toBeNull();
+  });
+
   it("says the pad lasts only for this page when the browser could not save it", async () => {
     shop();
     await settle();
@@ -314,7 +326,7 @@ describe("while commerce is enabled", () => {
       return null;
     }
     render(
-      <OrderPadProvider commerceEnabled>
+      <OrderPadProvider>
         <Grab />
       </OrderPadProvider>,
     );
@@ -329,7 +341,7 @@ describe("while commerce is enabled", () => {
       cleanup();
       window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines }));
       render(
-        <OrderPadProvider commerceEnabled>
+        <OrderPadProvider>
           <AddToOrder productId="drafts.plush-tula" productName="Tula plush" />
         </OrderPadProvider>,
       );

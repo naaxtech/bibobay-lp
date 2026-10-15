@@ -38,9 +38,9 @@ export function AddToOrder({ productId, productName }: { productId: string; prod
   };
   return (
     <div className="add-to-order">
-      <button type="button" className="btn btn-primary" onClick={onAdd}>
+      {/* One label, starting with the visible words: a hidden span would be block-level, and Chromium then names it "Add to order : …". */}
+      <button type="button" className="btn btn-primary" onClick={onAdd} aria-label={`${UI_COPY.orderPad.add}: ${productName}`}>
         {UI_COPY.orderPad.add}
-        <span className="sr-only">: {productName}</span>
       </button>
       <p role="status" className="add-to-order__status">
         {message}

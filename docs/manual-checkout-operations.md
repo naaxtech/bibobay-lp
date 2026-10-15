@@ -2,15 +2,38 @@
 
 **Status: partly built, not usable yet.** The commerce gate and order pad (Task 6) exist, and so do
 the order database, the order request API and the tracking API (Task 7a; see
-[database-security.md](database-security.md#orders-migrations-0002-to-0005)). The shop, order and
-tracking pages are not built yet (Task 7b), and neither are the staff area and quote emails (Task 8;
-see the plan in `docs/superpowers/plans/`). `commerceEnabled` is `false` by default and must stay
-off: switching it on today adds a header link to a `/shop` page that does not exist, and opens the
-order and tracking APIs, which would store order requests that nobody can manage yet.
+[database-security.md](database-security.md#orders-migrations-0002-to-0005)) and the shop's
+catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b). The order request page and the
+tracking pages (`/order`, `/track`, `/orders/[token]`) are not built yet (Task 7c), and neither are
+the staff area and quote emails (Task 8; see the plan in `docs/superpowers/plans/`).
+`commerceEnabled` is `false` by default and must stay off: switching it on today shows the shop,
+whose "Review your order" link leads to a page that does not exist yet, and opens the order and
+tracking APIs, which would store order requests that nobody can manage yet.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been
 tested. Do not take orders by any other route in the meantime.
+
+## What exists today
+
+**The shop pages** (Task 7b)
+
+- While commerce is off, `/shop` and every `/shop/...` address answer "not found" (the site's
+  404 page) before the catalogue is read, and no page shows a shop link.
+- While it is on, `/shop` lists every listed product with its picture, name, short description and
+  an "Add to order" button, grouped by category when products have one. A product page adds the
+  CMS details, the SKU, variant and pack when set, and the product's notice. A sold-out product
+  keeps its page, marked sold out, with no way to add it. No price appears anywhere.
+- The order request page (`/order`), the tracking pages and every `/orders/...` page will be
+  `noindex` and kept out of the sitemap; `/orders/...` already sends no referrer, and visit
+  statistics and error reports record such an address as `/orders/[token]`.
+
+**Testing the shop with commerce on** (developers)
+
+`scripts/e2e/enable-commerce-fixture.mjs <copy>` switches commerce and tracking on in a scratch
+copy of the repository and makes its catalogue return a few test products, so the production build
+of that copy can run `e2e/shop/commerce-on.spec.ts` (`E2E_COMMERCE=1`). It refuses to touch this
+repository or any folder inside a git work tree, and nothing in the site imports it.
 
 ## What the specification requires
 

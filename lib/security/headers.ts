@@ -13,6 +13,8 @@
  * `connect-src`) build the exact policy production sends.
  */
 
+import { ORDER_LINK_SOURCE } from "../privacy/private-links";
+
 export const NONCE_HEADER = "x-nonce";
 
 export interface SecurityEnvironment {
@@ -136,3 +138,14 @@ export function staticSecurityHeaders(environment: SecurityEnvironment): Array<{
     ...(environment.vercelProduction ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }] : []),
   ];
 }
+
+/**
+ * Task 7b: the private order pages (/orders/<token>, Task 7c) carry their tracking token in the
+ * address, so they send no referrer at all: a link or a picture on them never hands the token to
+ * another site, or to another page of this one. next.config.ts lists this rule after the site-wide
+ * one; when two rules set the same header, the last one wins.
+ */
+export const PRIVATE_LINK_HEADER_RULE: { source: string; headers: Array<{ key: string; value: string }> } = {
+  source: ORDER_LINK_SOURCE,
+  headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+};

@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DeploymentNetworkError,
+  GATED_PAYLOAD_PATHS,
+  PAYLOAD_PATHS,
   analyzeHtml,
   checkAsset,
   checkBody,
@@ -383,6 +385,93 @@ describe("runFetchChecks client payload scan", () => {
     routes[`${origin}/privacy`] = { ...routes[`${origin}/privacy`]!, body: "<html><body>rv-7Hq2LmN9xPz4</body></html>" };
     const leaked = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: withSender });
     expect(leaked.find((result) => result.name === "client payloads")?.status).toBe("fail");
+  });
+});
+
+/*
+ * Task 7b: pages that exist only while a CMS switch is on (the shop). Each is scanned like the
+ * always-on pages when it answers 200; otherwise it must answer 404, never a server error and never a
+ * redirect, because a switched-off shop is a clean "not found".
+ */
+describe("runFetchChecks client payload scan of switchable pages", () => {
+  const origin = "http://127.0.0.1:3200";
+  const rules = deriveSecretRules({
+    envExample: "SUPABASE_SERVICE_ROLE_KEY=\nSANITY_REVALIDATE_SECRET=\n",
+    allowedPublicNames: new Set(),
+    env: { SANITY_REVALIDATE_SECRET: "rv-7Hq2LmN9xPz4" },
+  });
+  const RSC = { status: 200, type: "text/x-component", body: '0:{"P":null,"b":"build"}\n' };
+
+  function routesWith(shop?: { html?: Canned; rsc?: Canned }): Record<string, Canned> {
+    const routes = healthyPage(origin);
+    const page = routes[`${origin}/`]!;
+    for (const path of PAYLOAD_PATHS) {
+      routes[`${origin}${path}`] = { ...page };
+      routes[`rsc:${origin}${path}`] = RSC;
+    }
+    if (shop?.html) routes[`${origin}/shop`] = shop.html;
+    if (shop?.rsc) routes[`rsc:${origin}/shop`] = shop.rsc;
+    return routes;
+  }
+
+  /** Answers `RSC: 1` requests from the `rsc:` entries, everything else from the plain table. */
+  function rscAwareFetch(routes: Record<string, Canned>, seen: string[] = []): typeof fetch {
+    const plain = fakeFetch(routes, seen);
+    return (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (new Headers(init?.headers).get("rsc") === "1") {
+        seen.push(`rsc:${url}`);
+        const canned = routes[`rsc:${url}`] ?? { status: 404, type: "text/html", body: "missing" };
+        return new Response(canned.body ?? "", { status: canned.status, headers: { ...(canned.type ? { "content-type": canned.type } : {}), ...canned.headers } });
+      }
+      return plain(input, init);
+    }) as typeof fetch;
+  }
+
+  const scanOf = (results: CheckResult[]) => results.find((result) => result.name === "client payloads");
+
+  it("keeps the always-on list as it was and lists the shop as switchable", () => {
+    expect([...PAYLOAD_PATHS]).toEqual(["/", "/privacy", "/terms", "/thank-you"]);
+    expect([...GATED_PAYLOAD_PATHS]).toEqual(["/shop"]);
+  });
+
+  it("passes a switched-off shop that answers 404, without scanning it", async () => {
+    const seen: string[] = [];
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith(), seen), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("pass");
+    expect(scanOf(results)?.detail).toContain("8 responses");
+    expect(scanOf(results)?.detail).toMatch(/\/shop answered 404/);
+    expect(seen).toContain(`${origin}/shop`);
+    expect(seen).not.toContain(`rsc:${origin}/shop`);
+  });
+
+  it("scans a switched-on shop's HTML and RSC payload like the other pages", async () => {
+    const seen: string[] = [];
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 200, type: "text/html", body: "<html><body>shop</body></html>" }, rsc: RSC }), seen), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("pass");
+    expect(scanOf(results)?.detail).toContain("10 responses");
+    expect(scanOf(results)?.detail).toContain("/shop");
+    expect(seen).toContain(`rsc:${origin}/shop`);
+  });
+
+  it("fails when a switched-on shop leaks a secret, naming the page and never the value", async () => {
+    const leak = { status: 200, type: "text/x-component", body: '1:["$","p",null,{"k":"rv-7Hq2LmN9xPz4"}]\n' };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 200, type: "text/html", body: "<html></html>" }, rsc: leak })), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toContain("/shop rsc");
+    expect(scanOf(results)?.detail).not.toContain("rv-7Hq2LmN9xPz4");
+  });
+
+  it("fails when the shop answers a server error", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 500, type: "text/html", body: "boom" } })), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toMatch(/\/shop answered 500/);
+  });
+
+  it("fails when the shop redirects, even within the site", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 307, headers: { location: "/" } } })), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toMatch(/\/shop redirected/);
   });
 });
 

@@ -43,9 +43,13 @@ export function OrderPadSummary({ listed }: { listed: ListedProduct[] }) {
                 <li key={line.productId} className="order-pad__line">
                   <span className="order-pad__name">{name}</span>
                   <QuantityField name={name} saved={line.quantity} onSave={(quantity) => pad.setQuantity(line.productId, quantity)} />
-                  <button type="button" className="text-link order-pad__remove" onClick={() => pad.setQuantity(line.productId, 0)}>
+                  <button
+                    type="button"
+                    className="text-link order-pad__remove"
+                    onClick={() => pad.setQuantity(line.productId, 0)}
+                    aria-label={`${UI_COPY.orderPad.remove}: ${name}`}
+                  >
                     {UI_COPY.orderPad.remove}
-                    <span className="sr-only">: {name}</span>
                   </button>
                 </li>
               );

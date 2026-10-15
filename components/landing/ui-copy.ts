@@ -41,6 +41,26 @@ export const UI_COPY = {
     remove: "Remove",
     review: "Review your order",
   },
+  /**
+   * The shop (Task 7b): shown only while commerce is enabled. The shop's own heading is the CMS
+   * label of the shop link (`navigation.commerceLabel`). No prices exist anywhere in the shop:
+   * orders are requests, and staff reply by email with a quote (spec §10).
+   */
+  shop: {
+    intro: "Choose what you would like and send us an order request. No prices are shown here and nothing is charged: we reply by email with a quote and a payment link.",
+    metaDescription: "Choose BIBO Bay products and send an order request. Nothing is charged on this website.",
+    empty: "There is nothing in the shop just now.",
+    backHome: "Back to the home page",
+    /** Heading for listed products without a category, when other products have one. */
+    moreProducts: "More from the shop",
+    soldOut: "Sold out",
+    soldOutNote: "This product is sold out, so it cannot be added to an order at the moment.",
+    details: "Details",
+    facts: { sku: "Product code", variant: "Variant", pack: "Pack" },
+    /** Names the list of a product's further pictures for assistive technology. */
+    morePictures: (name: string) => `More pictures of ${name}`,
+    backToShop: "Back to the shop",
+  },
   /** The last-resort error page (app/global-error.tsx): no internal detail. */
   globalError: {
     title: "Something went wrong",

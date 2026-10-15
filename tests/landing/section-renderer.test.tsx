@@ -254,7 +254,8 @@ describe("lead capture", () => {
     const link = within(lead).getByRole("link", { name: /^Download the free pack/ });
     expect(link.getAttribute("href")).toBe("/freebies/bibo-bay-activity-pack.pdf");
     expect(link.hasAttribute("download")).toBe(true);
-    expect(link.textContent).toContain("Bibo Bay Activity Pack");
+    // The link's whole name, one label: "<visible words>: <pack title>".
+    expect(link.getAttribute("aria-label")).toBe("Download the free pack: Bibo Bay Activity Pack");
     const cover = within(lead).getByRole("img", { name: /activity pack/i });
     expect(cover.getAttribute("src")).toMatch(/^\/freebies\/activity-pack-cover-\d+\.webp$/);
     expect(within(lead).getByText(/^PDF · 8 pages · \d+(\.\d)? MB$/)).toBeTruthy();
@@ -271,7 +272,7 @@ describe("lead capture", () => {
     }));
     const link = within(section("lead")).getByRole("link", { name: /^Download the free pack/ });
     expect(link.getAttribute("href")).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
-    expect(link.textContent).toContain("Bay colouring sheet");
+    expect(link.getAttribute("aria-label")).toBe("Download the free pack: Bay colouring sheet");
     expect(within(section("lead")).getByText("One printable page of the Bay.")).toBeTruthy();
     // The repository's previews and size describe only the repository's own pack.
     expect(within(section("lead")).queryByRole("img", { name: /activity pack/i })).toBeNull();

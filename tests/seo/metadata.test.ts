@@ -9,16 +9,19 @@ import robotsRoute from "@/app/robots";
 import sitemapRoute from "@/app/sitemap";
 import { brandTokens } from "@/lib/brand/tokens";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import type { LegalSettings, PortableContent } from "@/lib/content/types";
+import type { LegalSettings, PortableContent, Product } from "@/lib/content/types";
+import { UI_COPY } from "@/components/landing/ui-copy";
 import {
   ROBOTS_DISALLOW,
   homeMetadata,
   legalMetadata,
   legalPageState,
   manifestFor,
+  productMetadata,
   robotsFor,
   seoEnvironment,
   serializeJsonLd,
+  shopMetadata,
   sitemapFor,
   structuredData,
   thankYouMetadata,
@@ -119,6 +122,67 @@ describe("legal pages", () => {
 describe("thank-you page", () => {
   it("is always noindex", () => {
     expect(thankYouMetadata({ settings: SAFE_FALLBACK_SETTINGS, seo: seoEnvironment(SAFE_FALLBACK_SETTINGS, PRODUCTION) }).robots).toEqual({ index: false, follow: true });
+  });
+});
+
+describe("shop and product pages (Task 7b)", () => {
+  const prodSeo = seoEnvironment(SAFE_FALLBACK_SETTINGS, { ...PRODUCTION, NEXT_PUBLIC_APP_URL: "https://bibobay.example" });
+  const settings = siteSettings((s) => {
+    s.commerceEnabled = true;
+    s.navigation.commerceLabel = "Bay shop";
+  });
+  const product: Product = { id: "product-tula", name: "Tula plush", slug: "tula-plush", description: "A soft Tula to hug.", details: [], images: [], status: "listed", order: 1 };
+
+  it("titles the shop with the CMS shop label and the site title, like the other pages", () => {
+    const meta = shopMetadata({ settings, seo: prodSeo, draft: false });
+    expect(meta.title).toBe(`Bay shop | ${settings.title}`);
+    expect(meta.description).toBe(UI_COPY.shop.metaDescription);
+    expect(meta.robots).toEqual({ index: true, follow: true });
+    expect(meta.alternates?.canonical).toBe("/shop");
+    expect(meta.openGraph).toMatchObject({ type: "website", title: `Bay shop | ${settings.title}`, siteName: settings.title });
+  });
+
+  it("keeps the shop out of search results on previews and in draft mode", () => {
+    for (const meta of [shopMetadata({ settings, seo: prodSeo, draft: true }), shopMetadata({ settings, seo: seoEnvironment(settings, PREVIEW), draft: false })]) {
+      expect(meta.robots).toEqual({ index: false, follow: false });
+      expect(meta.alternates).toBeUndefined();
+    }
+  });
+
+  it("takes a product's title and description from its SEO, with the site title appended", () => {
+    const meta = productMetadata({ product: { ...product, seo: { title: "Tula the turtle plush", description: "Soft, washable, made for hugs." } }, settings, seo: prodSeo, draft: false });
+    expect(meta.title).toBe(`Tula the turtle plush | ${settings.title}`);
+    expect(meta.description).toBe("Soft, washable, made for hugs.");
+    expect(meta.alternates?.canonical).toBe("/shop/tula-plush");
+    expect(meta.robots).toEqual({ index: true, follow: true });
+  });
+
+  it("falls back to the product's name and description without CMS SEO", () => {
+    const meta = productMetadata({ product, settings, seo: prodSeo, draft: false });
+    expect(meta.title).toBe(`Tula plush | ${settings.title}`);
+    expect(meta.description).toBe("A soft Tula to hug.");
+    const bare = productMetadata({ product: { ...product, description: "" }, settings, seo: prodSeo, draft: false });
+    expect(bare.description).toBe(UI_COPY.shop.metaDescription);
+  });
+
+  it("is noindex when the CMS asks, when the product is sold out, in draft mode and on previews", () => {
+    const cases = [
+      productMetadata({ product: { ...product, seo: { title: "T", description: "D", noIndex: true } }, settings, seo: prodSeo, draft: false }),
+      productMetadata({ product: { ...product, status: "sold-out" }, settings, seo: prodSeo, draft: false }),
+      productMetadata({ product, settings, seo: prodSeo, draft: true }),
+      productMetadata({ product, settings, seo: seoEnvironment(settings, PREVIEW), draft: false }),
+    ];
+    for (const meta of cases) {
+      expect(meta.robots).toMatchObject({ index: false });
+      expect(meta.alternates).toBeUndefined();
+    }
+  });
+
+  it("shares a product picture only when the page resolved one, and never a price", () => {
+    const meta = productMetadata({ product, settings, seo: prodSeo, draft: false, image: { url: "https://cdn.sanity.io/images/p/d/a.png", alt: "Tula plush on a shelf" } });
+    expect(meta.openGraph).toMatchObject({ images: [{ url: "https://cdn.sanity.io/images/p/d/a.png", alt: "Tula plush on a shelf" }] });
+    expect(productMetadata({ product, settings, seo: prodSeo, draft: false }).openGraph && "images" in productMetadata({ product, settings, seo: prodSeo, draft: false }).openGraph!).toBe(false);
+    expect(JSON.stringify(meta)).not.toMatch(/price|currency|offer/i);
   });
 });
 

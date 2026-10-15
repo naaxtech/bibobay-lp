@@ -122,6 +122,8 @@ token cannot reach a CI log.
 
 The client-payload check fetches `/`, `/privacy`, `/terms` and `/thank-you` as HTML and as the
 React Server Components payload (`RSC: 1`) and runs the bundle scan's rules (below) over both.
+Pages that exist only behind a CMS switch (`/shop`, while commerce is on) are scanned the same way
+when they answer 200; switched off they must answer 404, and a server error or a redirect fails.
 Pages are rendered per request, so this is the only check that sees what the server actually sends,
 for example a server value passed to a client component as a prop. Contact addresses are allowed
 there, because the pages publish the address editors choose.

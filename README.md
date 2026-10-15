@@ -20,9 +20,10 @@ What exists today and what does not:
 | Signed Sanity revalidation webhook, Studio draft preview | built (needs secrets; see [docs/deployment.md](docs/deployment.md)) |
 | Nonce Content-Security-Policy and security headers, `/api/health`, `/api/readiness` | built |
 | CI, client-bundle secret scan, deployment verifier | built |
-| Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; nothing mounts the pad until the shop pages exist) |
+| Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; the root layout mounts the pad only while commerce is on) |
 | Order tables, order request and tracking APIs (`/api/orders`, `/api/orders/track`), gated by `commerceEnabled` | built (Task 7a) |
-| Shop, order and tracking pages | not built yet (Task 7b) |
+| Shop catalogue and product pages (`/shop`, `/shop/[slug]`), no prices, 404 while commerce is off | built (Task 7b) |
+| Order and tracking pages (`/order`, `/track`, `/orders/[token]`) | not built yet (Task 7c) |
 | Staff order administration, quote emails, outbox worker | not built yet (Task 8) |
 | Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11) |
@@ -84,7 +85,7 @@ The full pre-release list, including running Playwright against a production bui
 - [docs/database-security.md](docs/database-security.md): tables, row level security, functions and grants, migrations.
 - [docs/deployment.md](docs/deployment.md): environment variables, Vercel, webhooks, health checks, CI, known advisories.
 - [docs/observability.md](docs/observability.md): cookieless visit statistics (PostHog): what is counted, what never is, setup.
-- [docs/manual-checkout-operations.md](docs/manual-checkout-operations.md): the planned manual ordering workflow (not built yet).
+- [docs/manual-checkout-operations.md](docs/manual-checkout-operations.md): the manual ordering workflow: what exists and what is still to come.
 - [docs/qa-checklist.md](docs/qa-checklist.md): release checklist with exact commands.
 - [AGENTS.md](AGENTS.md): instructions for coding agents working in this repository.
 - `docs/superpowers/`: the design specification and implementation plan the work follows.

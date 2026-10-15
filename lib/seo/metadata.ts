@@ -1,9 +1,10 @@
 import type { Metadata, MetadataRoute } from "next";
 
 import { BIBO_LOGO_ASSETS } from "@/components/brand/BiboLogo";
+import { UI_COPY } from "@/components/landing/ui-copy";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
 import { brandTokens } from "@/lib/brand/tokens";
-import type { LandingPageContent, LegalSettings, SiteSettings } from "@/lib/content/types";
+import type { LandingPageContent, LegalSettings, Product, SiteSettings } from "@/lib/content/types";
 
 /*
  * Metadata, robots, sitemap, manifest and structured data (Task 9 rulings R35, R36), as pure
@@ -123,6 +124,64 @@ export function thankYouMetadata({ settings, seo }: { settings: SiteSettings; se
     description: THANK_YOU_COPY.description,
     ...(seo.baseUrl ? { metadataBase: seo.baseUrl } : {}),
     robots: NOINDEX_FOLLOW,
+  };
+}
+
+export interface ShopMetadataInput {
+  settings: SiteSettings;
+  seo: SeoEnvironment;
+  draft: boolean;
+}
+
+/**
+ * The catalogue (Task 7b), titled with the CMS shop label like the other pages. The page itself
+ * exists only while commerce is on, so this is never asked for otherwise.
+ */
+export function shopMetadata({ settings, seo, draft }: ShopMetadataInput): Metadata {
+  const title = `${settings.navigation.commerceLabel} | ${settings.title}`;
+  const description = UI_COPY.shop.metaDescription;
+  const indexable = seo.indexable && !draft;
+  return {
+    title,
+    description,
+    ...(seo.baseUrl ? { metadataBase: seo.baseUrl } : {}),
+    ...(indexable && seo.baseUrl ? { alternates: { canonical: "/shop" } } : {}),
+    robots: indexable ? INDEX : NOINDEX_NOFOLLOW,
+    openGraph: { type: "website", title, description, siteName: settings.title, ...(indexable && seo.baseUrl ? { url: "/shop" } : {}) },
+  };
+}
+
+export interface ProductMetadataInput extends ShopMetadataInput {
+  product: Product;
+  /** A product picture already resolved to a Sanity CDN URL; without one, app/opengraph-image.tsx is used. */
+  image?: { url: string; alt: string };
+}
+
+/**
+ * A product page (Task 7b): the product's CMS SEO, else its name and description, with the site
+ * title appended. Never a price, an offer or Product structured data (spec §14). A sold-out product
+ * keeps its page for shared links but stays out of search results, as the CMS can ask for any product.
+ */
+export function productMetadata({ product, settings, seo, draft, image }: ProductMetadataInput): Metadata {
+  const title = `${product.seo?.title ?? product.name} | ${settings.title}`;
+  const description = product.seo?.description || product.description || UI_COPY.shop.metaDescription;
+  const path = `/shop/${product.slug}`;
+  const deployable = seo.indexable && !draft;
+  const indexable = deployable && product.seo?.noIndex !== true && product.status === "listed";
+  return {
+    title,
+    description,
+    ...(seo.baseUrl ? { metadataBase: seo.baseUrl } : {}),
+    ...(indexable && seo.baseUrl ? { alternates: { canonical: path } } : {}),
+    robots: !deployable ? NOINDEX_NOFOLLOW : indexable ? INDEX : NOINDEX_FOLLOW,
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      siteName: settings.title,
+      ...(indexable && seo.baseUrl ? { url: path } : {}),
+      ...(image ? { images: [{ url: image.url, alt: image.alt }] } : {}),
+    },
   };
 }
 

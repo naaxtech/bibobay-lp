@@ -150,6 +150,16 @@ describe("next.config.ts headers()", () => {
     expect(api?.headers).toContainEqual({ key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'" });
   });
 
+  it("sends no referrer from the private order pages, so the token in their address never leaves them (Task 7b)", async () => {
+    const rules = await nextConfig.headers!();
+    const everywhere = rules.findIndex((rule) => rule.source === "/:path*");
+    const orders = rules.findIndex((rule) => rule.source === "/orders/:path*");
+    expect(orders).toBeGreaterThan(-1);
+    expect(rules[orders]?.headers).toEqual([{ key: "Referrer-Policy", value: "no-referrer" }]);
+    // Next applies matching rules in order and the last value of a header wins (next.config headers docs).
+    expect(orders).toBeGreaterThan(everywhere);
+  });
+
   it("does not advertise the framework", () => {
     expect(nextConfig.poweredByHeader).toBe(false);
   });

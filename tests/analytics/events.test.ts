@@ -94,3 +94,42 @@ describe("email addresses in the page address (review M1)", () => {
     expect(cleanProperties("cta_clicked", { label: "Write to parent%40example.com", section: "hero" })).toEqual({ section: "hero" });
   });
 });
+
+/*
+ * Task 7b: the private order page (/orders/<token>, Task 7c) puts its tracking token in the path.
+ * Whatever PostHog captures, the address, the path, the previous page or a label, carries
+ * /orders/[token], never the token.
+ */
+describe("private order links (Task 7b)", () => {
+  const TOKEN = "3f9a0c1d2e4b5a6978c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
+
+  it("masks the token in every address and path a page view carries", () => {
+    const result = cleanCapture(capture("$pageview", {
+      $current_url: `https://bibobay.example/orders/${TOKEN}?utm_source=email&ref=x`,
+      $pathname: `/orders/${TOKEN}`,
+      $prev_pageview_pathname: `/orders/${TOKEN}`,
+      $session_entry_url: `https://bibobay.example/orders/${TOKEN}`,
+      $referrer: `https://bibobay.example/orders/${TOKEN}`,
+      title: "Your order | BIBO Bay",
+    }));
+    expect(JSON.stringify(result)).not.toContain(TOKEN);
+    expect(result?.properties.$current_url).toBe("https://bibobay.example/orders/[token]?utm_source=email");
+    expect(result?.properties.$pathname).toBe("/orders/[token]");
+    expect(result?.properties.$prev_pageview_pathname).toBe("/orders/[token]");
+    expect(result?.properties.$session_entry_url).toBe("https://bibobay.example/orders/[token]");
+    expect(result?.properties.$referrer).toBe("https://bibobay.example");
+  });
+
+  it("masks the token in a page leave and in an action's own words", () => {
+    expect(JSON.stringify(cleanCapture(capture("$pageleave", { $current_url: `https://bibobay.example/orders/${TOKEN}`, $pathname: `/orders/${TOKEN}` })))).not.toContain(TOKEN);
+    expect(cleanProperties("cta_clicked", { label: `Open /orders/${TOKEN}`, section: "page", destination: "internal" })).toEqual({ label: "Open /orders/[token]", section: "page", destination: "internal" });
+    expect(cleanCapture(capture("cta_clicked", { label: `/orders/${TOKEN}`, section: "page" }))?.properties.label).toBe("/orders/[token]");
+  });
+
+  it("leaves every other address alone, the order API and the shop included", () => {
+    const result = cleanCapture(capture("$pageview", { $current_url: "https://bibobay.example/shop/tula-plush", $pathname: "/api/orders/track" }));
+    expect(result?.properties.$current_url).toBe("https://bibobay.example/shop/tula-plush");
+    expect(result?.properties.$pathname).toBe("/api/orders/track");
+    expect(cleanCapture(capture("$pageview", { $pathname: "/orders" }))?.properties.$pathname).toBe("/orders");
+  });
+});

@@ -2,8 +2,10 @@ import { AnalyticsChoices } from "@/components/analytics/AnalyticsChoices";
 import { BiboLogo } from "@/components/brand/BiboLogo";
 import { analyticsConfig } from "@/lib/analytics/config";
 import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
-import type { SiteSettings } from "@/lib/content/types";
+import { isCommerceEnabled } from "@/lib/commerce/gate";
+import type { Cta, SiteSettings } from "@/lib/content/types";
 import { CtaLink } from "./CtaLink";
+import { SHOP_PATH } from "./sections";
 import { UI_COPY } from "./ui-copy";
 
 export interface FooterProps {
@@ -11,12 +13,15 @@ export interface FooterProps {
 }
 
 /**
- * Navy band with the canonical logo, the CMS footer copy and legal links. Social links come only
- * from verified settings, and contact appears only when an address is configured.
+ * Navy band with the canonical logo, the CMS footer copy and legal links, led by the shop link while
+ * commerce is on (spec §10, Task 7b). Social links come only from verified settings, and contact
+ * appears only when an address is configured.
  */
 export function Footer({ settings }: FooterProps) {
   const { footer, socialLinks, contactEmail } = settings;
   const analytics = analyticsConfig();
+  const shop: Cta[] = isCommerceEnabled(settings) && !footer.legalLinks.some((link) => link.href === SHOP_PATH) ? [{ label: settings.navigation.commerceLabel, href: SHOP_PATH }] : [];
+  const links = [...shop, ...footer.legalLinks];
   return (
     <footer className="site-footer" data-surface="navy">
       <div className="landing-container grid gap-x-12 gap-y-10 py-14 sm:py-16 lg:grid-cols-12">
@@ -25,10 +30,10 @@ export function Footer({ settings }: FooterProps) {
           {footer.text ? <p className="mt-6 max-w-[38ch] text-(--footer-ink-soft)">{footer.text}</p> : null}
         </div>
         <div className="grid gap-8 sm:grid-cols-3 lg:col-span-6 lg:col-start-7">
-          {footer.legalLinks.length > 0 ? (
+          {links.length > 0 ? (
             <nav aria-label={UI_COPY.footerNavigation}>
               <ul className="grid gap-1">
-                {footer.legalLinks.map((link) => (
+                {links.map((link) => (
                   <li key={`${link.href}-${link.label}`}>
                     <CtaLink cta={link} className="footer-link" />
                   </li>

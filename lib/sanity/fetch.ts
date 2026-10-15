@@ -44,9 +44,12 @@ const category = (raw: unknown): ProductCategory | undefined => {
   const art = asset(v.image, name);
   return { id, name, slug: handle, description: str(v.description), order: typeof v.order === "number" && Number.isFinite(v.order) ? v.order : 0, ...(art ? { image: art } : {}) };
 };
-function normalizeProduct(raw: unknown): Product | null {
-  const v = rec(raw), id = str(v.id) || str(v._id), name = str(v.name), handle = slug(v.slug);
-  if (!id || !name || !handle || v.status !== "listed") return null;
+/** Statuses a public page may show: the catalogue lists only `listed`; a product page also shows `sold-out`. */
+type PublicStatus = Exclude<Product["status"], "draft">;
+const isPublicStatus = (value: unknown, accepted: readonly PublicStatus[]): value is PublicStatus => accepted.includes(value as PublicStatus);
+function normalizeProduct(raw: unknown, accepted: readonly PublicStatus[] = ["listed"]): Product | null {
+  const v = rec(raw), id = str(v.id) || str(v._id), name = str(v.name), handle = slug(v.slug), status = v.status;
+  if (!id || !name || !handle || !isPublicStatus(status, accepted)) return null;
   const images = Array.isArray(v.images) ? v.images.map((entry) => asset(entry, name)).filter((a): a is ImageWithAlt => !!a) : [];
   const linkedCategory = category(v.category);
 
@@ -59,7 +62,7 @@ function normalizeProduct(raw: unknown): Product | null {
   const commerceNotice = str(notice.title) && str(notice.body) ? { title: str(notice.title), body: str(notice.body), ...(str(noticeCta.label) && safeHref ? { cta: { label: str(noticeCta.label), href: safeHref, ...(noticeCta.external === true ? { external: true } : {}) } } : {}) } : undefined;
   // R80: optional order snapshot fields; a blank or non-text value is left out.
   const codes = Object.fromEntries((["sku", "variant", "pack"] as const).flatMap((key) => (str(v[key]) ? [[key, str(v[key])]] : []))) as Pick<Product, "sku" | "variant" | "pack">;
-  return { id, name, slug: handle, description: str(v.description), details, images, status: "listed", order: typeof v.order === "number" && Number.isFinite(v.order) ? v.order : 0,
+  return { id, name, slug: handle, description: str(v.description), details, images, status, order: typeof v.order === "number" && Number.isFinite(v.order) ? v.order : 0,
     ...(linkedCategory ? { category: linkedCategory } : {}), ...codes,
     ...(seo ? { seo } : {}), ...(commerceNotice ? { commerceNotice } : {}) };
 }
@@ -67,14 +70,15 @@ export async function getListedProducts(options: ContentOptions = {}): Promise<P
   const settings = await getSiteSettings(options);
   if (!settings.commerceEnabled) return [];
   const raw = await query<unknown>(LISTED_PRODUCTS_QUERY, {}, ["product", "productCategory"], options);
-  return Array.isArray(raw) ? raw.map(normalizeProduct).filter((entry): entry is Product => entry !== null) : [];
+  return Array.isArray(raw) ? raw.map((entry) => normalizeProduct(entry)).filter((entry): entry is Product => entry !== null) : [];
 }
 export async function getProductBySlug(handle: string, options: ContentOptions = {}): Promise<Product | null> {
   if (!slug(handle)) return null;
   const settings = await getSiteSettings(options);
   if (!settings.commerceEnabled) return null;
   const raw = await query<unknown>(PRODUCT_BY_SLUG_QUERY, { slug: handle }, ["product", "productCategory"], options);
-  return normalizeProduct(raw);
+  // A sold-out product keeps its page (shared links keep working, marked sold out); drafts do not.
+  return normalizeProduct(raw, ["listed", "sold-out"]);
 }
 
 /**

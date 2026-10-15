@@ -38,6 +38,9 @@ PostHog strips the address before GeoIP runs, so no location is added. Tag links
 - No autocapture, session replay, heatmaps, dead-click or rage-click capture, exception capture,
   surveys, product tours, web experiments, feature flags or web vitals.
 - No form contents: `lead_submitted` carries the outcome only.
+- No private order link: the token in a `/orders/<token>` address (the tracking page, Task 7c)
+  never leaves the browser. Every address, path and label is sent as `/orders/[token]`
+  (`lib/privacy/private-links.ts`), and those pages send no referrer.
 - `before_send` (`lib/analytics/events.ts` `cleanCapture`) is the one gate: it drops any event not
   in the table above, any property not allowed for that event (PostHog's own `token`,
   `distinct_id` and page `title` are kept: it refuses events without them), query strings other than campaign
@@ -109,7 +112,8 @@ project); otherwise nothing loads and nothing is sent.
 - **Scrubbing** (`lib/observability/sentry-config.ts`, every event, transaction and breadcrumb):
   `sendDefaultPii: false`; the request keeps its method, its URL without the query and the user
   agent only; the user and all extra data are removed; email-shaped text becomes `[email]`;
-  breadcrumb and span URLs lose their queries. No session replay. Traces: 0.1 in production, all in
+  breadcrumb and span URLs lose their queries; a private order link's token becomes
+  `/orders/[token]` in request URLs, transaction names, breadcrumbs, messages and spans. No session replay. Traces: 0.1 in production, all in
   preview and development.
 - **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.
   There is no `SENTRY_ENVIRONMENT` setting: Sentry's browser SDK reads that name itself, so listing

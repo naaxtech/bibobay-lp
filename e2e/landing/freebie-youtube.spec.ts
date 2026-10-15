@@ -31,6 +31,9 @@ for (const { name, use } of VIEWPORTS) {
       await expect(card.getByText(/^PDF · \d+ pages · [\d.]+ MB$/)).toBeVisible();
 
       const download = card.getByRole("link", { name: /^Download the free pack/ });
+      // Exactly "<label>: <title>": a block-level hidden span makes Chromium insert a space before the colon.
+      const title = (await card.getByRole("heading", { level: 3 }).innerText()).trim();
+      await expect(download).toHaveAccessibleName(`Download the free pack: ${title}`);
       await expect(download).toHaveAttribute("href", ACTIVITY_PACK.fileUrl);
       // The card sits inside the viewport, not off its edge.
       const box = (await card.boundingBox())!;

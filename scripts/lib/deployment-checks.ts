@@ -296,6 +296,13 @@ async function readJson(response: Response): Promise<unknown> {
 /** Pages whose server-rendered HTML and RSC payload are scanned for secrets (all are rendered per request). */
 export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you"] as const;
 
+/**
+ * Pages that exist only while a CMS switch is on (Task 7b: the shop, while commerce is enabled).
+ * Each is scanned like PAYLOAD_PATHS when it answers 200. Switched off it must answer 404: a server
+ * error or a redirect fails the check.
+ */
+export const GATED_PAYLOAD_PATHS = ["/shop"] as const;
+
 async function scanClientPayloads(fetcher: typeof fetch, origin: string, allowed: ReadonlySet<string>, timeoutMs: number, rules: SecretRules): Promise<CheckResult> {
   const name = "client payloads";
   if (rules.configErrors.length > 0) return { name, status: "fail", detail: rules.configErrors.join("; ") };
@@ -304,38 +311,96 @@ async function scanClientPayloads(fetcher: typeof fetch, origin: string, allowed
   // client-JS scan (verify:bundle) still looks for them.
   const pageRules: SecretRules = { ...rules, secretValues: rules.secretValues.filter(({ name: valueName }) => !ADDRESS_NAMES.has(valueName)) };
   const problems: string[] = [];
+  const notes: string[] = [];
+  const scannedPaths: string[] = [];
   let scanned = 0;
-  for (const path of PAYLOAD_PATHS) {
-    for (const kind of ["html", "rsc"] as const) {
-      const label = `${path} ${kind}`;
-      let fetched: Fetched;
-      try {
-        fetched = await get(fetcher, new URL(path, origin), allowed, timeoutMs, kind === "rsc" ? { RSC: "1" } : {});
-      } catch (error) {
-        problems.push(`${label} not scanned (${error instanceof Error ? error.message : "request failed"})`);
-        continue;
-      }
-      if (!fetched.ok) {
-        problems.push(`${label} not scanned (redirected to another origin)`);
-        continue;
-      }
-      const { response } = fetched;
-      const body = await response.text().catch(() => "");
-      const type = response.headers.get("content-type") ?? "";
-      if (response.status !== 200) {
-        problems.push(`${label} not scanned (${response.status})`);
-        continue;
-      }
-      if (kind === "rsc" && !/^text\/x-component\b/i.test(type)) {
-        problems.push(`${label} not scanned (answered ${type.split(";")[0] || "no content-type"}, not an RSC payload)`);
-        continue;
-      }
-      scanned += 1;
-      for (const finding of scanText(body, label, pageRules)) problems.push(`${label}: ${finding.kind} ${finding.rule}`);
+
+  const scan = (label: string, body: string) => {
+    scanned += 1;
+    for (const finding of scanText(body, label, pageRules)) problems.push(`${label}: ${finding.kind} ${finding.rule}`);
+  };
+
+  /** The page's RSC payload (Next answers a bare `RSC: 1` GET with a same-origin redirect first). */
+  const scanRsc = async (path: string) => {
+    const label = `${path} rsc`;
+    let fetched: Fetched;
+    try {
+      fetched = await get(fetcher, new URL(path, origin), allowed, timeoutMs, { RSC: "1" });
+    } catch (error) {
+      problems.push(`${label} not scanned (${error instanceof Error ? error.message : "request failed"})`);
+      return;
     }
+    if (!fetched.ok) {
+      problems.push(`${label} not scanned (redirected to another origin)`);
+      return;
+    }
+    const { response } = fetched;
+    const body = await response.text().catch(() => "");
+    const type = response.headers.get("content-type") ?? "";
+    if (response.status !== 200) {
+      problems.push(`${label} not scanned (${response.status})`);
+      return;
+    }
+    if (!/^text\/x-component\b/i.test(type)) {
+      problems.push(`${label} not scanned (answered ${type.split(";")[0] || "no content-type"}, not an RSC payload)`);
+      return;
+    }
+    scan(label, body);
+  };
+
+  for (const path of PAYLOAD_PATHS) {
+    const label = `${path} html`;
+    let fetched: Fetched | null = null;
+    try {
+      fetched = await get(fetcher, new URL(path, origin), allowed, timeoutMs);
+    } catch (error) {
+      problems.push(`${label} not scanned (${error instanceof Error ? error.message : "request failed"})`);
+    }
+    if (fetched && !fetched.ok) problems.push(`${label} not scanned (redirected to another origin)`);
+    else if (fetched) {
+      const body = await fetched.response.text().catch(() => "");
+      if (fetched.response.status !== 200) problems.push(`${label} not scanned (${fetched.response.status})`);
+      else scan(label, body);
+    }
+    await scanRsc(path);
+    scannedPaths.push(path);
   }
+
+  for (const path of GATED_PAYLOAD_PATHS) {
+    const requested = new URL(path, origin);
+    let fetched: Fetched;
+    try {
+      fetched = await get(fetcher, requested, allowed, timeoutMs);
+    } catch (error) {
+      problems.push(`${path} html not scanned (${error instanceof Error ? error.message : "request failed"})`);
+      continue;
+    }
+    if (!fetched.ok) {
+      problems.push(`${path} redirected to another origin; a switched-off page must answer 404`);
+      continue;
+    }
+    const body = await fetched.response.text().catch(() => "");
+    if (fetched.url.href !== requested.href) {
+      problems.push(`${path} redirected to ${fetched.url.pathname}; a switched-off page must answer 404`);
+      continue;
+    }
+    const { status } = fetched.response;
+    if (status === 404) {
+      notes.push(`${path} answered 404 (switched off, not scanned)`);
+      continue;
+    }
+    if (status !== 200) {
+      problems.push(`${path} answered ${status}; a switchable page must answer 200 or 404`);
+      continue;
+    }
+    scan(`${path} html`, body);
+    await scanRsc(path);
+    scannedPaths.push(path);
+  }
+
   if (problems.length > 0) return { name, status: "fail", detail: clip(problems, 6) };
-  return { name, status: "pass", detail: `${scanned} responses (HTML and RSC of ${PAYLOAD_PATHS.join(", ")}): no server name, secret value, token shape or server-code string` };
+  const note = notes.length > 0 ? `; ${notes.join("; ")}` : "";
+  return { name, status: "pass", detail: `${scanned} responses (HTML and RSC of ${scannedPaths.join(", ")}): no server name, secret value, token shape or server-code string${note}` };
 }
 
 /** Every fetch-only check, in table order. Throws DeploymentNetworkError when the home page is unreachable. */

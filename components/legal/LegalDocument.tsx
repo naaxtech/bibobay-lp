@@ -1,6 +1,6 @@
 import { PortableText } from "@/components/landing/PortableText";
 import type { SiteSettings } from "@/lib/content/types";
-import { LEGAL_FALLBACK } from "@/lib/content/legal-fallback";
+import { legalFallbackFor } from "@/lib/content/legal-fallback";
 import type { LegalKind, LegalPageState } from "@/lib/seo/metadata";
 import type { LegalSettings } from "@/lib/content/types";
 import { LEGAL_PAGE_COPY } from "./legal-copy";
@@ -14,8 +14,9 @@ export interface LegalDocumentProps {
 
 /**
  * Ruling R30: the Sanity legal text when there is some; otherwise the repository fallback, under a
- * note saying it has not been reviewed. Only the fallback privacy page adds the configured contact
- * address: Sanity text carries its own.
+ * note saying it has not been reviewed. The fallback follows the commerce switch (Task 7b): it says
+ * nothing is sold while commerce is off, and describes order requests while it is on. Only the
+ * fallback privacy page adds the configured contact address: Sanity text carries its own.
  */
 export function LegalDocument({ kind, legal, state, settings }: LegalDocumentProps) {
   if (state.source === "cms") {
@@ -31,7 +32,7 @@ export function LegalDocument({ kind, legal, state, settings }: LegalDocumentPro
       <p role="note" className="simple-page__note">
         {LEGAL_PAGE_COPY.fallbackNote}
       </p>
-      <PortableText value={LEGAL_FALLBACK[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
+      <PortableText value={legalFallbackFor(settings)[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
       {kind === "privacy" && settings.contactEmail ? (
         <p className="simple-page__contact">
           {LEGAL_PAGE_COPY.contactLead}{" "}

@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { metadata } from "@/app/layout";
 import { brandTokens } from "@/lib/brand/tokens";
 import { BRAND_ASSET_SOURCE, BRAND_ASSET_TARGETS, deriveBrandAssets } from "@/scripts/generate-brand-assets";
 import { paintedColours, readSvg, readText, viewBoxOf } from "./svg-geometry";
+
+// The root layout mounts the order pad from the server (Task 7b), which reads CMS settings.
+vi.mock("server-only", () => ({}));
 
 const LETTERS = ["b1", "i", "b2", "o"] as const;
 /** The pieces around the letters on the channel mark: a star over the i and three sparkles off the O. */

@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AGE_BANDS } from "@/lib/leads/fields";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { LEGAL_FALLBACK } from "@/lib/content/legal-fallback";
+import { LEGAL_FALLBACK, legalFallbackFor } from "@/lib/content/legal-fallback";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
 
@@ -143,6 +145,110 @@ describe("repository fallback legal text (ruling R30)", () => {
   it("keeps the content contract: SAFE_FALLBACK_LEGAL is still empty", () => {
     expect(SAFE_FALLBACK_LEGAL.privacy).toEqual([]);
     expect(SAFE_FALLBACK_LEGAL.terms).toEqual([]);
+  });
+});
+
+/*
+ * Task 7b: the fallback text follows the commerce switch. Off (the default) it is exactly the text
+ * above, "nothing is sold" included. On, those lines go and the text describes what an order request
+ * stores (migrations 0002 to 0005), why, and how payment works, without a retention period.
+ */
+describe("repository fallback legal text while commerce is on (Task 7b)", () => {
+  const on = legalFallbackFor({ commerceEnabled: true });
+  const privacy = textOf(on.privacy);
+  const terms = textOf(on.terms);
+  const migration = ["0002_orders.sql", "0003_order_tracking.sql", "0005_shared_rate_limits_and_token_rotation.sql"].map((file) => readFileSync(resolve("supabase/migrations", file), "utf8")).join("\n");
+
+  it("is exactly today's text while commerce is off, or anything but a literal true", () => {
+    for (const settings of [{ commerceEnabled: false }, { commerceEnabled: "true" as unknown as boolean }, SAFE_FALLBACK_SETTINGS]) expect(legalFallbackFor(settings)).toBe(LEGAL_FALLBACK);
+    expect(textOf(LEGAL_FALLBACK.privacy)).toMatch(/Nothing is sold on this website\./);
+    expect(textOf(LEGAL_FALLBACK.terms)).toMatch(/Nothing is for sale on this website at the moment\./);
+  });
+
+  it("drops every \"nothing is sold\" line", () => {
+    expect(privacy).not.toMatch(/nothing is sold|nothing is for sale/i);
+    expect(terms).not.toMatch(/nothing is sold|nothing is for sale/i);
+  });
+
+  it("describes the contact and delivery details an order stores, as migration 0002 defines them", () => {
+    for (const column of ["contact_name", "email", "phone", "address_line1", "address_line2", "city", "region", "postal_code", "country", "notes", "consent_version", "consent_granted_at"]) expect(migration, column).toMatch(new RegExp(`\\b${column}\\b`));
+    expect(privacy).toMatch(/order form is for adults/i);
+    expect(privacy).toMatch(/your name and email address/i);
+    expect(privacy).toMatch(/phone number if you choose/i);
+    expect(privacy).toMatch(/delivery address/i);
+    expect(privacy).toMatch(/street address, city and country/i);
+    expect(privacy).toMatch(/region and postal code/i);
+    expect(privacy).toMatch(/notes you add/i);
+    expect(privacy).toMatch(/version of the wording you agreed to, and when you agreed/i);
+  });
+
+  it("describes the product snapshot, the order's history, its email records and the tracking link's hash", () => {
+    // orders, order_items, order_events, order_email_outbox: every order table the migrations create.
+    for (const table of ["orders", "order_items", "order_events", "order_email_outbox"]) expect(migration).toMatch(new RegExp(`create table if not exists public\\.${table} `));
+    for (const column of ["sanity_id", "title", "sku", "variant", "pack", "quantity", "actor", "provider_message_id", "last_error_code", "tracking_token_hash", "tracking_token_expires_at"]) expect(migration, column).toMatch(new RegExp(`\\b${column}\\b`));
+    expect(privacy).toMatch(/as each product was described in the shop when you sent the request/i);
+    expect(privacy).toMatch(/product code, variant and pack/i);
+    expect(privacy).toMatch(/the shop's own reference for it, its name/i);
+    expect(privacy).toMatch(/how many of each/i);
+    expect(privacy).toMatch(/reference, its status/i);
+    expect(privacy).toMatch(/record of each step/i);
+    expect(privacy).toMatch(/you, the BIBO Bay team or the website itself/i);
+    expect(privacy).toMatch(/one-way code \(a hash\)/i);
+    expect(privacy).toMatch(/link itself is not stored/i);
+    expect(privacy).toMatch(/delivery record/i);
+  });
+
+  it("never asks for card details, takes no payment, and explains the payment link staff send later", () => {
+    expect(migration).not.toMatch(/card_number|\bcvc\b|\biban\b/i);
+    expect(privacy).toMatch(/never ask for payment card or bank details/i);
+    expect(privacy).toMatch(/no payment is taken on this website/i);
+    expect(privacy).toMatch(/quote and a link to pay/i);
+    expect(privacy).toMatch(/currency, the amounts quoted, the payment link/i);
+    expect(terms).toMatch(/does not buy anything and charges nothing/i);
+    expect(terms).toMatch(/quote and a payment link/i);
+    expect(terms).toMatch(/Only adults may send an order request/i);
+    expect(terms).not.toMatch(/refund|delivery within|guarantee|money-back/i);
+  });
+
+  it("says why the details are used, and that the acknowledgement carries no prices", () => {
+    expect(privacy).toMatch(/to handle your order request/i);
+    expect(privacy).toMatch(/acknowledging your request, without prices/i);
+  });
+
+  it("describes the order list kept on the device, and the private link kept out of statistics and error reports", () => {
+    expect(privacy).toMatch(/only which products you added and how many/i);
+    expect(privacy).toMatch(/\/orders\/\[token\]/);
+  });
+
+  it("counts order requests and lookups against the keyed code, never storing the address", () => {
+    expect(privacy).toMatch(/not stored with your signup or your order/i);
+    expect(privacy).toMatch(/order requests and order lookups are counted the same way/i);
+  });
+
+  it("states no retention period, and no deletion that does not exist", () => {
+    expect(privacy).toMatch(/nothing deletes them automatically/i);
+    expect(privacy).not.toMatch(/\b\d+\s*(days|months|years)\b/i);
+    expect(privacy).not.toMatch(/we delete your order|orders are deleted/i);
+  });
+
+  it("still invents no company, address, jurisdiction or contact email", () => {
+    for (const text of [privacy, terms]) {
+      expect(text).not.toMatch(/@/);
+      expect(text).not.toMatch(/\b(Ltd|LLC|Inc\.?|GmbH|Pty|Limited|Corporation|registered (office|number|in))\b/i);
+      expect(text).not.toMatch(/\b(GDPR|CCPA|COPPA|Data Protection Act|governed by|laws of|jurisdiction|court)\b/i);
+    }
+  });
+
+  it("is what /privacy and /terms show while commerce is on", async () => {
+    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true });
+    for (const [load, expected] of [[() => import("@/app/privacy/page"), "never ask for payment card or bank details"], [() => import("@/app/terms/page"), "does not buy anything and charges nothing"]] as const) {
+      const { default: Page } = await load();
+      render(await Page());
+      const main = screen.getByRole("main");
+      expect(main.textContent).toMatch(new RegExp(expected, "i"));
+      expect(main.textContent).not.toMatch(/nothing is sold|nothing is for sale/i);
+      cleanup();
+    }
   });
 });
 
