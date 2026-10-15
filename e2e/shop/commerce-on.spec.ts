@@ -119,7 +119,8 @@ for (const { name, use } of VIEWPORTS) {
         await expect(main.locator("dt", { hasText: label })).toBeVisible();
         await expect(main.locator("dd", { hasText: value })).toBeVisible();
       }
-      await expect(main.getByRole("complementary").getByRole("heading", { name: FIXTURE.tula.notice })).toBeVisible();
+      await expect(main.getByRole("region", { name: FIXTURE.tula.notice }).getByRole("heading", { name: FIXTURE.tula.notice })).toBeVisible();
+      await expect(main.getByRole("complementary")).toHaveCount(0);
       await expect(main.getByRole("heading", { level: 2, name: COPY.details })).toBeVisible();
       await expect(main.getByRole("heading", { level: 3, name: "Care" })).toBeVisible();
       expect(await main.innerText()).not.toMatch(PRICE);
@@ -194,12 +195,17 @@ for (const { name, use } of VIEWPORTS) {
   });
 }
 
-test("the sitemap lists the shop and its listed products only, when the deployment is indexable", async ({ request }) => {
+test("the sitemap matches robots.txt: empty when the deployment is not indexable, else the shop and its listed products", async ({ request }) => {
   const body = await (await request.get("/sitemap.xml")).text();
-  // A non-production server publishes an empty sitemap (ruling R35); a production one lists the shop.
-  if (/<loc>/.test(body)) {
+  const robots = await (await request.get("/robots.txt")).text();
+  // Ruling R35: a non-production server disallows everything and publishes an empty sitemap. The
+  // listing itself is unit-tested (tests/shop/sitemap.test.ts); this pins what the server serves.
+  const indexable = !/^Disallow:\s*\/\s*$/m.test(robots);
+  if (indexable) {
     expect(body).toMatch(/\/shop<\/loc>/);
     for (const slug of ["tula-reef-plush", "bob-bath-boat", "bay-activity-cards"]) expect(body).toContain(`/shop/${slug}</loc>`);
+  } else {
+    expect(body).not.toMatch(/<loc>/);
   }
   expect(body).not.toContain(FIXTURE.soldOut.slug);
   expect(body).not.toContain(FIXTURE.draftSlug);

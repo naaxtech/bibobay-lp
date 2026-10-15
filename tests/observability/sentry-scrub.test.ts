@@ -198,3 +198,60 @@ describe("shared Sentry options", () => {
     expect(integrations(offered).map((integration) => integration.name)).toEqual(["BrowserTracing", "Dedupe"]);
   });
 });
+
+/*
+ * Task 7b review Important 1: a server transaction keeps its root span's attributes in
+ * contexts.trace.data, where Next sets http.target to the request URL. Every level is cleaned.
+ */
+describe("private order links in transaction trace data (Task 7b review)", () => {
+  const TOKEN = "tok_SECRET123abcdef";
+
+  it("masks the token and drops the query at every depth of contexts and span data", () => {
+    const transaction = {
+      type: "transaction" as const,
+      transaction: `GET /orders/${TOKEN}`,
+      contexts: {
+        trace: {
+          trace_id: "0123456789abcdef0123456789abcdef",
+          span_id: "0123456789abcdef",
+          op: "http.server",
+          data: {
+            "http.target": `/orders/${TOKEN}?x=1`,
+            "url.full": `https://bibo.example/orders/${TOKEN}?x=1`,
+            "http.query": "x=1",
+            "url.query": "?x=1",
+            "next.route": "/orders/[token]",
+            nested: { deeper: { path: `/orders/${TOKEN}`, list: [`/orders/${TOKEN}?x=1`] } },
+          },
+        },
+      },
+      spans: [
+        {
+          span_id: "1",
+          trace_id: "0123456789abcdef0123456789abcdef",
+          start_timestamp: 1,
+          description: `render /orders/${TOKEN}`,
+          data: { "http.target": `/orders/${TOKEN}?x=1`, "url.query": "?x=1", attributes: { route: `/orders/${TOKEN}` } },
+        },
+      ],
+    };
+    const scrubbed = scrubEvent(transaction as unknown as Parameters<typeof scrubEvent>[0]);
+    const text = JSON.stringify(scrubbed);
+    expect(text).not.toContain(TOKEN);
+    expect(text).not.toContain("x=1");
+    const data = (scrubbed.contexts?.trace as { data: Record<string, unknown> }).data;
+    expect(data["http.target"]).toBe("/orders/[token]");
+    expect(data["url.full"]).toBe("https://bibo.example/orders/[token]");
+    expect(data["next.route"]).toBe("/orders/[token]");
+    expect(data).not.toHaveProperty("http.query");
+    expect(data).not.toHaveProperty("url.query");
+    expect(scrubbed.transaction).toBe("GET /orders/[token]");
+  });
+
+  it("stops at a depth limit rather than walking a cycle", () => {
+    const loop: Record<string, unknown> = { path: `/orders/${TOKEN}` };
+    loop.self = loop;
+    const scrubbed = scrubEvent({ contexts: { custom: loop } } as unknown as Parameters<typeof scrubEvent>[0]);
+    expect(JSON.stringify(scrubbed.contexts?.custom, (key, value) => (key === "self" && typeof value === "object" ? "[cut]" : value))).not.toContain(TOKEN);
+  });
+});

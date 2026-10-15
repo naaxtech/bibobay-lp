@@ -5,7 +5,8 @@ import { brandTokens } from "@/lib/brand/tokens";
 import { BRAND_ASSET_SOURCE, BRAND_ASSET_TARGETS, deriveBrandAssets } from "@/scripts/generate-brand-assets";
 import { paintedColours, readSvg, readText, viewBoxOf } from "./svg-geometry";
 
-// The root layout mounts the order pad from the server (Task 7b), which reads CMS settings.
+// Added when the root layout mounted the order pad (Task 7b); the pad now mounts in app/(commerce), so this
+// mock is no longer needed. Kept, harmless: remove only with the owner's go-ahead (no-deletion rule).
 vi.mock("server-only", () => ({}));
 
 const LETTERS = ["b1", "i", "b2", "o"] as const;

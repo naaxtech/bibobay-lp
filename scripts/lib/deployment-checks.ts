@@ -380,7 +380,8 @@ async function scanClientPayloads(fetcher: typeof fetch, origin: string, allowed
       continue;
     }
     const body = await fetched.response.text().catch(() => "");
-    if (fetched.url.href !== requested.href) {
+    // A same-page upgrade (http to https on the same host) is followed; any other redirect fails.
+    if (`${fetched.url.pathname}${fetched.url.search}` !== `${requested.pathname}${requested.search}`) {
       problems.push(`${path} redirected to ${fetched.url.pathname}; a switched-off page must answer 404`);
       continue;
     }

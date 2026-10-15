@@ -468,6 +468,30 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
     expect(scanOf(results)?.detail).toMatch(/\/shop answered 500/);
   });
 
+  it("follows the host's upgrade of the same page to https, then accepts its 404 (review Minor 3)", async () => {
+    const routes = routesWith({ html: { status: 308, headers: { location: "https://127.0.0.1:3200/shop" } } });
+    routes["https://127.0.0.1:3200/shop"] = { status: 404, type: "text/html", body: "not found" };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("pass");
+    expect(scanOf(results)?.detail).toMatch(/\/shop answered 404/);
+  });
+
+  it("fails when a switched-on shop's HTML leaks a secret, naming the page and never the value (review Minor 3)", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), {
+      fetch: rscAwareFetch(routesWith({ html: { status: 200, type: "text/html", body: "<html><script>var k='rv-7Hq2LmN9xPz4'</script></html>" }, rsc: RSC })),
+      scanRules: rules,
+    });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toContain("/shop html");
+    expect(scanOf(results)?.detail).not.toContain("rv-7Hq2LmN9xPz4");
+  });
+
+  it("fails when the shop redirects to another site (review Minor 3)", async () => {
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 307, headers: { location: "https://elsewhere.example/shop" } } })), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toMatch(/\/shop redirected to another origin/);
+  });
+
   it("fails when the shop redirects, even within the site", async () => {
     const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 307, headers: { location: "/" } } })), scanRules: rules });
     expect(scanOf(results)?.status).toBe("fail");

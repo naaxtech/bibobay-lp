@@ -6,7 +6,7 @@ import { ORDER_PAD_STORAGE_KEY } from "@/lib/orders/constants";
 import { addOrderPadLine, isOrderPadFull, isOrderPadProductId, keepListedLines, parseOrderPad, serialiseOrderPad, updateOrderPadQuantity, type OrderPadLine } from "@/lib/orders/pad";
 
 /**
- * The order pad's state (Task 6, spec §10). The root layout mounts it from the server, and only
+ * The order pad's state (Task 6, spec §10). The app/(commerce) layout mounts it from the server, and only
  * while commerce is enabled (./OrderPadMount.tsx); without it no control finds a pad and nothing is
  * read from or written to the device.
  *

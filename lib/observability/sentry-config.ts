@@ -39,11 +39,29 @@ function withoutQuery(value: string): string {
 
 const cleanString = (value: string) => maskText(withoutQuery(value));
 
-function cleanRecord<T extends Record<string, unknown>>(record: T, drop: readonly string[] = []): T {
+/** Query strings the SDK and Next record as separate attributes; dropped wherever they appear. */
+const QUERY_KEYS: readonly string[] = ["http.query", "url.query"];
+/**
+ * How deep nested context and span data is cleaned (Task 7b review: Next records the request URL
+ * as `http.target` in `contexts.trace.data`). Anything deeper is dropped, which also ends a cycle.
+ */
+const MAX_DEPTH = 6;
+
+function cleanValue(value: unknown, depth: number): unknown {
+  if (typeof value === "string") return cleanString(value);
+  if (!value || typeof value !== "object") return value;
+  if (depth >= MAX_DEPTH) return undefined;
+  if (Array.isArray(value)) return value.map((entry) => cleanValue(entry, depth + 1));
+  return cleanRecord(value as Record<string, unknown>, depth + 1);
+}
+
+/** Every string at every depth cleaned (query removed, emails and order tokens masked); query keys dropped. */
+function cleanRecord<T extends Record<string, unknown>>(record: T, depth = 0): T {
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(record)) {
-    if (drop.includes(key)) continue;
-    clean[key] = typeof value === "string" ? cleanString(value) : value;
+    if (QUERY_KEYS.includes(key)) continue;
+    const cleaned = cleanValue(value, depth);
+    if (cleaned !== undefined) clean[key] = cleaned;
   }
   return clean as T;
 }
@@ -83,7 +101,7 @@ export function scrubEvent<T extends Event>(event: T): T {
   if (typeof clean.transaction === "string") clean.transaction = maskPrivatePaths(withoutQuery(clean.transaction));
   if (clean.spans) {
     clean.spans = clean.spans.map((span) => {
-      const scrubbed = span.data ? { ...span, data: cleanRecord(span.data, ["http.query"]) } : { ...span };
+      const scrubbed = span.data ? { ...span, data: cleanRecord(span.data) } : { ...span };
       if (typeof scrubbed.description === "string") scrubbed.description = maskPrivatePaths(scrubbed.description);
       return scrubbed;
     });

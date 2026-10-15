@@ -4,10 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AGE_BANDS } from "@/lib/leads/fields";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { LEGAL_FALLBACK, legalFallbackFor } from "@/lib/content/legal-fallback";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
+import { LEAD_RATE_LIMIT } from "@/lib/leads/submit";
+import { ORDER_RATE_LIMIT } from "@/lib/orders/submit";
+import { ORDER_TRACK_RATE_LIMIT } from "@/lib/orders/track";
 
 vi.mock("server-only", () => ({}));
 
@@ -191,7 +194,7 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
     expect(privacy).toMatch(/the shop's own reference for it, its name/i);
     expect(privacy).toMatch(/how many of each/i);
     expect(privacy).toMatch(/reference, its status/i);
-    expect(privacy).toMatch(/record of each step/i);
+    expect(privacy).toMatch(/a record of what has happened to the order/i);
     expect(privacy).toMatch(/you, the BIBO Bay team or the website itself/i);
     expect(privacy).toMatch(/one-way code \(a hash\)/i);
     expect(privacy).toMatch(/link itself is not stored/i);
@@ -223,6 +226,25 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
   it("counts order requests and lookups against the keyed code, never storing the address", () => {
     expect(privacy).toMatch(/not stored with your signup or your order/i);
     expect(privacy).toMatch(/order requests and order lookups are counted the same way/i);
+  });
+
+  it("describes only the order events the migrations record (review Minor 4)", () => {
+    const migrations = readdirSync(resolve("supabase/migrations")).map((file) => readFileSync(resolve("supabase/migrations", file), "utf8")).join("\n");
+    expect(migrations).toContain("'order_submitted'");
+    expect(migrations).toContain("'tracking_token_rotated'");
+    expect(privacy).toMatch(/your sending it/i);
+    expect(privacy).toMatch(/replacement of its tracking link/i);
+    // Status changes are recorded once a migration writes them (staff administration, Task 8).
+    if (!/'status_changed'/.test(migrations)) expect(privacy).not.toMatch(/change of its status/i);
+  });
+
+  it("states the rate-limit windows the code uses (review Minor 4)", () => {
+    expect(LEAD_RATE_LIMIT.windowSeconds).toBe(600);
+    expect(privacy).toMatch(/signup attempts, in 10-minute windows/i);
+    expect(ORDER_RATE_LIMIT.windowSeconds).toBe(3600);
+    expect(privacy).toMatch(/order requests by the hour/i);
+    expect(ORDER_TRACK_RATE_LIMIT.windowSeconds).toBe(600);
+    expect(privacy).toMatch(/lookups in 10-minute windows/i);
   });
 
   it("states no retention period, and no deletion that does not exist", () => {

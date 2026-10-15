@@ -50,6 +50,11 @@ function facts(product: Product): Array<[label: string, value: string]> {
 export default async function ProductPage({ params }: ProductPageProps) {
   const { preview, settings, product } = await load(params);
   const [first, ...more] = product.images;
+  // Only pictures that resolve (review Minor 7): an empty list is never drawn.
+  const thumbs = more.flatMap((image, index) => {
+    const art = productArt(image, PRODUCT_ART_WIDTH.thumb);
+    return art ? [{ key: `${index}-${image.asset._ref}`, art }] : [];
+  });
   const productFacts = facts(product);
   const soldOut = product.status === "sold-out";
   const notice = product.commerceNotice;
@@ -62,16 +67,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="product-page">
           <div className="product-page__gallery">
             <ProductPicture art={productArt(first, PRODUCT_ART_WIDTH.hero)} name={product.name} sizes="(min-width: 64rem) 36rem, 92vw" priority className="product-print--hero" />
-            {more.length > 0 ? (
+            {thumbs.length > 0 ? (
               <ul className="product-page__thumbs" aria-label={UI_COPY.shop.morePictures(product.name)}>
-                {more.map((image, index) => {
-                  const art = productArt(image, PRODUCT_ART_WIDTH.thumb);
-                  return art ? (
-                    <li key={`${index}-${image.asset._ref}`}>
-                      <ProductPicture art={art} name={product.name} sizes="7rem" className="product-print--thumb" />
-                    </li>
-                  ) : null;
-                })}
+                {thumbs.map(({ key, art }) => (
+                  <li key={key}>
+                    <ProductPicture art={art} name={product.name} sizes="7rem" className="product-print--thumb" />
+                  </li>
+                ))}
               </ul>
             ) : null}
           </div>
@@ -89,14 +91,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <AddToOrder productId={product.id} productName={product.name} />
               )}
             </div>
+            {/* A named region, not an <aside>: a complementary landmark belongs at the top level, not in <main> (review Minor 7). */}
             {notice ? (
-              <aside className="product-notice" aria-labelledby="product-notice-title">
+              <section className="product-notice" aria-labelledby="product-notice-title">
                 <h2 id="product-notice-title" className="product-notice__title">
                   {notice.title}
                 </h2>
                 <p className="product-notice__body">{notice.body}</p>
                 {notice.cta ? <CtaLink cta={notice.cta} variant="text" className="product-notice__link" /> : null}
-              </aside>
+              </section>
             ) : null}
             {productFacts.length > 0 ? (
               <dl className="product-facts">

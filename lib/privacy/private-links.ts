@@ -15,12 +15,18 @@ export const ORDER_LINK_SOURCE = "/orders/:path*";
 
 /**
  * `/orders/<segment>` where `/orders` is the first segment of a path: at the start of the text, right
- * after an origin (`https://host`), or after a space, quote, bracket or `=`. `/api/orders/track` and
- * other paths that merely contain "orders" are left alone.
+ * after an origin (`https://host`), or after any character that cannot belong to a path segment
+ * (review Minor 2: `:`, `;`, `,`, a backtick, a bracket, `>`, a quote, a space…). A path character
+ * before it (`/api/orders/track`, `/shop/orders/…`) means a longer path, which is left alone. An
+ * already masked `/orders/[token]` stays as it is.
  */
-const ORDER_TOKEN_SEGMENT = /(^|[\s"'(=]|[a-z][a-z0-9+.-]*:\/\/[^/\s"'?#]+)\/orders\/[^/?#\s"'<>&]+/gi;
+const ORDER_TOKEN_SEGMENT = /(^|[^A-Za-z0-9._~%+-]|[a-z][a-z0-9+.-]*:\/\/[^/\s"'?#]+)\/orders\/(?!\[token\])[^/?#\s"'<>&`\],;)]+/gi;
+/** The same path URL-encoded (`%2Forders%2F<segment>`), as in a `?next=` value or a digest. */
+const ENCODED_ORDER_TOKEN_SEGMENT = /(^|[^A-Za-z0-9._~+-])%2Forders%2F(?!\[token\])[^/?#\s"'<>&%`\],;)]+/gi;
 
 /** The text with every private order token replaced by "[token]". */
 export function maskPrivatePaths(value: string): string {
-  return value.replace(ORDER_TOKEN_SEGMENT, `$1${ORDER_LINK_ROUTE}`);
+  return value
+    .replace(ORDER_TOKEN_SEGMENT, `$1${ORDER_LINK_ROUTE}`)
+    .replace(ENCODED_ORDER_TOKEN_SEGMENT, (match, before: string) => `${before}${match.slice(before.length, before.length + 12)}[token]`);
 }

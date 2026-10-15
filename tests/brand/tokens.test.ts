@@ -4,7 +4,8 @@ import RootLayout from "@/app/layout";
 import { brandCssVariables, brandReducedMotionCssVariables, brandTokens } from "@/lib/brand/tokens";
 import { inheritedAttribute, paintedColours, readSvg, readText } from "./svg-geometry";
 
-// The root layout mounts the order pad from the server (Task 7b), which reads CMS settings.
+// Added when the root layout mounted the order pad (Task 7b); the pad now mounts in app/(commerce), so this
+// mock is no longer needed. Kept, harmless: remove only with the owner's go-ahead (no-deletion rule).
 vi.mock("server-only", () => ({}));
 
 type ColourName = keyof typeof brandTokens.color;

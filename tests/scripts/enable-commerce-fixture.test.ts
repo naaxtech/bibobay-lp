@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,19 +78,19 @@ function loadGenerated(source: string): { e2eCommerceFixture: (groq: string, par
 const snapshot = (folder: string) => Object.fromEntries(TOUCHED.map((file) => [file, readFileSync(join(folder, file), "utf8")]));
 
 describe("enable-commerce-fixture refusals", () => {
-  it("refuses the repository itself and changes nothing", () => {
+  // Review Minor 5: asked directly, never by running the file-writing script against the repository,
+  // so a broken refusal fails here without switching commerce on in the work tree.
+  const refusal = async (target: string) => ((await import(pathToFileURL(SCRIPT).href)) as { refusalFor(target: string): string | null }).refusalFor(target);
+
+  it("refuses the repository itself", async () => {
     const before = snapshot(REPO);
-    const result = run(REPO);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/refused: .*is this repository itself/i);
+    expect(await refusal(REPO)).toMatch(/is this repository itself/i);
     expect(snapshot(REPO)).toEqual(before);
     expect(existsSync(resolve(FIXTURE_MODULE))).toBe(false);
   });
 
-  it("refuses a folder inside the repository", () => {
-    const result = run(resolve("lib"));
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/refused: .*inside this repository/i);
+  it("refuses a folder inside the repository", async () => {
+    expect(await refusal(resolve("lib"))).toMatch(/inside this repository/i);
   });
 
   it("refuses a copy inside a git work tree, however deep, and leaves it untouched", () => {

@@ -25,7 +25,7 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 | `components/landing/` | One component per landing section, the section renderer, `ui-copy.ts` (interface labels not held in Sanity) |
 | `components/brand/` | The logo renderer and the drawn scenery: `ReefBackdrop` (sunbeams, bubbles and the sandy sea floor behind the hero and the closing scene) and `BayBackdrop` (the earlier paper horizon, kept for a slot with no art at all) |
 | `components/forms/` | The founding-family form (`LeadForm.tsx`) and its copy |
-| `components/shop/` | The shop (Task 7b): product card and picture, catalogue grouping, `ShopFrame`, `shop.css`; the order pad (`OrderPadProvider`, mounted by the root layout through `OrderPadMount` only while commerce is on), `AddToOrder` and `OrderPadSummary` |
+| `components/shop/` | The shop (Task 7b): product card and picture, catalogue grouping, `ShopFrame`, `shop.css`; the order pad (`OrderPadProvider`, mounted by the `app/(commerce)` layout through `OrderPadMount` only while commerce is on, so no other page downloads it), `AddToOrder` and `OrderPadSummary` |
 | `components/legal/`, `components/preview/` | `SiteFrame` (header, main, footer for every page but the landing page), privacy, terms and thank-you page shells; the draft-preview notice |
 | `components/motion/` | GSAP provider, reduced-motion hook, section reveals |
 | `lib/content/` | Content types, normalisation, repository fallback content, fallback legal text, and `lib/content/brand-art.ts`: the registry of repository brand art (each still's size, srcset, alt text and source video) |
@@ -80,7 +80,7 @@ listed product pages only then.
 - Pages and sections are React Server Components by default. Client components are only:
   `LeadForm`, `Navbar` (mobile menu), `Characters` and `Episodes` (tab selectors), `SectionShell`
   (reveals), `GsapProvider` and `Dialog`, plus the shop's `OrderPadProvider`, `AddToOrder` and
-  `OrderPadSummary`, which do nothing unless the root layout mounted the pad (commerce on).
+  `OrderPadSummary`, which do nothing unless the `app/(commerce)` layout mounted the pad (commerce on).
 - Every module that reads a server setting or talks to Sanity with a token, Supabase or Resend
   imports `server-only`, so importing it from a client component is a build error:
   `lib/sanity/{client,fetch,image}.ts`, `lib/leads/{submit,dependencies,http}.ts`,

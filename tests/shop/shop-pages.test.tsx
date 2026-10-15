@@ -201,6 +201,23 @@ describe("/shop/[slug]", () => {
     expect(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Bob plush` })).toBeTruthy();
   });
 
+  // A picture without a file reference resolves to no URL (as lib/sanity/image.ts does), so it is never shown.
+  it("draws no empty list of more pictures when none of them can be shown (review Minor 7)", async () => {
+    getSiteSettings.mockResolvedValue(ON);
+    getProductBySlug.mockResolvedValue({ ...detailed, images: [detailed.images[0]!, { asset: { _ref: "" }, alt: "A picture whose file is missing" }] });
+    withPad(await ProductPage(params("tula-plush")));
+    expect(screen.queryByRole("list", { name: UI_COPY.shop.morePictures("Tula plush") })).toBeNull();
+  });
+
+  it("puts the CMS notice in a named region, not a complementary landmark inside main (review Minor 7)", async () => {
+    getSiteSettings.mockResolvedValue(ON);
+    getProductBySlug.mockResolvedValue(detailed);
+    withPad(await ProductPage(params("tula-plush")));
+    const main = screen.getByRole("main");
+    expect(within(main).queryByRole("complementary")).toBeNull();
+    expect(within(main).getByRole("region", { name: "Made in small batches" })).toBeTruthy();
+  });
+
   it("shows a sold-out product as sold out, with no way to add it", async () => {
     getSiteSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue({ ...detailed, status: "sold-out" });

@@ -20,7 +20,7 @@ What exists today and what does not:
 | Signed Sanity revalidation webhook, Studio draft preview | built (needs secrets; see [docs/deployment.md](docs/deployment.md)) |
 | Nonce Content-Security-Policy and security headers, `/api/health`, `/api/readiness` | built |
 | CI, client-bundle secret scan, deployment verifier | built |
-| Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; the root layout mounts the pad only while commerce is on) |
+| Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; the `app/(commerce)` layout mounts the pad only while commerce is on) |
 | Order tables, order request and tracking APIs (`/api/orders`, `/api/orders/track`), gated by `commerceEnabled` | built (Task 7a) |
 | Shop catalogue and product pages (`/shop`, `/shop/[slug]`), no prices, 404 while commerce is off | built (Task 7b) |
 | Order and tracking pages (`/order`, `/track`, `/orders/[token]`) | not built yet (Task 7c) |
