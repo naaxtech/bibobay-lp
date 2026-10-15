@@ -1,0 +1,24 @@
+lib/content/legal-fallback.ts
+  h_0549c11fec2ab0 63-65,74
+lib/sanity/draft-mode.ts
+  h_0549c11fec2ab0 30-34
+lib/security/revalidation.ts
+  h_0549c11fec2ab0 47-50
+tests/content/legal-pages.test.tsx
+  h_0549c11fec2ab0 64-69,74-78
+tests/security/draft-mode.test.ts
+  h_0549c11fec2ab0 53-57
+tests/security/revalidation.test.ts
+  h_0549c11fec2ab0 1-2,107-109,113-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0cc6b76183d4bde0b96ab6394f189a638c0917be",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
