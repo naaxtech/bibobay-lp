@@ -1,0 +1,84 @@
+README.md
+  h_0549c11fec2ab0 23-25,27
+app/api/orders/route.ts
+  h_0549c11fec2ab0 1-71
+app/api/orders/track/route.ts
+  h_0549c11fec2ab0 1-69
+components/forms/order-copy.ts
+  h_0549c11fec2ab0 1-38
+docs/architecture.md
+  h_0549c11fec2ab0 54-55,66-68,82-83
+docs/cms-operations.md
+  h_0549c11fec2ab0 45,51-52
+docs/database-security.md
+  h_0549c11fec2ab0 3-7,16,85-119,129-132
+docs/manual-checkout-operations.md
+  h_0549c11fec2ab0 3-9
+lib/content/types.ts
+  h_0549c11fec2ab0 18
+lib/leads/dependencies.ts
+  h_0549c11fec2ab0 32-33,47
+lib/orders/catalogue.ts
+  h_0549c11fec2ab0 1-99
+lib/orders/dependencies.ts
+  h_0549c11fec2ab0 1-94
+lib/orders/fields.ts
+  h_0549c11fec2ab0 1-89
+lib/orders/schema.ts
+  h_0549c11fec2ab0 1-202
+lib/orders/submit.ts
+  h_0549c11fec2ab0 1-203
+lib/orders/track.ts
+  h_0549c11fec2ab0 1-143
+lib/sanity/fetch.ts
+  h_0549c11fec2ab0 6,60-61,63,79-94
+lib/sanity/queries.ts
+  h_0549c11fec2ab0 15,20,24-32
+lib/supabase/orders.ts
+  h_0549c11fec2ab0 1-136
+studio/schemaTypes/documents/collections.ts
+  h_0549c11fec2ab0 66-69
+supabase/migrations/0002_orders.sql
+  h_0549c11fec2ab0 1-404
+supabase/migrations/0003_order_tracking.sql
+  h_0549c11fec2ab0 1-137
+supabase/migrations/0004_lock_tracking_payload.sql
+  h_0549c11fec2ab0 1-93
+supabase/migrations/0005_shared_rate_limits_and_token_rotation.sql
+  h_0549c11fec2ab0 1-89
+supabase/tests/0002_orders_rls.sql
+  h_0549c11fec2ab0 1-358
+supabase/tests/0003_tracking_grants.sql
+  h_0549c11fec2ab0 1-219
+tests/content/product-contract.test.ts
+  h_0549c11fec2ab0 32-50
+tests/content/studio-contract.test.ts
+  h_0549c11fec2ab0 28-29
+tests/leads/migration-database.test.ts
+  h_0549c11fec2ab0 1,4-5,7-12,14,19-20,29-30,32,41
+tests/orders/canonical-products.test.ts
+  h_0549c11fec2ab0 1-148
+tests/orders/migration-database.test.ts
+  h_0549c11fec2ab0 1-81
+tests/orders/migration-policy.test.ts
+  h_0549c11fec2ab0 1-230
+tests/orders/order-schema.test.ts
+  h_0549c11fec2ab0 1-237
+tests/orders/order-submit.test.ts
+  h_0549c11fec2ab0 1-505
+tests/orders/tracking.test.ts
+  h_0549c11fec2ab0 1-375
+tests/support/supabase-db.ts
+  h_0549c11fec2ab0 1-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7d6f5d0fef8572ca3f846b3b8f1db2d4aafd9833",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
