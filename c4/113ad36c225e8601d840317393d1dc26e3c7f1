@@ -1,0 +1,19 @@
+tests/brand/brand-assets.test.ts
+  s_deed703217db6f::t_b6e1844acb673b 8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4113ad36c225e8601d840317393d1dc26e3c7f1",
+  "prompts": {},
+  "sessions": {
+    "s_deed703217db6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3504e079468593a6",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
