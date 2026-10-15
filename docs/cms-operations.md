@@ -114,7 +114,11 @@ rather than send a link that cannot open from an inbox.
 To change the pack, edit `scripts/freebie/build_activity_pack.py` (or the site copy it reads) and
 run `uv run scripts/freebie/build_activity_pack.py` from the repository root. It rewrites the PDF,
 its page previews and `lib/content/activity-pack.manifest.json`; `tests/freebie` checks that the
-three still agree and that every link in the PDF goes to the channel or one of its videos.
+three still agree, and that every link and QR code in the PDF goes to the channel or one of its
+videos. The build is reproducible: the fonts are pinned to a google/fonts commit and checked by
+sha256, and the Python packages are locked in `build_activity_pack.py.lock`, so the same inputs
+give the same bytes. After changing the dependency list, run `uv lock --script
+scripts/freebie/build_activity_pack.py`.
 
 ## Tab sections: one long text makes every panel tall
 

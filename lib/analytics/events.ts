@@ -35,6 +35,25 @@ const CLICK_IDS = new Set(["gclid", "gad_source", "gclsrc", "dclid", "gbraid", "
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 const MAX_TEXT = 80;
 
+/**
+ * Review M1: an address can hide percent-encoded (`%40`, even `%2540`) in a path or a label. Text
+ * is decoded up to three times before the email check; undecodable text is checked as it is.
+ */
+function holdsEmail(value: string): boolean {
+  let text = value;
+  for (let round = 0; round < 3; round += 1) {
+    if (EMAIL.test(text)) return true;
+    try {
+      const decoded = decodeURIComponent(text);
+      if (decoded === text) break;
+      text = decoded;
+    } catch {
+      break;
+    }
+  }
+  return EMAIL.test(text);
+}
+
 function isEventName(event: string): event is AnalyticsEvent {
   return Object.hasOwn(ANALYTICS_EVENTS, event);
 }
@@ -44,7 +63,7 @@ function plainValue(value: unknown): AnalyticsValue | undefined {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   if (typeof value === "string") {
     const text = value.trim();
-    return text && !EMAIL.test(text) ? text.slice(0, MAX_TEXT) : undefined;
+    return text && !holdsEmail(text) ? text.slice(0, MAX_TEXT) : undefined;
   }
   return undefined;
 }
@@ -60,7 +79,7 @@ export function cleanProperties(event: string, properties: Record<string, unknow
   return clean;
 }
 
-/** Origin and path, plus the campaign tags; no other query, no fragment. */
+/** Origin and path, plus the campaign tags; no other query, no fragment. A path holding an email address becomes "/". */
 function pageAddress(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   try {
@@ -68,10 +87,11 @@ function pageAddress(value: unknown): string | undefined {
     const kept = new URLSearchParams();
     for (const tag of CAMPAIGN_TAGS) {
       const tagValue = url.searchParams.get(tag);
-      if (tagValue && !EMAIL.test(tagValue)) kept.set(tag, tagValue.slice(0, MAX_TEXT));
+      if (tagValue && !holdsEmail(tagValue)) kept.set(tag, tagValue.slice(0, MAX_TEXT));
     }
     const query = kept.toString();
-    return `${url.origin}${url.pathname}${query ? `?${query}` : ""}`;
+    const path = holdsEmail(url.pathname) ? "/" : url.pathname;
+    return `${url.origin}${path}${query ? `?${query}` : ""}`;
   } catch {
     return undefined;
   }
@@ -121,7 +141,7 @@ export function cleanCapture<T extends CaptureLike>(capture: T): T | null {
       continue;
     }
     if (name.startsWith("$") || CAMPAIGN_TAGS.includes(name) || SDK_FIELDS.has(name)) {
-      if (typeof value === "string" && EMAIL.test(value)) continue;
+      if (typeof value === "string" && holdsEmail(value)) continue;
       properties[name] = value;
       continue;
     }

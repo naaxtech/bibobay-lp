@@ -307,12 +307,10 @@
     transition-duration: var(--bibo-duration-press);
   }
 
-  /*
-   * The primary button is a chunky yellow toy key, the I of the logo: a lip of deeper amber below
-   * it that a press flattens. Navy on yellow is 6.5:1. It is the same on every ground.
-   */
-  /* YouTube's play mark on links to the channel or a video: sized to the text, in its colour. */
+  /* YouTube's play mark on links to the channel or a video: sized to the text, in YouTube's colours. */
   .youtube-mark {
+    /* Inline even in a block label: Tailwind's base layer makes every svg a block. */
+    display: inline-block;
     flex: none;
     inline-size: 1.4em;
     block-size: 1em;
@@ -376,6 +374,10 @@
     align-items: center;
   }
 
+  /*
+   * The primary button is a chunky yellow toy key, the I of the logo: a lip of deeper amber below
+   * it that a press flattens. Navy on yellow is 6.5:1. It is the same on every ground.
+   */
   .btn-primary {
     --btn-lip: color-mix(in srgb, var(--bibo-color-orange) 55%, var(--bibo-color-yellow));
     background-color: var(--bibo-color-yellow);

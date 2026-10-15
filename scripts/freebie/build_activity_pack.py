@@ -1,11 +1,11 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "reportlab>=4.2",
-#   "pillow>=10.4",
-#   "fonttools>=4.53",
-#   "pymupdf>=1.24",
-#   "svglib>=1.5",
+#   "reportlab==5.0.1",
+#   "pillow==12.3.0",
+#   "fonttools==4.67.0",
+#   "pymupdf==1.28.2",
+#   "svglib==2.3.0",
 # ]
 # ///
 """Builds the free Bibo Bay Activity Pack (rulings R66-R69 in the project ledger).
@@ -38,7 +38,7 @@ import urllib.request
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-import fitz  # pymupdf
+import pymupdf as fitz
 from fontTools.ttLib import TTFont as FontToolsFont
 from fontTools.varLib import instancer
 from PIL import Image
@@ -83,10 +83,12 @@ KELP = HexColor("#6fbf4a")
 RED = HexColor("#e5483f")
 LINE = 2.6
 
+# Pinned to the google/fonts commit that last changed each file, and checked by sha256, so the pack
+# rebuilds byte for byte (review M7). Both fonts are OFL.
 FONTS = {
-    "Fredoka": ("https://raw.githubusercontent.com/google/fonts/main/ofl/fredoka/Fredoka%5Bwdth,wght%5D.ttf", {"wght": 600, "wdth": 100}),
-    "Jakarta": ("https://raw.githubusercontent.com/google/fonts/main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf", {"wght": 500}),
-    "JakartaBold": ("https://raw.githubusercontent.com/google/fonts/main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf", {"wght": 750}),
+    "Fredoka": ("https://raw.githubusercontent.com/google/fonts/eda3fe521878f70de0e2d91fd6d800f93f8c4758/ofl/fredoka/Fredoka%5Bwdth,wght%5D.ttf", "2ba02e68b152868aef9ba28e24b3648c7d457fe6f25c761f2c2c53fb61a73fc8", {"wght": 600, "wdth": 100}),
+    "Jakarta": ("https://raw.githubusercontent.com/google/fonts/8cd7d0de182c88592d6852c245fe48f66eef55ee/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf", "89b3fb38aa0d275d7a731d0d817a4f1622b316b4d7fbdedcf02ee9099ff68bc8", {"wght": 500}),
+    "JakartaBold": ("https://raw.githubusercontent.com/google/fonts/8cd7d0de182c88592d6852c245fe48f66eef55ee/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf", "89b3fb38aa0d275d7a731d0d817a4f1622b316b4d7fbdedcf02ee9099ff68bc8", {"wght": 750}),
 }
 
 
@@ -97,15 +99,21 @@ FONTS = {
 def load_fonts() -> None:
     cache = Path(tempfile.gettempdir()) / "bibobay-freebie-fonts"
     cache.mkdir(exist_ok=True)
-    for name, (url, axes) in FONTS.items():
-        variable = cache / url.rsplit("/", 1)[1].replace("%5B", "[").replace("%5D", "]").replace(",", "_")
-        if not variable.exists():
+    for name, (url, sha256, axes) in FONTS.items():
+        variable = cache / (f"{sha256[:12]}-" + url.rsplit("/", 1)[1].replace("%5B", "[").replace("%5D", "]").replace(",", "_"))
+        if not variable.exists() or hashlib.sha256(variable.read_bytes()).hexdigest() != sha256:
             with urllib.request.urlopen(url, timeout=60) as response:
-                variable.write_bytes(response.read())
-        static = cache / f"{name}.ttf"
-        if not static.exists():
-            font = instancer.instantiateVariableFont(FontToolsFont(variable), axes)
-            font.save(static)
+                data = response.read()
+            if hashlib.sha256(data).hexdigest() != sha256:
+                raise SystemExit(f"{url} does not match its pinned sha256")
+            variable.write_bytes(data)
+        # Instanced on every run, keeping the source font's own timestamp: fontTools otherwise
+        # stamps the save time into the font, and the embedded subset (so the PDF's bytes) would
+        # depend on when the cache was filled.
+        static = cache / f"{name}-{sha256[:12]}.ttf"
+        font = instancer.instantiateVariableFont(FontToolsFont(variable, recalcTimestamp=False), axes)
+        font.recalcTimestamp = False
+        font.save(static)
         pdfmetrics.registerFont(TTFont(name, str(static)))
 
 
@@ -128,6 +136,8 @@ class Pack:
         self.content = content
         self.links: list[str] = []
         self.pages: list[str] = []
+        # Every QR code's payload with its page number, for the manifest and tests/freebie (review M8).
+        self.qr_codes: list[dict] = []
         self.videos = {episode["id"]: episode for episode in content["episodes"]}
 
     # -- primitives
@@ -187,6 +197,7 @@ class Pack:
         c.restoreState()
 
     def qr(self, url: str, x: float, y: float, size: float) -> None:
+        self.qr_codes.append({"page": len(self.pages), "url": url})
         widget = QrCodeWidget(url)
         widget.barLevel = "M"
         widget.barBorder = 2
@@ -972,6 +983,7 @@ def main() -> None:
         "sha256": hashlib.sha256(data).hexdigest(),
         "pages": pack.pages,
         "links": sorted(set(pack.links)),
+        "qr": pack.qr_codes,
         "videos": [{"id": e["id"], "title": e["title"], "url": e["mediaUrl"]} for e in content["episodes"]],
         "characters": [character["name"] for character in content["characters"]],
         "previews": write_previews(pdf_path),

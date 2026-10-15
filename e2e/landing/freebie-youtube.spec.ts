@@ -50,6 +50,29 @@ for (const { name, use } of VIEWPORTS) {
       }
     });
 
+    test("draws YouTube's mark on the same line as each link's words, on the landing and 404 pages", async ({ page }) => {
+      for (const path of ["/", "/no-such-page"]) {
+        await page.goto(path);
+        const misplaced = await page.evaluate(() =>
+          Array.from(document.querySelectorAll<SVGElement>("a [data-youtube-mark]")).flatMap((mark) => {
+            const link = mark.closest("a")!;
+            const box = mark.getBoundingClientRect();
+            if (box.width === 0 || box.height === 0) return []; // visually hidden labels (phones)
+            const walker = document.createTreeWalker(link, NodeFilter.SHOW_TEXT, { acceptNode: (node) => (node.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT) });
+            const text = walker.nextNode();
+            if (!text) return [`${link.href}: no words`];
+            const range = document.createRange();
+            range.selectNodeContents(text);
+            const line = range.getClientRects()[0];
+            if (!line) return [];
+            const middle = box.top + box.height / 2;
+            return middle >= line.top && middle <= line.bottom ? [] : [`${link.textContent?.trim()}: mark at ${Math.round(middle)}, words ${Math.round(line.top)}-${Math.round(line.bottom)}`];
+          }),
+        );
+        expect(misplaced, path).toEqual([]);
+      }
+    });
+
     test("puts the channel's subscribe link in the header, one tap away on every screen", async ({ page }) => {
       await page.goto("/");
       const header = page.getByRole("banner");

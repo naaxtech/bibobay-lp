@@ -1,3 +1,4 @@
+import { FREEBIE_PATH } from "../content/freebie-path";
 import type { AnalyticsEvent, AnalyticsProperties } from "./events";
 
 /**
@@ -49,7 +50,7 @@ function classifyLink(link: HTMLAnchorElement): ClassifiedClick | null {
   if (url.protocol === "mailto:" || url.protocol === "tel:") return null;
   const video = youtube(url);
   if (video) return { event: "youtube_clicked", properties: { ...video, section, label: words } };
-  if (url.origin === window.location.origin && /^\/freebies\/[\w-]+\.pdf$/.test(url.pathname)) {
+  if (url.origin === window.location.origin && FREEBIE_PATH.test(url.pathname)) {
     return { event: "freebie_downloaded", properties: { file: url.pathname, section, label: words } };
   }
   const destination = url.origin === window.location.origin ? "internal" : "external";
@@ -58,7 +59,11 @@ function classifyLink(link: HTMLAnchorElement): ClassifiedClick | null {
 
 export function classifyClick(target: Element): ClassifiedClick | null {
   const tab = target.closest("[role='tab']");
-  if (tab) return { event: "tab_selected", properties: { section: sectionOf(tab), label: label(tab) } };
+  if (tab) {
+    // Clicking the tab already showing changes nothing, so it is not counted.
+    if (tab.getAttribute("aria-selected") === "true") return null;
+    return { event: "tab_selected", properties: { section: sectionOf(tab), label: label(tab) } };
+  }
   const question = target.closest("summary");
   if (question) {
     const details = question.parentElement;

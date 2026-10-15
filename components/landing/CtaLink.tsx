@@ -58,6 +58,7 @@ export function CtaLink({ cta, variant = "plain", className, onClick, children }
   }
   return (
     <a href={cta.href} className={classes} onClick={onClick}>
+      {isYouTubeHref(cta.href) ? <YouTubeMark /> : null}
       {label}
     </a>
   );

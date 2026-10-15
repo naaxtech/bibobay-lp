@@ -67,6 +67,12 @@ describe("footer", () => {
     render(<Footer settings={SAFE_FALLBACK_SETTINGS} />);
     expect(screen.getByRole("button", { name: "Analytics choices" })).toBeTruthy();
   });
+
+  it("keeps Analytics choices when an editor removes every legal link (review I2)", () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", KEY);
+    render(<Footer settings={{ ...SAFE_FALLBACK_SETTINGS, footer: { ...SAFE_FALLBACK_SETTINGS.footer, legalLinks: [] } }} />);
+    expect(screen.getByRole("button", { name: "Analytics choices" })).toBeTruthy();
+  });
 });
 
 describe("signup outcome", () => {

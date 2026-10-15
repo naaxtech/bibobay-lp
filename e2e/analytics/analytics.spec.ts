@@ -109,8 +109,8 @@ test.describe("visit statistics (cookieless PostHog)", () => {
     await context.close();
   });
 
-  test("stops, and stays stopped after a reload, once the visitor turns statistics off", async ({ page, context }) => {
-    const { requests } = await watch(context);
+  test("stops at once, across client-side navigation and after a reload, once the visitor turns statistics off", async ({ page, context }) => {
+    const { requests, events } = await watch(context);
     await page.goto("/");
     await expect.poll(() => requests.length, { timeout: 15_000 }).toBeGreaterThan(0);
     await page.getByRole("button", { name: "Analytics choices" }).click();
@@ -118,8 +118,18 @@ test.describe("visit statistics (cookieless PostHog)", () => {
     await dialog.getByRole("button", { name: "Turn statistics off" }).click();
     await expect(dialog.getByRole("status")).toHaveText("Visit statistics are off for this browser.");
     await dialog.getByRole("button", { name: "Close" }).click();
-    await page.waitForTimeout(1_500);
+    // Let PostHog flush what was captured before the switch, then nothing more may leave.
+    await page.waitForTimeout(4_000);
+    const sentBefore = events.length;
+    // Review C1: PostHog ignores its own opt-out in cookieless mode, so its page view for a
+    // client-side navigation must be dropped by the site's before_send.
+    await page.locator("footer").getByRole("link", { name: "Privacy" }).click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await page.waitForTimeout(4_000);
+    expect(events.slice(sentBefore).map((event) => event.event)).toEqual([]);
+    expect(events.filter((event) => String(event.properties.$current_url ?? "").endsWith("/privacy"))).toEqual([]);
     const before = requests.length;
+    await page.goto("/");
     await page.reload();
     await page.locator("#lead").scrollIntoViewIfNeeded();
     await page.waitForTimeout(4_000);

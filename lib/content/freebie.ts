@@ -1,4 +1,7 @@
 import manifest from "./activity-pack.manifest.json";
+import { FREEBIE_PATH } from "./freebie-path";
+
+export { FREEBIE_PATH };
 
 /**
  * The free Bibo Bay Activity Pack (rulings R66-R69): a printable PDF in public/freebies, built by
@@ -29,7 +32,6 @@ export function isRepositoryPack(fileUrl: string | undefined): boolean {
 }
 
 /** A PDF this site serves from public/freebies: one path segment, no dot segments, no protocol. */
-export const FREEBIE_PATH = /^\/freebies\/[a-z0-9][a-z0-9-]*\.pdf$/;
 
 /**
  * The address a download can be reached at from outside the site (an email): https files as they

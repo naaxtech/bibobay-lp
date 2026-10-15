@@ -8,6 +8,12 @@ export const ANALYTICS_PREFERENCE_KEY = "bibo.analytics.v1";
 
 export type AnalyticsChoice = "on" | "off";
 
+/**
+ * Review M3: this page's own choice, for browsers that block storage. Without it, "off" would
+ * read back as "on" and a Global Privacy Control visitor could never turn statistics on.
+ */
+let pageChoice: AnalyticsChoice | null = null;
+
 function storage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
@@ -16,21 +22,28 @@ function storage(): Storage | null {
   }
 }
 
+/** The stored choice (it may come from another tab), else the one made on this page. */
 export function readChoice(): AnalyticsChoice | null {
   try {
     const value = storage()?.getItem(ANALYTICS_PREFERENCE_KEY);
-    return value === "on" || value === "off" ? value : null;
+    if (value === "on" || value === "off") return value;
   } catch {
-    return null;
+    // Storage is blocked: fall back to this page's choice.
   }
+  return pageChoice;
 }
 
 export function writeChoice(choice: AnalyticsChoice): void {
+  pageChoice = choice;
   try {
     storage()?.setItem(ANALYTICS_PREFERENCE_KEY, choice);
   } catch {
     // Storage can be blocked; the choice then lasts for this page only.
   }
+}
+
+export function forgetChoiceForTests(): void {
+  pageChoice = null;
 }
 
 /** Global Privacy Control, or the older Do Not Track header, counts as "off". */

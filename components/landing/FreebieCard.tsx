@@ -46,7 +46,7 @@ export function FreebieCard({ magnet }: { magnet: LeadMagnet & { fileUrl: string
         </div>
       ) : null}
       <div className="freebie-card__body">
-        <p className="freebie-card__title">{magnet.title}</p>
+        <h3 className="freebie-card__title">{magnet.title}</h3>
         {magnet.description ? <p className="freebie-card__description">{magnet.description}</p> : null}
         <a href={magnet.fileUrl} className="btn btn-primary freebie-card__download" {...(ours ? { download: "" } : {})}>
           <DownloadGlyph />

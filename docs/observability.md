@@ -11,12 +11,12 @@ project key. There is no consent banner, because nothing is stored on the visito
 
 | Event | When | Properties |
 |---|---|---|
-| `$pageview`, `$pageleave` | Every page, including client-side navigation; leave carries time on page and scroll depth | Page address cut to origin + path + `utm_source/medium/campaign/content/term`; referring site (origin only); browser, OS, device type, screen and viewport size |
+| `$pageview`, `$pageleave` | Every page, including client-side navigation; leave carries time on page and scroll depth | Page address cut to origin + path + `utm_source/medium/campaign/content/term` (a path holding an email address becomes `/`); referring site (origin only); browser and its full user agent, OS, device type, screen and viewport size, browser language, time zone |
 | `youtube_clicked` | A link to the channel, its subscribe prompt or a video | `kind` (`channel`, `subscribe`, `video`), `video_id`, `section`, `label` |
 | `freebie_downloaded` | The activity pack (or any `/freebies/*.pdf`) | `file`, `section` |
-| `cta_clicked` | Any other link | `destination` (`anchor`, `internal`, `external`), `section`, `label` |
-| `section_viewed` | A landing section reaches the middle of the screen (once per page load) | `section` |
-| `tab_selected` | A friend or video tab | `section`, `label` |
+| `cta_clicked` | Any other link (click or middle-click) | `destination` (`anchor`, `internal`, `external`), `section`, `label` |
+| `section_viewed` | A landing section reaches the middle of the screen (once per page view, also after client-side navigation; a section seen while statistics are off counts once they are on) | `section` |
+| `tab_selected` | A friend or video tab other than the one showing | `section`, `label` |
 | `faq_opened` | A question is opened | `index`, `section` |
 | `menu_opened` | The phone menu | `section` |
 | `lead_submitted` | The signup form gets a stored answer | `persisted`, `acknowledgementQueued` |
@@ -25,7 +25,8 @@ project key. There is no consent banner, because nothing is stored on the visito
 `menu`. `label` is the link's visible words, at most 80 characters.
 
 Where visitors come from: PostHog's Web analytics dashboard groups `$pageview` by referring domain,
-`utm_*` campaign tags, country and device. Tag links you share, for example
+`utm_*` campaign tags and device. There is no country or city: in cookieless server hash mode
+PostHog strips the address before GeoIP runs, so no location is added. Tag links you share, for example
 `https://<domain>/?utm_source=youtube&utm_medium=video_description&utm_campaign=activity_pack`.
 
 ## What is never collected
@@ -41,7 +42,13 @@ Where visitors come from: PostHog's Web analytics dashboard groups `$pageview` b
   in the table above, any property not allowed for that event (PostHog's own `token`,
   `distinct_id` and page `title` are kept: it refuses events without them), query strings other than campaign
   tags, the referrer's path and query, ad-click identifiers (`gclid`, `fbclid`, `msclkid` and
-  similar), person properties, initial-visit copies, and any value that looks like an email address.
+  similar), person properties, initial-visit copies, and any value that looks like an email address,
+  even percent-encoded.
+- The visitor's choice is enforced in `before_send` too: in cookieless mode PostHog ignores
+  `opt_out_capturing`, so turning statistics off (here or in another tab) drops every later event,
+  PostHog's own page views and page leaves included.
+- A PostHog toolbar link (`#__posthog=…`, `#state=…`) is removed from the address before PostHog
+  starts, so its toolbar code never writes to storage.
 - PostHog code is the bundled `posthog-js/dist/module.no-external` build with external dependency
   loading off, so it never fetches scripts from PostHog under the site's `'strict-dynamic'` CSP. The
   configured host is added to `connect-src` only.
@@ -50,9 +57,10 @@ Where visitors come from: PostHog's Web analytics dashboard groups `$pageview` b
 
 - A browser that sends Global Privacy Control or Do Not Track, unless that visitor turns statistics
   on in Analytics choices.
-- A visitor who turns statistics off under **Analytics choices** in the footer. The choice is kept
-  in `localStorage` (`bibo.analytics.v1`), which is the only thing analytics ever store, and only
-  after that choice.
+- A visitor who turns statistics off under **Analytics choices** in the footer (on every page,
+  including the 404 page, and even if an editor removes the legal links). The choice is kept in
+  `localStorage` (`bibo.analytics.v1`), which is the only thing analytics ever store, and only after
+  that choice; where storage is blocked it lasts for the page.
 - Automated browsers: PostHog drops events from known bots and from browsers driven by automation
   (`navigator.webdriver`), so crawlers and test runs do not inflate the numbers. The e2e spec
   stands in for a person's browser for that reason.
@@ -64,11 +72,11 @@ Where visitors come from: PostHog's Web analytics dashboard groups `$pageview` b
    `NEXT_PUBLIC_POSTHOG_HOST` to match (`https://us.i.posthog.com` or `https://eu.i.posthog.com`).
 2. **Project settings → Web analytics → Cookieless server hash mode: on.** Without it PostHog
    ignores every event this site sends.
-3. Consider **Project settings → Discard client IP data** if you do not need city-level location;
-   country-level reports still work from the GeoIP lookup made before the address is discarded.
-4. Set `NEXT_PUBLIC_POSTHOG_KEY` (the project key, `phc_…`; never a personal key, `phx_…`, which
-   `verify:env` refuses) in Vercel, then redeploy.
-5. Check: open the site, click a YouTube link and the activity pack, then confirm the events in
+3. Set `NEXT_PUBLIC_POSTHOG_KEY` (the project key, `phc_…`; never a personal key, `phx_…`, which
+   `verify:env` refuses) in Vercel, then redeploy: Next inlines `NEXT_PUBLIC_` values into the
+   build. `verify:env` also fails a key or host that is set but malformed, which would otherwise
+   leave analytics silently off.
+4. Check: open the site, click a YouTube link and the activity pack, then confirm the events in
    PostHog's Activity view.
 
 The privacy page's fallback text (`lib/content/legal-fallback.ts`) describes all of this; keep it
@@ -81,8 +89,8 @@ in step with the code, and have the owner and a lawyer review it before launch.
 - Browser: `e2e/analytics/analytics.spec.ts`, skipped unless `E2E_ANALYTICS=1`. Run it against a
   production build made with a placeholder key and `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com`
   (Playwright answers that host itself; no real request is made). It checks that events reach the
-  host with trimmed addresses, that nothing is written to cookies or storage, and that GPC and the
-  footer switch stop all requests.
+  host with trimmed addresses, that nothing is written to cookies or storage, that GPC stops all
+  requests, and that after the footer switch no event is sent, also across client-side navigation.
 
 ## Error reports (Sentry)
 

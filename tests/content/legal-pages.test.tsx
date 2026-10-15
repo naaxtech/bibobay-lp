@@ -51,6 +51,20 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe/i);
   });
 
+  it("describes what visit statistics really send in cookieless mode (review I1)", () => {
+    // Cookieless server hash mode strips the address before GeoIP runs: no location is added.
+    expect(privacy).not.toMatch(/location/i);
+    expect(privacy).toMatch(/language and time zone/i);
+    expect(privacy).toMatch(/how far down each page you scroll and how long you stay/i);
+    expect(privacy).toMatch(/value that changes every day/i);
+    expect(privacy).toMatch(/does not keep the address/i);
+  });
+
+  it("does not claim to store nothing on the device: the off choice is stored (review M2)", () => {
+    expect(privacy).not.toMatch(/stores nothing on your device[,.;]/i);
+    expect(privacy).toMatch(/stores nothing on your device unless you turn statistics off/i);
+  });
+
   it("describes error reports exactly as the scrubber sends them (Task 10M-a)", () => {
     expect(privacy).toMatch(/only when error reporting is switched on/i);
     expect(privacy).toMatch(/no form details/i);
@@ -176,5 +190,21 @@ describe("/thank-you (ruling R31)", () => {
     expect(main.textContent).not.toMatch(/you('re| are) (on|in)|you joined|welcome aboard|subscribed/i);
     expect(within(main).getByRole("link", { name: THANK_YOU_COPY.backToForm }).getAttribute("href")).toBe("/#lead");
     expect((await generateMetadata()).robots).toEqual({ index: false, follow: true });
+  });
+});
+
+describe("the page for a missing address (review I2)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("is a calm branded page that leads home and keeps the footer, with Analytics choices", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", `phc_${"Fixture0nly".repeat(4)}`);
+    const { default: NotFound } = await import("@/app/not-found");
+    const { NOT_FOUND_COPY } = await import("@/components/legal/legal-copy");
+    render(await NotFound());
+    expect(screen.getByRole("heading", { level: 1, name: NOT_FOUND_COPY.title })).toBeTruthy();
+    expect(screen.getByRole("link", { name: NOT_FOUND_COPY.backHome }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("button", { name: "Analytics choices" })).toBeTruthy();
   });
 });

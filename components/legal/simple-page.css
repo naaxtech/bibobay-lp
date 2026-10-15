@@ -6,6 +6,8 @@
 
 @layer components {
   .simple-page {
+    /* A short page (thank-you, 404) still fills the screen, so no bare strip shows under the footer. */
+    min-block-size: calc(100dvh - var(--site-header-height));
     background-color: var(--ground);
     color: var(--ink);
     padding-block: clamp(2.5rem, 1.5rem + 5vw, 5.5rem) var(--bibo-space-section);

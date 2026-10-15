@@ -39,6 +39,16 @@ export const THANK_YOU_COPY = {
 } as const;
 
 /** Ruling R33: editors previewing unpublished drafts always see that they are, and can leave. */
+/** The page for an address the site does not have (app/not-found.tsx, review I2). */
+export const NOT_FOUND_COPY = {
+  title: "This page is not here",
+  paragraphs: [
+    "The link may be mistyped, or the page may have moved. Tula, Bob and Lumi are waiting on the home page, and every adventure is free to watch on YouTube.",
+  ],
+  backHome: "Back to the home page",
+  watch: "Watch on YouTube",
+} as const;
+
 export const PREVIEW_COPY = {
   notice: "Preview: you are seeing unpublished drafts.",
   exit: "Exit preview",

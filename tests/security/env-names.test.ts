@@ -54,3 +54,24 @@ describe("Vercel's own public variables", () => {
     expect(verifyEnvironment({ SUPABASE_SERVICE_ROLE_KEY: "secret-value", NEXT_PUBLIC_VERCEL_URL: "secret-value" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_VERCEL_URL"]);
   });
 });
+
+describe("monitoring values the app would silently ignore (review M6)", () => {
+  const VALID_KEY = `phc_${"Fixture0nly".repeat(4)}`;
+  it.each([
+    ["a project secret key", { NEXT_PUBLIC_POSTHOG_KEY: `phs_${"Fixture0nly".repeat(4)}` }],
+    ["a key too short to be a project key", { NEXT_PUBLIC_POSTHOG_KEY: "phc_short" }],
+    ["a host that is not an https origin", { NEXT_PUBLIC_POSTHOG_KEY: VALID_KEY, NEXT_PUBLIC_POSTHOG_HOST: "http://ph.example.com" }],
+    ["a Sentry DSN without a public key", { NEXT_PUBLIC_SENTRY_DSN: "https://o0.ingest.example.com/1" }],
+  ])("fails for %s, naming the variable but never its value", (_case, env) => {
+    const report = verifyEnvironment(env, "production");
+    expect(report.ok).toBe(false);
+    const text = report.errors.join("\n");
+    expect(text).toMatch(/NEXT_PUBLIC_(POSTHOG_KEY|POSTHOG_HOST|SENTRY_DSN)/);
+    for (const value of Object.values(env)) expect(text).not.toContain(value);
+  });
+
+  it("accepts a valid key, host and DSN, and empty values", () => {
+    expect(verifyEnvironment({ NEXT_PUBLIC_POSTHOG_KEY: VALID_KEY, NEXT_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com", NEXT_PUBLIC_SENTRY_DSN: "https://abc123@o0.ingest.example.com/1" }, "production").errors).toEqual([]);
+    expect(verifyEnvironment({ NEXT_PUBLIC_POSTHOG_KEY: "", NEXT_PUBLIC_POSTHOG_HOST: "", NEXT_PUBLIC_SENTRY_DSN: " " }, "production").errors).toEqual([]);
+  });
+});

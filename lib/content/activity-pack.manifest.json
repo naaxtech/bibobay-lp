@@ -1,7 +1,7 @@
 {
   "file": "/freebies/bibo-bay-activity-pack.pdf",
-  "bytes": 439970,
-  "sha256": "2e23e9fd714798c10bcac7b624e85316a41558b8ddc1654cef0dc1822e39266a",
+  "bytes": 439969,
+  "sha256": "b371be2d4a36567c23640c7b40f8e2353da892b99f1b056ebd639fc715ef006f",
   "pages": [
     "Cover",
     "Meet the friends of Bibo Bay",
@@ -22,6 +22,68 @@
     "https://www.youtube.com/watch?v=RNfHUxM-Bso",
     "https://www.youtube.com/watch?v=V4HEDvQD7vg",
     "https://www.youtube.com/watch?v=yrpyvb5dVbA"
+  ],
+  "qr": [
+    {
+      "page": 1,
+      "url": "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1"
+    },
+    {
+      "page": 3,
+      "url": "https://www.youtube.com/watch?v=3birY6XZ3_c"
+    },
+    {
+      "page": 4,
+      "url": "https://www.youtube.com/watch?v=CvQeoCVk_mc"
+    },
+    {
+      "page": 5,
+      "url": "https://www.youtube.com/watch?v=6URNMNeC_3Y"
+    },
+    {
+      "page": 6,
+      "url": "https://www.youtube.com/watch?v=RNfHUxM-Bso"
+    },
+    {
+      "page": 7,
+      "url": "https://www.youtube.com/watch?v=V4HEDvQD7vg"
+    },
+    {
+      "page": 7,
+      "url": "https://www.youtube.com/watch?v=1pp8G-bKeik"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=3birY6XZ3_c"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=1pp8G-bKeik"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=6URNMNeC_3Y"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=RNfHUxM-Bso"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=CvQeoCVk_mc"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=yrpyvb5dVbA"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=V4HEDvQD7vg"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1"
+    }
   ],
   "videos": [
     {

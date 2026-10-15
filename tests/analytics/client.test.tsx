@@ -29,21 +29,63 @@ vi.mock("posthog-js/dist/module.no-external", () => {
   sdk.calls.imported += 1;
   return { default: sdk.posthog };
 });
+const nav = vi.hoisted(() => ({ pathname: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
+
+/** A stand-in IntersectionObserver the tests drive by hand. */
+class FakeObserver {
+  static all: FakeObserver[] = [];
+  readonly observed = new Set<Element>();
+  disconnected = false;
+  constructor(private readonly callback: IntersectionObserverCallback) {
+    FakeObserver.all.push(this);
+  }
+  observe(element: Element) {
+    this.observed.add(element);
+  }
+  unobserve(element: Element) {
+    this.observed.delete(element);
+  }
+  disconnect() {
+    this.disconnected = true;
+    this.observed.clear();
+  }
+  takeRecords() {
+    return [];
+  }
+  /** The element crosses the middle of the screen, for every live observer watching it. */
+  static intersect(element: Element) {
+    for (const observer of FakeObserver.all) {
+      if (observer.disconnected || !observer.observed.has(element)) continue;
+      observer.callback([{ target: element, isIntersecting: true } as unknown as IntersectionObserverEntry], observer as unknown as IntersectionObserver);
+    }
+  }
+}
 
 import { AnalyticsChoices } from "@/components/analytics/AnalyticsChoices";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
-import { posthogOptions, resetAnalyticsForTests, track } from "@/lib/analytics/client";
+import { posthogOptions, resetAnalyticsForTests, resumeAnalytics, stopAnalytics, track } from "@/lib/analytics/client";
 import { ANALYTICS_PREFERENCE_KEY } from "@/lib/analytics/preference";
 
 const CONFIG = { key: "phc_ExampleKey0123456789abcdefABCDEF", apiHost: "https://ph.example.com" };
+const PAGEVIEW = (event = "$pageview") => ({
+  uuid: "u-1",
+  event,
+  properties: { token: CONFIG.key, distinct_id: "$posthog_cookieless", $current_url: "https://bibo.example/privacy" },
+});
 
 const settle = () => act(async () => {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
   await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
+const captured = (name: string) => sdk.calls.capture.filter(([event]) => event === name);
+
 beforeEach(() => {
   resetAnalyticsForTests();
+  nav.pathname = "/";
+  FakeObserver.all = [];
+  vi.stubGlobal("IntersectionObserver", FakeObserver);
   Object.assign(sdk.calls, { init: [], capture: [], optOut: 0, optIn: 0 });
   window.localStorage.clear();
   Object.defineProperty(navigator, "globalPrivacyControl", { value: undefined, configurable: true });
@@ -53,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.body.innerHTML = "";
+  vi.unstubAllGlobals();
 });
 
 describe("PostHog options", () => {
@@ -148,19 +191,134 @@ describe("AnalyticsChoices (footer)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Analytics choices" }));
     const dialog = screen.getByRole("dialog", { name: "Analytics choices" });
     expect(within(dialog).getByText(/no cookies/i)).toBeTruthy();
+    // Review I1: the explainer names what is really sent in cookieless mode.
+    expect(within(dialog).getByText(/language and time zone/i)).toBeTruthy();
+    const beforeSend = sdk.calls.init[0]![1].before_send as (capture: unknown) => unknown;
     fireEvent.click(within(dialog).getByRole("button", { name: "Turn statistics off" }));
     expect(window.localStorage.getItem(ANALYTICS_PREFERENCE_KEY)).toBe("off");
-    expect(sdk.calls.optOut).toBe(1);
+    // Review C1: what proves "off" is that PostHog's own events are dropped, not an opt-out call
+    // (cookieless_mode "always" ignores opt_out_capturing).
+    expect(beforeSend(PAGEVIEW())).toBeNull();
     track("cta_clicked", { section: "hero" });
     expect(sdk.calls.capture.some(([event]) => event === "cta_clicked")).toBe(false);
     fireEvent.click(within(dialog).getByRole("button", { name: "Turn statistics on" }));
     await settle();
     expect(window.localStorage.getItem(ANALYTICS_PREFERENCE_KEY)).toBe("on");
-    expect(sdk.calls.optIn).toBe(1);
+    expect(beforeSend(PAGEVIEW())).not.toBeNull();
   });
 
   it("is not offered when analytics are not configured: there is nothing to choose", () => {
     render(<AnalyticsChoices config={null} />);
     expect(screen.queryByRole("button", { name: "Analytics choices" })).toBeNull();
+  });
+});
+
+describe("turning statistics off (review C1: cookieless_mode \"always\" ignores PostHog's opt-out)", () => {
+  const beforeSend = () => sdk.calls.init[0]![1].before_send as (capture: unknown) => unknown;
+
+  it("drops PostHog's own page views and page leaves from the moment statistics are turned off, until they are on again", async () => {
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(beforeSend()(PAGEVIEW())).not.toBeNull();
+    stopAnalytics();
+    expect(beforeSend()(PAGEVIEW())).toBeNull();
+    expect(beforeSend()(PAGEVIEW("$pageleave"))).toBeNull();
+    await act(async () => {
+      await resumeAnalytics(CONFIG);
+    });
+    expect(beforeSend()(PAGEVIEW())).not.toBeNull();
+  });
+
+  it("drops events once statistics were turned off in another tab", async () => {
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    window.localStorage.setItem(ANALYTICS_PREFERENCE_KEY, "off");
+    expect(beforeSend()(PAGEVIEW())).toBeNull();
+  });
+
+  it("never starts PostHog when statistics are turned off while it is still loading, and can start it later", async () => {
+    render(<AnalyticsProvider config={CONFIG} />);
+    stopAnalytics();
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    await act(async () => {
+      await resumeAnalytics(CONFIG);
+    });
+    expect(sdk.calls.init).toHaveLength(1);
+  });
+});
+
+describe("PostHog toolbar links (review M2)", () => {
+  afterEach(() => {
+    window.history.replaceState({}, "", "/");
+  });
+
+  it.each(["#__posthog=eyJhY3Rpb24iOiJwaF9hdXRob3JpemUifQ", "#state=%7B%22action%22%3A%22ph_authorize%22%7D", "#a=1&__posthog=x"])(
+    "removes %s from the address before PostHog starts, so nothing is written to the device",
+    async (hash) => {
+      window.history.replaceState({}, "", `/?utm_source=news${hash}`);
+      render(<AnalyticsProvider config={CONFIG} />);
+      await settle();
+      expect(sdk.calls.init).toHaveLength(1);
+      expect(window.location.hash).toBe("");
+      expect(window.location.search).toBe("?utm_source=news");
+    },
+  );
+
+  it("keeps an ordinary page anchor", async () => {
+    window.history.replaceState({}, "", "/#lead");
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(window.location.hash).toBe("#lead");
+  });
+});
+
+describe("section views (review M4)", () => {
+  it("counts each section once when it reaches the middle of the screen", async () => {
+    document.body.innerHTML = `<section data-section="episodes"></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    const section = document.querySelector("[data-section='episodes']")!;
+    FakeObserver.intersect(section);
+    FakeObserver.intersect(section);
+    expect(captured("section_viewed")).toEqual([["section_viewed", { section: "episodes" }]]);
+  });
+
+  it("counts the sections of a page reached by client-side navigation", async () => {
+    nav.pathname = "/privacy";
+    const { rerender } = render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    document.body.insertAdjacentHTML("beforeend", `<section data-section="characters"></section>`);
+    nav.pathname = "/";
+    rerender(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    FakeObserver.intersect(document.querySelector("[data-section='characters']")!);
+    expect(captured("section_viewed")).toEqual([["section_viewed", { section: "characters" }]]);
+  });
+
+  it("counts a section seen while statistics were off once they are turned on again", async () => {
+    document.body.innerHTML = `<section data-section="lead"></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    stopAnalytics();
+    const section = document.querySelector("[data-section='lead']")!;
+    FakeObserver.intersect(section);
+    expect(captured("section_viewed")).toEqual([]);
+    await act(async () => {
+      await resumeAnalytics(CONFIG);
+    });
+    FakeObserver.intersect(section);
+    expect(captured("section_viewed")).toEqual([["section_viewed", { section: "lead" }]]);
+  });
+});
+
+describe("middle-click (review M13)", () => {
+  it("counts a YouTube link opened with the middle button", async () => {
+    document.body.innerHTML = `<section data-section="hero"><a id="yt" href="https://www.youtube.com/@bibobay-tv">Watch on YouTube</a></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    fireEvent(document.getElementById("yt")!, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    fireEvent(document.getElementById("yt")!, new MouseEvent("auxclick", { bubbles: true, button: 2 }));
+    expect(captured("youtube_clicked")).toEqual([["youtube_clicked", { kind: "channel", section: "hero", label: "Watch on YouTube" }]]);
   });
 });

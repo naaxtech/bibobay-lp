@@ -52,3 +52,17 @@ describe("classifyClick", () => {
     expect(classifyClick(el("#plain"))).toBeNull();
   });
 });
+
+describe("classifier edges (review M13)", () => {
+  it("treats only the site's own pack names as a free download, like the CMS rule", () => {
+    document.body.innerHTML = `<section data-section="lead"><a id="odd" href="/freebies/Pack_1.pdf">Pack</a><a id="ok" href="/freebies/bibo-bay-activity-pack.pdf">Pack</a></section>`;
+    expect(classifyClick(document.getElementById("odd")!)?.event).toBe("cta_clicked");
+    expect(classifyClick(document.getElementById("ok")!)?.event).toBe("freebie_downloaded");
+  });
+
+  it("does not count a click on the tab that is already showing", () => {
+    document.body.innerHTML = `<section data-section="characters"><button role="tab" aria-selected="true" id="on">Tula</button><button role="tab" aria-selected="false" id="off">Bob</button></section>`;
+    expect(classifyClick(document.getElementById("on")!)).toBeNull();
+    expect(classifyClick(document.getElementById("off")!)?.event).toBe("tab_selected");
+  });
+});

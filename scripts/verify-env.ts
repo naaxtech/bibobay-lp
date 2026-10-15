@@ -1,3 +1,5 @@
+import { analyticsConfig } from "../lib/analytics/config";
+import { sentryDsnFrom } from "../lib/observability/sentry-dsn";
 import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -95,11 +97,21 @@ export function verifyEnvironment(
     ? [`LEAD_IP_HASH_SECRET must be at least ${LEAD_IP_HASH_SECRET_MIN_LENGTH} characters`]
     : [];
 
+  // Review M6: monitoring values that are set but malformed would leave analytics or error reports
+  // silently off. Fail instead, naming the variable but never its value.
+  const monitoring: string[] = [];
+  if ((env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? "") && analyticsConfig(env) === null) {
+    monitoring.push("NEXT_PUBLIC_POSTHOG_KEY / NEXT_PUBLIC_POSTHOG_HOST: not a PostHog project key (phc_) with an exact https host; analytics would stay off");
+  }
+  if ((env.NEXT_PUBLIC_SENTRY_DSN?.trim() ?? "") && sentryDsnFrom(env.NEXT_PUBLIC_SENTRY_DSN) === null) {
+    monitoring.push("NEXT_PUBLIC_SENTRY_DSN: not an https DSN with a public key and a numeric project; error reports would stay off");
+  }
+
   return {
-    ok: forbiddenPublic.length === 0 && weak.length === 0,
+    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0,
     phase,
     forbiddenPublic,
-    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak],
+    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring],
   };
 }
 

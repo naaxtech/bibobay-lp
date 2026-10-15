@@ -16,6 +16,7 @@ export interface FooterProps {
  */
 export function Footer({ settings }: FooterProps) {
   const { footer, socialLinks, contactEmail } = settings;
+  const analytics = analyticsConfig();
   return (
     <footer className="site-footer" data-surface="navy">
       <div className="landing-container grid gap-x-12 gap-y-10 py-14 sm:py-16 lg:grid-cols-12">
@@ -33,10 +34,17 @@ export function Footer({ settings }: FooterProps) {
                   </li>
                 ))}
                 <li>
-                  <AnalyticsChoices config={analyticsConfig()} />
+                  <AnalyticsChoices config={analytics} />
                 </li>
               </ul>
             </nav>
+          ) : analytics ? (
+            // Review I2: the only way to turn statistics off stays, whatever an editor removes.
+            <ul className="grid gap-1">
+              <li>
+                <AnalyticsChoices config={analytics} />
+              </li>
+            </ul>
           ) : null}
           {socialLinks.length > 0 ? (
             <ul className="grid gap-1">

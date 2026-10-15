@@ -1,8 +1,9 @@
 /**
  * Analytics configuration (ruling R70). Both values are public by design: a PostHog project key
- * can only send events. Read on the server at request time and handed to the client as props, so
- * a deployment can switch analytics on or off without a rebuild. Absent or malformed: no analytics,
- * no request to PostHog, no "Analytics choices" link.
+ * can only send events. Read on the server and handed to the client as props. Next inlines
+ * NEXT_PUBLIC_ values into the build, so changing them takes a redeploy (review M5). Absent or
+ * malformed: no analytics, no request to PostHog, no "Analytics choices" link; verify:env fails a
+ * build whose values are set but malformed (review M6).
  */
 export interface AnalyticsConfig {
   /** PostHog project key (`phc_…`). */

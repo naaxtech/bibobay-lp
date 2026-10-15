@@ -366,8 +366,27 @@ describe("YouTube-first calls to action", () => {
       const mark = link.querySelector("[data-youtube-mark]");
       expect(mark, `${link.textContent} carries the mark`).not.toBeNull();
       expect(mark!.getAttribute("aria-hidden")).toBe("true");
+      // Review M9: the real mark, drawn in YouTube's own colours (red, with a white play triangle).
+      expect(mark!.tagName.toLowerCase(), `${link.textContent} draws the mark`).toBe("svg");
+      const fills = Array.from(mark!.querySelectorAll("[fill]"), (shape) => shape.getAttribute("fill")?.toUpperCase());
+      expect(fills).toEqual(["#FF0000", "#FFFFFF"]);
     }
     // Links elsewhere carry no mark.
     expect(document.querySelectorAll("a[href^='#'] [data-youtube-mark]").length).toBe(0);
+  });
+});
+
+describe("YouTube mark on every kind of link (review M9)", () => {
+  it("marks a CMS link to YouTube that is not set to open a new tab", async () => {
+    const { CtaLink } = await import("@/components/landing/CtaLink");
+    render(<CtaLink cta={{ label: "Our channel", href: "https://www.youtube.com/@bibobay-tv" }} />);
+    expect(screen.getByRole("link", { name: "Our channel" }).querySelector("svg[data-youtube-mark]")).not.toBeNull();
+  });
+});
+
+describe("the free pack card (review M12)", () => {
+  it("titles the pack as a heading under the section's own", () => {
+    renderPage();
+    expect(within(section("lead")).getByRole("heading", { level: 3, name: "Bibo Bay Activity Pack" })).toBeTruthy();
   });
 });

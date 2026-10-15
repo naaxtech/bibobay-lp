@@ -13,7 +13,7 @@ import { ACTIVITY_PACK, absoluteFileUrl, activityPackPreviews } from "@/lib/cont
 const root = process.cwd();
 const fromPublic = (path: string) => readFileSync(join(root, "public", path));
 const manifest = JSON.parse(readFileSync(join(root, "lib/content/activity-pack.manifest.json"), "utf8")) as {
-  sha256: string; bytes: number; pages: string[]; links: string[];
+  sha256: string; bytes: number; pages: string[]; links: string[]; qr?: Array<{ page: number; url: string }>;
   videos: Array<{ id: string; title: string; url: string }>; characters: string[];
 };
 
@@ -57,6 +57,34 @@ describe("the Bibo Bay activity pack (freebie)", () => {
     for (const video of videos) expect(uris, video).toContain(video);
     expect(uris).toContain(BIBO_YOUTUBE_SUBSCRIBE_URL);
     expect(new Set(uris)).toEqual(new Set(manifest.links));
+  });
+
+  it("encodes in its QR codes only the channel, its subscribe prompt and verified videos, each also a link (review M8)", () => {
+    const videos = Object.values(BIBO_VIDEO_IDS).map(youtubeWatchUrl);
+    const allowed = new Set([BIBO_YOUTUBE_CHANNEL_URL, BIBO_YOUTUBE_SUBSCRIBE_URL, ...videos]);
+    const qr = manifest.qr ?? [];
+    expect(qr.length).toBeGreaterThanOrEqual(videos.length + 1);
+    const uris = new Set([...body.matchAll(/\/URI\s*\((.*?)\)/g)].map((match) => match[1]!.replace(/\\(.)/g, "$1")));
+    for (const { page, url } of qr) {
+      expect(allowed.has(url), `page ${page}: ${url}`).toBe(true);
+      expect(uris.has(url), `page ${page}: ${url} is also a link`).toBe(true);
+      expect(page).toBeGreaterThanOrEqual(1);
+      expect(page).toBeLessThanOrEqual(ACTIVITY_PACK.pages);
+    }
+  });
+
+  it("pins its inputs: fonts by commit and checksum, Python packages by exact version (review M7)", () => {
+    const script = readFileSync(join(root, "scripts/freebie/build_activity_pack.py"), "utf8");
+    const fonts = [...script.matchAll(/"(https:\/\/raw\.githubusercontent\.com\/google\/fonts\/[^"]+)",\s*"([0-9a-f]*)"/g)];
+    expect(fonts.length).toBeGreaterThanOrEqual(2);
+    for (const [, url, sha] of fonts) {
+      expect(url, url).toMatch(/\/google\/fonts\/[0-9a-f]{40}\//);
+      expect(sha, url).toMatch(/^[0-9a-f]{64}$/);
+    }
+    const dependencies = /# dependencies = \[([\s\S]*?)# \]/.exec(script)?.[1] ?? "";
+    const pins = dependencies.split(/\r?\n/).map((line) => line.replace(/^#\s*/, "").trim()).filter(Boolean);
+    expect(pins.length).toBeGreaterThanOrEqual(5);
+    for (const pin of pins) expect(pin).toMatch(/^"[a-z0-9-]+==[0-9][0-9.]*",?$/);
   });
 
   it("prints the site's own video titles and friends, so the pack and the page never disagree", () => {

@@ -78,3 +78,19 @@ describe("cleanCapture (before_send)", () => {
     expect(result?.properties).toEqual({ $browser: "Safari" });
   });
 });
+
+describe("email addresses in the page address (review M1)", () => {
+  it.each(["/missing/parent@example.com", "/missing/parent%40example.com", "/missing/parent%2540example.com"])("drops %s from the page address and path", (path) => {
+    const result = cleanCapture({
+      uuid: "u-1",
+      event: "$pageview",
+      properties: { token: "phc_x", distinct_id: "$posthog_cookieless", $current_url: `https://bibo.example${path}?utm_source=news`, $pathname: path },
+    });
+    expect(JSON.stringify(result)).not.toMatch(/parent/);
+    expect(result!.properties.$current_url).toBe("https://bibo.example/?utm_source=news");
+  });
+
+  it("drops a percent-encoded address from an action's own properties", () => {
+    expect(cleanProperties("cta_clicked", { label: "Write to parent%40example.com", section: "hero" })).toEqual({ section: "hero" });
+  });
+});

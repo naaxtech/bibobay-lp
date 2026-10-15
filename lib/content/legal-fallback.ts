@@ -54,13 +54,13 @@ const privacy: PortableContent = [
   ),
   heading("Visit statistics"),
   paragraph(
-    "Only when statistics are switched on for this website, it counts visits with PostHog to learn which pages, videos and activities families use, and how they find BIBO Bay. Each page view and each button or link you choose is sent with: the page address (without anything after a question mark except campaign tags), the site or campaign that sent you, your browser, device type and screen size, and an approximate location that PostHog works out from your network address.",
+    "Only when statistics are switched on for this website, it counts visits with PostHog to learn which pages, videos and activities families use, and how they find BIBO Bay. Each page view and each button or link you choose is sent with: the page address (without anything after a question mark except campaign tags), the site or campaign that sent you, your browser, device type and screen size, your browser's language and time zone, which parts of the page you reach, and how far down each page you scroll and how long you stay. To count visitors without cookies, PostHog combines your network address and browser details with a value that changes every day; it does not keep the address.",
   ),
   paragraph(
-    "It uses no cookies and stores nothing on your device, so it builds no profile of you and cannot recognise you on a later day. It never records what you type into the form; it notes only that a signup was saved.",
+    "It uses no cookies and stores nothing on your device unless you turn statistics off, when your browser remembers that choice. It builds no profile of you and cannot recognise you on a later day. It never records what you type into the form; it notes only that a signup was saved.",
   ),
   paragraph(
-    "A browser that sends Global Privacy Control or Do Not Track is not counted. You can turn statistics off, or on again, under Analytics choices at the foot of every page; if you turn them off, your browser remembers that choice on your device.",
+    "A browser that sends Global Privacy Control or Do Not Track is not counted. You can turn statistics off, or on again, under Analytics choices at the foot of every page.",
   ),
   heading("Why we use your details"),
   paragraph(

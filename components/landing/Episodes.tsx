@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 
+import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
 import { youtubeVideoId } from "@/lib/content/brand-art";
 import type { EpisodePreview, LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage, CmsArt } from "./CmsArt";
@@ -44,8 +45,9 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
       {watchHref ? (
         <a href={watchHref} className="storybook__cover storybook__watch" target="_blank" rel="noopener noreferrer">
           {cover}
-          <span className="storybook__play" aria-hidden="true" data-youtube-mark />
+          <span className="storybook__play" aria-hidden="true" />
           <span className="storybook__watch-label">
+            {isYouTubeHref(watchHref) ? <YouTubeMark /> : null}
             {youtubeVideoId(watchHref) ? UI_COPY.watchOnYouTube : UI_COPY.watchStory}
             {/* The title tells the seven ways out apart in a screen reader's list of links. */}
             <span className="sr-only">{`${UI_COPY.videoLinkTitle(story.title)} ${UI_COPY.opensInNewTab}`}</span>
