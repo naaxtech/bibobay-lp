@@ -1,0 +1,19 @@
+app/layout.tsx
+  s_deed703217db6f::t_be69c99fa40094 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fb63db61fcad21e2ffe108e9a9d3d3818c7a18ce",
+  "prompts": {},
+  "sessions": {
+    "s_deed703217db6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3504e079468593a6",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
