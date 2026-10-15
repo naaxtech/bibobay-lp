@@ -1,0 +1,42 @@
+.github/workflows/ci.yml
+  h_0549c11fec2ab0 38-40,43-45,142
+docs/cms-operations.md
+  h_0549c11fec2ab0 134-137
+docs/deployment.md
+  h_0549c11fec2ab0 67-69,104-116,143-149,157,159
+docs/qa-checklist.md
+  h_0549c11fec2ab0 10,73
+next.config.ts
+  h_0549c11fec2ab0 13-17
+scripts/lib/bundle-secrets.ts
+  h_0549c11fec2ab0 38
+scripts/lib/deployment-checks.ts
+  h_0549c11fec2ab0 11-12,188-212,221-222,237-241,244-285,296-340,346,348,350,352,354-359,362,373,377-383,385,394-395,402,412,445-446,492,495-496,503-509,512
+scripts/verify-deployment.ts
+  h_0549c11fec2ab0 1-7,15-20,48,70,72,100-102,109,117,120,130
+tests/scripts/build-config.test.ts
+  h_0549c11fec2ab0 1-60
+tests/scripts/ci-workflow.test.ts
+  h_0549c11fec2ab0 128-133,135,137,178-179,205,208-210
+tests/scripts/deployment-checks.test.ts
+  h_0549c11fec2ab0 17,24,40-43,45,53-61,182,188-203,258-386,397-423,467-492
+tests/scripts/docs-claims.test.ts
+  h_0549c11fec2ab0 1-53
+tests/scripts/docs-hygiene.test.ts
+  h_0549c11fec2ab0 2,10-12,24-39,60-66,79,81-95,97,105,109-114,116,122-124,129-130,140-145,150-151,154
+tsconfig.build.json
+  h_0549c11fec2ab0 1-23
+vercel.json
+  h_0549c11fec2ab0 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a6ee4f2661bbeb22bf0addae515e6b8ec79b201a",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
