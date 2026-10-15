@@ -56,27 +56,36 @@ describe("Studio content model", () => {
 });
 
 describe("claim-safe editorial seed", () => {
-  it("provides idempotent fixed-ID singletons and real concepts only", () => {
+  // The channel's real videos (ruling R55), checked on 2026-10-15; the seed may link nothing else.
+  const VERIFIED_VIDEO_IDS = new Set(["3birY6XZ3_c", "1pp8G-bKeik", "6URNMNeC_3Y", "RNfHUxM-Bso", "CvQeoCVk_mc", "yrpyvb5dVbA", "V4HEDvQD7vg"]);
+
+  it("provides idempotent fixed-ID singletons with the channel's cast and real videos only", () => {
     const docs = buildSeedDocuments();
     expect(new Set(docs.map((d) => d._id)).size).toBe(docs.length);
-    expect(docs.filter((d) => d._type === "character")).toHaveLength(6);
-    expect(docs.filter((d) => d._type === "episodePreview")).toHaveLength(3);
+    expect(docs.filter((d) => d._type === "character")).toHaveLength(3);
+    expect(docs.filter((d) => d._type === "episodePreview")).toHaveLength(7);
     expect(docs.filter((d) => d._type === "ecosystemEntry")).toHaveLength(8);
     for (const [id, type] of [["siteSettings", "siteSettings"], ["landingPage", "landingPage"], ["legalSettings", "legalSettings"]]) expect(docs.find((d) => d._id === id)?._type).toBe(type);
     const site = docs.find((d) => d._id === "siteSettings")!;
     expect([site.commerceEnabled, site.trackingEnabled, site.testimonialsEnabled]).toEqual([false, false, false]);
-    expect(site.socialLinks).toEqual([]);
+    // The one owner-confirmed account: the Bibo Bay YouTube channel.
+    expect(site.socialLinks).toEqual([{ _type: "socialLink", _key: "youtube", platform: "youtube", url: "https://www.youtube.com/@bibobay-tv", verified: true }]);
     const landing = docs.find((d) => d._id === "landingPage")!;
     expect(landing.testimonials).toEqual([]);
-    expect(landing.episodes).toHaveLength(3);
-    expect(landing.characters).toHaveLength(6);
+    expect(landing.episodes).toHaveLength(7);
+    expect(landing.characters).toHaveLength(3);
     expect(landing.ecosystem).toHaveLength(8);
     expect((landing.sections as Array<{ id: string; visible: boolean }>).find((s) => s.id === "testimonials")?.visible).toBe(false);
     expect((landing.lead as Record<string, unknown>).leadMagnet).toBeUndefined();
     for (const episode of docs.filter((d) => d._type === "episodePreview")) {
-      expect(episode.status).toBe("concept");
-      expect(episode.mediaUrl).toBeUndefined();
+      expect(episode.status).toBe("published");
+      const id = /^https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})$/.exec(String(episode.mediaUrl))?.[1];
+      expect(id && VERIFIED_VIDEO_IDS.has(id), `${episode._id} links a verified channel video`).toBe(true);
     }
-    expect(JSON.stringify(docs)).not.toMatch(/"(?:price|currency|canonicalUrl|studioUrl|contactEmail|fileUrl|verified|mediaUrl)"\s*:/);
+    for (const character of docs.filter((d) => d._type === "character")) expect(character.status).toBe("published");
+    // Media and verification appear only where checked above; prices, private contacts and downloads never.
+    const others = docs.filter((d) => d._type !== "episodePreview" && d._id !== "siteSettings");
+    expect(JSON.stringify(others)).not.toMatch(/"(?:verified|mediaUrl)"\s*:/);
+    expect(JSON.stringify(docs)).not.toMatch(/"(?:price|currency|canonicalUrl|studioUrl|contactEmail|fileUrl)"\s*:/);
   });
 });

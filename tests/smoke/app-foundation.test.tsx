@@ -21,7 +21,7 @@ describe("root page", () => {
     render(await Home());
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(headings[0]?.textContent).toBe("Where bright little adventures begin.");
+    expect(headings[0]?.textContent).toBe("Bright minds. Kind hearts. Big adventures.");
   });
 
   it("names the BIBO brand with the canonical logo in the site header", async () => {
@@ -32,7 +32,7 @@ describe("root page", () => {
   it("states the brand idea without unsupported claims", async () => {
     const { container } = render(await Home());
     const text = container.textContent ?? "";
-    expect(text).toContain("Bright minds. Kind hearts. Better humans.");
+    expect(text).toContain("Bright minds. Kind hearts. Big adventures.");
     // No fabricated social proof, counts, experts, testimonials or dates.
     expect(text).not.toMatch(/\d[\d,.]*\s*\+?\s*(families|parents|users|kids|children|downloads)/i);
     expect(text).not.toMatch(/testimonial|expert|trusted by|award|coming (in|on) \d/i);

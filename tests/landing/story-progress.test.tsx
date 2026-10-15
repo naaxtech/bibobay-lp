@@ -14,7 +14,10 @@ afterEach(() => {
   cleanup();
 });
 
-function renderPage(content: LandingPageContent = landingContent()) {
+/** The progress logic is checked on a fixed set of three stories, however many the fallback lists. */
+const threeStories = (edit?: (draft: LandingPageContent) => void) => landingContent((draft) => { draft.episodes = draft.episodes.slice(0, 3); edit?.(draft); });
+
+function renderPage(content: LandingPageContent = threeStories()) {
   return render(<LandingPage content={content} settings={siteSettings()} />);
 }
 
@@ -40,7 +43,7 @@ describe("story concept progress", () => {
   });
 
   it("counts however many concepts the CMS has", () => {
-    renderPage(landingContent((draft) => {
+    renderPage(threeStories((draft) => {
       draft.episodes.push({ ...draft.episodes[0]!, id: "tide", title: "The Tide Pool Riddle" });
     }));
     expect(stops()).toHaveLength(4);

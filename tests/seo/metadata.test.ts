@@ -173,7 +173,8 @@ describe("sitemap.xml", () => {
 describe("structured data", () => {
   it("describes the Organization and WebSite from settings, with no URL until one is verified", () => {
     const [org, site] = structuredData(SAFE_FALLBACK_SETTINGS, seoEnvironment(SAFE_FALLBACK_SETTINGS, PRODUCTION));
-    expect(org).toEqual({ "@context": "https://schema.org", "@type": "Organization", name: SAFE_FALLBACK_SETTINGS.title });
+    // The owner-confirmed channel is the organisation's one verified profile.
+    expect(org).toEqual({ "@context": "https://schema.org", "@type": "Organization", name: SAFE_FALLBACK_SETTINGS.title, sameAs: ["https://www.youtube.com/@bibobay-tv"] });
     expect(site).toEqual({ "@context": "https://schema.org", "@type": "WebSite", name: SAFE_FALLBACK_SETTINGS.title, description: SAFE_FALLBACK_SETTINGS.description });
   });
 

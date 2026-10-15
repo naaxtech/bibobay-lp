@@ -41,7 +41,7 @@ describe("landmarks and headings", () => {
   it("has exactly one h1, the hero title, and never skips a heading level", () => {
     renderPage();
     const h1s = screen.getAllByRole("heading", { level: 1 });
-    expect(h1s.map((heading) => heading.textContent)).toEqual(["Where bright little adventures begin."]);
+    expect(h1s.map((heading) => heading.textContent)).toEqual([landingContent().hero.title]);
     const levels = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6")).map((heading) => Number(heading.tagName.slice(1)));
     expect(levels[0]).toBe(1);
     levels.slice(1).forEach((level, index) => expect(level - levels[index]!, `heading #${index + 2}`).toBeLessThanOrEqual(1));
@@ -90,21 +90,22 @@ describe("landmarks and headings", () => {
 });
 
 describe("character selector", () => {
+  const friends = landingContent().characters;
+  const last = friends.length - 1;
   const characterTabs = () =>
-    within(within(section("characters")).getByRole("tablist", { name: "Six friends, lots of ways to explore." })).getAllByRole("tab");
+    within(within(section("characters")).getByRole("tablist", { name: landingContent().charactersIntro.heading })).getAllByRole("tab");
 
-  it("names each friend's tab with name, role and concept status", () => {
+  it("names each friend's tab with name and role, and a status only for an unfinished concept", () => {
     renderPage();
     const names = characterTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim());
-    expect(names).toEqual([
-      "Ollie the Sea Otter The Curious Heart Concept",
-      "Wally the Whale Shark The Gentle Giant Concept",
-      "Shelly the Sea Turtle The Planet Guardian Concept",
-      "Pip the Little Squid The Word Explorer Concept",
-      "Finny the Clownfish The Joyful Neighbor Concept",
-      "Pearl in the Shell The Quiet Wisdom Concept",
-    ]);
-    expect(screen.getByRole("tab", { name: "Ollie the Sea Otter The Curious Heart Concept" })).toBe(characterTabs()[0]);
+    expect(names).toEqual(["Tula the Turtle The fruit finder", "Bob the Fish The little spotter", "Lumi The song and dance friend"]);
+    expect(screen.getByRole("tab", { name: "Tula the Turtle The fruit finder" })).toBe(characterTabs()[0]);
+  });
+
+  it("still stamps a friend the CMS marks as an unfinished concept", () => {
+    renderPage(landingContent((draft) => { draft.characters[0]!.status = "concept"; }));
+    expect(characterTabs()[0]!.textContent).toContain("Concept");
+    expect(within(within(section("characters")).getByRole("tabpanel")).getByText("Concept")).toBeTruthy();
   });
 
   it("selects the first friend and ties every tab to its own panel", () => {
@@ -117,8 +118,8 @@ describe("character selector", () => {
       expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
       expect(panel?.hasAttribute("inert"), "only the chosen friend can be reached").toBe(index !== 0);
     });
-    expect(visiblePanelHeading("characters")).toBe("Ollie the Sea Otter");
-    expect(within(within(section("characters")).getByRole("tabpanel")).getByText("Concept")).toBeTruthy();
+    expect(visiblePanelHeading("characters")).toBe(friends[0]!.name);
+    expect(within(within(section("characters")).getByRole("tabpanel")).queryByText("Concept"), "published friends carry no concept stamp").toBeNull();
   });
 
   it("moves selection and focus with the arrow keys, wrapping at both ends", () => {
@@ -131,36 +132,36 @@ describe("character selector", () => {
     expect(tabs[1]!.tabIndex).toBe(0);
     expect(tabs[0]!.getAttribute("aria-selected")).toBe("false");
     expect(tabs[0]!.tabIndex).toBe(-1);
-    expect(visiblePanelHeading("characters")).toBe("Wally the Whale Shark");
+    expect(visiblePanelHeading("characters")).toBe(friends[1]!.name);
 
     fireEvent.keyDown(tabs[1]!, { key: "ArrowLeft" });
     fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(tabs[5]);
-    expect(visiblePanelHeading("characters")).toBe("Pearl in the Shell");
+    expect(document.activeElement).toBe(tabs[last]);
+    expect(visiblePanelHeading("characters")).toBe(friends[last]!.name);
 
-    fireEvent.keyDown(tabs[5]!, { key: "ArrowDown" });
+    fireEvent.keyDown(tabs[last]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(tabs[0]);
     fireEvent.keyDown(tabs[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(tabs[5]);
+    expect(document.activeElement).toBe(tabs[last]);
   });
 
   it("jumps to the first and last friend with Home and End", () => {
     renderPage();
     const tabs = characterTabs();
-    tabs[2]!.focus();
-    fireEvent.keyDown(tabs[2]!, { key: "End" });
-    expect(document.activeElement).toBe(tabs[5]);
-    expect(tabs[5]!.getAttribute("aria-selected")).toBe("true");
-    fireEvent.keyDown(tabs[5]!, { key: "Home" });
+    tabs[1]!.focus();
+    fireEvent.keyDown(tabs[1]!, { key: "End" });
+    expect(document.activeElement).toBe(tabs[last]);
+    expect(tabs[last]!.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(tabs[last]!, { key: "Home" });
     expect(document.activeElement).toBe(tabs[0]);
-    expect(visiblePanelHeading("characters")).toBe("Ollie the Sea Otter");
+    expect(visiblePanelHeading("characters")).toBe(friends[0]!.name);
   });
 
   it("selects a friend on click", () => {
     renderPage();
-    fireEvent.click(characterTabs()[3]!);
-    expect(characterTabs()[3]!.getAttribute("aria-selected")).toBe("true");
-    expect(visiblePanelHeading("characters")).toBe("Pip the Little Squid");
+    fireEvent.click(characterTabs()[2]!);
+    expect(characterTabs()[2]!.getAttribute("aria-selected")).toBe("true");
+    expect(visiblePanelHeading("characters")).toBe("Lumi");
   });
 
   it("draws an abstract placeholder rather than pretend character art", () => {
@@ -172,34 +173,39 @@ describe("character selector", () => {
   });
 });
 
-describe("story concept selector", () => {
+describe("video selector", () => {
+  const videos = landingContent().episodes;
   const storyTabs = () =>
-    within(within(section("episodes")).getByRole("tablist", { name: "Adventures we are imagining." })).getAllByRole("tab");
+    within(within(section("episodes")).getByRole("tablist", { name: landingContent().episodesIntro.heading })).getAllByRole("tab");
 
-  it("labels each story tab as a concept", () => {
+  it("names each video tab by its title, and marks only an unfinished story as a concept", () => {
     renderPage();
-    expect(storyTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual([
-      "The Lost Alphabet Coral Story concept",
-      "Wally’s Big Count & Calm Breath Story concept",
-      "Shelly’s Great Shoreline Clean-Up Story concept",
-    ]);
-    expect(visiblePanelHeading("episodes")).toBe("The Lost Alphabet Coral");
+    expect(storyTabs().map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual(videos.map((video) => video.title));
+    expect(visiblePanelHeading("episodes")).toBe(videos[0]!.title);
   });
 
-  it("moves through the stories with the arrow keys and offers no play control", () => {
+  it("still marks a story the CMS keeps as a concept", () => {
+    renderPage(landingContent((draft) => { draft.episodes[0]!.status = "concept"; }));
+    expect(storyTabs()[0]!.textContent?.replace(/\s+/g, " ").trim()).toBe(`${videos[0]!.title} Story concept`);
+  });
+
+  it("moves through the videos with the arrow keys and links out to YouTube instead of playing in the page", () => {
     renderPage();
     const tabs = storyTabs();
     tabs[0]!.focus();
     fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
     expect(document.activeElement).toBe(tabs[1]);
     expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
-    expect(visiblePanelHeading("episodes")).toBe("Wally’s Big Count & Calm Breath");
+    expect(visiblePanelHeading("episodes")).toBe(videos[1]!.title);
     fireEvent.keyDown(tabs[1]!, { key: "End" });
-    expect(visiblePanelHeading("episodes")).toBe("Shelly’s Great Shoreline Clean-Up");
+    expect(visiblePanelHeading("episodes")).toBe(videos[videos.length - 1]!.title);
     const panel = within(section("episodes")).getByRole("tabpanel");
     expect(within(panel).queryByRole("button")).toBeNull();
-    expect(panel.querySelector("video, audio")).toBeNull();
-    expect(panel.textContent).toContain("Story concept");
+    expect(panel.querySelector("video, audio, iframe")).toBeNull();
+    const watch = within(panel).getByRole("link", { name: /watch/i });
+    expect(watch.getAttribute("href")).toBe(videos[videos.length - 1]!.mediaUrl);
+    expect(watch.getAttribute("target")).toBe("_blank");
+    expect(watch.getAttribute("rel")).toContain("noopener");
   });
 });
 
@@ -259,7 +265,7 @@ describe("FAQ accordion", () => {
   it("opens the first answer and toggles each question on activation", () => {
     renderPage();
     const items = Array.from(section("faq").querySelectorAll("details"));
-    expect(items.map((item) => item.open)).toEqual([true, false, false]);
+    expect(items.map((item) => item.open)).toEqual(landingContent().faqs.map((_, index) => index === 0));
     fireEvent.click(items[1]!.querySelector("summary")!);
     expect(items[1]!.open).toBe(true);
     fireEvent.click(items[0]!.querySelector("summary")!);
@@ -360,7 +366,7 @@ describe("mobile navigation menu", () => {
     const { button, dialog } = openMenu();
     expect(button.getAttribute("aria-expanded")).toBe("true");
     expect(within(dialog).getByRole("link", { name: "Meet the friends" }).getAttribute("href")).toBe("#characters");
-    expect(within(dialog).getByRole("link", { name: "Story ideas" }).getAttribute("href")).toBe("#episodes");
+    expect(within(dialog).getByRole("link", { name: "Watch" }).getAttribute("href")).toBe("#episodes");
     expect(within(dialog).getByRole("link", { name: "Join the list" }).getAttribute("href")).toBe("#lead");
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
   });
@@ -368,7 +374,7 @@ describe("mobile navigation menu", () => {
   it("closes when a destination is chosen", () => {
     renderPage();
     const { dialog } = openMenu();
-    fireEvent.click(within(dialog).getByRole("link", { name: "Story ideas" }));
+    fireEvent.click(within(dialog).getByRole("link", { name: "Watch" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(menuButton().getAttribute("aria-expanded")).toBe("false");
   });

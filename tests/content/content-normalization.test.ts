@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { normalizeLandingContent, normalizeSiteSettings, normalizeLegalSettings } from "@/lib/content/normalize";
-import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
+import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 
 describe("untrusted editorial content", () => {
   it("uses complete safe copy for missing or malformed landing documents", () => {
     expect(normalizeLandingContent(null)).toEqual(SAFE_FALLBACK_CONTENT);
     expect(normalizeLandingContent({ hero: { title: "  " }, characters: "bad" })).toEqual(SAFE_FALLBACK_CONTENT);
+  });
+
+  it("keeps a fallback CTA's external flag only when the CMS gives no destination of its own", () => {
+    const external = { label: "Watch on YouTube", href: "https://www.youtube.com/@bibobay-tv", external: true };
+    expect(SAFE_FALLBACK_CONTENT.hero.primaryCta).toEqual(external);
+    expect(normalizeLandingContent({ hero: { title: "A title" } }).hero.primaryCta).toEqual(external);
+    expect(normalizeLandingContent({ hero: { title: "A title", primaryCta: { label: "Meet the friends", href: "#characters" } } }).hero.primaryCta)
+      .toEqual({ label: "Meet the friends", href: "#characters" });
   });
 
   it("preserves editor order, hero visibility and omissions, and hides unverified proof", () => {
@@ -42,7 +50,9 @@ describe("untrusted editorial content", () => {
     ] });
     expect([settings.commerceEnabled, settings.trackingEnabled, settings.testimonialsEnabled]).toEqual([false, false, false]);
     expect(settings.socialLinks).toEqual([{ platform: "youtube", url: "https://www.youtube.com/@bibo", verified: true }]);
-    expect(normalizeSiteSettings(null).socialLinks).toEqual([]);
+    // No settings document at all: the repository fallback's owner-confirmed channel; an explicit empty list stays empty.
+    expect(normalizeSiteSettings(null).socialLinks).toEqual(SAFE_FALLBACK_SETTINGS.socialLinks);
+    expect(normalizeSiteSettings({ socialLinks: [] }).socialLinks).toEqual([]);
   });
 
   it("returns safe legal defaults for invalid CMS documents", () => {

@@ -145,7 +145,8 @@ for (const { name, use } of VIEWPORTS) {
       const problems = collectProblems(page);
       await openLanding(page);
       await expect(page.locator("html")).toHaveAttribute("data-motion", "full");
-      const cta = section(page, "hero").getByRole("link", { name: "Meet the Bay friends" });
+      // The in-page CTA: pressing the external "Watch on YouTube" link would open a new tab mid-test.
+      const cta = section(page, "hero").getByRole("link", { name: "Meet Tula, Bob & Lumi" });
       const box = await cta.boundingBox();
       if (!box) throw new Error("hero CTA is not laid out");
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

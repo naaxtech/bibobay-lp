@@ -49,7 +49,7 @@ describe("section order and visibility", () => {
     }));
     expect(sectionOrder()).toEqual(["hero", "trust", "characters", "offline", "pillars", "ecosystem", "lead", "faq", "finalCta"]);
     expect(document.getElementById("episodes")).toBeNull();
-    expect(screen.queryByRole("link", { name: "Story ideas" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Watch" })).toBeNull();
     expect(linkHrefs()).not.toContain("#episodes");
   });
 
@@ -59,7 +59,7 @@ describe("section order and visibility", () => {
       draft.faqs = [];
     }));
     expect(sectionOrder()).toEqual(["hero", "trust", "promise", "episodes", "offline", "pillars", "ecosystem", "lead", "finalCta"]);
-    expect(screen.queryByRole("link", { name: "Meet the Bay friends" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Meet Tula, Bob & Lumi" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Meet the friends" })).toBeNull();
     expect(linkHrefs()).not.toContain("#characters");
   });
@@ -144,9 +144,15 @@ describe("navigation, footer and settings gates", () => {
   });
 
   it("renders social links only from verified settings", () => {
-    const { unmount } = renderPage();
-    expect(linkHrefs().filter((href) => /instagram|youtube|facebook|tiktok|pinterest/.test(href ?? ""))).toEqual([]);
+    // Social profiles live in the footer; the page's own "Watch on YouTube" calls are not profiles.
+    const social = () => within(screen.getByRole("contentinfo")).queryAllByRole("link").map((link) => link.getAttribute("href")).filter((href) => /instagram|youtube|facebook|tiktok|pinterest/.test(href ?? ""));
+    const { unmount } = renderPage(landingContent(), siteSettings((draft) => { draft.socialLinks = []; }));
+    expect(social()).toEqual([]);
     unmount();
+    // The fallback's one owner-confirmed account: the Bibo Bay channel, in the footer.
+    const second = renderPage();
+    expect(within(screen.getByRole("contentinfo")).getByRole("link", { name: /YouTube/ }).getAttribute("href")).toBe("https://www.youtube.com/@bibobay-tv");
+    second.unmount();
     renderPage(landingContent(), siteSettings((draft) => {
       draft.socialLinks = [{ platform: "instagram", url: "https://www.instagram.com/bibobay/", verified: true }];
     }));
@@ -224,12 +230,17 @@ describe("lead capture", () => {
     expect(within(section("lead")).getByRole("form", { name: "Founding family signup" })).toBeTruthy();
   });
 
-  it("keeps calls to action that scroll to the lead section", () => {
+  it("keeps the founding-family list one tap away and sends the opening and closing calls to the channel", () => {
     renderPage();
     const toLead = Array.from(document.querySelectorAll('a[href="#lead"]')).map((link) => link.textContent?.trim());
-    expect(toLead).toEqual(expect.arrayContaining(["Join the list", "Join the founding-family list"]));
-    expect(within(section("hero")).getByRole("link", { name: "Join the founding-family list" }).getAttribute("href")).toBe("#lead");
-    expect(within(section("finalCta")).getByRole("link", { name: "Join the founding-family list" }).getAttribute("href")).toBe("#lead");
+    expect(toLead).toContain("Join the list");
+    for (const id of ["hero", "finalCta"] as const) {
+      const watch = within(section(id)).getByRole("link", { name: /Watch on YouTube/ });
+      expect(watch.getAttribute("href")).toBe("https://www.youtube.com/@bibobay-tv");
+      expect(watch.getAttribute("target")).toBe("_blank");
+      expect(watch.getAttribute("rel")).toContain("noopener");
+    }
+    expect(within(section("hero")).getByRole("link", { name: "Meet Tula, Bob & Lumi" }).getAttribute("href")).toBe("#characters");
   });
 
   it("offers a download only when the CMS marks a real file available", () => {

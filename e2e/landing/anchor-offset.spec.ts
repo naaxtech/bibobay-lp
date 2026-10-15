@@ -33,7 +33,7 @@ for (const { name, use } of VIEWPORTS) {
     test("land just below the sticky header", async ({ page }) => {
       await page.goto("/");
 
-      await page.getByRole("link", { name: "Meet the Bay friends" }).click();
+      await page.getByRole("link", { name: "Meet Tula, Bob & Lumi" }).click();
       await expectLandedBelowHeader(page, "characters");
 
       if (name === "mobile") {
@@ -43,7 +43,7 @@ for (const { name, use } of VIEWPORTS) {
           await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible({ timeout: 1_000 });
         }).toPass();
       }
-      await page.getByRole("link", { name: "Story ideas" }).click();
+      await page.getByRole("link", { name: "Watch", exact: true }).click();
       await expectLandedBelowHeader(page, "episodes");
 
       await page.goto("/#faq");

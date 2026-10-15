@@ -15,7 +15,7 @@ describe("normalized image and Sanity URL", () => {
     expect(content.hero.image).toEqual(image);
     expect(content.characters[0]?.image).toEqual(image);
     const missingAlt = normalizeLandingContent({ hero: { image: { asset: { _ref: ref }, ...geometry } } });
-    expect(missingAlt.hero.image).toEqual({ asset: { _ref: ref }, alt: "Where bright little adventures begin. illustration", ...geometry });
+    expect(missingAlt.hero.image).toEqual({ asset: { _ref: ref }, alt: "Bright minds. Kind hearts. Big adventures. illustration", ...geometry });
   });
 
   it.each([

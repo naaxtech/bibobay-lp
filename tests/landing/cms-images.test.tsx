@@ -55,7 +55,7 @@ describe("CMS images", () => {
   it("keeps every illustrated fallback when the CMS supplies no images", () => {
     renderPage();
     expect(contentImages()).toHaveLength(0);
-    expect(within(section("hero")).getByRole("img", { name: "A calm, illustrated bay on the horizon." })).toBeTruthy();
+    expect(within(section("hero")).getByRole("img", { name: landingContent().hero.artworkDescription })).toBeTruthy();
     expect(section("hero").querySelector("[data-bay-layer]")).not.toBeNull();
     expect(section("finalCta").querySelector("[data-bay-layer]")).not.toBeNull();
   });
@@ -71,7 +71,7 @@ describe("CMS images", () => {
     expect(image.getAttribute("fetchpriority")).toBe("high");
     // The image replaces the default artwork; the artwork's description no longer names anything.
     expect(hero.querySelector("[data-bay-layer]")).toBeNull();
-    expect(within(hero).queryByRole("img", { name: "A calm, illustrated bay on the horizon." })).toBeNull();
+    expect(within(hero).queryByRole("img", { name: landingContent().hero.artworkDescription })).toBeNull();
     expect(contentImages()).toHaveLength(1);
   });
 

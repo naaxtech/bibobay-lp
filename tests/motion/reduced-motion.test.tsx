@@ -119,7 +119,7 @@ function inlineMotionStyles(options: { includeBayLayers?: boolean } = {}) {
 
 const renderPage = () => render(<LandingPage content={landingContent()} settings={siteSettings()} />);
 const sectionById = (id: string) => document.getElementById(id) as HTMLElement;
-const heroCta = () => within(sectionById("hero")).getByRole("link", { name: "Meet the Bay friends" });
+const heroCta = () => within(sectionById("hero")).getByRole("link", { name: "Meet Tula, Bob & Lumi" });
 const pillarItems = () => Array.from(sectionById("pillars").querySelectorAll<HTMLElement>("li.pillar"));
 const shownPanel = (id: string) => within(sectionById(id)).getByRole("tabpanel");
 const bayLayer = (id: string, name: string) => sectionById(id).querySelector(`[data-bay-layer="${name}"]`) as SVGGElement;

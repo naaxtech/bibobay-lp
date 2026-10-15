@@ -1,24 +1,50 @@
 import { describe, expect, it } from "vitest";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 
+/*
+ * The fallback copy follows the Bibo Bay YouTube channel (ruling R55). These ids are the channel's
+ * real videos, each opened and checked on 2026-10-15; nothing else may be linked as media.
+ */
+const CHANNEL = "https://www.youtube.com/@bibobay-tv";
+const VERIFIED_VIDEO_IDS = new Set(["3birY6XZ3_c", "1pp8G-bKeik", "6URNMNeC_3Y", "RNfHUxM-Bso", "CvQeoCVk_mc", "yrpyvb5dVbA", "V4HEDvQD7vg"]);
+
 describe("truthful offline content", () => {
-  it("contains the six existing character concepts and labels all stories as concepts", () => {
-    expect(SAFE_FALLBACK_CONTENT.characters.map((c) => c.name)).toEqual([
-      "Ollie the Sea Otter", "Wally the Whale Shark", "Shelly the Sea Turtle", "Pip the Little Squid", "Finny the Clownfish", "Pearl in the Shell",
+  it("introduces the channel's cast: Tula, Bob and Lumi, as published characters", () => {
+    expect(SAFE_FALLBACK_CONTENT.characters.map((c) => [c.name, c.species])).toEqual([
+      ["Tula the Turtle", "Sea turtle"], ["Bob the Fish", "Clownfish"], ["Lumi", "Octopus"],
     ]);
-    expect(SAFE_FALLBACK_CONTENT.episodes.length).toBeGreaterThan(0);
-    expect(SAFE_FALLBACK_CONTENT.episodes.every((episode) => episode.status === "concept")).toBe(true);
+    expect(SAFE_FALLBACK_CONTENT.characters.every((c) => c.status === "published")).toBe(true);
     expect(SAFE_FALLBACK_CONTENT.ecosystem.map((entry) => entry.name)).toEqual([
       "BIBO Academy", "BIBO Lab", "BIBO Play", "BIBO Planet", "BIBO Makes", "BIBO Books", "BIBO at Home", "BIBO Shop",
     ]);
+    expect(SAFE_FALLBACK_CONTENT.ecosystem.every((entry) => entry.status === "idea")).toBe(true);
   });
 
-  it("does not fabricate audience size, episode duration, media, delivery, expert proof, or testimonials", () => {
+  it("links only real, published channel videos, each to its youtube.com watch page", () => {
+    const { episodes } = SAFE_FALLBACK_CONTENT;
+    expect(episodes.length).toBeGreaterThan(0);
+    for (const episode of episodes) {
+      expect(episode.status, episode.id).toBe("published");
+      const match = /^https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})$/.exec(episode.mediaUrl ?? "");
+      expect(match, `${episode.id} links a youtube.com watch page`).not.toBeNull();
+      expect(VERIFIED_VIDEO_IDS.has(match![1]!), `${episode.id} is a verified channel video`).toBe(true);
+    }
+    expect(new Set(episodes.map((episode) => episode.mediaUrl)).size).toBe(episodes.length);
+  });
+
+  it("lists the owner-confirmed YouTube channel as its only social link", () => {
+    expect(SAFE_FALLBACK_SETTINGS.socialLinks).toEqual([{ platform: "youtube", url: CHANNEL, verified: true }]);
+    for (const cta of [SAFE_FALLBACK_CONTENT.hero.primaryCta, SAFE_FALLBACK_CONTENT.finalCta.cta]) {
+      expect(cta).toEqual({ label: "Watch on YouTube", href: CHANNEL, external: true });
+    }
+  });
+
+  it("does not fabricate audience size, view counts, delivery, expert proof, or testimonials", () => {
     const text = JSON.stringify(SAFE_FALLBACK_CONTENT).toLowerCase();
     expect(text).not.toMatch(/11.minute|12.minute|pilot episode|as seen on|educator.approved|created with early childhood educators|starter kit|download free|free printable|thousands of families/);
+    expect(text).not.toMatch(/\bsubscribers\b|\bviews\b|million|\d+k\b|award|#1|best.selling/);
     expect(SAFE_FALLBACK_CONTENT.testimonials).toEqual([]);
     expect(SAFE_FALLBACK_CONTENT.sections.find((s) => s.id === "testimonials")?.visible).toBe(false);
-    expect(SAFE_FALLBACK_SETTINGS.socialLinks).toEqual([]);
     expect([SAFE_FALLBACK_SETTINGS.commerceEnabled, SAFE_FALLBACK_SETTINGS.trackingEnabled, SAFE_FALLBACK_SETTINGS.testimonialsEnabled]).toEqual([false, false, false]);
     expect(SAFE_FALLBACK_LEGAL.privacy).toEqual([]);
   });

@@ -9,7 +9,14 @@ const optionalText = (value: unknown): string | undefined => text(value) || unde
 const stringList = (value: unknown, fallback: string[]): string[] => Array.isArray(value) ? value.filter((s): s is string => typeof s === "string" && !!s.trim()).map((s) => s.trim()) : fallback;
 const validUrl = (value: unknown): string | undefined => { if (typeof value !== "string") return; try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : undefined; } catch { return; } };
 const href = (value: unknown): string | undefined => typeof value === "string" && /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(value) ? value : validUrl(value);
-const cta = (raw: unknown, fallback: Cta): Cta => { const value = record(raw); return { label: text(value.label, fallback.label), href: href(value.href) ?? fallback.href, ...(value.external === true ? { external: true } : {}) }; };
+const cta = (raw: unknown, fallback: Cta): Cta => {
+  const value = record(raw);
+  const own = href(value.href);
+  // A CTA that falls back to the repository destination keeps that destination's new-tab flag; an
+  // editor's own destination is external only when the editor says so.
+  const external = own ? value.external === true : fallback.external === true;
+  return { label: text(value.label, fallback.label), href: own ?? fallback.href, ...(external ? { external: true } : {}) };
+};
 const imageGeometry = (raw: unknown, keys: string[]): Record<string, number> | undefined => {
   const value = record(raw);
   if (!keys.every((key) => typeof value[key] === "number" && Number.isFinite(value[key]) && (value[key] as number) >= 0 && (value[key] as number) <= 1)) return;
