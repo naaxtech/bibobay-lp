@@ -33,3 +33,26 @@ describe("a visitor's choice when storage is blocked", () => {
     expect(analyticsAllowed()).toBe(true);
   });
 });
+
+describe("a choice the device refuses to save (re-review)", () => {
+  beforeEach(() => {
+    resetAnalyticsForTests();
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+    resetAnalyticsForTests();
+  });
+
+  it("keeps this page's \"off\" over an older stored \"on\"", () => {
+    window.localStorage.setItem("bibo.analytics.v1", "on");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    writeChoice("off");
+    expect(readChoice()).toBe("off");
+    expect(analyticsAllowed()).toBe(false);
+  });
+});

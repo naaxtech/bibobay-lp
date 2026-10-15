@@ -55,6 +55,7 @@ describe("repository fallback legal text (ruling R30)", () => {
     // Cookieless server hash mode strips the address before GeoIP runs: no location is added.
     expect(privacy).not.toMatch(/location/i);
     expect(privacy).toMatch(/language and time zone/i);
+    expect(privacy).toMatch(/operating system/i);
     expect(privacy).toMatch(/how far down each page you scroll and how long you stay/i);
     expect(privacy).toMatch(/value that changes every day/i);
     expect(privacy).toMatch(/does not keep the address/i);
@@ -206,5 +207,11 @@ describe("the page for a missing address (review I2)", () => {
     expect(screen.getByRole("heading", { level: 1, name: NOT_FOUND_COPY.title })).toBeTruthy();
     expect(screen.getByRole("link", { name: NOT_FOUND_COPY.backHome }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("button", { name: "Analytics choices" })).toBeTruthy();
+  });
+
+  it("is titled like the site's other pages (re-review)", async () => {
+    const { metadata } = await import("@/app/not-found");
+    const { NOT_FOUND_COPY } = await import("@/components/legal/legal-copy");
+    expect(metadata.title).toBe(`${NOT_FOUND_COPY.title} | ${SAFE_FALLBACK_SETTINGS.title}`);
   });
 });

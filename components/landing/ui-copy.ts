@@ -51,7 +51,7 @@ export const UI_COPY = {
   analytics: {
     choices: "Analytics choices",
     explainer: [
-      "BIBO Bay counts visits to learn which pages, videos and activities families use, and how they find us: the page, the site or campaign that sent you, your browser and device type, your browser's language and time zone, how far you scroll and how long you stay, and which buttons and links you choose.",
+      "BIBO Bay counts visits to learn which pages, videos and activities families use, and how they find us: the page, the site or campaign that sent you, your browser, operating system and device type, your browser's language and time zone, how far you scroll and how long you stay, and which buttons and links you choose.",
       "It uses no cookies and builds no profile of you. To count visitors, PostHog combines your network address and browser details with a value that changes every day, and does not keep the address. It never records what you type into the form. A browser that sends Global Privacy Control or Do Not Track is not counted.",
       "If you turn statistics off, this browser remembers that choice on your device.",
     ],

@@ -72,8 +72,9 @@ export function analyticsActive(): boolean {
 
 /**
  * Review M2: a PostHog toolbar link (`#__posthog=…` or the legacy `#state=…`) makes the bundled
- * toolbar code write its parameters to local storage, even with remote loading off. The site has no
- * use for the toolbar, so such a fragment is removed from the address before PostHog starts.
+ * toolbar code write its parameters to local storage, even with remote loading off. That code
+ * reads the address as soon as the SDK module is evaluated (toolbar.js `STATE_FROM_WINDOW`), so
+ * the fragment is removed before the SDK is even loaded. The site has no use for the toolbar.
  */
 const TOOLBAR_HASH = /(?:^#|&)(?:__posthog|state)=/;
 
@@ -87,6 +88,7 @@ export function startAnalytics(config: AnalyticsConfig | null, load: Loader = lo
   if (!config || !analyticsAllowed()) return Promise.resolve(false);
   stopped = false;
   if (client) return Promise.resolve(true);
+  if (!starting) dropToolbarLink();
   starting ??= load()
     .then(({ default: posthog }) => {
       if (!analyticsActive()) {
@@ -94,7 +96,6 @@ export function startAnalytics(config: AnalyticsConfig | null, load: Loader = lo
         starting = null;
         return false;
       }
-      dropToolbarLink();
       posthog.init(config.key, posthogOptions(config));
       client = posthog;
       for (const [event, properties] of queue.splice(0)) send(event, properties);

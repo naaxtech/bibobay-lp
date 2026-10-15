@@ -1,6 +1,7 @@
 import manifest from "./activity-pack.manifest.json";
 import { FREEBIE_PATH } from "./freebie-path";
 
+/** A PDF this site serves from public/freebies: one path segment, no dot segments, no protocol. */
 export { FREEBIE_PATH };
 
 /**
@@ -30,8 +31,6 @@ export function activityPackPreviews(): PackPreview[] {
 export function isRepositoryPack(fileUrl: string | undefined): boolean {
   return fileUrl === ACTIVITY_PACK.fileUrl;
 }
-
-/** A PDF this site serves from public/freebies: one path segment, no dot segments, no protocol. */
 
 /**
  * The address a download can be reached at from outside the site (an email): https files as they

@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.11"
+# requires-python = "==3.12.*"
 # dependencies = [
 #   "reportlab==5.0.1",
 #   "pillow==12.3.0",

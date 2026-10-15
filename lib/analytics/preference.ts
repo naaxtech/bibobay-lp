@@ -13,6 +13,8 @@ export type AnalyticsChoice = "on" | "off";
  * read back as "on" and a Global Privacy Control visitor could never turn statistics on.
  */
 let pageChoice: AnalyticsChoice | null = null;
+/** True while the device refused this page's latest choice: then the page's choice wins. */
+let unsaved = false;
 
 function storage(): Storage | null {
   try {
@@ -24,6 +26,7 @@ function storage(): Storage | null {
 
 /** The stored choice (it may come from another tab), else the one made on this page. */
 export function readChoice(): AnalyticsChoice | null {
+  if (unsaved) return pageChoice;
   try {
     const value = storage()?.getItem(ANALYTICS_PREFERENCE_KEY);
     if (value === "on" || value === "off") return value;
@@ -35,15 +38,21 @@ export function readChoice(): AnalyticsChoice | null {
 
 export function writeChoice(choice: AnalyticsChoice): void {
   pageChoice = choice;
+  unsaved = true;
   try {
-    storage()?.setItem(ANALYTICS_PREFERENCE_KEY, choice);
+    const device = storage();
+    if (device) {
+      device.setItem(ANALYTICS_PREFERENCE_KEY, choice);
+      unsaved = false;
+    }
   } catch {
-    // Storage can be blocked; the choice then lasts for this page only.
+    // Storage blocked or full: the choice lasts for this page, ahead of any older stored one.
   }
 }
 
 export function forgetChoiceForTests(): void {
   pageChoice = null;
+  unsaved = false;
 }
 
 /** Global Privacy Control, or the older Do Not Track header, counts as "off". */

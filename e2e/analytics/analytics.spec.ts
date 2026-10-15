@@ -97,6 +97,20 @@ test.describe("visit statistics (cookieless PostHog)", () => {
     for (const event of events) expect(allowed.has(event.event), event.event).toBe(true);
   });
 
+  test("a PostHog toolbar link changes nothing on the device (re-review M2)", async ({ page, context }) => {
+    const { events } = await watch(context);
+    const state = Buffer.from(JSON.stringify({ action: "ph_authorize", token: "phc_PlaceholderKey0123456789abcdefABCDEF" })).toString("base64");
+    for (const hash of [`#__posthog=${state}`, `#state=${encodeURIComponent(JSON.stringify({ action: "ph_authorize" }))}`]) {
+      const sent = events.length;
+      // A full load each time: going from "/" to "/#…" alone would only move to an anchor.
+      await page.goto("about:blank");
+      await page.goto(`/${hash}`);
+      await expect.poll(() => named(events.slice(sent), "$pageview").length, { timeout: 15_000 }).toBeGreaterThan(0);
+      expect(await page.evaluate(() => window.location.hash)).toBe("");
+      expect(await storageKeys(page)).toEqual([]);
+    }
+  });
+
   test("sends nothing for a browser with Global Privacy Control", async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: PERSON_UA });
     await context.addInitScript(() => Object.defineProperty(Navigator.prototype, "globalPrivacyControl", { get: () => true }));

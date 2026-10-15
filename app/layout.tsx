@@ -16,7 +16,7 @@ const bodyFace = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-
 
 /*
  * Ruling R36: each page sets its own metadata from Sanity (app/page.tsx `generateMetadata`, the legal
- * and thank-you pages). This is only the default for routes without any (the 404 page), taken from
+ * and thank-you pages, the 404 page). This is only the default for a route without any, taken from
  * the repository fallback settings. The favicon comes from app/icon.svg, generated from the canonical
  * logo; the share image from app/opengraph-image.tsx.
  */

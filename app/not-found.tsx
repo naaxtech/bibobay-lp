@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CtaLink } from "@/components/landing/CtaLink";
 import { SimplePageShell } from "@/components/legal/SimplePageShell";
 import { NOT_FOUND_COPY } from "@/components/legal/legal-copy";
-import { BIBO_YOUTUBE_CHANNEL_URL } from "@/lib/content/fallback";
+import { BIBO_YOUTUBE_CHANNEL_URL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { getSiteSettings } from "@/lib/sanity/fetch";
 
 /**
@@ -11,7 +11,7 @@ import { getSiteSettings } from "@/lib/sanity/fetch";
  * the channel, and the site footer, so Analytics choices are offered here too. Next answers 404 and
  * marks it noindex itself.
  */
-export const metadata: Metadata = { title: NOT_FOUND_COPY.title };
+export const metadata: Metadata = { title: `${NOT_FOUND_COPY.title} | ${SAFE_FALLBACK_SETTINGS.title}` };
 
 export default async function NotFound() {
   const settings = await getSiteSettings();

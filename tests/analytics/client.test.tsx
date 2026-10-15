@@ -64,7 +64,7 @@ class FakeObserver {
 
 import { AnalyticsChoices } from "@/components/analytics/AnalyticsChoices";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
-import { posthogOptions, resetAnalyticsForTests, resumeAnalytics, stopAnalytics, track } from "@/lib/analytics/client";
+import { posthogOptions, resetAnalyticsForTests, resumeAnalytics, startAnalytics, stopAnalytics, track } from "@/lib/analytics/client";
 import { ANALYTICS_PREFERENCE_KEY } from "@/lib/analytics/preference";
 
 const CONFIG = { key: "phc_ExampleKey0123456789abcdefABCDEF", apiHost: "https://ph.example.com" };
@@ -264,6 +264,16 @@ describe("PostHog toolbar links (review M2)", () => {
       expect(window.location.search).toBe("?utm_source=news");
     },
   );
+
+  it("removes the link before PostHog's code even loads: its toolbar reads the address as it loads (re-review M2)", async () => {
+    window.history.replaceState({}, "", "/?utm_source=news#__posthog=eyJhY3Rpb24iOiJwaF9hdXRob3JpemUifQ");
+    let addressAtLoad = "not loaded";
+    await startAnalytics(CONFIG, async () => {
+      addressAtLoad = `${window.location.search}${window.location.hash}`;
+      return { default: sdk.posthog } as unknown as typeof import("posthog-js/dist/module.no-external");
+    });
+    expect(addressAtLoad).toBe("?utm_source=news");
+  });
 
   it("keeps an ordinary page anchor", async () => {
     window.history.replaceState({}, "", "/#lead");

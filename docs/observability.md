@@ -47,8 +47,9 @@ PostHog strips the address before GeoIP runs, so no location is added. Tag links
 - The visitor's choice is enforced in `before_send` too: in cookieless mode PostHog ignores
   `opt_out_capturing`, so turning statistics off (here or in another tab) drops every later event,
   PostHog's own page views and page leaves included.
-- A PostHog toolbar link (`#__posthog=…`, `#state=…`) is removed from the address before PostHog
-  starts, so its toolbar code never writes to storage.
+- A PostHog toolbar link (`#__posthog=…`, `#state=…`) is removed from the address before the
+  PostHog code is even loaded (its toolbar code reads the address as it loads), so it never writes
+  to storage.
 - PostHog code is the bundled `posthog-js/dist/module.no-external` build with external dependency
   loading off, so it never fetches scripts from PostHog under the site's `'strict-dynamic'` CSP. The
   configured host is added to `connect-src` only.

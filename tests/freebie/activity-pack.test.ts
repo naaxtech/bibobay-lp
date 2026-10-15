@@ -81,6 +81,10 @@ describe("the Bibo Bay activity pack (freebie)", () => {
       expect(url, url).toMatch(/\/google\/fonts\/[0-9a-f]{40}\//);
       expect(sha, url).toMatch(/^[0-9a-f]{64}$/);
     }
+    // One Python minor version: zlib differs between them (3.14 uses zlib-ng), and so would the bytes.
+    expect(script).toMatch(/^# requires-python = "==3\.\d+\.\*"$/m);
+    const lock = readFileSync(join(root, "scripts/freebie/build_activity_pack.py.lock"), "utf8");
+    expect(lock).toMatch(/^requires-python = "==3\.\d+\.\*"$/m);
     const dependencies = /# dependencies = \[([\s\S]*?)# \]/.exec(script)?.[1] ?? "";
     const pins = dependencies.split(/\r?\n/).map((line) => line.replace(/^#\s*/, "").trim()).filter(Boolean);
     expect(pins.length).toBeGreaterThanOrEqual(5);
