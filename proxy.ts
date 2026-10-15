@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { analyticsConfig } from "./lib/analytics/config";
 import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironment } from "./lib/security/headers";
 
 /**
@@ -11,7 +12,9 @@ import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironm
  */
 export function proxy(request: NextRequest) {
   const nonce = createNonce();
-  const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment() });
+  // Ruling R70: events go to the configured PostHog host (connect-src only; the SDK is bundled).
+  const analyticsHost = analyticsConfig()?.apiHost;
+  const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment(), extraConnectSources: analyticsHost ? [analyticsHost] : [] });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_HEADER, nonce);

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent } from "react";
+import { track } from "@/lib/analytics/client";
 
 import {
   AGE_BANDS,
@@ -165,6 +166,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
       const answer: unknown = await response.json().catch(() => null);
       if (response.ok && isRecord(answer) && answer.ok === true && answer.persisted === true) {
         setOutcome({ tone: "success", text: copy.successMessage });
+        // Ruling R70: the outcome only; nothing the visitor typed.
+        track("lead_submitted", { persisted: true, acknowledgementQueued: answer.acknowledgementQueued === true });
         form.reset();
         returnFocusTo = "status";
       } else if (response.status === 429) {

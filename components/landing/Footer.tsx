@@ -1,4 +1,6 @@
+import { AnalyticsChoices } from "@/components/analytics/AnalyticsChoices";
 import { BiboLogo } from "@/components/brand/BiboLogo";
+import { analyticsConfig } from "@/lib/analytics/config";
 import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
 import type { SiteSettings } from "@/lib/content/types";
 import { CtaLink } from "./CtaLink";
@@ -30,6 +32,9 @@ export function Footer({ settings }: FooterProps) {
                     <CtaLink cta={link} className="footer-link" />
                   </li>
                 ))}
+                <li>
+                  <AnalyticsChoices config={analyticsConfig()} />
+                </li>
               </ul>
             </nav>
           ) : null}

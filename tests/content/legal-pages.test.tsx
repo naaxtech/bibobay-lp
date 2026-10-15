@@ -44,7 +44,19 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/Supabase/);
     expect(privacy).toMatch(/Resend/);
     expect(privacy).toMatch(/Sanity/);
-    expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe|PostHog|Sentry/i);
+    // Ruling R70: PostHog counts visits when it is configured; nothing else watches visitors.
+    expect(privacy).toMatch(/PostHog/);
+    expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe|Sentry/i);
+  });
+
+  it("describes the visit statistics exactly as the code runs them (ruling R70)", () => {
+    expect(privacy).toMatch(/no cookies/i);
+    expect(privacy).toMatch(/no profile/i);
+    expect(privacy).toMatch(/never records what you type/i);
+    expect(privacy).toMatch(/site or campaign that sent you/i);
+    expect(privacy).toMatch(/Global Privacy Control/);
+    expect(privacy).toMatch(/Analytics choices/);
+    expect(privacy).toMatch(/only when statistics are switched on/i);
   });
 
   it("states the honest limits: no child data, no card data, no stored IP address, no advertising cookies", () => {
@@ -97,6 +109,10 @@ describe("repository fallback legal text (ruling R30)", () => {
 
   it("makes no commerce, download or social-proof promises in the terms", () => {
     expect(terms).toMatch(/nothing is for sale/i);
+    // The free activity pack is real (R66): the terms say it may be printed at home, and no longer
+    // claim that nothing here is a download.
+    expect(terms).toMatch(/activity pack/i);
+    expect(terms).not.toMatch(/promises a show, a product, a download/i);
     expect(terms).not.toMatch(/refund|delivery within|guarantee|money-back/i);
   });
 

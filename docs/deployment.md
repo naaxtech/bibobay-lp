@@ -23,6 +23,8 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `NEXT_PUBLIC_SANITY_API_VERSION` | public | optional | Sanity project | API date, `YYYY-MM-DD`; default `2026-03-01`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | public | for lead storage | Supabase project | Project URL (https; http only for a local stack). |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | not used yet | Supabase project | Reserved for staff sign-in (Task 8); nothing reads it today. A secret key here is refused. |
+| `NEXT_PUBLIC_POSTHOG_KEY` | public | for visit statistics | PostHog project (BIBO Bay owner account) | Project key (`phc_…`). Empty: no analytics, no request to PostHog, no "Analytics choices" link. A personal API key (`phx_…`) is refused. See `docs/observability.md`. |
+| `NEXT_PUBLIC_POSTHOG_HOST` | public | optional | PostHog project | Exact https origin events go to; default `https://us.i.posthog.com` (EU: `https://eu.i.posthog.com`). Added to CSP `connect-src` only. |
 | `SANITY_API_READ_TOKEN` | server | for Studio draft preview | Sanity project (Viewer token) | Lets `/api/draft-mode/enable` check the preview secret and read drafts. Without it that route answers 503. |
 | `SANITY_WRITE_TOKEN` | server | only to run the Studio seed | Sanity project (Editor token) | Used by `npm --prefix studio run seed`, never by the website. Do not set it on Vercel. |
 | `SANITY_REVALIDATE_SECRET` | server | production (readiness requires it) | BIBO Bay owner (random) | Shared with the Sanity webhook that calls `/api/revalidate`. |
@@ -44,6 +46,10 @@ Studio variables (set where the Studio is built or deployed, not on the website)
 `SANITY_STUDIO_PROJECT_ID`, `SANITY_STUDIO_DATASET`, optional `SANITY_STUDIO_PREVIEW_URL`.
 
 Generate random secrets with, for example, `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`.
+
+Visit statistics (PostHog) need one switch in the PostHog project as well as the two variables
+above: **Cookieless server hash mode** (Project settings → Web analytics). See
+[observability.md](observability.md).
 
 ## Vercel project
 

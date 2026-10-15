@@ -30,6 +30,9 @@ describe("lead environment names", () => {
     const publicNames = envExampleNames().filter((name) => name.startsWith("NEXT_PUBLIC_")).sort();
     expect(publicNames).toEqual([
       "NEXT_PUBLIC_APP_URL",
+      // Ruling R70 (visit statistics), not leads: the PostHog project key and host.
+      "NEXT_PUBLIC_POSTHOG_HOST",
+      "NEXT_PUBLIC_POSTHOG_KEY",
       "NEXT_PUBLIC_SANITY_API_VERSION",
       "NEXT_PUBLIC_SANITY_DATASET",
       "NEXT_PUBLIC_SANITY_PROJECT_ID",

@@ -10,9 +10,9 @@ import type { PortableContent } from "./types";
  * emails in lib/email/lead-emails.ts). It names no company, address, registration, jurisdiction or
  * contact email; /privacy adds the contact address from site settings when one is configured.
  *
- * Update it whenever behaviour changes. Known follow-ups: Task 10M (analytics after consent, error
- * monitoring) must add those processors and the consent cookie; Task 7 (manual orders) must update
- * the "nothing is for sale" lines before commerce is switched on.
+ * Update it whenever behaviour changes. Visit statistics (ruling R70, lib/analytics) are described
+ * below. Known follow-ups: error monitoring (Sentry) must add that processor; Task 7 (manual orders)
+ * must update the "nothing is for sale" lines before commerce is switched on.
  *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
  * default, which tells pages that Sanity has no text) stays unchanged.
@@ -52,6 +52,16 @@ const privacy: PortableContent = [
   paragraph(
     "This website does not use advertising or analytics cookies. The only cookie it sets is a preview cookie used by the people who edit the website.",
   ),
+  heading("Visit statistics"),
+  paragraph(
+    "Only when statistics are switched on for this website, it counts visits with PostHog to learn which pages, videos and activities families use, and how they find BIBO Bay. Each page view and each button or link you choose is sent with: the page address (without anything after a question mark except campaign tags), the site or campaign that sent you, your browser, device type and screen size, and an approximate location that PostHog works out from your network address.",
+  ),
+  paragraph(
+    "It uses no cookies and stores nothing on your device, so it builds no profile of you and cannot recognise you on a later day. It never records what you type into the form; it notes only that a signup was saved.",
+  ),
+  paragraph(
+    "A browser that sends Global Privacy Control or Do Not Track is not counted. You can turn statistics off, or on again, under Analytics choices at the foot of every page; if you turn them off, your browser remembers that choice on your device.",
+  ),
   heading("Why we use your details"),
   paragraph(
     "To send you updates about BIBO Bay, which is what you agree to when you join. Once email sending is set up, you receive one email confirming that you joined, and the BIBO Bay team may receive a short note with your email address, first name and age range so they know someone signed up.",
@@ -60,6 +70,7 @@ const privacy: PortableContent = [
   heading("Services that handle your details"),
   paragraph("Supabase hosts the database where signups are stored."),
   paragraph("Resend delivers the emails described above."),
+  paragraph("PostHog receives the visit statistics described above, when they are switched on."),
   paragraph(
     "For each email, the database keeps a delivery record: which email it was, whether it was sent, how many attempts were made and when, the email service's message reference, and a short error code if sending failed. It does not keep a copy of the email.",
   ),
@@ -85,7 +96,7 @@ const terms: PortableContent = [
   ),
   heading("What this website is"),
   paragraph(
-    "The characters, story ideas and other material shown here are concepts. They may change, and some may never be made. Nothing on this website promises a show, a product, a download or a date.",
+    "The characters, story ideas and other material shown here are concepts. They may change, and some may never be made. Nothing on this website promises a show, a product or a date.",
   ),
   paragraph("Nothing is for sale on this website at the moment."),
   heading("The founding-family list"),
@@ -97,7 +108,7 @@ const terms: PortableContent = [
     "Please use the website only for its purpose. Do not try to break it, overload it, or submit someone else's details.",
   ),
   paragraph(
-    "The BIBO Bay name, characters, artwork and words on this website are not licensed for reuse. Please ask before copying them.",
+    "The BIBO Bay name, characters, artwork and words on this website are not licensed for reuse. Please ask before copying them. The free activity pack may be printed for use at home.",
   ),
   paragraph(
     "The website is offered as it is while it is being built. Pages and features may change, move or be unavailable at times.",

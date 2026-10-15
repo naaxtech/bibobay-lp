@@ -24,6 +24,11 @@ const allowedPublicNames = new Set([
   "NEXT_PUBLIC_SANITY_API_VERSION",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  // Ruling R70 (visit statistics): a PostHog project key can only send events, so it is public by
+  // design; the host is where they go. A personal API key (phx_) reads the whole project and is
+  // refused under this name below.
+  "NEXT_PUBLIC_POSTHOG_KEY",
+  "NEXT_PUBLIC_POSTHOG_HOST",
 ]);
 
 /**
@@ -60,6 +65,7 @@ export function verifyEnvironment(
     .filter((name) => name.startsWith("NEXT_PUBLIC_") && (
       !allowedPublicNames.has(name) ||
       /^sb_secret_/i.test(env[name]?.trim() ?? "") ||
+      (name === "NEXT_PUBLIC_POSTHOG_KEY" && /^phx_/i.test(env[name]?.trim() ?? "")) ||
       privateValues.has(env[name]?.trim())
     ))
     .sort();

@@ -3,6 +3,8 @@ import { Fredoka, Plus_Jakarta_Sans } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { analyticsConfig } from "@/lib/analytics/config";
 import { SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { atRequestTime } from "@/lib/next/request-time";
 
@@ -41,6 +43,8 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         <RenderPerRequest />
         {children}
+        {/* Ruling R70: cookieless visit statistics on every page; nothing without a PostHog key. */}
+        <AnalyticsProvider config={analyticsConfig()} />
       </body>
     </html>
   );

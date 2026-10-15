@@ -82,6 +82,7 @@ The full pre-release list, including running Playwright against a production bui
 - [docs/cms-operations.md](docs/cms-operations.md): working in the Studio, feature toggles, publishing and preview.
 - [docs/database-security.md](docs/database-security.md): tables, row level security, functions and grants, migrations.
 - [docs/deployment.md](docs/deployment.md): environment variables, Vercel, webhooks, health checks, CI, known advisories.
+- [docs/observability.md](docs/observability.md): cookieless visit statistics (PostHog): what is counted, what never is, setup.
 - [docs/manual-checkout-operations.md](docs/manual-checkout-operations.md): the planned manual ordering workflow (not built yet).
 - [docs/qa-checklist.md](docs/qa-checklist.md): release checklist with exact commands.
 - [AGENTS.md](AGENTS.md): instructions for coding agents working in this repository.

@@ -27,6 +27,19 @@ export const UI_COPY = {
   watchStory: "Watch the story",
   /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
   watchOnYouTube: "Watch on YouTube",
+  /** Visit statistics (ruling R70): the footer's choices dialog. */
+  analytics: {
+    choices: "Analytics choices",
+    explainer: [
+      "BIBO Bay counts visits to learn which pages, videos and activities families use, and how they find us: the page, the site or campaign that sent you, your browser and device type, and which buttons and links you choose.",
+      "It uses no cookies and builds no profile of you. It never records what you type into the form. A browser that sends Global Privacy Control or Do Not Track is not counted.",
+      "If you turn statistics off, this browser remembers that choice on your device.",
+    ],
+    statusOn: "Visit statistics are on for this browser.",
+    statusOff: "Visit statistics are off for this browser.",
+    turnOff: "Turn statistics off",
+    turnOn: "Turn statistics on",
+  },
   /** The download card's button; the file's own title follows for assistive technology. */
   downloadFreebie: "Download the free pack",
   /** The repository pack's format line, from its real page count and size. */

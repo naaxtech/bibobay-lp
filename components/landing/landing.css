@@ -320,6 +320,57 @@
     vertical-align: -0.12em;
   }
 
+  .footer-link--button {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  /* The analytics choices: a centred card over a dimmed page (the menu dialog fills the screen). */
+  .dialog-layer:has(.analytics-dialog) {
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background-color: rgb(40 59 99 / 0.45);
+  }
+
+  .analytics-dialog .dialog__title {
+    font-family: var(--bibo-font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  .analytics-dialog {
+    max-inline-size: 34rem;
+    max-block-size: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.75rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  .analytics-dialog__text {
+    margin-block-start: 0.75rem;
+    color: var(--bibo-color-navy-soft);
+  }
+
+  .analytics-dialog__status {
+    margin-block-start: 1rem;
+    font-weight: 600;
+  }
+
+  .analytics-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-block-start: 1.25rem;
+  }
+
   .footer-link--social {
     display: inline-flex;
     align-items: center;
