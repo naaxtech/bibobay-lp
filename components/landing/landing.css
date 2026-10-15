@@ -928,7 +928,7 @@
 
     /* The fold of the open book, shading the right-hand page. */
     .storybook__page {
-      box-shadow: inset 1.25rem 0 1.5rem -1.25rem rgb(19 41 75 / 0.16);
+      box-shadow: inset 1.25rem 0 1.5rem -1.25rem rgb(40 59 99 / 0.16);
     }
   }
 
@@ -986,7 +986,7 @@
     margin-block-start: 0.45rem;
     border-radius: 50%;
     background-color: var(--step-color);
-    box-shadow: 0.125rem 0.1875rem 0 rgb(19 41 75 / 0.12);
+    box-shadow: 0.125rem 0.1875rem 0 rgb(40 59 99 / 0.12);
   }
 
   /* ---------- What children can practise: a staggered typographic list ---------- */

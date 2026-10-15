@@ -80,9 +80,29 @@ describe("brand palette", () => {
     expect(fill('#bibo-inks > g[data-piece="b2"]')).toBe(brandTokens.color.orange);
     expect(fill('#bibo-inks > g[data-piece="o"]')).toBe(brandTokens.color.purple);
     expect(fill('#bibo-inks [data-piece="smile"]')).toBe(brandTokens.color.navy);
+    expect(fill("#bibo-star")).toBe(brandTokens.color.amber);
+    expect(fill("#bibo-sparkles > path")).toBe(brandTokens.color.teal);
     expect(fill("#bibo-diecuts > path")).toBe(brandTokens.color.paper);
     const palette = new Set<string>(Object.values(brandTokens.color));
     expect([...paintedColours(doc)].filter((colour) => !palette.has(colour))).toEqual([]);
+  });
+
+  it("uses the Bibo Bay channel's own inks and reef colours (ruling R55)", () => {
+    // Sampled from the channel mark (900 px avatar) and banner on 2026-10-15.
+    expect(brandTokens.color).toMatchObject({
+      cream: "#fffbf8",
+      teal: "#349da1",
+      yellow: "#fdbb1f",
+      amber: "#fcac21",
+      orange: "#f06b32",
+      purple: "#9467aa",
+      navy: "#283b63",
+    });
+    // The sunlit reef: deep water at the top, azure, the light shafts, warm sand, the pink badge, Lumi's lilac.
+    for (const name of ["oceanDeep", "ocean", "lagoon", "sandWarm", "coral", "lilac", "kelp"] as const) {
+      expect(brandTokens.color[name], name).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    expect(brandTokens.color.ocean).toBe("#0a8ef8");
   });
 
   it("writes every colour as lowercase six-digit hex", () => {

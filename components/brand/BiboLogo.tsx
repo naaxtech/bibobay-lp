@@ -14,9 +14,9 @@ interface BiboLogoAsset {
  * canvas, so the browser reserves the right space before the image arrives.
  */
 export const BIBO_LOGO_ASSETS = {
-  full: { src: "/bibo-logo.svg", width: 846, height: 544 },
-  mark: { src: "/brand/bibo-mark.svg", width: 948, height: 948 },
-  monochrome: { src: "/brand/bibo-logo-monochrome.svg", width: 846, height: 544 },
+  full: { src: "/bibo-logo.svg", width: 796, height: 496 },
+  mark: { src: "/brand/bibo-mark.svg", width: 892, height: 892 },
+  monochrome: { src: "/brand/bibo-logo-monochrome.svg", width: 796, height: 496 },
 } as const satisfies Record<BiboLogoVariant, BiboLogoAsset>;
 
 export const BIBO_LOGO_ALT = "BIBO";

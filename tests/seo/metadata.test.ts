@@ -7,6 +7,7 @@ import manifestRoute from "@/app/manifest";
 import * as openGraphImage from "@/app/opengraph-image";
 import robotsRoute from "@/app/robots";
 import sitemapRoute from "@/app/sitemap";
+import { brandTokens } from "@/lib/brand/tokens";
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
 import {
@@ -205,8 +206,8 @@ describe("web app manifest", () => {
       description: SAFE_FALLBACK_SETTINGS.description,
       start_url: "/",
       display: "browser",
-      background_color: "#f8f3e9",
-      theme_color: "#f8f3e9",
+      background_color: brandTokens.color.cream,
+      theme_color: brandTokens.color.cream,
       icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
     });
   });

@@ -23,9 +23,9 @@ export interface LeadMagnetLink {
 }
 
 const BRAND = "BIBO Bay";
-const NAVY = "#13294b";
-const NAVY_SOFT = "#45536b";
-const CREAM = "#f8f3e9";
+const NAVY = "#283b63";
+const NAVY_SOFT = "#4a5878";
+const CREAM = "#fffbf8";
 const TEAL_INK = "#0c6b68";
 
 export function escapeHtml(value: string): string {

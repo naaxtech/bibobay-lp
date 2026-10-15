@@ -8,24 +8,31 @@
 
 const color = {
   // Paper and ink
-  cream: "#f8f3e9",
+  cream: "#fffbf8",
   paper: "#ffffff",
-  sand: "#ede0c6",
-  line: "#dccfb6",
-  navy: "#13294b",
-  navySoft: "#45536b",
-  // Logo inks, sampled from references/bibo-logo.jpg and fixed as production values
-  teal: "#29aba8",
-  yellow: "#f9b224",
-  amber: "#f6a31c",
-  orange: "#f06323",
-  purple: "#7c5fa8",
+  sand: "#fbe9d4",
+  line: "#ecd8bf",
+  navy: "#283b63",
+  navySoft: "#4a5878",
+  // Logo inks, sampled from the Bibo Bay channel mark (ruling R55) and fixed as production values
+  teal: "#349da1",
+  yellow: "#fdbb1f",
+  amber: "#fcac21",
+  orange: "#f06b32",
+  purple: "#9467aa",
   // Text-safe deep tones of the logo inks: at least 4.5:1 on cream, paper and sand
   tealInk: "#0c6b68",
   orangeInk: "#a93b0c",
   purpleInk: "#5b4189",
-  // Bay system colours
-  ocean: "#3aa8d0",
+  // The sunlit reef of the channel banner: deep water, azure, light shafts, warm sand, the pink
+  // badge, Lumi's lilac and Tula's kelp green. Decorative fills only; text never sits on them unpaired.
+  oceanDeep: "#0b5cb8",
+  ocean: "#0a8ef8",
+  lagoon: "#3bb8fb",
+  sandWarm: "#f5c08f",
+  coral: "#f63882",
+  lilac: "#c08ae2",
+  kelp: "#6fbf4a",
   seagrass: "#5e9f6e",
 } as const;
 
@@ -54,9 +61,9 @@ const radius = {
 
 /** Cut-paper light falls from the top left, so every cast layer drops down and to the right. */
 const shadow = {
-  paper: "0.125rem 0.1875rem 0 rgb(19 41 75 / 0.06), 0.25rem 0.5rem 1.25rem rgb(19 41 75 / 0.12)",
-  felt: "inset 0 0.0625rem 0 rgb(255 255 255 / 0.65), 0.125rem 0.375rem 1.5rem rgb(19 41 75 / 0.1)",
-  lifted: "0.1875rem 0.375rem 0 rgb(19 41 75 / 0.07), 0.5rem 1rem 2rem rgb(19 41 75 / 0.16)",
+  paper: "0.125rem 0.1875rem 0 rgb(40 59 99 / 0.06), 0.25rem 0.5rem 1.25rem rgb(40 59 99 / 0.12)",
+  felt: "inset 0 0.0625rem 0 rgb(255 255 255 / 0.65), 0.125rem 0.375rem 1.5rem rgb(40 59 99 / 0.1)",
+  lifted: "0.1875rem 0.375rem 0 rgb(40 59 99 / 0.07), 0.5rem 1rem 2rem rgb(40 59 99 / 0.16)",
 } as const;
 
 const space = {

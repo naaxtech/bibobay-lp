@@ -6,7 +6,8 @@ import { BRAND_ASSET_SOURCE, BRAND_ASSET_TARGETS, deriveBrandAssets } from "@/sc
 import { paintedColours, readSvg, readText, viewBoxOf } from "./svg-geometry";
 
 const LETTERS = ["b1", "i", "b2", "o"] as const;
-const RAYS = ["ray-left", "ray-top", "ray-right"] as const;
+/** The pieces around the letters on the channel mark: a star over the i and three sparkles off the O. */
+const EXTRAS = ["star", "sparkle-1", "sparkle-2", "sparkle-3"] as const;
 
 const dieCut = (doc: Document, piece: string) => doc.querySelector(`#bibo-diecuts > path[data-piece="${piece}"]`);
 const pathData = (doc: Document) => Array.from(doc.querySelectorAll("path")).map((path) => path.getAttribute("d") ?? "");
@@ -52,20 +53,21 @@ describe("derived brand assets", () => {
     const doc = readSvg("public/brand/bibo-mark.svg");
     const [, , w, h] = viewBoxOf(doc);
     expect(w).toBe(h);
-    for (const piece of [...LETTERS, ...RAYS]) expect(dieCut(doc, piece), `mark keeps the ${piece} sticker`).not.toBeNull();
-    expect(doc.querySelectorAll("#bibo-sun-rays > path")).toHaveLength(3);
+    for (const piece of [...LETTERS, ...EXTRAS]) expect(dieCut(doc, piece), `mark keeps the ${piece} sticker`).not.toBeNull();
+    expect(doc.querySelector("#bibo-star")).not.toBeNull();
+    expect(doc.querySelectorAll("#bibo-sparkles > path")).toHaveLength(3);
     expect(doc.querySelectorAll('#bibo-inks [data-piece="smile"]')).toHaveLength(1);
   });
 
-  it("print the monochrome logo in one ink with every letterform, the sun, three rays and the smile", () => {
+  it("print the monochrome logo in one ink with every letterform, the star, three sparkles and the smile", () => {
     const doc = readSvg("public/brand/bibo-logo-monochrome.svg");
     expect([...paintedColours(doc)]).toEqual([brandTokens.color.navy]);
     expect(doc.querySelectorAll("filter")).toHaveLength(0);
     for (const piece of LETTERS) {
       expect(doc.querySelector(`#bibo-inks > g[data-piece="${piece}"]`), `monochrome keeps ${piece}`).not.toBeNull();
     }
-    expect(doc.querySelector("#bibo-sun")).not.toBeNull();
-    expect(doc.querySelectorAll("#bibo-sun-rays > path")).toHaveLength(3);
+    expect(doc.querySelector("#bibo-star")).not.toBeNull();
+    expect(doc.querySelectorAll("#bibo-sparkles > path")).toHaveLength(3);
     expect(doc.querySelectorAll('#bibo-inks [data-piece="smile"]')).toHaveLength(1);
   });
 
@@ -75,7 +77,8 @@ describe("derived brand assets", () => {
     expect(w).toBe(h);
     expect(doc.querySelectorAll("filter, [filter]")).toHaveLength(0);
     for (const piece of LETTERS) expect(dieCut(doc, piece), `icon keeps the ${piece} sticker`).not.toBeNull();
-    expect(doc.querySelectorAll("#bibo-sun-rays > path")).toHaveLength(3);
+    expect(doc.querySelector("#bibo-star")).not.toBeNull();
+    expect(doc.querySelectorAll("#bibo-sparkles > path")).toHaveLength(3);
   });
 
   it("let the generated app/icon.svg be the favicon instead of a hand-pointed icon", () => {

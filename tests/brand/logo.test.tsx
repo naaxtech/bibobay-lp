@@ -24,7 +24,9 @@ import {
 
 const CANONICAL = "public/bibo-logo.svg";
 const LETTERS = ["b1", "i", "b2", "o"] as const;
-const RAYS = ["ray-left", "ray-top", "ray-right"] as const;
+/** The pieces around the letters on the channel mark: a star over the i and three sparkles off the O. */
+const SPARKLES = ["sparkle-1", "sparkle-2", "sparkle-3"] as const;
+const EXTRAS = ["star", ...SPARKLES] as const;
 
 const canonical = () => readSvg(CANONICAL);
 const dieCut = (doc: Document, piece: string) => doc.querySelector(`#bibo-diecuts > path[data-piece="${piece}"]`);
@@ -74,7 +76,7 @@ describe("canonical BIBO logo", () => {
 
   it("gives every sticker its own soft down-right paper shadow", () => {
     const doc = canonical();
-    for (const piece of [...LETTERS, ...RAYS]) {
+    for (const piece of [...LETTERS, ...EXTRAS]) {
       const cut = dieCut(doc, piece);
       expect(cut, `die-cut for ${piece}`).not.toBeNull();
       const shadow = shadowFilterOf(doc, cut!);
@@ -114,39 +116,50 @@ describe("canonical BIBO logo", () => {
       expect(inheritedAttribute(path, "fill-rule")).toBe("evenodd");
     }
     expect(letter(doc, "i")!.querySelector("#bibo-i-stem")).not.toBeNull();
-    expect(letter(doc, "i")!.querySelector("#bibo-sun")).not.toBeNull();
+    // The star is its own amber piece beside the letters (see below), not part of the i.
+    expect(letter(doc, "i")!.querySelector("#bibo-star")).toBeNull();
   });
 
-  it("crowns the i with a sun dot and exactly three rays, each on its own backing", () => {
+  it("crowns the i with an amber star, set apart from the stem on its own sticker", () => {
     const doc = canonical();
-    const sunElement = doc.querySelector("#bibo-sun");
-    expect(sunElement).not.toBeNull();
-    const sun = elementBounds(sunElement!);
-    const rays = Array.from(doc.querySelectorAll("#bibo-sun-rays > path"));
-    expect(rays.map((ray) => ray.getAttribute("data-piece"))).toEqual([...RAYS]);
+    const starElement = doc.querySelector('#bibo-star[data-piece="star"]');
+    expect(starElement).not.toBeNull();
+    const star = elementBounds(starElement!);
+    const stem = elementBounds(doc.querySelector("#bibo-i-stem")!);
 
-    const [left, top, right] = rays.map((ray) => pathBounds(ray.getAttribute("d") ?? ""));
-    for (const ray of [left!, top!, right!]) expect(centre(ray)[1]).toBeLessThan(sun.minY);
-    expect(centre(left!)[0]).toBeLessThan(centre(sun)[0]);
-    expect(centre(right!)[0]).toBeGreaterThan(centre(sun)[0]);
-    // Bounds include Bezier control points, which widen the rounded caps; diagonals stay near square.
-    expect(height(top!)).toBeGreaterThan(width(top!) * 1.5);
-    for (const diagonal of [left!, right!]) {
-      expect(Math.min(width(diagonal), height(diagonal)) / Math.max(width(diagonal), height(diagonal))).toBeGreaterThan(0.5);
-    }
+    // Directly over the stem, clear of it, and about as wide as it is tall.
+    expect(centre(star)[0]).toBeGreaterThan(stem.minX);
+    expect(centre(star)[0]).toBeLessThan(stem.maxX);
+    expect(star.maxY).toBeLessThan(stem.minY);
+    expect(width(star) / height(star)).toBeGreaterThan(0.75);
+    expect(width(star) / height(star)).toBeLessThan(1.33);
 
-    // Left ray warm amber, upright ray in the second B's coral-orange, right ray in the first B's teal.
-    const [leftFill, topFill, rightFill] = rays.map((ray) => fillOf(ray));
-    expect(new Set([leftFill, topFill, rightFill]).size).toBe(3);
-    expect(topFill).toBe(fillOf(letter(doc, "b2")));
-    expect(rightFill).toBe(fillOf(letter(doc, "b1")));
-    expect(leftFill).not.toBe(fillOf(sunElement));
+    // Warm amber: red over green over blue, and a different ink from the yellow stem.
+    const starFill = fillOf(starElement);
+    expect(starFill).not.toBe(fillOf(letter(doc, "i")));
+    const [r, g, b] = rgb(starFill ?? "#000000");
+    expect(r).toBeGreaterThan(g);
+    expect(g).toBeGreaterThan(b);
 
-    for (const piece of RAYS) {
-      const backing = dieCut(doc, piece);
-      expect(backing, `backing for ${piece}`).not.toBeNull();
-      const ray = pathBounds(doc.querySelector(`#bibo-sun-rays > path[data-piece="${piece}"]`)?.getAttribute("d") ?? "");
-      expect(contains(pathBounds(backing!.getAttribute("d") ?? ""), ray, 1)).toBe(true);
+    const backing = dieCut(doc, "star");
+    expect(backing, "star sticker").not.toBeNull();
+    expect(contains(pathBounds(backing!.getAttribute("d") ?? ""), star, 1)).toBe(true);
+    expect(containsPoint(pathBounds(backing!.getAttribute("d") ?? ""), centre(stem))).toBe(false);
+  });
+
+  it("sends exactly three teal sparkles off the top right of the O, each on its own sticker", () => {
+    const doc = canonical();
+    const sparkles = Array.from(doc.querySelectorAll("#bibo-sparkles > path"));
+    expect(sparkles.map((sparkle) => sparkle.getAttribute("data-piece"))).toEqual([...SPARKLES]);
+    const o = elementBounds(letter(doc, "o")!);
+    for (const sparkle of sparkles) {
+      const bounds = pathBounds(sparkle.getAttribute("d") ?? "");
+      expect(centre(bounds)[0], "right of the O's centre").toBeGreaterThan(centre(o)[0]);
+      expect(centre(bounds)[1], "in the O's top quarter or above").toBeLessThan(o.minY + height(o) * 0.25);
+      expect(fillOf(sparkle), "teal like the first B").toBe(fillOf(letter(doc, "b1")));
+      const backing = dieCut(doc, sparkle.getAttribute("data-piece")!);
+      expect(backing, `sticker for ${sparkle.getAttribute("data-piece")}`).not.toBeNull();
+      expect(contains(pathBounds(backing!.getAttribute("d") ?? ""), bounds, 1)).toBe(true);
     }
   });
 
@@ -154,9 +167,11 @@ describe("canonical BIBO logo", () => {
     const doc = canonical();
     const smiles = doc.querySelectorAll('#bibo-inks [data-piece="smile"]');
     expect(smiles).toHaveLength(1);
+    // Navy: blue leads, and the ink stays dark enough to read as a line, not a colour.
     const [r, g, b] = rgb(fillOf(smiles[0]!) ?? "#ffffff");
     expect(b).toBeGreaterThan(r);
-    expect(r + g + b).toBeLessThan(160);
+    expect(b).toBeGreaterThan(g);
+    expect(r + g + b).toBeLessThan(220);
 
     const smile = elementBounds(smiles[0]!);
     const stem = elementBounds(doc.querySelector("#bibo-i-stem")!);

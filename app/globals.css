@@ -12,21 +12,27 @@
  */
 :root {
   color-scheme: light;
-  --bibo-color-cream: #f8f3e9;
+  --bibo-color-cream: #fffbf8;
   --bibo-color-paper: #ffffff;
-  --bibo-color-sand: #ede0c6;
-  --bibo-color-line: #dccfb6;
-  --bibo-color-navy: #13294b;
-  --bibo-color-navy-soft: #45536b;
-  --bibo-color-teal: #29aba8;
-  --bibo-color-yellow: #f9b224;
-  --bibo-color-amber: #f6a31c;
-  --bibo-color-orange: #f06323;
-  --bibo-color-purple: #7c5fa8;
+  --bibo-color-sand: #fbe9d4;
+  --bibo-color-line: #ecd8bf;
+  --bibo-color-navy: #283b63;
+  --bibo-color-navy-soft: #4a5878;
+  --bibo-color-teal: #349da1;
+  --bibo-color-yellow: #fdbb1f;
+  --bibo-color-amber: #fcac21;
+  --bibo-color-orange: #f06b32;
+  --bibo-color-purple: #9467aa;
   --bibo-color-teal-ink: #0c6b68;
   --bibo-color-orange-ink: #a93b0c;
   --bibo-color-purple-ink: #5b4189;
-  --bibo-color-ocean: #3aa8d0;
+  --bibo-color-ocean-deep: #0b5cb8;
+  --bibo-color-ocean: #0a8ef8;
+  --bibo-color-lagoon: #3bb8fb;
+  --bibo-color-sand-warm: #f5c08f;
+  --bibo-color-coral: #f63882;
+  --bibo-color-lilac: #c08ae2;
+  --bibo-color-kelp: #6fbf4a;
   --bibo-color-seagrass: #5e9f6e;
   --bibo-font-display: var(--font-fredoka, "Fredoka"), ui-rounded, "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
   --bibo-font-body: var(--font-plus-jakarta, "Plus Jakarta Sans"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -48,9 +54,9 @@
   --bibo-radius-paper: 1.25rem;
   --bibo-radius-sticker: 2rem;
   --bibo-radius-pill: 999px;
-  --bibo-shadow-paper: 0.125rem 0.1875rem 0 rgb(19 41 75 / 0.06), 0.25rem 0.5rem 1.25rem rgb(19 41 75 / 0.12);
-  --bibo-shadow-felt: inset 0 0.0625rem 0 rgb(255 255 255 / 0.65), 0.125rem 0.375rem 1.5rem rgb(19 41 75 / 0.1);
-  --bibo-shadow-lifted: 0.1875rem 0.375rem 0 rgb(19 41 75 / 0.07), 0.5rem 1rem 2rem rgb(19 41 75 / 0.16);
+  --bibo-shadow-paper: 0.125rem 0.1875rem 0 rgb(40 59 99 / 0.06), 0.25rem 0.5rem 1.25rem rgb(40 59 99 / 0.12);
+  --bibo-shadow-felt: inset 0 0.0625rem 0 rgb(255 255 255 / 0.65), 0.125rem 0.375rem 1.5rem rgb(40 59 99 / 0.1);
+  --bibo-shadow-lifted: 0.1875rem 0.375rem 0 rgb(40 59 99 / 0.07), 0.5rem 1rem 2rem rgb(40 59 99 / 0.16);
   --bibo-space-tight: clamp(0.5rem, 0.42rem + 0.4vw, 0.75rem);
   --bibo-space-block: clamp(1rem, 0.8rem + 1vw, 1.5rem);
   --bibo-space-gutter: clamp(1rem, 0.4rem + 3vw, 3rem);
@@ -63,8 +69,8 @@
   --bibo-ease-paper: cubic-bezier(0.22, 1, 0.36, 1);
   --bibo-ease-press: cubic-bezier(0.3, 0, 0.2, 1);
   --bibo-ease-drift: cubic-bezier(0.45, 0, 0.55, 1);
-  --bibo-focus-color: #13294b;
-  --bibo-focus-color-on-dark: #f9b224;
+  --bibo-focus-color: #283b63;
+  --bibo-focus-color-on-dark: #fdbb1f;
   --bibo-focus-width: 3px;
   --bibo-focus-offset: 3px;
 }
@@ -101,7 +107,13 @@
   --color-bibo-teal-ink: var(--bibo-color-teal-ink);
   --color-bibo-orange-ink: var(--bibo-color-orange-ink);
   --color-bibo-purple-ink: var(--bibo-color-purple-ink);
+  --color-bibo-ocean-deep: var(--bibo-color-ocean-deep);
   --color-bibo-ocean: var(--bibo-color-ocean);
+  --color-bibo-lagoon: var(--bibo-color-lagoon);
+  --color-bibo-sand-warm: var(--bibo-color-sand-warm);
+  --color-bibo-coral: var(--bibo-color-coral);
+  --color-bibo-lilac: var(--bibo-color-lilac);
+  --color-bibo-kelp: var(--bibo-color-kelp);
   --color-bibo-seagrass: var(--bibo-color-seagrass);
   --font-sans: var(--bibo-font-body);
   --font-body: var(--bibo-font-body);
