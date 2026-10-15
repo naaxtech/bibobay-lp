@@ -51,6 +51,8 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/privacy`, `/terms` | ƒ | Legal pages: Sanity text, or the plain-language repository fallback (then noindex) |
 | `/thank-you` | ƒ | Neutral page explaining the list; never claims a signup happened; noindex |
 | `/shop`, `/shop/[slug]` | ƒ | Catalogue and product pages, with no price anywhere; 404 unless commerce is enabled in the CMS, decided before the catalogue is read (Task 7b). A sold-out product keeps its page, marked sold out and noindex; a draft or unknown slug is a 404 |
+| `/order` | ƒ | Order request: the order pad with names from the CMS catalogue, how paying works (nothing is charged here), and the order form; 404 unless commerce is enabled, decided before anything else is read; noindex (Task 7c) |
+| `/track`, `/orders/[token]` | ƒ | Order tracking by reference plus email, and by private link; 404 unless commerce and tracking are enabled; noindex. A malformed or unknown token is the same 404; `/orders/*` sends `Referrer-Policy: no-referrer`, `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow` (Task 7c) |
 | `/_not-found` | ƒ | 404 page |
 | `/studio` | ƒ | 307 to the Studio URL from site settings when it is https; 404 otherwise |
 | `/api/leads` | ƒ | POST: founding-family signup |
@@ -66,21 +68,23 @@ Planned, not in the code:
 
 | Route | State |
 |---|---|
-| `/order` | not built yet (Task 7c): order request form; noindex |
-| `/track`, `/orders/[token]` | not built yet (Task 7c): order tracking pages; noindex, and `/orders/*` already sends `Referrer-Policy: no-referrer` |
 | `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8): staff order administration |
 
-The robots rules already keep crawlers out of those future private paths (`ROBOTS_DISALLOW` in
-`lib/seo/metadata.ts`). The header and footer show the shop link (the CMS label
-`navigation.commerceLabel`) only while commerce is enabled, and the sitemap lists `/shop` and the
-listed product pages only then.
+The robots rules keep crawlers out of the private and transactional paths (`/order`, `/orders/`,
+`/track`, `/admin`; `ROBOTS_DISALLOW` in `lib/seo/metadata.ts`), and the sitemap never lists them.
+The header and footer show the shop link (the CMS label `navigation.commerceLabel`) only while
+commerce is enabled, the footer's "Track an order" link only while tracking is enabled too, and the
+sitemap lists `/shop` and the listed product pages only while commerce is on.
 
 ## Server and client boundary
 
 - Pages and sections are React Server Components by default. Client components are only:
   `LeadForm`, `Navbar` (mobile menu), `Characters` and `Episodes` (tab selectors), `SectionShell`
-  (reveals), `GsapProvider` and `Dialog`, plus the shop's `OrderPadProvider`, `AddToOrder` and
-  `OrderPadSummary`, which do nothing unless the `app/(commerce)` layout mounted the pad (commerce on).
+  (reveals), `GsapProvider` and `Dialog`, plus the shop's `OrderPadProvider`, `AddToOrder`,
+  `OrderPadSummary` and `OrderRequest` (with `OrderForm`), which do nothing unless the
+  `app/(commerce)` layout mounted the pad (commerce on), and `TrackOrderForm` and `LocalTime` on the
+  tracking pages. The order status view (`components/orders/OrderStatusView.tsx`) renders on the
+  server for `/orders/[token]` and in the browser for `/track`.
 - Every module that reads a server setting or talks to Sanity with a token, Supabase or Resend
   imports `server-only`, so importing it from a client component is a build error:
   `lib/sanity/{client,fetch,image}.ts`, `lib/leads/{submit,dependencies,http}.ts`,
@@ -89,7 +93,8 @@ listed product pages only then.
   `lib/ops/readiness.ts`. (`lib/sanity/env.ts` reads only the public project id, dataset and API
   version; `lib/sanity/draft-mode.ts` is used only by server routes and pages.)
 - The browser form imports only `lib/leads/fields.ts` (no Zod, no `process.env`); a test walks its
-  import graph (`tests/leads/env-boundary.test.ts`).
+  import graph (`tests/leads/env-boundary.test.ts`). The order and tracking forms likewise import
+  only `lib/orders/fields.ts`, `lib/orders/constants.ts` and `lib/orders/countries.ts` (and types).
 - The browser never calls Supabase or Resend. The CSP's `connect-src 'self'` enforces this.
 - `npm run verify:bundle` scans the built client output for server names, secret values and
   token-shaped strings; see [deployment.md](deployment.md#client-bundle-secret-scan).
@@ -169,7 +174,8 @@ upgrade-insecure-requests            (Vercel deployments only)
   `Cross-Origin-Opener-Policy: same-origin`, and no `X-Powered-By`. HSTS
   (`max-age=63072000; includeSubDomains`, no `preload`) is sent only by the production Vercel deployment.
 - `/orders/*` (the private order pages, Task 7c) sends `Referrer-Policy: no-referrer` instead, so
-  the tracking token in their address never leaves them (`PRIVATE_LINK_HEADER_RULE`).
+  the tracking token in their address never leaves them, plus `Cache-Control: private, no-store` and
+  `X-Robots-Tag: noindex, nofollow` (`PRIVATE_LINK_HEADER_RULE`).
 - **Why every page is rendered per request:** the HTML carries inline React Server Components
   scripts, and Next can stamp the nonce on them only when it renders the page for that request.
   The root layout awaits `connection()`; that keeps the Sanity reads in the Data Cache, so a request

@@ -1,14 +1,13 @@
 # Manual checkout operations
 
-**Status: partly built, not usable yet.** The commerce gate and order pad (Task 6) exist, and so do
-the order database, the order request API and the tracking API (Task 7a; see
-[database-security.md](database-security.md#orders-migrations-0002-to-0005)) and the shop's
-catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b). The order request page and the
-tracking pages (`/order`, `/track`, `/orders/[token]`) are not built yet (Task 7c), and neither are
-the staff area and quote emails (Task 8; see the plan in `docs/superpowers/plans/`).
-`commerceEnabled` is `false` by default and must stay off: switching it on today shows the shop,
-whose "Review your order" link leads to a page that does not exist yet, and opens the order and
-tracking APIs, which would store order requests that nobody can manage yet.
+**Status: the customer side is built; the staff side is not built yet, so it is not usable yet.**
+The commerce gate and order pad (Task 6), the order database, the order request API and the
+tracking API (Task 7a; see [database-security.md](database-security.md#orders-migrations-0002-to-0005)),
+the shop's catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b), and the order request
+and tracking pages, `/order`, `/track` and `/orders/[token]` (Task 7c), all exist. The staff area,
+quote emails and the outbox worker are not built yet (Task 8; see the plan in
+`docs/superpowers/plans/`). `commerceEnabled` is `false` by default and must stay off: switching it
+on today lets customers send order requests that nobody can see, answer or manage yet.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been
@@ -24,16 +23,37 @@ tested. Do not take orders by any other route in the meantime.
   an "Add to order" button, grouped by category when products have one. A product page adds the
   CMS details, the SKU, variant and pack when set, and the product's notice. A sold-out product
   keeps its page, marked sold out, with no way to add it. No price appears anywhere.
-- The order request page (`/order`), the tracking pages and every `/orders/...` page will be
-  `noindex` and kept out of the sitemap; `/orders/...` already sends no referrer, and visit
-  statistics and error reports record such an address as `/orders/[token]`.
+
+**The order and tracking pages** (Task 7c)
+
+- While commerce is off, `/order` answers "not found"; while commerce or tracking is off, `/track`
+  and every `/orders/...` address do too, and the footer shows no "Track an order" link.
+- `/order` shows the customer's order pad with product names from the CMS (products no longer listed
+  drop out), says plainly that nothing is charged and that a quote with a payment link comes by
+  email, and asks for adult contact and delivery details, optional notes and the order consent tick
+  (the sentence and its version come from the CMS legal settings; see
+  [cms-operations.md](cms-operations.md#legal-text-consent-version-and-indexing)). The country list
+  is the CMS `orderCountries`, or every country.
+- Each order attempt carries a random submission key. If a customer's connection drops and the form
+  sends the same request again, the database answers with the first order's reference and stores
+  nothing new: one order, one set of queued emails.
+- Once stored, the page shows the order reference and, with tracking on, the private tracking link
+  (shown once; only a hash of it is kept) and the way to `/track`. The order pad empties.
+- `/track` finds an order by its reference and the email it was placed with; `/orders/<token>`
+  opens it by private link. Both show the status, its steps, the products with their quantities and
+  two dates, never a price, an address or an email. Every miss reads the same.
+- These pages are `noindex` and never in the sitemap. `/orders/...` sends no referrer and
+  `Cache-Control: private, no-store`, and visit statistics and error reports record such an address
+  as `/orders/[token]`.
 
 **Testing the shop with commerce on** (developers)
 
 `scripts/e2e/enable-commerce-fixture.mjs <copy>` switches commerce and tracking on in a scratch
 copy of the repository and makes its catalogue return a few test products, so the production build
-of that copy can run `e2e/shop/commerce-on.spec.ts` (`E2E_COMMERCE=1`). It refuses to touch this
-repository or any folder inside a git work tree, and nothing in the site imports it.
+of that copy can run `e2e/shop/commerce-on.spec.ts` and `e2e/shop/order-flow.spec.ts`
+(`E2E_COMMERCE=1`). The copy has no database: the order and tracking specs answer the API calls in
+the browser (`page.route`), and `/orders/<token>` shows its "tracking unavailable" state. It refuses
+to touch this repository or any folder inside a git work tree, and nothing in the site imports it.
 
 ## What the specification requires
 

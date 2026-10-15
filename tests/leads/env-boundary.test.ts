@@ -124,4 +124,20 @@ describe("the browser form's import graph", () => {
     }
     expect(seen.size).toBeGreaterThanOrEqual(3);
   });
+
+  it("is matched by the order and tracking forms' graphs (Task 7c): no server-only module, Supabase or secret", () => {
+    const seen = new Set<string>();
+    const queue = ["components/shop/OrderRequest.tsx", "components/forms/OrderForm.tsx", "components/forms/TrackOrderForm.tsx", "components/orders/OrderStatusView.tsx"].map((file) => resolve(file));
+    while (queue.length) {
+      const file = queue.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      expect(file, "client graph imports server-only").not.toBe("server-only");
+      if (file === "server-only") continue;
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(/@supabase\/|from ["']resend["']|from ["']zod["']|process\.env|SERVICE_ROLE|RESEND_API_KEY|LEAD_IP_HASH_SECRET/);
+      queue.push(...localImports(file));
+    }
+    expect([...seen].some((file) => file.endsWith(resolve("lib/orders/fields.ts")))).toBe(true);
+  });
 });

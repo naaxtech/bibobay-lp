@@ -84,13 +84,15 @@ create temp table fixture on commit drop as
     p_city => 'Seaside', p_country => 'AU', p_consent => true, p_consent_version => 'consent-v1',
     p_lines => '[{"sanity_id": "product-tula", "title": "Tula plush", "sku": "BB-TULA-01", "variant": "Large", "pack": "Single", "quantity": 2},
                  {"sanity_id": "product-bob", "title": "Bob book", "sku": null, "variant": null, "pack": null, "quantity": 1}]'::jsonb,
-    p_phone => '+61 2 5550 1234', p_postal_code => '2000', p_notes => 'Leave at the door'
+    p_phone => '+61 2 5550 1234', p_postal_code => '2000', p_notes => 'Leave at the door',
+    p_submission_key => gen_random_uuid()
   );
 create temp table other on commit drop as
   select * from public.submit_order(
     p_contact_name => 'Alex Shore', p_email => 'other@example.com', p_address_line1 => '3 Reef Street',
     p_city => 'Bayview', p_country => 'AU', p_consent => true, p_consent_version => 'consent-v1',
-    p_lines => '[{"sanity_id": "product-lumi", "title": "Lumi puzzle", "quantity": 1}]'::jsonb
+    p_lines => '[{"sanity_id": "product-lumi", "title": "Lumi puzzle", "quantity": 1}]'::jsonb,
+    p_submission_key => gen_random_uuid()
   );
 
 -- The private token

@@ -62,7 +62,7 @@ begin
 
   -- The order RPCs: service_role only.
   foreach v_function in array array[
-    'public.submit_order(text, text, text, text, text, boolean, text, jsonb, text, text, text, text, text)',
+    'public.submit_order(text, text, text, text, text, boolean, text, jsonb, uuid, text, text, text, text, text)',
     'public.lookup_order_by_token(text)',
     'public.lookup_order_by_reference_email(text, text)'
   ] loop

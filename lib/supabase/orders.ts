@@ -84,6 +84,7 @@ export function createSupabaseOrderRepository(client: RpcClient): SupabaseOrderR
         p_notes: record.notes ?? null,
         p_consent: true,
         p_consent_version: record.consentVersion,
+        p_submission_key: record.submissionKey,
         // The canonical CMS snapshot only (lib/orders/catalogue.ts), in the keys submit_order checks.
         p_lines: record.lines.map((line) => ({
           sanity_id: line.productId,
@@ -94,13 +95,22 @@ export function createSupabaseOrderRepository(client: RpcClient): SupabaseOrderR
           quantity: line.quantity,
         })),
       }));
-      const expiresAt = isoTimestamp(row?.tracking_token_expires_at);
+      if (!isUuid(row?.order_id) || typeof row?.reference !== "string" || !ORDER_REFERENCE_PATTERN.test(row.reference)) {
+        throw new RpcError("submit_order", "bad_response");
+      }
+      // R81: a repeated submission key answers with the first order, and never with a token.
+      if (row.duplicate === true) {
+        if (row.tracking_token !== null || row.tracking_token_expires_at !== null || row.acknowledgement_queued !== false) {
+          throw new RpcError("submit_order", "bad_response");
+        }
+        return { orderId: row.order_id, reference: row.reference, trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true };
+      }
+      const expiresAt = isoTimestamp(row.tracking_token_expires_at);
       if (
-        !isUuid(row?.order_id) ||
-        typeof row?.reference !== "string" || !ORDER_REFERENCE_PATTERN.test(row.reference) ||
-        typeof row?.tracking_token !== "string" || !TRACKING_TOKEN_PATTERN.test(row.tracking_token) ||
+        row.duplicate !== false ||
+        typeof row.tracking_token !== "string" || !TRACKING_TOKEN_PATTERN.test(row.tracking_token) ||
         !expiresAt ||
-        typeof row?.acknowledgement_queued !== "boolean"
+        typeof row.acknowledgement_queued !== "boolean"
       ) {
         throw new RpcError("submit_order", "bad_response");
       }
@@ -110,6 +120,7 @@ export function createSupabaseOrderRepository(client: RpcClient): SupabaseOrderR
         trackingToken: row.tracking_token,
         trackingTokenExpiresAt: expiresAt,
         acknowledgementQueued: row.acknowledgement_queued,
+        duplicate: false,
       };
     },
 

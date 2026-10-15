@@ -9,6 +9,7 @@ const { getSiteSettings, getLegalSettings, getListedProducts } = vi.hoisted(() =
 vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings, getLegalSettings, getListedProducts }));
 
 import sitemapRoute from "@/app/sitemap";
+import { seoEnvironment, sitemapFor } from "@/lib/seo/metadata";
 
 /**
  * Task 7b, spec §10 "Server gating": the sitemap lists /shop and the listed products' pages only
@@ -38,6 +39,15 @@ describe("app/sitemap.ts and the shop", () => {
   it("lists /shop and every listed product page while commerce is on", async () => {
     getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true });
     expect(await urls()).toEqual(["https://bibobay.example/", "https://bibobay.example/shop", "https://bibobay.example/shop/tula-plush", "https://bibobay.example/shop/bubble-cards"]);
+  });
+
+  it("never lists the order, tracking or private order pages, with commerce and tracking on (Task 7c)", async () => {
+    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true, trackingEnabled: true });
+    const listed = await urls();
+    expect(listed.filter((url) => /\/(?:order|orders|track)(?:\/|$)/.test(new URL(url).pathname))).toEqual([]);
+    const seo = seoEnvironment({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true });
+    const pinned = sitemapFor({ seo, settings: { ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true, trackingEnabled: true }, legal: SAFE_FALLBACK_LEGAL, commerceRoutes: ["/shop", "/order", "/track", "/orders/abc", `/orders/${"a".repeat(64)}`] });
+    expect(pinned.map((entry) => entry.url)).toEqual(["https://bibobay.example/", "https://bibobay.example/shop"]);
   });
 
   it("leaves out a product the CMS keeps out of search results", async () => {

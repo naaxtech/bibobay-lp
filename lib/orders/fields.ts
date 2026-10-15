@@ -1,6 +1,6 @@
 /**
- * The order request's field rules, shared by the server schema (./schema.ts) and, in Task 7b, the
- * browser's order form.
+ * The order request's field rules, shared by the server schema (./schema.ts) and the browser's order
+ * form (components/forms/OrderForm.tsx, Task 7c), which checks fields with `checkOrderFields`.
  *
  * Deliberately free of Zod, like lib/leads/fields.ts: the order form can import these constants
  * without shipping a schema library. Every limit here is mirrored by the CHECK constraints and the
@@ -10,7 +10,7 @@
  * Spec §3 ruling 2: adult contact and delivery details only. Nothing here may grow a child's name,
  * birthday, photo, voice, health, school or location. Spec §10: no prices and no payment details.
  */
-import type { LeadFieldErrorCode } from "@/lib/leads/fields";
+import { EMAIL_PATTERN, type LeadFieldErrorCode } from "@/lib/leads/fields";
 
 export { EMAIL_PATTERN, HONEYPOT_FIELD, isHoneypotFilled, normalizeEmail } from "@/lib/leads/fields";
 export { ORDER_PAD_MAX_LINES, ORDER_PAD_MAX_QUANTITY } from "./constants";
@@ -87,3 +87,77 @@ export const ORDER_FIELD_ORDER: readonly OrderField[] = [
   "consent",
   "lines",
 ];
+
+/** What the order form holds for each field it shows. */
+export interface OrderFieldValues {
+  contactName: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  notes: string;
+  consent: boolean;
+}
+
+type Check = (value: string) => OrderFieldErrorCode | undefined;
+
+/** A required one-line field: the server's trim, then required, too long, control characters. */
+const requiredLine = (limit: number): Check => (value) => {
+  const text = value.trim();
+  if (!text) return "required";
+  if (text.length > limit) return "too_long";
+  return SINGLE_LINE_CONTROL.test(text) ? "invalid" : undefined;
+};
+
+/** An optional one-line field: blank means not given. */
+const optionalLine = (limit: number): Check => (value) => (value.trim() ? requiredLine(limit)(value) : undefined);
+
+/**
+ * The browser's check of the order form, giving the same first problem per field as the server's
+ * schema (./schema.ts): tests/orders/order-fields.test.ts compares the two case by case. `countries`
+ * is what the form offers (ruling R85); the server refuses any other country the same way.
+ */
+export function checkOrderFields(values: OrderFieldValues, countries: readonly string[]): OrderFieldErrors {
+  const email = values.email.trim().toLowerCase();
+  const phone = values.phone.trim();
+  const postalCode = values.postalCode.trim();
+  const notes = values.notes.trim();
+  const country = values.country.trim().toUpperCase();
+  const found: OrderFieldErrors = {
+    contactName: requiredLine(ORDER_LIMITS.contactName)(values.contactName),
+    email: !email ? "required" : email.length > ORDER_LIMITS.email ? "too_long" : EMAIL_PATTERN.test(email) ? undefined : "invalid",
+    phone: !phone ? undefined : phone.length > ORDER_LIMITS.phone ? "too_long" : phone.length < PHONE_MIN_LENGTH || !PHONE_PATTERN.test(phone) ? "invalid" : undefined,
+    addressLine1: requiredLine(ORDER_LIMITS.addressLine)(values.addressLine1),
+    addressLine2: optionalLine(ORDER_LIMITS.addressLine)(values.addressLine2),
+    city: requiredLine(ORDER_LIMITS.city)(values.city),
+    region: optionalLine(ORDER_LIMITS.region)(values.region),
+    postalCode: !postalCode ? undefined : postalCode.length > ORDER_LIMITS.postalCode ? "too_long" : POSTAL_CODE_PATTERN.test(postalCode) ? undefined : "invalid",
+    country: !country ? "required" : COUNTRY_PATTERN.test(country) && countries.includes(country) ? undefined : "invalid",
+    notes: !notes ? undefined : notes.length > ORDER_LIMITS.notes ? "too_long" : MULTI_LINE_CONTROL.test(notes) ? "invalid" : undefined,
+    consent: values.consent ? undefined : "required",
+  };
+  const errors: OrderFieldErrors = {};
+  for (const field of ORDER_FIELD_ORDER) {
+    const code = found[field];
+    if (code) errors[field] = code;
+  }
+  return errors;
+}
+
+/**
+ * Ruling R81: a new random key for one order attempt, made when the form opens and kept across
+ * retries until the server answers, so a request sent twice is stored once. A version 4 UUID;
+ * `crypto.randomUUID` where the browser has it, else built from `crypto.getRandomValues`.
+ */
+export function newSubmissionKey(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

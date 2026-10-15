@@ -1,5 +1,10 @@
 import { defineArrayMember, defineField, defineType } from "sanity";
 
+import { orderCountriesProblem } from "../countries";
+
+/** The consent-version token the site stores (lib/leads/dependencies.ts CONSENT_VERSION_PATTERN). */
+const CONSENT_VERSION = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/;
+
 export const siteSettings = defineType({ name: "siteSettings", title: "Site settings", type: "document", fields: [
   defineField({ name: "title", type: "string", validation: (rule) => rule.required() }),
   defineField({ name: "description", type: "text" }),
@@ -8,13 +13,22 @@ export const siteSettings = defineType({ name: "siteSettings", title: "Site sett
   defineField({ name: "seo", type: "seo" }),
   defineField({ name: "commerceEnabled", title: "Enable public commerce", type: "boolean", initialValue: false }),
   defineField({ name: "trackingEnabled", title: "Enable public order tracking", type: "boolean", initialValue: false }),
+  defineField({
+    name: "orderCountries",
+    title: "Countries an order may be delivered to",
+    description: "Two-letter ISO 3166-1 codes in capitals, such as GB or PH. Leave empty to list every country on the order form; the team quotes freight for each request.",
+    type: "array",
+    of: [defineArrayMember({ type: "string" })],
+    options: { layout: "tags" },
+    validation: (rule) => rule.custom((value) => orderCountriesProblem(value)),
+  }),
   defineField({ name: "testimonialsEnabled", title: "Enable verified family experiences", type: "boolean", initialValue: false }),
   defineField({ name: "contactEmail", title: "Verified public contact email", type: "email" }),
   defineField({ name: "studioUrl", title: "Verified standalone Studio URL", type: "url" }),
   defineField({ name: "socialLinks", type: "array", of: [defineArrayMember({ type: "socialLink" })] }),
   defineField({ name: "navigation", type: "navigationSettings" }),
   defineField({ name: "footer", type: "footerSettings" }),
-], initialValue: { commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false, socialLinks: [] } });
+], initialValue: { commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false, socialLinks: [], orderCountries: [] } });
 
 export const landingPage = defineType({ name: "landingPage", title: "Landing page", type: "document", fields: [
   defineField({ name: "sections", title: "Order and visibility", type: "array", of: [defineArrayMember({ type: "landingSection" })], validation: (rule) => rule.custom((value) => {
@@ -47,6 +61,27 @@ export const legalSettings = defineType({ name: "legalSettings", title: "Legal a
   defineField({ name: "terms", type: "portableContent", description: "Requires counsel review before indexing." }),
   defineField({ name: "privacyVersion", type: "date" }), defineField({ name: "termsVersion", type: "date" }),
   defineField({ name: "consentCopyVersion", type: "string", validation: (rule) => rule.required() }),
+  defineField({
+    name: "orderConsentCopy",
+    title: "Order form consent sentence",
+    description: "The sentence a buyer ticks on the order form. Leave it and its version empty to use the site's built-in sentence.",
+    type: "text",
+    rows: 3,
+    validation: (rule) => rule.max(500),
+  }),
+  defineField({
+    name: "orderConsentCopyVersion",
+    title: "Order consent version",
+    description: "Stored with each order as the version of the order consent sentence the buyer agreed to. Change it whenever you change that sentence. A short token: letters, digits, . _ : - (at most 40 characters).",
+    type: "string",
+    validation: (rule) =>
+      rule.custom((value, context) => {
+        const copy = (context.document as { orderConsentCopy?: unknown } | undefined)?.orderConsentCopy;
+        const version = typeof value === "string" ? value.trim() : "";
+        if (!version) return typeof copy === "string" && copy.trim() ? "Set a version whenever the order consent sentence is set" : true;
+        return CONSENT_VERSION.test(version) ? true : "Use a short token: letters, digits, . _ : - (at most 40 characters)";
+      }),
+  }),
 ] });
 
 export const singletonTypes = [siteSettings, landingPage, legalSettings];

@@ -137,6 +137,11 @@ export const orderSubmissionSchema = z.strictObject({
   notes,
   consent: z.literal(true, { error: "required" }),
   lines,
+  /**
+   * Ruling R81: the form's random key for this order attempt, kept across retries until one is
+   * answered. Not a field the visitor fills in, so a bad one refuses the body as a whole.
+   */
+  submissionKey: z.uuid({ error: "invalid" }),
   /** The honeypot: only ever empty here; a filled one is turned away before validation. */
   [HONEYPOT_FIELD]: z.literal("").optional(),
 });

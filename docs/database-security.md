@@ -92,14 +92,14 @@ and no payment detail is ever stored.
 
 | Table | Holds | Notes |
 |---|---|---|
-| `orders` | One row per order request | Human-readable `reference` (`BB-XXXX-XXXX`), `status` (`new`, `confirmed`, `paid`, `dispatched`, `closed`, `cancelled`), `status_changed_at`, adult contact and delivery details (each bounded: name 120, email 254, phone 32, address lines 200, city and region 100, postal code 16, notes 1000, a two-letter country), `consent_version`, `consent_granted_at`, `tracking_token_hash` (SHA-256 only, never the token), `tracking_token_expires_at`, `tracking_token_rotated_at`, and the staff quote columns (`currency`, `subtotal_minor`, `freight_minor`, `payment_url`, `quote_sent_at`), empty until Task 8, and `retain_until` (retention metadata), empty until a retention policy is adopted: nothing sets or acts on it yet. |
+| `orders` | One row per order request | Human-readable `reference` (`BB-XXXX-XXXX`), `submission_key` (the order form's random key for the request, unique: one order per key), `status` (`new`, `confirmed`, `paid`, `dispatched`, `closed`, `cancelled`), `status_changed_at`, adult contact and delivery details (each bounded: name 120, email 254, phone 32, address lines 200, city and region 100, postal code 16, notes 1000, a two-letter country), `consent_version`, `consent_granted_at`, `tracking_token_hash` (SHA-256 only, never the token), `tracking_token_expires_at`, `tracking_token_rotated_at`, and the staff quote columns (`currency`, `subtotal_minor`, `freight_minor`, `payment_url`, `quote_sent_at`), empty until Task 8, and `retain_until` (retention metadata), empty until a retention policy is adopted: nothing sets or acts on it yet. |
 | `order_items` | The CMS snapshot of each product at ordering time | `sanity_id`, `title`, `sku`, `variant`, `pack`, `quantity` (1 to 999), `line_number` (1 to 40). One line per product. |
 | `order_events` | The audit trail | `actor` (`customer`, `staff`, `system`), `event_type`, `old_status`, `new_status`, `metadata` (a small JSON object). |
 | `order_email_outbox` | Order emails waiting for the Task 8 worker | Shaped like `lead_delivery_events`: `kind` (`acknowledgement` or `staff_alert`), `status`, `attempts`, `next_attempt_at`, `provider_message_id`, `last_error_code`. Unique on `(order_id, kind)`. |
 
 | Function | Does | Executable by |
 |---|---|---|
-| `submit_order(...)` → `(order_id, reference, tracking_token, tracking_token_expires_at, acknowledgement_queued)` | Re-validates every argument, then in one transaction writes the order, its lines (the server's canonical CMS snapshot, checked key by key), an `order_submitted` audit event and both outbox rows. If any part fails, nothing is kept. The tracking token is returned this once. | `service_role` only |
+| `submit_order(...)` → `(order_id, reference, tracking_token, tracking_token_expires_at, acknowledgement_queued, duplicate)` | Re-validates every argument, then in one transaction writes the order, its lines (the server's canonical CMS snapshot, checked key by key), an `order_submitted` audit event and both outbox rows. If any part fails, nothing is kept. The tracking token is returned this once. A submission key already used with the same email (a retry whose answer was lost) returns the first order's id and reference with no token, nothing queued and `duplicate` true, and writes nothing; the same key with another email is refused. | `service_role` only |
 | `lookup_order_by_token(token)` → JSON or null | The order for a current, unexpired token. | `service_role` only |
 | `lookup_order_by_reference_email(reference, email)` → JSON or null | The order with that reference AND that email, both normalised. | `service_role` only |
 | `rotate_order_tracking_token(order_id)` → `(tracking_token, tracking_token_expires_at)` | Issues a new token with a new expiry (180 days); the old one stops working; records a `tracking_token_rotated` event. For staff and the Task 8 worker. | `service_role` only |
@@ -109,6 +109,12 @@ Both lookups return the same locked payload: reference, status, `submittedAt`, `
 each line's title, variant, pack and quantity. Never an address, email, name, phone, notes, SKU,
 product id, price or payment link. Every miss (unknown, malformed, expired, wrong email) returns the
 same null, so a lookup cannot reveal which references exist.
+
+One order per submission key (ruling R81): the order form makes a random key once per order attempt
+and sends the same key on every retry, so a request sent again after a lost answer cannot become a
+second order or queue a second set of emails. The first order's token cannot be handed out again
+(only its hash is kept), so the site answers such a retry with the reference and points the buyer at
+tracking by reference and email.
 
 Order rate limits reuse `consume_rate_limit` (ruling R79; no second limiter table):
 

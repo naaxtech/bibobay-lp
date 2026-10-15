@@ -53,6 +53,7 @@ const RECORD: OrderRecordInput = {
   country: "PH",
   notes: "Please call before delivery.",
   consentVersion: "2026-10.v1",
+  submissionKey: "3b0e2f4a-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
   lines: [
     { productId: "plush-tula", name: "Tula plush", sku: "BB-TULA-01", variant: "Large", pack: null, quantity: 2 },
     { productId: "book-bubbles", name: "Bubble breathing book", sku: null, variant: null, pack: "Pack of 3", quantity: 1 },
@@ -77,6 +78,8 @@ describe("the order adapter against the real migrations", () => {
     expect(stored.reference).toMatch(/^BB-[0-9A-F]{4}-[0-9A-F]{4}$/);
     expect(stored.trackingToken).toMatch(/^[0-9a-f]{64}$/);
     expect(stored.acknowledgementQueued).toBe(true);
+    expect(stored.duplicate).toBe(false);
+    if (stored.duplicate) return;
     expect(Date.parse(stored.trackingTokenExpiresAt)).toBeGreaterThan(Date.now());
 
     const expected = {
@@ -95,6 +98,27 @@ describe("the order adapter against the real migrations", () => {
     expect(rotated.trackingToken).not.toBe(stored.trackingToken);
     expect(await repository.lookupByToken(stored.trackingToken)).toBeNull();
     expect(await repository.lookupByToken(rotated.trackingToken)).toMatchObject(expected);
+  });
+
+  it("answers a repeated submission key with the first order: same reference, no new token, nothing queued (R81)", async () => {
+    const repository = createSupabaseOrderRepository(pgliteRpc(db));
+    const record: OrderRecordInput = { ...RECORD, submissionKey: "7d1c9e2b-4a3f-4c6d-9e8f-1a2b3c4d5e6f" };
+    const first = await repository.submitOrder(record);
+    expect(first.duplicate).toBe(false);
+    // The retry of a request whose answer was lost: the same key, the email as the person typed it again.
+    const again = await repository.submitOrder({ ...record, email: " PARENT@example.com " });
+    expect(again).toEqual({ orderId: first.orderId, reference: first.reference, trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true });
+    // The first order's private link keeps working; nothing was replaced.
+    if (first.duplicate) return;
+    expect(await repository.lookupByToken(first.trackingToken)).toMatchObject({ reference: first.reference });
+  });
+
+  it("refuses a repeated submission key with another email as a value-free error (R81)", async () => {
+    const repository = createSupabaseOrderRepository(pgliteRpc(db));
+    const record: OrderRecordInput = { ...RECORD, submissionKey: "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d" };
+    await repository.submitOrder(record);
+    const error = await repository.submitOrder({ ...record, email: "someone-else@example.com" }).catch((caught: unknown) => caught);
+    expect((error as Error).message).toBe("submit_order failed (23505)");
   });
 
   it("surfaces a database refusal as an RpcError naming only the function", async () => {

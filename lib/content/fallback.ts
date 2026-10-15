@@ -107,8 +107,15 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
 export const SAFE_FALLBACK_SETTINGS: SiteSettings = {
   title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.", seo: SAFE_FALLBACK_CONTENT.seo,
   commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false,
+  // R85: no list means every country; an editor may narrow it in the Studio.
+  orderCountries: [],
   socialLinks: [{ platform: "youtube", url: BIBO_YOUTUBE_CHANNEL_URL, verified: true }],
   navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Free activity pack", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
   footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact" },
 };
-export const SAFE_FALLBACK_LEGAL: LegalSettings = { privacy: [], terms: [], consentCopyVersion: "1" };
+export const SAFE_FALLBACK_LEGAL: LegalSettings = {
+  privacy: [], terms: [], consentCopyVersion: "1",
+  // R82: the order form's own consent, recorded with each order; separate from the signup's.
+  orderConsentCopy: "I am an adult, and I agree that BIBO Bay may use these details to answer this order request, send me a quote and deliver the order if I go ahead.",
+  orderConsentCopyVersion: "order-1",
+};

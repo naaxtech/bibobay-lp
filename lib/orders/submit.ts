@@ -4,13 +4,14 @@ import { ORDER_COPY } from "@/components/forms/order-copy";
 import { errorCodeOf } from "@/lib/leads/submit";
 import type { RateLimiter } from "@/lib/security/rate-limit";
 import type { CanonicalLinesResult, CanonicalOrderLine } from "./catalogue";
+import { orderCountryCodes } from "./countries";
 import type { OrderPadLine } from "./pad";
 import { isHoneypotFilled, validateOrderSubmission, type OrderFieldErrors } from "./schema";
 
 /**
  * Order request orchestration (spec §10 steps 4-7). Order matters and is the whole point:
  *
- *   commerce gate → honeypot → validation → storage configured? → shared rate limit
+ *   commerce gate → honeypot → validation (and the CMS country list) → storage configured? → shared rate limit
  *   → canonical CMS reload of every product → one atomic write → answer
  *
  * The gate comes first and, while commerce is off, nothing else runs: no database, no CMS read.
@@ -20,6 +21,11 @@ import { isHoneypotFilled, validateOrderSubmission, type OrderFieldErrors } from
  * the order was received only once all of it committed (no fake success), and
  * `acknowledgementQueued` mirrors what the database reports. Nothing is sent from here: the Task 8
  * worker sends the queued messages. Every refusal is generic and never names a product.
+ *
+ * Ruling R81: the form sends one random submission key per order attempt and the same key on every
+ * retry. A retry of a request that was stored (its answer lost on the way) gets the first order's
+ * reference back and stores nothing new; no tracking token comes with it, because the first one
+ * exists only as a hash.
  */
 
 /** Exactly what is stored for an order: adult details, the server's consent version, canonical lines. */
@@ -35,17 +41,30 @@ export interface OrderRecordInput {
   country: string;
   notes?: string;
   consentVersion: string;
+  /** The form's key for this order attempt (R81). */
+  submissionKey: string;
   lines: CanonicalOrderLine[];
 }
 
-export interface StoredOrder {
-  orderId: string;
-  reference: string;
-  /** The private tracking token; it exists outside a hash only in this answer. */
-  trackingToken: string;
-  trackingTokenExpiresAt: string;
-  acknowledgementQueued: boolean;
-}
+export type StoredOrder =
+  | {
+      orderId: string;
+      reference: string;
+      /** The private tracking token; it exists outside a hash only in this answer. */
+      trackingToken: string;
+      trackingTokenExpiresAt: string;
+      acknowledgementQueued: boolean;
+      duplicate: false;
+    }
+  | {
+      /** A repeated submission key (R81): the first order, nothing new stored, no token, nothing queued. */
+      orderId: string;
+      reference: string;
+      trackingToken: null;
+      trackingTokenExpiresAt: null;
+      acknowledgementQueued: false;
+      duplicate: true;
+    };
 
 export interface OrderRepository {
   /** Stores the order atomically; resolves only once it committed. */
@@ -57,6 +76,8 @@ export const ORDER_RATE_LIMIT = { scope: "order", maxHits: 5, windowSeconds: 360
 
 export type OrderLogEvent =
   | { event: "order_stored"; lines: number }
+  /** A retry of a request already stored (R81): the customer's connection, not a fault. */
+  | { event: "order_duplicate" }
   | { event: "order_store_failed"; code: string }
   | { event: "order_commerce_disabled" }
   | { event: "order_honeypot" }
@@ -80,8 +101,10 @@ export interface OrderSubmissionDependencies {
   rateLimiter: RateLimiter | null;
   /** The canonical CMS reload (./catalogue.ts). */
   resolveLines: (lines: OrderPadLine[]) => Promise<CanonicalLinesResult>;
-  /** The consent copy version from CMS legal settings; never taken from the request. */
+  /** The order form's consent version from CMS legal settings (R82); never taken from the request. */
   consentVersion: string;
+  /** R85: the CMS list of countries an order may name; empty means every assigned country code. */
+  orderCountries: readonly string[];
   /** An opaque, keyed hash of the client address (lib/leads/http.ts); never the address itself. */
   clientKey: string;
   /** Structured, PII-free operational log. */
@@ -96,6 +119,8 @@ export interface OrderApiBody {
   fieldErrors?: OrderFieldErrors;
   /** Present only once the order is stored. */
   reference?: string;
+  /** True when this request was a retry of one already stored (R81); never with a token. */
+  duplicate?: true;
   /** Present only once the order is stored, and only while tracking is switched on. */
   trackingToken?: string;
 }
@@ -132,6 +157,12 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
     const hasFieldErrors = Object.keys(validation.fieldErrors).length > 0;
     const result = refused(400, hasFieldErrors ? ORDER_COPY.outcome.checkDetails : ORDER_COPY.outcome.notConfirmed);
     if (hasFieldErrors) result.body.fieldErrors = validation.fieldErrors;
+    return result;
+  }
+  // R85: the form lists only these countries, so another one is a field the visitor can correct.
+  if (!orderCountryCodes(dependencies.orderCountries).includes(validation.data.country)) {
+    const result = refused(400, ORDER_COPY.outcome.checkDetails);
+    result.body.fieldErrors = { country: "invalid" };
     return result;
   }
 
@@ -178,6 +209,7 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
     country: data.country,
     ...(data.notes ? { notes: data.notes } : {}),
     consentVersion: dependencies.consentVersion,
+    submissionKey: data.submissionKey,
     lines: canonical.lines,
   };
 
@@ -187,6 +219,22 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
   } catch (error) {
     log({ event: "order_store_failed", code: errorCodeOf(error) });
     return refused(500, ORDER_COPY.outcome.notConfirmed);
+  }
+
+  if (stored.duplicate) {
+    log({ event: "order_duplicate" });
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        persisted: true,
+        acknowledgementQueued: false,
+        duplicate: true,
+        // No tracking page to point at while tracking is off.
+        message: dependencies.trackingEnabled ? ORDER_COPY.outcome.alreadyReceived : ORDER_COPY.outcome.alreadyReceivedUntracked,
+        reference: stored.reference,
+      },
+    };
   }
   log({ event: "order_stored", lines: record.lines.length });
 

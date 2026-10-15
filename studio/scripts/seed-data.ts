@@ -69,7 +69,7 @@ export function buildSeedDocuments(): SeedDocument[] {
   const siteSettings: SeedDocument = {
     _id: "siteSettings", _type: "siteSettings", title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.",
     seo: seo(...SEO),
-    commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false,
+    commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false, orderCountries: [],
     socialLinks: [{ _type: "socialLink", _key: "youtube", platform: "youtube", url: CHANNEL, verified: true }],
     navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes"), cta("Free activity pack", "#lead")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: subscribeOnYouTube(), commerceLabel: "Shop" },
     footer: { _type: "footerSettings", text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [cta("Privacy", "/privacy"), cta("Terms", "/terms")].map((item, index) => ({ ...item, _key: `legal-${index}` })), contactLabel: "Contact" },
@@ -99,6 +99,10 @@ export function buildSeedDocuments(): SeedDocument[] {
     faqs: questions.map(([id]) => ref("faqItem", id)),
     finalCta: { ...intro("Come say hello", "Dive into Bibo Bay.", "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", "finalCtaSection"), cta: subscribeOnYouTube() },
   };
-  const legalSettings: SeedDocument = { _id: "legalSettings", _type: "legalSettings", privacy: [], terms: [], consentCopyVersion: "1" };
+  const legalSettings: SeedDocument = {
+    _id: "legalSettings", _type: "legalSettings", privacy: [], terms: [], consentCopyVersion: "1",
+    orderConsentCopy: "I am an adult, and I agree that BIBO Bay may use these details to answer this order request, send me a quote and deliver the order if I go ahead.",
+    orderConsentCopyVersion: "order-1",
+  };
   return [...collections, siteSettings, landingPage, legalSettings];
 }

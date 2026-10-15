@@ -163,6 +163,12 @@ describe("order migrations: tables", () => {
     expect(orders).toContain("consent_granted_at timestamptz not null default now()");
   });
 
+  it("stores one order per submission key, so a retried request cannot become a second order (R81)", () => {
+    const orders = tableDefinition(all, "orders");
+    expect(orders).toContain("submission_key uuid not null");
+    expect(orders).toContain("constraint orders_submission_key_key unique (submission_key)");
+  });
+
   it("stores the tracking token only as a hash, with an expiry", () => {
     const orders = tableDefinition(all, "orders");
     expect(orders).toContain("tracking_token_hash text not null");
@@ -230,6 +236,18 @@ describe("order migrations: functions", () => {
     expect(submit?.body).toMatch(/raise exception 'consent is required'/);
     expect(submit?.body).toContain("insert into public.order_events");
     expect(submit?.body).toContain("insert into public.order_email_outbox");
+  });
+
+  it("takes the submission key as an argument and answers a repeat as a duplicate (R81)", () => {
+    const submit = functions.find((fn) => fn.name === "submit_order");
+    expect(submit?.header).toMatch(/p_submission_key uuid[,)]/);
+    expect(submit?.header).toMatch(/returns table \([^)]*\bduplicate boolean\)/);
+    // A concurrent repeat must not raise a unique violation: the insert yields to the first order.
+    expect(submit?.body).toContain("on conflict (submission_key) do nothing");
+  });
+
+  it("names submit_order's new signature wherever 0004 proves its grants", () => {
+    expect(each["0004_lock_tracking_payload.sql"]).toContain("public.submit_order(text, text, text, text, text, boolean, text, jsonb, uuid, text, text, text, text, text)");
   });
 
   it("verifies its own grants when the payload is locked (0004), so a regression fails the deploy", () => {

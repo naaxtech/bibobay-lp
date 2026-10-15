@@ -29,7 +29,7 @@ Three singletons sit at the top of the desk (fixed IDs; a second copy cannot be 
 |---|---|---|
 | Site settings | `siteSettings` | Title, description, verified canonical URL, default SEO, feature toggles, contact email, Studio URL, social links, navigation, footer |
 | Landing page | `landingPage` | Section order and visibility, page SEO, the copy of every section, and references to the collections |
-| Legal and consent | `legalSettings` | Privacy text, terms text, their version dates, the consent-copy version |
+| Legal and consent | `legalSettings` | Privacy text, terms text, their version dates, the consent-copy version, and the order form's consent sentence with its version |
 
 Collections:
 
@@ -48,8 +48,9 @@ Collections:
 
 | Toggle | Default | Effect today |
 |---|---|---|
-| `commerceEnabled` | `false` | Adds the shop link (labelled with the navigation's shop label) to the header and footer, opens `/shop` and the product pages (Task 7b), lists them in the sitemap, switches the privacy and terms fallback text to its order-request version, and opens the order API (`/api/orders`). The order page is not built yet (Task 7c) and nobody can manage orders yet (Task 8), so leave it off. |
-| `trackingEnabled` | `false` | With commerce on, opens the tracking API (`/api/orders/track`). The tracking pages are not built yet (Task 7c). |
+| `commerceEnabled` | `false` | Adds the shop link (labelled with the navigation's shop label) to the header and footer, opens `/shop` and the product pages (Task 7b), lists them in the sitemap, switches the privacy and terms fallback text to its order-request version, and opens the order page `/order` and the order API (`/api/orders`) (Task 7c). Nobody can manage orders yet (Task 8), so leave it off. |
+| `trackingEnabled` | `false` | With commerce on, opens the tracking page `/track`, the private order links `/orders/<token>` and the tracking API (`/api/orders/track`), adds "Track an order" to the footer, and shows a new order's private link on the order page (Task 7c). |
+| `orderCountries` | empty | The countries the order form offers, as two-letter ISO 3166-1 codes in capitals (`GB`, `PH`, `AU`). Empty means every country. The server refuses an order for any other country. The team quotes delivery for each order, so listing a country promises nothing about it. |
 | `testimonialsEnabled` | `false` | Allows the testimonials section to render, and then only entries marked verified. |
 | `canonicalUrlVerified` | `false` | The canonical URL is used (canonical tags, sitemap, structured data) only when this is on. Turn it on only after the domain is verified. |
 
@@ -139,6 +140,11 @@ length.
   agreed to. Change it whenever the consent sentence in the signup section changes. It must be a
   short token (letters, digits, `.`, `_`, `:`, `-`; at most 40 characters); anything else makes the
   server store the fallback version `1` and log a warning.
+- `orderConsentCopy` is the sentence a buyer ticks on the order form, and `orderConsentCopyVersion`
+  is stored with each order as its version (same token rules). Set both or neither: leaving either
+  empty, or giving a version the server cannot store, shows the site's built-in order sentence and
+  records its version (`order-1`) instead, so an order never records a version for words the buyer
+  did not see. Change the version whenever you change the sentence.
 
 ## Preview (draft mode)
 

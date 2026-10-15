@@ -8,14 +8,15 @@
 -- anon, authenticated or service_role; submit_order a security definer with an empty search_path,
 -- executable by service_role only; the token helpers executable by nobody but their owner; real
 -- behaviour under each API role; bounded, validated arguments; an atomic write of the order, its
--- lines, its audit event and its outbox rows; and the tracking token stored only as a hash.
+-- lines, its audit event and its outbox rows; the tracking token stored only as a hash; and one
+-- order per submission key (R81): a repeat answers with the first order and writes nothing.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(99);
+select plan(110);
 
 -- ---------------------------------------------------------------------------
 -- Tables: RLS enabled and forced, no policies, no privileges for any API role
@@ -60,6 +61,8 @@ select has_column('public', 'orders', 'tracking_token_hash', 'orders keeps a has
 select hasnt_column('public', 'orders', 'tracking_token', 'orders never stores the raw tracking token');
 select has_column('public', 'orders', 'tracking_token_expires_at', 'orders records when the tracking token expires');
 select has_column('public', 'orders', 'retain_until', 'orders keeps retention metadata (spec 11)');
+select col_not_null('public', 'orders', 'submission_key', 'every order records the key of the request that made it (R81)');
+select col_is_unique('public', 'orders', 'submission_key', 'one order per submission key (R81)');
 select columns_are(
   'public', 'order_items',
   array['id', 'order_id', 'line_number', 'sanity_id', 'title', 'sku', 'variant', 'pack', 'quantity', 'created_at'],
@@ -72,7 +75,7 @@ select columns_are(
 
 select is_definer(
   'public', 'submit_order',
-  array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'text', 'text', 'text', 'text', 'text'],
+  array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'uuid', 'text', 'text', 'text', 'text', 'text'],
   'submit_order is security definer'
 );
 select isnt_definer('public', 'order_tracking_token_hash', array['text'], 'the token hash helper runs with its caller''s rights');
@@ -91,9 +94,9 @@ select is_empty(
   'no function in public is executable by PUBLIC'
 );
 
-select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'text', 'text', 'text', 'text', 'text'], 'anon', array[]::text[], 'anon cannot execute submit_order');
-select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'text', 'text', 'text', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute submit_order');
-select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'text', 'text', 'text', 'text', 'text'], 'service_role', array['EXECUTE'], 'service_role can execute submit_order');
+select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'uuid', 'text', 'text', 'text', 'text', 'text'], 'anon', array[]::text[], 'anon cannot execute submit_order');
+select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'uuid', 'text', 'text', 'text', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute submit_order');
+select function_privs_are('public', 'submit_order', array['text', 'text', 'text', 'text', 'text', 'boolean', 'text', 'jsonb', 'uuid', 'text', 'text', 'text', 'text', 'text'], 'service_role', array['EXECUTE'], 'service_role can execute submit_order');
 select function_privs_are('public', 'order_tracking_token_hash', array['text'], 'anon', array[]::text[], 'anon cannot execute the token hash helper');
 select function_privs_are('public', 'order_tracking_token_hash', array['text'], 'authenticated', array[]::text[], 'authenticated cannot execute the token hash helper');
 select function_privs_are('public', 'order_tracking_token_hash', array['text'], 'service_role', array[]::text[], 'service_role cannot execute the token hash helper');
@@ -116,7 +119,8 @@ create function pg_temp.try_order(
   p_address_line2    text    default null,
   p_region           text    default null,
   p_postal_code      text    default null,
-  p_notes            text    default null
+  p_notes            text    default null,
+  p_submission_key   uuid    default gen_random_uuid()
 )
 returns text
 language sql
@@ -125,7 +129,7 @@ as $fn$
     p_contact_name => p_contact_name, p_email => p_email, p_address_line1 => p_address_line1, p_city => p_city,
     p_country => p_country, p_consent => p_consent, p_consent_version => p_consent_version, p_lines => p_lines,
     p_phone => p_phone, p_address_line2 => p_address_line2, p_region => p_region, p_postal_code => p_postal_code,
-    p_notes => p_notes
+    p_notes => p_notes, p_submission_key => p_submission_key
   ) as o;
 $fn$;
 
@@ -173,7 +177,8 @@ create temp table fixture on commit drop as
     p_city => 'Seaside', p_country => 'au', p_consent => true, p_consent_version => 'consent-v1',
     p_lines => '[{"sanity_id": "product-tula", "title": "Tula plush", "sku": "BB-TULA-01", "variant": "Large", "pack": "Single", "quantity": 2},
                  {"sanity_id": "product-bob", "title": "Bob book", "sku": null, "variant": null, "pack": null, "quantity": 1}]'::jsonb,
-    p_phone => '+61 2 5550 1234', p_postal_code => '2000', p_notes => 'Leave at the door'
+    p_phone => '+61 2 5550 1234', p_postal_code => '2000', p_notes => 'Leave at the door',
+    p_submission_key => '0f5b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f'
   );
 
 select ok((select reference ~ '^BB-[0-9A-F]{4}-[0-9A-F]{4}$' from fixture), 'an order gets a human-readable reference');
@@ -188,6 +193,44 @@ select isnt(
   pg_temp.try_order(p_email => 'second@example.com'),
   'every order gets its own reference'
 );
+
+-- R81: one order per submission key. The form keeps its key across retries, so a request whose
+-- answer was lost and is sent again finds the first order instead of making a second one.
+select is((select duplicate from fixture), false, 'a first submission is not a duplicate');
+
+reset role;
+create temp table counts_before_repeat on commit drop as
+  select (select count(*) from public.orders) as orders, (select count(*) from public.order_items) as items,
+         (select count(*) from public.order_events) as events, (select count(*) from public.order_email_outbox) as outbox;
+set local role service_role;
+
+create temp table repeat on commit drop as
+  select * from public.submit_order(
+    p_contact_name => 'Sam Rivers', p_email => 'PARENT@example.com ', p_address_line1 => '12 Harbour Road',
+    p_city => 'Seaside', p_country => 'AU', p_consent => true, p_consent_version => 'consent-v1',
+    p_lines => '[{"sanity_id": "product-tula", "title": "Tula plush", "sku": "BB-TULA-01", "variant": "Large", "pack": "Single", "quantity": 2}]'::jsonb,
+    p_submission_key => '0f5b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f'
+  );
+
+select is((select order_id from repeat), (select order_id from fixture), 'a repeated submission key answers with the first order');
+select is((select reference from repeat), (select reference from fixture), 'and its reference');
+select ok((select tracking_token is null and tracking_token_expires_at is null from repeat), 'a repeat issues no tracking token: the first one exists only as a hash');
+select is((select acknowledgement_queued from repeat), false, 'a repeat queues no second acknowledgement');
+select is((select duplicate from repeat), true, 'and says it is a duplicate');
+select throws_ok(
+  $$ select pg_temp.try_order(p_email => 'someone-else@example.com', p_submission_key => '0f5b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f') $$,
+  '23505', 'submission key already used', 'a repeated key with another email is refused, without saying whose order it is'
+);
+select throws_ok($$ select pg_temp.try_order(p_submission_key => null) $$, '22023', 'submission key is required', 'submit_order needs a submission key');
+
+reset role;
+select ok(
+  (select c.orders = (select count(*) from public.orders) and c.items = (select count(*) from public.order_items)
+          and c.events = (select count(*) from public.order_events) and c.outbox = (select count(*) from public.order_email_outbox)
+     from counts_before_repeat as c),
+  'a repeat writes no order, line, audit event or outbox row'
+);
+set local role service_role;
 
 -- Arguments: consent, bounds and shapes. Error messages never repeat the submitted values.
 select throws_ok($$ select pg_temp.try_order(p_consent => false) $$, '22023', 'consent is required', 'submit_order refuses an order without consent');

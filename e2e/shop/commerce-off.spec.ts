@@ -4,8 +4,9 @@ import { COMMERCE_ON, NOT_FOUND_TITLE, ORDER_PAD_KEY, VIEWPORTS, guardApisAndSto
 
 /*
  * Task 7b, commerce off (the default; spec §10 "Server gating"). Part of the normal run: the shop
- * routes answer the site's 404 page, no page links to the shop, the sitemap never lists it, and no
- * page reads the order pad from the device. Skipped in the commerce-on run (E2E_COMMERCE=1), whose
+ * routes (and, Task 7c, the order, tracking and private order pages) answer the site's 404 page, no
+ * page links to any of them, the sitemap never lists them, and no page reads the order pad from the
+ * device. Skipped in the commerce-on run (E2E_COMMERCE=1), whose
  * server has commerce switched on.
  */
 
@@ -16,7 +17,8 @@ for (const { name, use } of VIEWPORTS) {
   test.describe(`the shop while commerce is off, on ${name}`, () => {
     test.use(use);
 
-    for (const path of ["/shop", "/shop/anything", "/shop/tula-reef-plush"]) {
+    // Task 7c: the order page, the tracking page and every private order link too.
+    for (const path of ["/shop", "/shop/anything", "/shop/tula-reef-plush", "/order", "/track", "/orders/anything", `/orders/${"0123456789abcdef".repeat(4)}`]) {
       test(`${path} answers 404 with the branded not-found page`, async ({ page }) => {
         const response = await page.goto(path);
         expect(response?.status()).toBe(404);
@@ -33,6 +35,9 @@ for (const { name, use } of VIEWPORTS) {
         await expect(page.getByRole("contentinfo")).toBeVisible();
         await expect(shopLinks(page)).toHaveCount(0);
         await expect(page.getByRole("contentinfo").getByRole("link", { name: /shop/i })).toHaveCount(0);
+        // Task 7c: no way to the order or tracking pages either.
+        await expect(page.locator('a[href="/order"], a[href="/track"], a[href^="/orders/"]')).toHaveCount(0);
+        await expect(page.getByRole("contentinfo").getByRole("link", { name: /track/i })).toHaveCount(0);
         // Let the client finish hydrating before checking what it read.
         await page.waitForLoadState("load");
         expect(await storageReads(page)).not.toContain(ORDER_PAD_KEY);
@@ -69,8 +74,8 @@ for (const path of ["/", "/privacy", "/no-such-page"]) {
   });
 }
 
-test("the sitemap never lists the shop", async ({ request }) => {
+test("the sitemap never lists the shop, order or tracking pages", async ({ request }) => {
   const response = await request.get("/sitemap.xml");
   expect(response.status()).toBe(200);
-  expect(await response.text()).not.toMatch(/\/shop\b/);
+  expect(await response.text()).not.toMatch(/\/(?:shop|order|orders|track)\b/);
 });

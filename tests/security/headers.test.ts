@@ -155,7 +155,12 @@ describe("next.config.ts headers()", () => {
     const everywhere = rules.findIndex((rule) => rule.source === "/:path*");
     const orders = rules.findIndex((rule) => rule.source === "/orders/:path*");
     expect(orders).toBeGreaterThan(-1);
-    expect(rules[orders]?.headers).toEqual([{ key: "Referrer-Policy", value: "no-referrer" }]);
+    // Task 7c: the token page is private and never cached or indexed, whatever answers it.
+    expect(rules[orders]?.headers).toEqual([
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
     // Next applies matching rules in order and the last value of a header wins (next.config headers docs).
     expect(orders).toBeGreaterThan(everywhere);
   });

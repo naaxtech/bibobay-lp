@@ -13,11 +13,19 @@ const cms = vi.hoisted(() => {
   const state = {
     settings: { commerceEnabled: true, trackingEnabled: true } as Record<string, unknown>,
     products: [] as unknown[] | null,
+    /** The signup's version: an order must never record it (R82). */
     consentVersion: "2026-10.v1",
+    orderConsentCopy: "I am an adult and agree to the order terms.",
+    orderConsentVersion: "order-2026-10",
   };
   return Object.assign(state, {
     getSiteSettings: vi.fn(async () => ({ ...(await import("@/lib/content/fallback")).SAFE_FALLBACK_SETTINGS, ...state.settings })),
-    getLegalSettings: vi.fn(async () => ({ ...(await import("@/lib/content/fallback")).SAFE_FALLBACK_LEGAL, consentCopyVersion: state.consentVersion })),
+    getLegalSettings: vi.fn(async () => ({
+      ...(await import("@/lib/content/fallback")).SAFE_FALLBACK_LEGAL,
+      consentCopyVersion: state.consentVersion,
+      orderConsentCopy: state.orderConsentCopy,
+      orderConsentCopyVersion: state.orderConsentVersion,
+    })),
     getOrderableProducts: vi.fn(async (ids: readonly string[]) => (void ids, state.products)),
   });
 });
@@ -40,7 +48,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: supabase.createClient })
 
 import { POST } from "@/app/api/orders/route";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { createOrderDependencies, createTrackingDependencies } from "@/lib/orders/dependencies";
+import { createOrderDependencies, createTrackingDependencies, orderConsentFrom } from "@/lib/orders/dependencies";
 import { createSupabaseOrderRepository } from "@/lib/supabase/orders";
 
 /*
@@ -56,6 +64,8 @@ const REFERENCE = "BB-1A2B-3C4D";
 const TOKEN = "ab".repeat(32);
 const CLIENT_IP = "203.0.113.9";
 const HASH_SECRET = "fixture-hash-secret-0123456789abcdef";
+/** R81: the order form's key for one order attempt. */
+const KEY = "6f1c2a4e-8b3d-4c5e-9a7f-1b2c3d4e5f60";
 
 const TULA_LINE: CanonicalOrderLine = { productId: "product-tula-plush", name: "Tula plush", sku: "BB-TULA-01", variant: "Large", pack: "Single", quantity: 2 };
 
@@ -70,6 +80,7 @@ const VALID = {
   notes: "Leave at the door",
   consent: true,
   lines: [{ productId: "product-tula-plush", quantity: 2 }],
+  submissionKey: KEY,
   website: "",
 };
 
@@ -80,7 +91,7 @@ function fakeRepository(answer: Partial<Awaited<ReturnType<OrderRepository["subm
     async submitOrder(record) {
       if (answer instanceof Error) throw answer;
       stored.push(record);
-      return { orderId: ORDER_ID, reference: REFERENCE, trackingToken: TOKEN, trackingTokenExpiresAt: "2027-04-14T00:00:00.000Z", acknowledgementQueued: true, ...answer };
+      return { orderId: ORDER_ID, reference: REFERENCE, trackingToken: TOKEN, trackingTokenExpiresAt: "2027-04-14T00:00:00.000Z", acknowledgementQueued: true, duplicate: false, ...answer } as Awaited<ReturnType<OrderRepository["submitOrder"]>>;
     },
   };
   return { repository, stored };
@@ -101,6 +112,7 @@ function deps(overrides: Partial<OrderSubmissionDependencies> = {}) {
     rateLimiter: allowAll,
     resolveLines,
     consentVersion: "7",
+    orderCountries: [],
     clientKey: "client-hash",
     log: (event) => events.push(event),
     ...overrides,
@@ -155,6 +167,26 @@ describe("before anything is stored", () => {
     expect(named.status).toBe(400);
     expect(named.body.fieldErrors).toEqual({ lines: "invalid" });
     expect(repo.stored).toEqual([]);
+  });
+
+  it("refuses a country outside the CMS list as a field problem, before counting or storing anything (R85)", async () => {
+    const repo = fakeRepository();
+    const consume = vi.fn(allowAll.consume);
+    const { dependencies, resolveLines } = deps({ repository: repo.repository, rateLimiter: { consume }, orderCountries: ["PH", "NZ"] });
+    const result = await submitOrder(VALID, dependencies);
+    expect(result).toEqual({ status: 400, body: { ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.checkDetails, fieldErrors: { country: "invalid" } } });
+    expect(consume).not.toHaveBeenCalled();
+    expect(resolveLines).not.toHaveBeenCalled();
+    expect(repo.stored).toEqual([]);
+    expect((await submitOrder({ ...VALID, country: "nz" }, dependencies)).status).toBe(200);
+  });
+
+  it("with no CMS list, accepts every assigned country code and refuses the rest (R85)", async () => {
+    const { dependencies } = deps();
+    expect((await submitOrder({ ...VALID, country: "PH" }, dependencies)).status).toBe(200);
+    for (const country of ["ZZ", "UK", "EU"]) {
+      expect((await submitOrder({ ...VALID, country }, dependencies)).body.fieldErrors, country).toEqual({ country: "invalid" });
+    }
   });
 
   it("stores nothing and answers 503 while storage is not configured", async () => {
@@ -238,6 +270,7 @@ describe("storing the order", () => {
       country: "AU",
       notes: "Leave at the door",
       consentVersion: "7",
+      submissionKey: KEY,
       lines: [TULA_LINE],
     }]);
   });
@@ -256,6 +289,25 @@ describe("storing the order", () => {
     const { dependencies } = deps({ trackingEnabled: false });
     const result = await submitOrder(VALID, dependencies);
     expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: ORDER_COPY.outcome.received, reference: REFERENCE });
+  });
+
+  it("answers a repeated submission key with the first order's reference: received already, no token, nothing queued (R81)", async () => {
+    const duplicate = fakeRepository({ trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true });
+    const { dependencies, events } = deps({ repository: duplicate.repository, trackingEnabled: true });
+    const result = await submitOrder(VALID, dependencies);
+    expect(result).toEqual({
+      status: 200,
+      body: { ok: true, persisted: true, acknowledgementQueued: false, duplicate: true, message: ORDER_COPY.outcome.alreadyReceived, reference: REFERENCE },
+    });
+    expect(duplicate.stored[0]?.submissionKey).toBe(KEY);
+    expect(events).toContainEqual({ event: "order_duplicate" });
+    expect(events).not.toContainEqual(expect.objectContaining({ event: "order_stored" }));
+  });
+
+  it("answers a repeat without pointing at a tracking page while tracking is off (R81)", async () => {
+    const duplicate = fakeRepository({ trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true });
+    const { dependencies } = deps({ repository: duplicate.repository, trackingEnabled: false });
+    expect((await submitOrder(VALID, dependencies)).body).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, duplicate: true, message: ORDER_COPY.outcome.alreadyReceivedUntracked, reference: REFERENCE });
   });
 
   it("reports the acknowledgement queued only when the database says its outbox row exists", async () => {
@@ -292,6 +344,17 @@ describe("order copy", () => {
   it("tells the buyer, when the order is received, that nothing has been charged", () => {
     expect(ORDER_COPY.outcome.received).toMatch(/nothing has been charged/i);
   });
+
+  it("answers a repeat as already received, pointing at tracking by reference and email (R81: no new link exists)", () => {
+    expect(ORDER_COPY.outcome.alreadyReceived).toMatch(/already/i);
+    expect(ORDER_COPY.outcome.alreadyReceived).toMatch(/nothing has been charged/i);
+    expect(ORDER_COPY.outcome.alreadyReceived).toMatch(/reference/i);
+    expect(ORDER_COPY.outcome.alreadyReceived).toMatch(/email/i);
+    expect(ORDER_COPY.outcome.alreadyReceivedUntracked).toMatch(/already/i);
+    expect(ORDER_COPY.outcome.alreadyReceivedUntracked).toMatch(/nothing has been charged/i);
+    expect(ORDER_COPY.outcome.alreadyReceivedUntracked).toMatch(/reference/i);
+    expect(ORDER_COPY.outcome.alreadyReceivedUntracked).not.toMatch(/track/i);
+  });
 });
 
 describe("Supabase order repository", () => {
@@ -300,8 +363,8 @@ describe("Supabase order repository", () => {
     const rpc: RpcClient = { rpc: (fn, args) => { calls.push([fn, args]); return Promise.resolve(answer); } };
     return { rpc, calls };
   }
-  const RECORD: OrderRecordInput = { contactName: "Sam Rivers", email: "parent@example.com", addressLine1: "12 Harbour Road", city: "Seaside", country: "AU", consentVersion: "7", lines: [TULA_LINE, { productId: "product-bob", name: "Bob book", sku: null, variant: null, pack: null, quantity: 1 }] };
-  const ROW = { order_id: ORDER_ID, reference: REFERENCE, tracking_token: TOKEN, tracking_token_expires_at: "2027-04-14T00:00:00+00:00", acknowledgement_queued: true };
+  const RECORD: OrderRecordInput = { contactName: "Sam Rivers", email: "parent@example.com", addressLine1: "12 Harbour Road", city: "Seaside", country: "AU", consentVersion: "7", submissionKey: KEY, lines: [TULA_LINE, { productId: "product-bob", name: "Bob book", sku: null, variant: null, pack: null, quantity: 1 }] };
+  const ROW = { order_id: ORDER_ID, reference: REFERENCE, tracking_token: TOKEN, tracking_token_expires_at: "2027-04-14T00:00:00+00:00", acknowledgement_queued: true, duplicate: false };
 
   it("calls submit_order with bounded named arguments and the canonical lines only", async () => {
     const { rpc, calls } = client({ data: [ROW], error: null });
@@ -309,12 +372,18 @@ describe("Supabase order repository", () => {
     expect(calls).toEqual([["submit_order", {
       p_contact_name: "Sam Rivers", p_email: "parent@example.com", p_phone: null, p_address_line1: "12 Harbour Road", p_address_line2: null,
       p_city: "Seaside", p_region: null, p_postal_code: null, p_country: "AU", p_notes: null, p_consent: true, p_consent_version: "7",
+      p_submission_key: KEY,
       p_lines: [
         { sanity_id: "product-tula-plush", title: "Tula plush", sku: "BB-TULA-01", variant: "Large", pack: "Single", quantity: 2 },
         { sanity_id: "product-bob", title: "Bob book", sku: null, variant: null, pack: null, quantity: 1 },
       ],
     }]]);
-    expect(stored).toEqual({ orderId: ORDER_ID, reference: REFERENCE, trackingToken: TOKEN, trackingTokenExpiresAt: "2027-04-14T00:00:00.000Z", acknowledgementQueued: true });
+    expect(stored).toEqual({ orderId: ORDER_ID, reference: REFERENCE, trackingToken: TOKEN, trackingTokenExpiresAt: "2027-04-14T00:00:00.000Z", acknowledgementQueued: true, duplicate: false });
+  });
+
+  it("reads a duplicate answer: the first order's id and reference, no token (R81)", async () => {
+    const { rpc } = client({ data: [{ ...ROW, tracking_token: null, tracking_token_expires_at: null, acknowledgement_queued: false, duplicate: true }], error: null });
+    expect(await createSupabaseOrderRepository(rpc).submitOrder(RECORD)).toEqual({ orderId: ORDER_ID, reference: REFERENCE, trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true });
   });
 
   it("throws a value-free error when the database refuses, never its message", async () => {
@@ -329,6 +398,9 @@ describe("Supabase order repository", () => {
     ["a malformed reference", [{ ...ROW, reference: "ORDER-1" }]],
     ["a malformed token", [{ ...ROW, tracking_token: "short" }]],
     ["no acknowledgement flag", [{ ...ROW, acknowledgement_queued: "yes" }]],
+    ["no duplicate flag", [{ ...ROW, duplicate: undefined }]],
+    ["a first order without a token", [{ ...ROW, tracking_token: null, tracking_token_expires_at: null }]],
+    ["a duplicate carrying a token", [{ ...ROW, duplicate: true, acknowledgement_queued: false }]],
   ])("treats %s as a failed write", async (_case, data) => {
     const { rpc } = client({ data, error: null });
     await expect(createSupabaseOrderRepository(rpc).submitOrder(RECORD)).rejects.toMatchObject({ code: "bad_response" });
@@ -366,7 +438,7 @@ describe("POST /api/orders", () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     configureSupabase();
     supabase.answers.consume_rate_limit = () => ({ data: [{ allowed: true, remaining: 4, retry_after_seconds: 0 }], error: null });
-    supabase.answers.submit_order = () => ({ data: [{ order_id: ORDER_ID, reference: REFERENCE, tracking_token: TOKEN, tracking_token_expires_at: "2027-04-14T00:00:00+00:00", acknowledgement_queued: true }], error: null });
+    supabase.answers.submit_order = () => ({ data: [{ order_id: ORDER_ID, reference: REFERENCE, tracking_token: TOKEN, tracking_token_expires_at: "2027-04-14T00:00:00+00:00", acknowledgement_queued: true, duplicate: false }], error: null });
   });
 
   afterEach(() => {
@@ -395,10 +467,19 @@ describe("POST /api/orders", () => {
     expect(cms.getOrderableProducts).toHaveBeenCalledWith(["product-tula-plush"]);
     expect(supabase.calls[1]?.[1]).toMatchObject({
       p_email: "parent@example.com",
+      p_submission_key: KEY,
       p_consent: true,
-      p_consent_version: "2026-10.v1",
+      // R82: the order form's own consent version, never the signup's.
+      p_consent_version: "order-2026-10",
       p_lines: [{ sanity_id: "product-tula-plush", title: "Tula plush", sku: "BB-TULA-01", variant: "Large", pack: "Single", quantity: 2 }],
     });
+  });
+
+  it("answers a retried request whose first answer was lost with the first order, and no token (R81)", async () => {
+    supabase.answers.submit_order = () => ({ data: [{ order_id: ORDER_ID, reference: REFERENCE, tracking_token: null, tracking_token_expires_at: null, acknowledgement_queued: false, duplicate: true }], error: null });
+    const response = await post(VALID);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, duplicate: true, message: ORDER_COPY.outcome.alreadyReceived, reference: REFERENCE });
   });
 
   it("keys the shared limiter by a keyed hash of the client address, never the address itself", async () => {
@@ -414,6 +495,14 @@ describe("POST /api/orders", () => {
     const buckets = supabase.calls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => args.bucket_key);
     expect(buckets[1]).toBe(buckets[0]);
     expect(buckets[2]).not.toBe(buckets[0]);
+  });
+
+  it("refuses a country the CMS does not list, touching no database (R85)", async () => {
+    cms.settings = { commerceEnabled: true, trackingEnabled: true, orderCountries: ["PH"] };
+    const response = await post(VALID);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.checkDetails, fieldErrors: { country: "invalid" } });
+    expect(supabase.calls).toEqual([]);
   });
 
   it("refuses a product the published catalogue does not list, without storing anything", async () => {
@@ -470,6 +559,8 @@ describe("order dependencies", () => {
 
   beforeEach(() => {
     cms.consentVersion = "2026-10.v1";
+    cms.orderConsentCopy = "I am an adult and agree to the order terms.";
+    cms.orderConsentVersion = "order-2026-10";
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
   });
@@ -500,15 +591,27 @@ describe("order dependencies", () => {
     expect(deps.clientKey).not.toContain(CLIENT_IP);
   });
 
-  it("records the CMS consent version when the database will accept it", async () => {
-    expect((await createOrderDependencies(request(), ON, {})).consentVersion).toBe("2026-10.v1");
+  it("records the order form's CMS consent version, never the signup's (R82)", async () => {
+    expect((await createOrderDependencies(request(), ON, {})).consentVersion).toBe("order-2026-10");
   });
 
-  it("falls back to the repository version, logging a code without the value, when the CMS version cannot be stored", async () => {
-    cms.consentVersion = "version two";
+  it("falls back to the repository order version, logging a code without the value, when the CMS version cannot be stored", async () => {
+    cms.orderConsentVersion = "version two";
     const deps = await createOrderDependencies(request(), ON, {});
-    expect(deps.consentVersion).toBe(SAFE_FALLBACK_LEGAL.consentCopyVersion);
+    expect(deps.consentVersion).toBe(SAFE_FALLBACK_LEGAL.orderConsentCopyVersion);
     const lines = vi.mocked(console.warn).mock.calls.map(([line]) => String(line));
     expect(lines).toEqual([JSON.stringify({ scope: "orders", event: "order_config_invalid", code: "consent_version_invalid" })]);
+  });
+
+  it("passes on the countries the CMS lists (R85)", async () => {
+    expect((await createOrderDependencies(request(), { ...ON, orderCountries: ["PH", "AU"] }, {})).orderCountries).toEqual(["PH", "AU"]);
+    expect((await createOrderDependencies(request(), ON, {})).orderCountries).toEqual([]);
+  });
+
+  it("gives the order page the sentence that matches the version an order records (R82)", () => {
+    const legal = { ...SAFE_FALLBACK_LEGAL, orderConsentCopy: "I agree to the order terms.", orderConsentCopyVersion: "order-3" };
+    expect(orderConsentFrom(legal)).toEqual({ copy: "I agree to the order terms.", version: "order-3" });
+    // A version the database cannot store: the repository sentence and version, together.
+    expect(orderConsentFrom({ ...legal, orderConsentCopyVersion: "version three" })).toEqual({ copy: SAFE_FALLBACK_LEGAL.orderConsentCopy, version: SAFE_FALLBACK_LEGAL.orderConsentCopyVersion });
   });
 });

@@ -144,8 +144,18 @@ export function staticSecurityHeaders(environment: SecurityEnvironment): Array<{
  * address, so they send no referrer at all: a link or a picture on them never hands the token to
  * another site, or to another page of this one. next.config.ts lists this rule after the site-wide
  * one; when two rules set the same header, the last one wins.
+ *
+ * Task 7c: nor may anything keep or index them. `private, no-store` covers every answer under the
+ * path, its 404s included. Next only fills in its own Cache-Control when none is set yet
+ * (next/dist/server/send-payload.js, next 16.3.8), and its own value for this dynamic page also says
+ * `no-store`, so either way no copy is kept. X-Robots-Tag keeps search engines away even from an
+ * answer that never reaches the page's robots meta tag.
  */
 export const PRIVATE_LINK_HEADER_RULE: { source: string; headers: Array<{ key: string; value: string }> } = {
   source: ORDER_LINK_SOURCE,
-  headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+  headers: [
+    { key: "Referrer-Policy", value: "no-referrer" },
+    { key: "Cache-Control", value: "private, no-store" },
+    { key: "X-Robots-Tag", value: "noindex, nofollow" },
+  ],
 };

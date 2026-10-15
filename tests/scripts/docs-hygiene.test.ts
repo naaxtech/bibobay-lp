@@ -183,38 +183,49 @@ describe("documentation matches the code", () => {
     for (const name of names) expect(deployment, name).toContain(`\`${name}\``);
   });
 
-  it("states that manual checkout is not built yet, and promises no procedure", () => {
+  it("states that the staff side of manual checkout is not built yet, and promises no procedure", () => {
     const text = read("docs/manual-checkout-operations.md");
     expect(text).toMatch(/not built yet/i);
     expect(text).toMatch(/Task 7c/);
     expect(text).toMatch(/Task 8/);
+    // Task 7c built the customer side; nobody can manage orders until Task 8, so commerce stays off.
+    expect(text).toMatch(/must stay off/i);
   });
 
-  it("never documents an order, tracking or admin route as present", () => {
+  it("never documents an admin route as present", () => {
     const architecture = read("docs/architecture.md");
-    // The route tables: a row starting with the route. `/order` also covers `/orders/[token]`; the
-    // order APIs (`/api/orders`) are built, and prose may mention the coming pages (their headers).
-    for (const route of ["/order", "/track", "/admin"]) {
-      for (const line of architecture.split(/\r?\n/).filter((entry) => entry.startsWith(`| \`${route}`))) {
-        expect(line, line).toMatch(/not built yet/i);
-      }
+    for (const line of architecture.split(/\r?\n/).filter((entry) => entry.startsWith("| `/admin"))) {
+      expect(line, line).toMatch(/not built yet/i);
     }
   });
 
-  it("documents the shop as built, behind the commerce switch, and the coming order pages as noindex (Task 7b)", () => {
+  it("documents the shop, order and tracking pages as built, behind their switches, and never indexed (Tasks 7b, 7c)", () => {
     const lines = read("docs/architecture.md").split(/\r?\n/);
     const shop = lines.find((line) => line.startsWith("| `/shop`, `/shop/[slug]` |")) ?? "";
     expect(shop).not.toMatch(/not built yet/i);
     expect(shop).toContain("ƒ");
     expect(shop).toMatch(/404 unless commerce is enabled/);
-    for (const route of ["`/order`", "`/track`, `/orders/[token]`"]) {
-      const line = lines.find((entry) => entry.startsWith(`| ${route} |`)) ?? "";
-      expect(line, route).toMatch(/not built yet \(Task 7c\)/);
+    const order = lines.find((entry) => entry.startsWith("| `/order` |")) ?? "";
+    const tracking = lines.find((entry) => entry.startsWith("| `/track`, `/orders/[token]` |")) ?? "";
+    for (const [route, line] of [["/order", order], ["/track", tracking]] as const) {
+      expect(line, route).not.toMatch(/not built yet/i);
+      expect(line, route).toContain("ƒ");
       expect(line, route).toMatch(/noindex/);
+      expect(line, route).toMatch(/Task 7c/);
     }
+    expect(order).toMatch(/404 unless commerce is enabled/);
+    expect(tracking).toMatch(/404 unless commerce and tracking are enabled/);
+    expect(tracking).toMatch(/no-store/);
     const readme = read("README.md").split(/\r?\n/);
     expect(readme.find((line) => line.includes("`/shop`")) ?? "", "README shop row").toMatch(/\| built \(Task 7b/);
-    expect(readme.find((line) => line.startsWith("| Order and tracking pages")) ?? "", "README order row").toMatch(/not built yet \(Task 7c\)/);
+    expect(readme.find((line) => line.startsWith("| Order and tracking pages")) ?? "", "README order row").toMatch(/\| built \(Task 7c\)/);
+  });
+
+  it("documents the order consent sentence and the order countries for editors (Task 7c)", () => {
+    const cms = read("docs/cms-operations.md");
+    for (const field of ["orderConsentCopy", "orderConsentCopyVersion", "orderCountries"]) expect(cms, field).toContain(`\`${field}\``);
+    const commerce = cms.split(/\r?\n/).find((line) => line.startsWith("| `commerceEnabled` |")) ?? "";
+    expect(commerce).not.toMatch(/not built yet \(Task 7c\)/);
   });
 
   it("keeps Next's managed agent block in AGENTS.md current and intact", () => {

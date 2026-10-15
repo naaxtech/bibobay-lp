@@ -14,12 +14,13 @@ export interface ListedProduct {
 
 /**
  * The order pad at a glance (Task 6): each pad product found in `listed`, with its quantity
- * (1 to 999) and a remove button, and a link to review the order. Product names come from the
- * catalogue the server passes in, never from the device. Products missing from `listed` are hidden,
- * not deleted: a page may pass part of the catalogue (the order page prunes with the whole one).
- * Renders nothing without an order pad (commerce disabled) or before the device has been read.
+ * (1 to 999) and a remove button, and a link to review the order (left out on the order page itself,
+ * Task 7c). Product names come from the catalogue the server passes in, never from the device.
+ * Products missing from `listed` are hidden, not deleted: a page may pass part of the catalogue (the
+ * order page prunes with the whole one). Renders nothing without an order pad (commerce disabled)
+ * or before the device has been read.
  */
-export function OrderPadSummary({ listed }: { listed: ListedProduct[] }) {
+export function OrderPadSummary({ listed, reviewLink = true }: { listed: readonly ListedProduct[]; reviewLink?: boolean }) {
   const pad = useOrderPad();
   const headingId = useId();
   const names = useMemo(() => new Map(listed.map((product) => [product.id, product.name])), [listed]);
@@ -55,9 +56,11 @@ export function OrderPadSummary({ listed }: { listed: ListedProduct[] }) {
               );
             })}
           </ul>
-          <Link href="/order" className="btn btn-primary order-pad__review" prefetch={false}>
-            {UI_COPY.orderPad.review}
-          </Link>
+          {reviewLink ? (
+            <Link href="/order" className="btn btn-primary order-pad__review" prefetch={false}>
+              {UI_COPY.orderPad.review}
+            </Link>
+          ) : null}
         </>
       )}
     </section>

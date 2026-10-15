@@ -19,6 +19,8 @@ import {
  */
 
 const LINE = { productId: "product-tula-plush", quantity: 2 };
+/** R81: the form's key for one order attempt, made once and kept across retries. */
+const KEY = "6f1c2a4e-8b3d-4c5e-9a7f-1b2c3d4e5f60";
 const VALID = {
   contactName: "  Sam Rivers ",
   email: " Parent@Example.COM ",
@@ -32,6 +34,7 @@ const VALID = {
   notes: "Please leave at the door.\nThank you.",
   consent: true,
   lines: [LINE],
+  submissionKey: KEY,
   [HONEYPOT_FIELD]: "",
 };
 
@@ -57,14 +60,31 @@ describe("a valid order request", () => {
       notes: "Please leave at the door.\nThank you.",
       consent: true,
       lines: [LINE],
+      submissionKey: KEY,
       [HONEYPOT_FIELD]: "",
     });
   });
 
-  it("needs only a name, email, first address line, city, country, consent and one line", () => {
+  it("needs only a name, email, first address line, city, country, consent, one line and the submission key", () => {
     const { phone, addressLine2, region, postalCode, notes, website, ...required } = VALID;
     void phone; void addressLine2; void region; void postalCode; void notes; void website;
     expect(validateOrderSubmission(required).ok).toBe(true);
+  });
+});
+
+describe("the submission key (R81)", () => {
+  it("is required: a body without one is refused as a whole, never as a field the visitor can fix", () => {
+    const { submissionKey, ...rest } = VALID;
+    void submissionKey;
+    expect(validateOrderSubmission(rest)).toEqual({ ok: false, fieldErrors: {}, formError: "invalid_metadata" });
+  });
+
+  it.each([["a short string", "abc"], ["a number", 42], ["a UUID with a space", ` ${KEY}`], ["a non-UUID of the right length", "z".repeat(36)], ["null", null]])("refuses %s", (_case, submissionKey) => {
+    expect(validateOrderSubmission({ ...VALID, submissionKey })).toEqual({ ok: false, fieldErrors: {}, formError: "invalid_metadata" });
+  });
+
+  it("accepts the UUIDs crypto.randomUUID makes", () => {
+    expect(validateOrderSubmission({ ...VALID, submissionKey: crypto.randomUUID() }).ok).toBe(true);
   });
 });
 

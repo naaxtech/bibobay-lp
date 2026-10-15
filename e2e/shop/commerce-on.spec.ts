@@ -12,7 +12,8 @@ import { COMMERCE_ON, NOT_FOUND_TITLE, ORDER_PAD_KEY, PRICE, SHOP_LABEL, VIEWPOR
  *   (in the copy) npm ci && npm run build && npx next start -p 3200
  *   PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 E2E_COMMERCE=1 npx playwright test e2e/shop
  *
- * Nothing here sends an order: the order page is Task 7c, and the API guard fails any /api call.
+ * Nothing here sends an order (e2e/shop/order-flow.spec.ts covers the order and tracking pages,
+ * Task 7c), and the API guard fails any /api call.
  */
 
 test.skip(!COMMERCE_ON, "needs a server with the commerce fixture (E2E_COMMERCE=1)");
@@ -86,7 +87,7 @@ for (const { name, use } of VIEWPORTS) {
       await expect(page.locator('[itemprop="price"], [itemprop="priceCurrency"], [data-price]')).toHaveCount(0);
       for (const json of await page.locator('script[type="application/ld+json"]').allTextContents()) expect(json).not.toMatch(/price|offer|currency/i);
 
-      // The way to review the order, in the header; Task 7c builds the page.
+      // The way to review the order, in the header (the order page, e2e/shop/order-flow.spec.ts).
       await expect(page.locator("header[data-site-header]").getByRole("link", { name: COPY.review })).toHaveAttribute("href", "/order");
       // Nothing runs off the side of a phone.
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

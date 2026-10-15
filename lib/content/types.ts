@@ -21,6 +21,8 @@ export interface SocialLink { platform: SocialPlatform; url: string; verified: t
 export interface SiteSettings {
   title: string; description: string; canonicalUrl?: string; seo: Seo;
   commerceEnabled: boolean; trackingEnabled: boolean; testimonialsEnabled: boolean;
+  /** R85: ISO 3166-1 alpha-2 codes an order may be delivered to; empty means every country. */
+  orderCountries: string[];
   contactEmail?: string; studioUrl?: string; socialLinks: SocialLink[];
   navigation: { links: Cta[]; primaryCta: Cta; commerceLabel: string };
   footer: { text: string; legalLinks: Cta[]; contactLabel: string };
@@ -40,4 +42,8 @@ export interface LandingPageContent {
   faqIntro: SectionIntro; faqs: FaqItem[];
   finalCta: SectionIntro & { cta: Cta };
 }
-export interface LegalSettings { privacy: PortableContent; terms: PortableContent; privacyVersion?: string; termsVersion?: string; consentCopyVersion: string }
+export interface LegalSettings {
+  privacy: PortableContent; terms: PortableContent; privacyVersion?: string; termsVersion?: string; consentCopyVersion: string;
+  /** R82: the order form's consent sentence and its version, always as a pair (CMS or repository). */
+  orderConsentCopy: string; orderConsentCopyVersion: string;
+}

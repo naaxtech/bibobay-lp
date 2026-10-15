@@ -1,3 +1,4 @@
+import { isCountryCode } from "../orders/countries";
 import { FREEBIE_PATH } from "./freebie";
 import { DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
 import type { BrandPillar, Character, Cta, EcosystemEntry, EpisodePreview, FaqItem, ImageWithAlt, LandingPageContent, LegalSettings, PortableContent, SectionConfig, SectionId, SectionIntro, Seo, SiteSettings, SocialLink, Testimonial } from "./types";
@@ -111,6 +112,8 @@ export function normalizeLandingContent(raw: unknown, options: { testimonialsEna
   };
 }
 
+/** R85: assigned country codes only, in capitals, once each, in the editor's order; empty means every country. */
+const orderCountries = (value: unknown): string[] => [...new Set(list(value).filter((code): code is string => typeof code === "string").map((code) => code.trim().toUpperCase()).filter(isCountryCode))];
 const SOCIAL_HOSTS: Record<string, string[]> = { instagram: ["instagram.com"], youtube: ["youtube.com", "youtu.be"], facebook: ["facebook.com"], tiktok: ["tiktok.com"], pinterest: ["pinterest.com"] };
 export function normalizeSiteSettings(raw: unknown): SiteSettings {
   const v = record(raw); if (!Object.keys(v).length) return SAFE_FALLBACK_SETTINGS;
@@ -120,6 +123,7 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
   return { title: text(v.title, f.title), description: text(v.description, f.description), seo: seo(v.seo, f.seo),
     ...(v.canonicalUrlVerified === true && validUrl(v.canonicalUrl) ? { canonicalUrl: validUrl(v.canonicalUrl) } : {}),
     commerceEnabled: v.commerceEnabled === true, trackingEnabled: v.trackingEnabled === true, testimonialsEnabled: v.testimonialsEnabled === true,
+    orderCountries: orderCountries(v.orderCountries),
     ...(optionalText(v.contactEmail) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(text(v.contactEmail)) ? { contactEmail: text(v.contactEmail) } : {}),
     ...(validUrl(v.studioUrl) ? { studioUrl: validUrl(v.studioUrl) } : {}), socialLinks,
     navigation: { links: items(nav.links, f.navigation.links, (entry) => text(entry.label) && href(entry.href) ? cta(entry, f.navigation.primaryCta) : undefined), primaryCta: cta(nav.primaryCta, f.navigation.primaryCta), commerceLabel: text(nav.commerceLabel, f.navigation.commerceLabel) },
@@ -128,5 +132,9 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
 }
 export function normalizeLegalSettings(raw: unknown): LegalSettings {
   const v = record(raw), f = SAFE_FALLBACK_LEGAL;
-  return { privacy: normalizePortableContent(v.privacy, f.privacy), terms: normalizePortableContent(v.terms, f.terms), ...(optionalText(v.privacyVersion) ? { privacyVersion: text(v.privacyVersion) } : {}), ...(optionalText(v.termsVersion) ? { termsVersion: text(v.termsVersion) } : {}), consentCopyVersion: text(v.consentCopyVersion, f.consentCopyVersion) };
+  // R82: the order consent sentence and its version come together, so an order never records a
+  // version for words the buyer did not see.
+  const orderCopy = text(v.orderConsentCopy), orderVersion = text(v.orderConsentCopyVersion);
+  const orderConsent = orderCopy && orderVersion ? { orderConsentCopy: orderCopy, orderConsentCopyVersion: orderVersion } : { orderConsentCopy: f.orderConsentCopy, orderConsentCopyVersion: f.orderConsentCopyVersion };
+  return { privacy: normalizePortableContent(v.privacy, f.privacy), terms: normalizePortableContent(v.terms, f.terms), ...(optionalText(v.privacyVersion) ? { privacyVersion: text(v.privacyVersion) } : {}), ...(optionalText(v.termsVersion) ? { termsVersion: text(v.termsVersion) } : {}), consentCopyVersion: text(v.consentCopyVersion, f.consentCopyVersion), ...orderConsent };
 }

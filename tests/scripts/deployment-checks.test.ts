@@ -430,9 +430,31 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
 
   const scanOf = (results: CheckResult[]) => results.find((result) => result.name === "client payloads");
 
-  it("keeps the always-on list as it was and lists the shop as switchable", () => {
+  it("keeps the always-on list as it was and lists the shop, order and tracking pages as switchable (Task 7c)", () => {
     expect([...PAYLOAD_PATHS]).toEqual(["/", "/privacy", "/terms", "/thank-you"]);
-    expect([...GATED_PAYLOAD_PATHS]).toEqual(["/shop"]);
+    expect([...GATED_PAYLOAD_PATHS]).toEqual(["/shop", "/order", "/track"]);
+  });
+
+  it("scans the order and tracking pages once they answer, and names a leak on either (Task 7c)", async () => {
+    const seen: string[] = [];
+    const routes = routesWith();
+    routes[`${origin}/order`] = { status: 200, type: "text/html", body: "<html><body>order</body></html>" };
+    routes[`rsc:${origin}/order`] = RSC;
+    routes[`${origin}/track`] = { status: 200, type: "text/html", body: "<html><script>var k='rv-7Hq2LmN9xPz4'</script></html>" };
+    routes[`rsc:${origin}/track`] = RSC;
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes, seen), scanRules: rules });
+    expect(seen).toContain(`rsc:${origin}/order`);
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toContain("/track html");
+    expect(scanOf(results)?.detail).not.toContain("rv-7Hq2LmN9xPz4");
+  });
+
+  it("fails when the order page answers a server error while switched off", async () => {
+    const routes = routesWith();
+    routes[`${origin}/order`] = { status: 500, type: "text/html", body: "boom" };
+    const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routes), scanRules: rules });
+    expect(scanOf(results)?.status).toBe("fail");
+    expect(scanOf(results)?.detail).toMatch(/\/order answered 500/);
   });
 
   it("passes a switched-off shop that answers 404, without scanning it", async () => {

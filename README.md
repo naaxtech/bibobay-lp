@@ -23,7 +23,7 @@ What exists today and what does not:
 | Commerce gate (`commerceEnabled`, `trackingEnabled`, both off by default) and order pad | built (Task 6; the `app/(commerce)` layout mounts the pad only while commerce is on) |
 | Order tables, order request and tracking APIs (`/api/orders`, `/api/orders/track`), gated by `commerceEnabled` | built (Task 7a) |
 | Shop catalogue and product pages (`/shop`, `/shop/[slug]`), no prices, 404 while commerce is off | built (Task 7b) |
-| Order and tracking pages (`/order`, `/track`, `/orders/[token]`) | not built yet (Task 7c) |
+| Order and tracking pages (`/order`, `/track`, `/orders/[token]`), idempotent order requests, order consent and countries from the CMS | built (Task 7c) |
 | Staff order administration, quote emails, outbox worker | not built yet (Task 8) |
 | Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11) |

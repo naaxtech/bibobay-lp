@@ -52,6 +52,8 @@ describe("which order events reach Sentry", () => {
       { event: "order_rate_limited" },
       { event: "order_commerce_disabled" },
       { event: "order_stored", lines: 2 },
+      // R81: a retry after a lost answer is the customer's connection, not a fault.
+      { event: "order_duplicate" },
     ];
     const tracking: TrackingLogEvent[] = [{ event: "order_track_miss" }, { event: "order_track_rate_limited" }, { event: "order_tracking_disabled" }, { event: "order_tracked" }];
     for (const entry of orders) logOrderEvent(entry);

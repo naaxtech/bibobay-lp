@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeLandingContent, normalizeSiteSettings, normalizeLegalSettings } from "@/lib/content/normalize";
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
+import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 
 describe("untrusted editorial content", () => {
   it("uses complete safe copy for missing or malformed landing documents", () => {
@@ -104,5 +104,45 @@ describe("the lead section's download", () => {
   it("offers nothing when an editor's lead section has no download, or marks it unavailable", () => {
     expect(normalizeLandingContent({ lead: { heading: "Join us" } }).lead.leadMagnet).toBeUndefined();
     expect(normalizeLandingContent({ lead: { leadMagnet: { title: "Pack", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: false } } }).lead.leadMagnet).toBeUndefined();
+  });
+});
+
+describe("the order form's consent sentence and version (R82)", () => {
+  it("has a repository sentence and version of its own, separate from the signup's", () => {
+    expect(SAFE_FALLBACK_LEGAL.orderConsentCopy).toMatch(/adult/i);
+    expect(SAFE_FALLBACK_LEGAL.orderConsentCopy).toMatch(/order/i);
+    expect(SAFE_FALLBACK_LEGAL.orderConsentCopyVersion).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/);
+    expect(SAFE_FALLBACK_LEGAL.orderConsentCopy).not.toBe(SAFE_FALLBACK_CONTENT.lead.consentCopy);
+  });
+
+  it("takes the CMS sentence and version together", () => {
+    const legal = normalizeLegalSettings({ consentCopyVersion: "3", orderConsentCopy: " I agree to the order terms. ", orderConsentCopyVersion: " order-2 " });
+    expect([legal.orderConsentCopy, legal.orderConsentCopyVersion]).toEqual(["I agree to the order terms.", "order-2"]);
+    expect(legal.consentCopyVersion).toBe("3");
+  });
+
+  it("never pairs a CMS sentence with the repository version, or the other way round", () => {
+    const fallback = [SAFE_FALLBACK_LEGAL.orderConsentCopy, SAFE_FALLBACK_LEGAL.orderConsentCopyVersion];
+    for (const raw of [{ orderConsentCopy: "A new sentence." }, { orderConsentCopyVersion: "order-9" }, { orderConsentCopy: " ", orderConsentCopyVersion: "order-9" }, null]) {
+      const legal = normalizeLegalSettings(raw);
+      expect([legal.orderConsentCopy, legal.orderConsentCopyVersion], JSON.stringify(raw)).toEqual(fallback);
+    }
+  });
+});
+
+describe("the countries an order may be delivered to (R85)", () => {
+  it("defaults to none listed, which means every country", () => {
+    expect(SAFE_FALLBACK_SETTINGS.orderCountries).toEqual([]);
+    expect(normalizeSiteSettings({}).orderCountries).toEqual([]);
+    expect(normalizeSiteSettings({ title: "BIBO Bay" }).orderCountries).toEqual([]);
+  });
+
+  it("keeps the editor's ISO 3166-1 alpha-2 codes, in their order, once each, in capitals", () => {
+    expect(normalizeSiteSettings({ orderCountries: ["ph", " AU ", "GB", "PH"] }).orderCountries).toEqual(["PH", "AU", "GB"]);
+  });
+
+  it("drops anything that is not an assigned country code", () => {
+    expect(normalizeSiteSettings({ orderCountries: ["UK", "ZZ", "EU", "Philippines", 7, null, "NZ"] }).orderCountries).toEqual(["NZ"]);
+    expect(normalizeSiteSettings({ orderCountries: "PH" }).orderCountries).toEqual([]);
   });
 });

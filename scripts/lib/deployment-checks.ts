@@ -297,11 +297,12 @@ async function readJson(response: Response): Promise<unknown> {
 export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you"] as const;
 
 /**
- * Pages that exist only while a CMS switch is on (Task 7b: the shop, while commerce is enabled).
- * Each is scanned like PAYLOAD_PATHS when it answers 200. Switched off it must answer 404: a server
- * error or a redirect fails the check.
+ * Pages that exist only while a CMS switch is on (Task 7b: the shop, while commerce is enabled;
+ * Task 7c: the order page with it, and the tracking page while tracking is also on). Each is
+ * scanned like PAYLOAD_PATHS when it answers 200. Switched off it must answer 404: a server error or
+ * a redirect fails the check. /orders/<token> is not listed: without a real token it is a 404.
  */
-export const GATED_PAYLOAD_PATHS = ["/shop"] as const;
+export const GATED_PAYLOAD_PATHS = ["/shop", "/order", "/track"] as const;
 
 async function scanClientPayloads(fetcher: typeof fetch, origin: string, allowed: ReadonlySet<string>, timeoutMs: number, rules: SecretRules): Promise<CheckResult> {
   const name = "client payloads";

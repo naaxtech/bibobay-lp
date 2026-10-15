@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { schemaTypes } from "@/studio/schemaTypes";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
 import { LANDING_PAGE_QUERY } from "@/lib/sanity/queries";
+import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
+import { ISO_COUNTRY_CODES } from "@/lib/orders/countries";
+import { ORDER_COUNTRY_CODES, orderCountriesProblem } from "@/studio/schemaTypes/countries";
 
 type Field = { name: string; type: string; of?: Array<{ type: string; to?: Array<{ type: string }> }>; to?: Array<{ type: string }>; fields?: Field[]; initialValue?: unknown };
 type Schema = { name: string; type: string; fields?: Field[] };
@@ -16,7 +19,9 @@ describe("Studio content model", () => {
   it("models every public contract field with editable typed data", () => {
     covers("siteSettings", ["title", "description", "canonicalUrl", "canonicalUrlVerified", "seo", "commerceEnabled", "trackingEnabled", "testimonialsEnabled", "contactEmail", "studioUrl", "socialLinks", "navigation", "footer"]);
     covers("landingPage", ["sections", "seo", "hero", "trust", "promise", "charactersIntro", "characters", "episodesIntro", "episodes", "offline", "pillarsIntro", "pillars", "ecosystemIntro", "ecosystem", "testimonialsIntro", "testimonials", "lead", "faqIntro", "faqs", "finalCta"]);
-    covers("legalSettings", ["privacy", "terms", "privacyVersion", "termsVersion", "consentCopyVersion"]);
+    covers("legalSettings", ["privacy", "terms", "privacyVersion", "termsVersion", "consentCopyVersion", "orderConsentCopy", "orderConsentCopyVersion"]);
+    // R85: the countries an order may be delivered to; empty means every country.
+    covers("siteSettings", ["orderCountries"]);
     covers("character", ["name", "species", "role", "description", "personality", "catchphrase", "favoriteActivity", "teaches", "image", "status", "accentColor"]);
     covers("episodePreview", ["title", "summary", "characterFocus", "learningFocus", "offlinePrompt", "image", "mediaUrl", "status"]);
     covers("brandPillar", ["title", "description", "prompts", "image"]);
@@ -70,6 +75,10 @@ describe("claim-safe editorial seed", () => {
     for (const [id, type] of [["siteSettings", "siteSettings"], ["landingPage", "landingPage"], ["legalSettings", "legalSettings"]]) expect(docs.find((d) => d._id === id)?._type).toBe(type);
     const site = docs.find((d) => d._id === "siteSettings")!;
     expect([site.commerceEnabled, site.trackingEnabled, site.testimonialsEnabled]).toEqual([false, false, false]);
+    expect(site.orderCountries).toEqual([]);
+    // R82: the order form's own consent sentence and version, as the repository fallback has them.
+    const legal = docs.find((d) => d._id === "legalSettings")!;
+    expect([legal.orderConsentCopy, legal.orderConsentCopyVersion]).toEqual([SAFE_FALLBACK_LEGAL.orderConsentCopy, SAFE_FALLBACK_LEGAL.orderConsentCopyVersion]);
     // The one owner-confirmed account: the Bibo Bay YouTube channel.
     expect(site.socialLinks).toEqual([{ _type: "socialLink", _key: "youtube", platform: "youtube", url: "https://www.youtube.com/@bibobay-tv", verified: true }]);
     const landing = docs.find((d) => d._id === "landingPage")!;
@@ -101,5 +110,28 @@ describe("hero artwork description (rebrand re-review N3)", () => {
     const field = (types.get("heroSection")?.fields as Array<Field & { description?: string }> | undefined)?.find((f) => f.name === "artworkDescription");
     expect(field?.description).toMatch(/only when/i);
     expect(field?.description).toMatch(/channel/i);
+  });
+});
+
+describe("order countries in the Studio (R85)", () => {
+  it("checks codes against the same ISO 3166-1 list the site uses", () => {
+    expect([...ORDER_COUNTRY_CODES]).toEqual([...ISO_COUNTRY_CODES]);
+  });
+
+  it("accepts none, or assigned two-letter codes in capitals, each once", () => {
+    expect(orderCountriesProblem(undefined)).toBe(true);
+    expect(orderCountriesProblem([])).toBe(true);
+    expect(orderCountriesProblem(["PH", "AU", "GB"])).toBe(true);
+  });
+
+  it("explains a code that is not one, and a repeated country", () => {
+    expect(orderCountriesProblem(["UK"])).toMatch(/UK/);
+    expect(orderCountriesProblem(["ph"])).toMatch(/ph/);
+    expect(orderCountriesProblem(["PH", "PH"])).toMatch(/once/);
+  });
+
+  it("asks for an order consent version whenever the order consent sentence is set (R82)", () => {
+    const field = (types.get("legalSettings")?.fields as Array<Field & { description?: string }> | undefined)?.find((f) => f.name === "orderConsentCopyVersion");
+    expect(field?.description).toMatch(/change it whenever/i);
   });
 });

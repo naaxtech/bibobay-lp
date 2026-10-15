@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { evaluate, parse } from "groq-js";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
-import { LANDING_PAGE_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { normalizeLandingContent, normalizeSiteSettings } from "@/lib/content/normalize";
+import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
+import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
+import { normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "@/lib/content/normalize";
 import { schemaTypes } from "@/studio/schemaTypes";
 
 // Models a tokenless published read: root-path documents are public, dotted IDs are not.
@@ -51,6 +51,10 @@ describe("seeded tokenless published landing read", () => {
     const bareIds = <T extends { id: string }>(entries: T[]) => entries.map((entry) => ({ ...entry, id: entry.id.replace(/^(?:character|episodePreview|brandPillar|ecosystemEntry|faqItem)-/, "") }));
     expect({ ...content, characters: bareIds(content.characters), episodes: bareIds(content.episodes), pillars: bareIds(content.pillars), ecosystem: bareIds(content.ecosystem), faqs: bareIds(content.faqs) }).toEqual(SAFE_FALLBACK_CONTENT);
     expect(settings).toEqual(SAFE_FALLBACK_SETTINGS);
+  });
+
+  it("publishes the repository's legal settings, the order consent sentence and version included (R82)", async () => {
+    expect(normalizeLegalSettings(await publicRead(LEGAL_SETTINGS_QUERY))).toEqual(SAFE_FALLBACK_LEGAL);
   });
 });
 

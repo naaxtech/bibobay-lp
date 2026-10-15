@@ -2,7 +2,7 @@ import "server-only";
 
 import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
-import type { SiteSettings } from "@/lib/content/types";
+import type { LegalSettings, SiteSettings } from "@/lib/content/types";
 import { CONSENT_VERSION_PATTERN, hashSecretFrom } from "@/lib/leads/dependencies";
 import { clientKeyFromHeaders } from "@/lib/leads/http";
 import { reportEvent } from "@/lib/observability/report";
@@ -44,12 +44,17 @@ export const logOrderEvent = (entry: OrderLogEvent) => logEvent("orders", entry)
 /** Structured operational log for tracking lookups: event names and codes only, never a token, reference or email. */
 export const logTrackingEvent = (entry: TrackingLogEvent) => logEvent("order-tracking", entry);
 
-/** The CMS consent version when the database will accept it, else the repository fallback (as for signups). */
-function consentVersionFrom(cmsVersion: string): string {
-  const version = cmsVersion.trim();
-  if (CONSENT_VERSION_PATTERN.test(version)) return version;
+/**
+ * Ruling R82: the order form's own consent sentence and the version an order records, always as a
+ * pair. The CMS pair when the database will accept its version; otherwise the repository sentence
+ * and version together (logged with a code, never the value), so the order page never shows words
+ * whose version an order would not record. The order page shows `copy`; the route records `version`.
+ */
+export function orderConsentFrom(legal: Pick<LegalSettings, "orderConsentCopy" | "orderConsentCopyVersion">): { copy: string; version: string } {
+  const version = legal.orderConsentCopyVersion.trim();
+  if (CONSENT_VERSION_PATTERN.test(version)) return { copy: legal.orderConsentCopy, version };
   logOrderEvent({ event: "order_config_invalid", code: "consent_version_invalid" });
-  return SAFE_FALLBACK_LEGAL.consentCopyVersion;
+  return { copy: SAFE_FALLBACK_LEGAL.orderConsentCopy, version: SAFE_FALLBACK_LEGAL.orderConsentCopyVersion };
 }
 
 function storageFrom(env: Record<string, string | undefined>) {
@@ -71,7 +76,8 @@ export async function createOrderDependencies(
     repository: client ? createSupabaseOrderRepository(client) : null,
     rateLimiter: client ? createSupabaseRateLimiter(client) : null,
     resolveLines: (lines) => resolveCanonicalOrderLines(lines),
-    consentVersion: consentVersionFrom(legal.consentCopyVersion),
+    consentVersion: orderConsentFrom(legal).version,
+    orderCountries: settings.orderCountries,
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
     log: logOrderEvent,
   };

@@ -31,7 +31,7 @@ import { landingContent, siteSettings } from "../landing/fixtures";
 vi.mock("server-only", () => ({}));
 
 const block = (text: string): PortableContent => [{ _type: "block", children: [{ _type: "span", text }] }];
-const reviewedLegal: LegalSettings = { privacy: block("Privacy text from Sanity."), terms: block("Terms text from Sanity."), privacyVersion: "2026-10", termsVersion: "2026-10", consentCopyVersion: "1" };
+const reviewedLegal: LegalSettings = { privacy: block("Privacy text from Sanity."), terms: block("Terms text from Sanity."), privacyVersion: "2026-10", termsVersion: "2026-10", consentCopyVersion: "1", orderConsentCopy: "I agree.", orderConsentCopyVersion: "order-1" };
 
 const PRODUCTION = { VERCEL_ENV: "production" };
 const PREVIEW = { VERCEL_ENV: "preview", NEXT_PUBLIC_APP_URL: "https://preview.bibo.example" };

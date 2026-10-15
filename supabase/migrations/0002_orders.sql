@@ -15,11 +15,18 @@
 --   * Adults only: contact and delivery details. No child data, no raw client address.
 --
 -- What one order request writes, in one transaction (submit_order):
---   orders (status new, consent version and time, a hashed private tracking token with an expiry)
+--   orders (status new, consent version and time, a hashed private tracking token with an expiry,
+--           and the submission key of the request that made it)
 --   order_items (the canonical CMS snapshot of each product: Sanity id, title, SKU, variant, pack)
 --   order_events (the audit trail: the customer submitted it)
 --   order_email_outbox (the buyer acknowledgement and the staff alert, pending for the Task 8 worker)
 -- If any part fails, none of it is kept.
+--
+-- One order per submission key (ruling R81). The order form makes a random key once per order
+-- attempt and sends it again on every retry. A request whose answer was lost, sent again, finds the
+-- first order instead of making a second one: submit_order answers with that order's id and
+-- reference, writes nothing and queues no second email. It cannot hand out the first tracking token
+-- again (only its hash exists), so a repeat answers without one.
 --
 -- The tracking token is issued here and returned to the server once. Only its SHA-256 hash is
 -- stored, so a leaked table cannot be used to track anyone's order. Lookups are in migration 0003.
@@ -56,6 +63,8 @@ create table if not exists public.orders (
   -- Human-readable, safe to read aloud or put in a subject line. Not a secret: on its own it
   -- reveals nothing (the reference lookup also needs the order's email).
   reference                   text not null,
+  -- The order form's random key for the request that made this order (R81); never shown to anyone.
+  submission_key              uuid not null,
   status                      text not null default 'new',
   status_changed_at           timestamptz not null default now(),
   contact_name                text not null,
@@ -86,6 +95,7 @@ create table if not exists public.orders (
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now(),
   constraint orders_reference_key unique (reference),
+  constraint orders_submission_key_key unique (submission_key),
   constraint orders_tracking_token_hash_key unique (tracking_token_hash),
   constraint orders_reference_shape check (reference ~ '^BB-[0-9A-F]{4}-[0-9A-F]{4}$'),
   constraint orders_status_values check (status in ('new', 'confirmed', 'paid', 'dispatched', 'closed', 'cancelled')),
@@ -242,6 +252,8 @@ revoke all on function public.issue_order_tracking_token() from public, anon, au
 -- ---------------------------------------------------------------------------
 -- submit_order: store one order request, atomically. Returns its id and reference, the private
 -- tracking token (the only time it exists outside a hash) and whether the acknowledgement is queued.
+-- A repeated submission key (R81) returns the first order's id and reference with no token, nothing
+-- queued and `duplicate` true; the same key with another email is refused.
 -- ---------------------------------------------------------------------------
 --
 -- Every column a buyer must not control is set here, never passed in: status, prices, the payment
@@ -258,13 +270,14 @@ create or replace function public.submit_order(
   p_consent          boolean,
   p_consent_version  text,
   p_lines            jsonb,
+  p_submission_key   uuid,
   p_phone            text default null,
   p_address_line2    text default null,
   p_region           text default null,
   p_postal_code      text default null,
   p_notes            text default null
 )
-returns table (order_id uuid, reference text, tracking_token text, tracking_token_expires_at timestamptz, acknowledgement_queued boolean)
+returns table (order_id uuid, reference text, tracking_token text, tracking_token_expires_at timestamptz, acknowledgement_queued boolean, duplicate boolean)
 language plpgsql
 volatile
 security definer
@@ -291,9 +304,15 @@ declare
   v_token_hash    text;
   v_expires_at    timestamptz;
   v_ack_queued    boolean;
+  v_first_id      uuid;
+  v_first_ref     text;
+  v_first_email   text;
 begin
   if p_consent is distinct from true then
     raise exception 'consent is required' using errcode = '22023';
+  end if;
+  if p_submission_key is null then
+    raise exception 'submission key is required' using errcode = '22023';
   end if;
   if char_length(v_version) not between 1 and 40 then
     raise exception 'consent version is invalid' using errcode = '22023';
@@ -372,15 +391,32 @@ begin
     into v_token, v_token_hash, v_expires_at
     from public.issue_order_tracking_token() as issued;
 
+  -- R81: a key already used (even by a request still committing) yields to the first order.
   insert into public.orders as o (
-    reference, contact_name, email, phone, address_line1, address_line2, city, region, postal_code,
-    country, notes, consent_version, consent_granted_at, tracking_token_hash, tracking_token_expires_at
+    reference, submission_key, contact_name, email, phone, address_line1, address_line2, city, region,
+    postal_code, country, notes, consent_version, consent_granted_at, tracking_token_hash, tracking_token_expires_at
   )
   values (
-    v_reference, v_contact_name, v_email, v_phone, v_line1, v_line2, v_city, v_region, v_postal_code,
-    v_country, v_notes, v_version, now(), v_token_hash, v_expires_at
+    v_reference, p_submission_key, v_contact_name, v_email, v_phone, v_line1, v_line2, v_city, v_region,
+    v_postal_code, v_country, v_notes, v_version, now(), v_token_hash, v_expires_at
   )
+  on conflict (submission_key) do nothing
   returning o.id into v_order_id;
+
+  if v_order_id is null then
+    select first_order.id, first_order.reference, first_order.email
+      into v_first_id, v_first_ref, v_first_email
+      from public.orders as first_order
+     where first_order.submission_key = p_submission_key;
+    -- The same request again: the same normalised email. Anything else is not a retry, and the
+    -- refusal names neither the order nor its email.
+    if v_first_email is distinct from v_email then
+      raise exception 'submission key already used' using errcode = '23505';
+    end if;
+    -- No new row anywhere, no outbox row, no token: the first order's token exists only as a hash.
+    return query select v_first_id, v_first_ref, null::text, null::timestamptz, false, true;
+    return;
+  end if;
 
   insert into public.order_items (order_id, line_number, sanity_id, title, sku, variant, pack, quantity)
   select v_order_id, line.line_no::smallint, line.value ->> 'sanity_id', line.value ->> 'title',
@@ -399,9 +435,9 @@ begin
     where queued.order_id = v_order_id and queued.kind = 'acknowledgement'
   );
 
-  return query select v_order_id, v_reference, v_token, v_expires_at, v_ack_queued;
+  return query select v_order_id, v_reference, v_token, v_expires_at, v_ack_queued, false;
 end;
 $fn$;
 
-revoke all on function public.submit_order(text, text, text, text, text, boolean, text, jsonb, text, text, text, text, text) from public, anon, authenticated;
-grant execute on function public.submit_order(text, text, text, text, text, boolean, text, jsonb, text, text, text, text, text) to service_role;
+revoke all on function public.submit_order(text, text, text, text, text, boolean, text, jsonb, uuid, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.submit_order(text, text, text, text, text, boolean, text, jsonb, uuid, text, text, text, text, text) to service_role;
