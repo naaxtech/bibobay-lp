@@ -37,13 +37,22 @@ const CAMPAIGN_TAGS = ["utm_source", "utm_medium", "utm_campaign", "utm_content"
 const CLICK_IDS = new Set(["gclid", "gad_source", "gclsrc", "dclid", "gbraid", "wbraid", "fbclid", "msclkid", "twclid", "li_fat_id", "mc_cid", "igshid", "ttclid", "rdt_cid", "epik", "qclid", "sccid", "irclid", "_kx"]);
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+/** An "@", or one percent-encoded any number of times (`%40`, `%2540`, …). */
+const AT_SIGN = /@|%(?:25)*40/i;
 const MAX_TEXT = 80;
+/**
+ * The longest value checked or kept, in characters (Task 7b re-review 2 O-a): an address can be
+ * as long as the request line allows (about 16 KB), and the email check costs more on long text.
+ */
+const MAX_FIELD = 2_000;
+const bounded = (value: string) => value.slice(0, MAX_FIELD);
 
 /**
  * Review M1: an address can hide percent-encoded (`%40`, even `%2540`) in a path or a label. Text
  * is decoded up to three times before the email check; undecodable text is checked as it is.
  */
 function holdsEmail(value: string): boolean {
+  if (!AT_SIGN.test(value)) return false;
   let text = value;
   for (let round = 0; round < 3; round += 1) {
     if (EMAIL.test(text)) return true;
@@ -66,7 +75,7 @@ function plainValue(value: unknown): AnalyticsValue | undefined {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   if (typeof value === "string") {
-    const text = maskPrivatePaths(value.trim());
+    const text = maskPrivatePaths(bounded(value.trim()));
     return text && !holdsEmail(text) ? text.slice(0, MAX_TEXT) : undefined;
   }
   return undefined;
@@ -91,10 +100,11 @@ function pageAddress(value: unknown): string | undefined {
     const kept = new URLSearchParams();
     for (const tag of CAMPAIGN_TAGS) {
       const tagValue = url.searchParams.get(tag);
-      if (tagValue && !holdsEmail(tagValue)) kept.set(tag, tagValue.slice(0, MAX_TEXT));
+      if (tagValue && !holdsEmail(bounded(tagValue))) kept.set(tag, tagValue.slice(0, MAX_TEXT));
     }
     const query = kept.toString();
-    const path = holdsEmail(url.pathname) ? "/" : maskPrivatePaths(url.pathname);
+    const pathname = bounded(url.pathname);
+    const path = holdsEmail(pathname) ? "/" : maskPrivatePaths(pathname);
     return `${url.origin}${path}${query ? `?${query}` : ""}`;
   } catch {
     return undefined;
@@ -145,8 +155,9 @@ export function cleanCapture<T extends CaptureLike>(capture: T): T | null {
       continue;
     }
     if (name.startsWith("$") || CAMPAIGN_TAGS.includes(name) || SDK_FIELDS.has(name)) {
-      if (typeof value === "string" && holdsEmail(value)) continue;
-      properties[name] = typeof value === "string" ? maskPrivatePaths(value) : value;
+      const text = typeof value === "string" ? bounded(value) : undefined;
+      if (text !== undefined && holdsEmail(text)) continue;
+      properties[name] = text !== undefined ? maskPrivatePaths(text) : value;
       continue;
     }
     if (!allowed.has(name)) continue;

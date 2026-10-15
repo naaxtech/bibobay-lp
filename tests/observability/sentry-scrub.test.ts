@@ -1,6 +1,8 @@
 import type { Breadcrumb, ErrorEvent } from "@sentry/nextjs";
 import { describe, expect, it } from "vitest";
 
+import { hasSpansEnabled } from "@sentry/core";
+
 import { scrubBreadcrumb, scrubEvent, sentryOptions, tracesSampleRateFor, type Integration, type TransactionEvent } from "@/lib/observability/sentry-config";
 
 /*
@@ -193,8 +195,11 @@ describe("shared Sentry options", () => {
   it("sends error reports only: tracing is off in every environment", () => {
     for (const environment of ["production", "preview", "development"]) {
       const options = sentryOptions({ dsn: DSN, environment });
-      expect(options).not.toHaveProperty("tracesSampleRate");
+      // null, not absent (re-review 2 N2): absent lets the server and edge SDKs read
+      // SENTRY_TRACES_SAMPLE_RATE; 0 would let a visitor's sentry-trace header turn sampling on.
+      expect(options.tracesSampleRate).toBeNull();
       expect(options).not.toHaveProperty("tracesSampler");
+      expect(hasSpansEnabled(options as Parameters<typeof hasSpansEnabled>[0])).toBe(false);
     }
   });
 
@@ -221,6 +226,32 @@ describe("shared Sentry options", () => {
     const integrations = options.integrations as (defaults: Integration[]) => Integration[];
     // Ruling R86: no browser tracing either.
     expect(integrations(offered).map((integration) => integration.name)).toEqual(["Dedupe"]);
+  });
+
+  // Re-review 2 N1: with a release (every Vercel build has one) the SDK sends a session per page
+  // load in the browser and session counts from the server. Error reports only: neither.
+  it("sends no sessions: no browser or process session integration, and the server's Http integration without sessions", () => {
+    const made: Array<{ sessions: boolean }> = [];
+    const options = sentryOptions({
+      dsn: DSN,
+      environment: "production",
+      makeHttpIntegration: (settings) => {
+        made.push(settings);
+        return { name: "Http" };
+      },
+    });
+    const offered = [{ name: "BrowserSession" }, { name: "ProcessSession" }, { name: "Http" }, { name: "Dedupe" }] as Integration[];
+    const integrations = options.integrations as (defaults: Integration[]) => Integration[];
+    const kept = integrations(offered);
+    expect(kept.map((integration) => integration.name)).toEqual(["Http", "Dedupe"]);
+    expect(kept[0]).not.toBe(offered[2]);
+    expect(made).toEqual([{ sessions: false }]);
+  });
+
+  it("keeps the browser's own integrations as they are when no Http factory is given", () => {
+    const integrations = sentryOptions({ dsn: DSN, environment: "production" }).integrations as (defaults: Integration[]) => Integration[];
+    const offered = [{ name: "Http" }, { name: "Dedupe" }] as Integration[];
+    expect(integrations(offered)).toEqual(offered);
   });
 });
 
@@ -305,5 +336,30 @@ describe("what else the scrubber removes (Task 7b re-review)", () => {
   it("cuts very long strings before masking them, so a huge value cannot stall the page", () => {
     const crumb = scrubBreadcrumb({ message: `${"word ".repeat(40_000)}end` });
     expect(crumb.message!.length).toBeLessThanOrEqual(2_001);
+  });
+});
+
+describe("the fields that skipped the cap (re-review 2 N3, N4)", () => {
+  it("cuts and masks the request URL, the transaction name and span descriptions too", () => {
+    const long = `/x/${"word-".repeat(4_000)}parent@example.com`;
+    const scrubbed = scrubEvent({
+      request: { url: `https://bibo.example${long}?q=1`, method: "GET" },
+      transaction: `GET ${long}`,
+      spans: [{ span_id: "1", trace_id: "0123456789abcdef0123456789abcdef", start_timestamp: 1, description: `render ${long}` }],
+    } as unknown as Parameters<typeof scrubEvent>[0]);
+    for (const text of [scrubbed.request?.url, scrubbed.transaction, scrubbed.spans?.[0]?.description]) {
+      expect(text!.length).toBeLessThanOrEqual(2_001);
+      expect(text).not.toContain("parent@example.com");
+    }
+  });
+
+  it("does not throw on a value whose text form throws, and sends a placeholder", () => {
+    class Unprintable {
+      toString(): string {
+        throw new Error("no text form");
+      }
+    }
+    const crumb = scrubBreadcrumb({ category: "console", data: { arguments: [new Unprintable()] } });
+    expect(crumb.data?.arguments).toEqual(["[unprintable]"]);
   });
 });

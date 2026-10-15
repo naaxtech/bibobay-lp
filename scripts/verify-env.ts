@@ -103,6 +103,10 @@ export function verifyEnvironment(
   if ((env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? "") && analyticsConfig(env) === null) {
     monitoring.push("NEXT_PUBLIC_POSTHOG_KEY / NEXT_PUBLIC_POSTHOG_HOST: not a PostHog project key (phc_) with an exact https host; analytics would stay off");
   }
+  // Ruling R86: error reports only. The Sentry SDK would read this name and trace (re-review 2 N2).
+  for (const name of ["SENTRY_TRACES_SAMPLE_RATE", "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE"]) {
+    if (env[name] !== undefined) monitoring.push(`${name}: Sentry tracing is off by design (ruling R86); remove this variable`);
+  }
   if ((env.NEXT_PUBLIC_SENTRY_DSN?.trim() ?? "") && sentryDsnFrom(env.NEXT_PUBLIC_SENTRY_DSN) === null) {
     monitoring.push("NEXT_PUBLIC_SENTRY_DSN: not an https DSN with a public key and a numeric project; error reports would stay off");
   }

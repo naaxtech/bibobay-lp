@@ -109,18 +109,24 @@ project); otherwise nothing loads and nothing is sent.
 - **App code** reaches Sentry only through `lib/observability/report.ts`: `reportError(error, {area,
   event})` and `reportEvent(event, {kind, code})`. Tags must be plain identifiers (`lead_route_failed`,
   `acknowledgement`, `PGRST301`); anything else, such as an address or a name, is dropped.
-- **Error reports only (ruling R86):** no performance tracing (no `tracesSampleRate`, no browser
-  tracing integration) and no session replay. Sentry SDK 11 streams traces as spans and never runs
-  `beforeSendTransaction` on them, so traces would leave with URL queries and private order tokens;
-  `e2e/observability/sentry.spec.ts` fails if anything but events (and the SDK's client reports)
-  leaves the page.
+- **Error reports only (ruling R86):** no performance tracing, no session replay and no
+  sessions. Sentry SDK 11 streams traces as spans and never runs `beforeSendTransaction` on them,
+  so traces would leave with URL queries and private order tokens. `tracesSampleRate` is `null`
+  (absent would let the Node.js and edge SDKs read `SENTRY_TRACES_SAMPLE_RATE`; `0` would let a
+  visitor's `sentry-trace` header turn sampling on), and `verify:env` refuses that variable. The
+  browser and process session integrations are dropped, and the Node.js Http integration runs
+  without request sessions: with a release (every Vercel build has one) the SDK would otherwise
+  send a session per page load and session counts from the server.
+  `e2e/observability/sentry.spec.ts` gives the build a release, as Vercel does, and fails if
+  anything but events (and the SDK's client reports) leaves the page.
 - **Data collection:** SDK 11 has no `sendDefaultPii`; `dataCollection` is set to the minimum
   (no user info, cookies, bodies, query strings, database or queue data, or stack-frame variables;
   only the `user-agent` request header).
 - **Scrubbing** (`lib/observability/sentry-config.ts`, every event and breadcrumb): the request
   keeps its method, its URL without the query and the user agent only; the user, all extra data and
   stack-frame variables are removed; every string at every depth of contexts, tags, breadcrumbs and
-  messages is cut to 2,000 characters, loses any query (also mid-text), and has email-shaped text
+  messages, and the request URL, transaction name and span descriptions, is cut to 2,000
+  characters, loses any query (also a path's query in mid-text), and has email-shaped text
   replaced by `[email]` and a private order link's token by `/orders/[token]` (any 64-digit hex
   run becomes `[token]`).
 - **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.

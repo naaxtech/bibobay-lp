@@ -133,3 +133,21 @@ describe("private order links (Task 7b)", () => {
     expect(cleanCapture(capture("$pageview", { $pathname: "/orders" }))?.properties.$pathname).toBe("/orders");
   });
 });
+
+describe("long addresses (Task 7b re-review 2 O-a)", () => {
+  it("cleans a page view with a 16,000-character path quickly, keeping at most 2,000 characters per value", () => {
+    const path = `/${"zz-".repeat(5_400)}`;
+    const capture = { uuid: "u-1", event: "$pageview", properties: { $current_url: `https://bibo.example${path}?utm_source=${"z".repeat(16_000)}`, $pathname: path, token: "phc_fixture", distinct_id: "d" } };
+    const started = performance.now();
+    const clean = cleanCapture(capture);
+    expect(performance.now() - started).toBeLessThan(250);
+    // A page address is its origin, a path of at most 2,000 characters and five 80-character tags at most.
+    for (const value of Object.values(clean!.properties)) if (typeof value === "string") expect(value.length).toBeLessThanOrEqual(2_600);
+    expect(String(clean!.properties.$pathname).length).toBeLessThanOrEqual(2_000);
+  });
+
+  it("still finds an encoded email address anywhere it keeps", () => {
+    const clean = cleanCapture({ uuid: "u-2", event: "$pageview", properties: { $pathname: "/hello/parent%252540example.com", token: "phc_fixture", distinct_id: "d" } });
+    expect(clean!.properties).not.toHaveProperty("$pathname");
+  });
+});

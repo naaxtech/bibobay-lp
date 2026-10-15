@@ -35,6 +35,11 @@ function itemsIn(request: Request): Array<{ type: string; text: string }> {
 // and no item may carry a private order token, a query value or an email address.
 test("sends error reports only, and no item carries a token, a query or an email", async ({ page }) => {
   const TOKEN = "3f9a0c1d2e4b5a6978c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
+  // A Vercel build always has a release (withSentryConfig takes the commit), and only then does the
+  // SDK send sessions (re-review 2 N1). This build has none, so give it one, as Vercel would.
+  await page.addInitScript(() => {
+    (window as unknown as { _sentryRelease: { id: string } })._sentryRelease = { id: "e2e-release" };
+  });
   const requests: Request[] = [];
   await page.route(`${INGEST}/**`, async (route) => {
     requests.push(route.request());

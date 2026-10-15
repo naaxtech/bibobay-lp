@@ -65,7 +65,14 @@ function cleanValue(value: unknown, depth: number): unknown {
   if (depth >= MAX_DEPTH) return undefined;
   if (Array.isArray(value)) return value.map((entry) => cleanValue(entry, depth + 1));
   const prototype = Object.getPrototypeOf(value) as unknown;
-  if (prototype !== Object.prototype && prototype !== null) return cleanString(String(value));
+  if (prototype !== Object.prototype && prototype !== null) {
+    try {
+      return cleanString(String(value));
+    } catch {
+      // Its text form throws (re-review 2 N4): send a placeholder rather than lose the report.
+      return "[unprintable]";
+    }
+  }
   return cleanRecord(value as Record<string, unknown>, depth + 1);
 }
 
@@ -89,7 +96,8 @@ export function scrubBreadcrumb(crumb: Breadcrumb): Breadcrumb {
 
 function scrubRequest(request: NonNullable<Event["request"]>): Event["request"] {
   const clean: NonNullable<Event["request"]> = {};
-  if (request.url) clean.url = maskPrivatePaths(withoutQuery(request.url));
+  // Cut and masked like every other string (re-review 2 N3).
+  if (request.url) clean.url = cleanString(request.url);
   if (request.method) clean.method = request.method;
   const userAgent = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === "user-agent");
   if (userAgent) clean.headers = { [userAgent[0]]: userAgent[1] };
@@ -125,11 +133,11 @@ export function scrubEvent<T extends Event>(event: T): T {
     clean.contexts = Object.fromEntries(Object.entries(clean.contexts).map(([key, context]) => [key, context && typeof context === "object" ? cleanRecord(context as Record<string, unknown>) : context]));
   }
   if (clean.breadcrumbs) clean.breadcrumbs = clean.breadcrumbs.map(scrubBreadcrumb);
-  if (typeof clean.transaction === "string") clean.transaction = maskPrivatePaths(withoutQuery(clean.transaction));
+  if (typeof clean.transaction === "string") clean.transaction = cleanString(clean.transaction);
   if (clean.spans) {
     clean.spans = clean.spans.map((span) => {
       const scrubbed = span.data ? { ...span, data: cleanRecord(span.data) } : { ...span };
-      if (typeof scrubbed.description === "string") scrubbed.description = maskPrivatePaths(scrubbed.description);
+      if (typeof scrubbed.description === "string") scrubbed.description = maskText(scrubbed.description);
       return scrubbed;
     });
   }
@@ -168,16 +176,28 @@ export const MINIMAL_DATA_COLLECTION = {
 export interface SentrySettings {
   dsn: string;
   environment: string;
+  /**
+   * The Node.js runtime passes `Sentry.httpIntegration`: its default Http integration counts
+   * request sessions, which are sent whenever the build has a release (every Vercel build).
+   */
+  makeHttpIntegration?: (settings: { sessions: false }) => Integration;
 }
+
+/** Integrations never kept: session replay, tracing, and sessions (re-review 2 N1). */
+const DROPPED_INTEGRATIONS = /^(Replay|BrowserTracing|BrowserSession|ProcessSession)/;
 
 /**
  * Error reports only (ruling R86): no `tracesSampleRate` or `tracesSampler`, so the SDK traces
  * nothing, and no browser tracing or replay integration.
  */
-export function sentryOptions({ dsn, environment }: SentrySettings) {
+export function sentryOptions({ dsn, environment, makeHttpIntegration }: SentrySettings) {
   return {
     dsn,
     environment,
+    // null, not absent (re-review 2 N2): absent lets the Node.js and edge SDKs read
+    // SENTRY_TRACES_SAMPLE_RATE from the environment; 0 would let a visitor's sentry-trace header
+    // turn sampling on. With null, hasSpansEnabled is false whatever the environment says.
+    tracesSampleRate: null as unknown as number | undefined,
     // SDK 10's switch; SDK 11 ignores it (dataCollection below replaces it). Kept for readers of the old docs.
     sendDefaultPii: false,
     dataCollection: MINIMAL_DATA_COLLECTION,
@@ -185,7 +205,11 @@ export function sentryOptions({ dsn, environment }: SentrySettings) {
     // Runs only with traceLifecycle "static", and tracing is off; kept so a trace could never skip the scrubber.
     beforeSendTransaction: (event: TransactionEvent) => scrubEvent(event),
     beforeBreadcrumb: (crumb: Breadcrumb) => scrubBreadcrumb(crumb),
-    // Never session replay or browser tracing, even if a default integration set offered them.
-    integrations: (defaults: Integration[]) => defaults.filter((integration) => !/^(Replay|BrowserTracing)/.test(integration.name)),
+    // Never session replay, tracing or sessions, even if a default integration set offered them; on
+    // Node.js, the Http integration again without sessions.
+    integrations: (defaults: Integration[]) =>
+      defaults
+        .filter((integration) => !DROPPED_INTEGRATIONS.test(integration.name))
+        .map((integration) => (integration.name === "Http" && makeHttpIntegration ? makeHttpIntegration({ sessions: false }) : integration)),
   };
 }

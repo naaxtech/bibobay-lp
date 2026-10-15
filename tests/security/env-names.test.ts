@@ -75,3 +75,11 @@ describe("monitoring values the app would silently ignore (review M6)", () => {
     expect(verifyEnvironment({ NEXT_PUBLIC_POSTHOG_KEY: "", NEXT_PUBLIC_POSTHOG_HOST: "", NEXT_PUBLIC_SENTRY_DSN: " " }, "production").errors).toEqual([]);
   });
 });
+
+describe("Sentry tracing switches (ruling R86, re-review 2 N2)", () => {
+  it.each(["SENTRY_TRACES_SAMPLE_RATE", "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE"])("refuses %s: error reports only", (name) => {
+    const report = verifyEnvironment({ [name]: "1" }, "production");
+    expect(report.ok).toBe(false);
+    expect(report.errors.join("\n")).toContain(name);
+  });
+});
