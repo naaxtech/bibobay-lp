@@ -1,0 +1,29 @@
+components/landing/Footer.tsx
+  s_0cc7eb3d8eb999::t_514ba2923e8bae 5-6,8,16-18,23-24,33,36
+tests/brand/brand-assets.test.ts
+  s_deed703217db6f::t_638cffb9c57739 1,8-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f8747f1b5d9a74d52716c3edef9bdc4b0d1e2f8c",
+  "prompts": {},
+  "sessions": {
+    "s_0cc7eb3d8eb999": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9204abd3-77fd-4017-aca1-2322f5e9db32",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_deed703217db6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3504e079468593a6",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
