@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(98);
+select plan(99);
 
 -- ---------------------------------------------------------------------------
 -- Tables: RLS enabled and forced, no policies, no privileges for any API role
@@ -59,6 +59,7 @@ select table_privs_are('public', 'order_email_outbox', 'service_role', array[]::
 select has_column('public', 'orders', 'tracking_token_hash', 'orders keeps a hash of the private tracking token');
 select hasnt_column('public', 'orders', 'tracking_token', 'orders never stores the raw tracking token');
 select has_column('public', 'orders', 'tracking_token_expires_at', 'orders records when the tracking token expires');
+select has_column('public', 'orders', 'retain_until', 'orders keeps retention metadata (spec 11)');
 select columns_are(
   'public', 'order_items',
   array['id', 'order_id', 'line_number', 'sanity_id', 'title', 'sku', 'variant', 'pack', 'quantity', 'created_at'],

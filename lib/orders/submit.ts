@@ -63,7 +63,8 @@ export type OrderLogEvent =
   | { event: "order_storage_unconfigured" }
   | { event: "order_rate_limited" }
   | { event: "order_rate_limit_unavailable"; code: string }
-  | { event: "order_products_unavailable" }
+  /** The customer asked for a product that is not (or no longer) listed: their choice, not a fault. */
+  | { event: "order_products_refused" }
   | { event: "order_catalogue_invalid" }
   | { event: "order_catalogue_unavailable" }
   | { event: "order_config_invalid"; code: "consent_version_invalid" };
@@ -161,7 +162,7 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
       log({ event: "order_catalogue_unavailable" });
       return refused(503, ORDER_COPY.outcome.busy);
     }
-    log({ event: canonical.reason === "invalid_product" ? "order_catalogue_invalid" : "order_products_unavailable" });
+    log({ event: canonical.reason === "invalid_product" ? "order_catalogue_invalid" : "order_products_refused" });
     return refused(400, ORDER_COPY.outcome.productsUnavailable);
   }
 

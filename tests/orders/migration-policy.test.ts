@@ -1,9 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// lib/leads/dependencies (the consent-version rule) is server-only.
+vi.mock("server-only", () => ({}));
 
 import { ORDER_PAD_MAX_LINES, ORDER_PAD_MAX_QUANTITY, ORDER_STATUSES } from "@/lib/orders/constants";
-import { ORDER_LIMITS, ORDER_LINE_LIMITS } from "@/lib/orders/fields";
+import { CONSENT_VERSION_PATTERN } from "@/lib/leads/dependencies";
+import { COUNTRY_PATTERN, ORDER_LIMITS, ORDER_LINE_LIMITS, PHONE_MIN_LENGTH, PHONE_PATTERN, POSTAL_CODE_PATTERN } from "@/lib/orders/fields";
 
 /*
  * Static policy gate for the order migrations (0002-0005), like tests/leads/migration-policy.test.ts
@@ -121,6 +125,25 @@ describe("order migrations: tables", () => {
     ] as const) {
       expect(orders, column).toMatch(new RegExp(`char_length\\(${column}\\) between \\d+ and ${limit}\\b`));
     }
+  });
+
+  it("checks phone, postal code, country and consent version exactly as the server does (review Minor 3)", () => {
+    // The raw file: the normalized text is lower-cased, and these patterns are case-sensitive.
+    const orders = readSql("supabase/migrations/0002_orders.sql");
+    expect(orders).toContain(`char_length(phone) between ${PHONE_MIN_LENGTH} and ${ORDER_LIMITS.phone}`);
+    expect(orders).toContain(`phone ~ '${PHONE_PATTERN.source}'`);
+    expect(orders).toContain(`postal_code ~ '${POSTAL_CODE_PATTERN.source}'`);
+    expect(orders).toContain(`country ~ '${COUNTRY_PATTERN.source}'`);
+    // The server accepts a CMS consent version of up to 40 characters; the column must too.
+    expect(CONSENT_VERSION_PATTERN.test("v".repeat(40))).toBe(true);
+    expect(CONSENT_VERSION_PATTERN.test("v".repeat(41))).toBe(false);
+    expect(orders).toContain("check (char_length(consent_version) between 1 and 40)");
+  });
+
+  it("keeps retention metadata on each order, empty until a retention policy sets it (spec §11, review Minor 1)", () => {
+    const orders = tableDefinition(all, "orders");
+    expect(orders).toMatch(/ retain_until timestamptz,/);
+    expect(all).not.toMatch(/retain_until\s*=/);
   });
 
   it("bounds every snapshot column by the limits the catalogue check applies", () => {

@@ -40,7 +40,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: supabase.createClient })
 
 import { POST } from "@/app/api/orders/route";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { createOrderDependencies } from "@/lib/orders/dependencies";
+import { createOrderDependencies, createTrackingDependencies } from "@/lib/orders/dependencies";
 import { createSupabaseOrderRepository } from "@/lib/supabase/orders";
 
 /*
@@ -201,7 +201,7 @@ describe("the canonical catalogue reload", () => {
   });
 
   it.each([
-    ["an unknown, draft, sold-out or unlisted product", "unavailable_products", "order_products_unavailable"],
+    ["an unknown, draft, sold-out or unlisted product", "unavailable_products", "order_products_refused"],
     ["a listed product whose CMS data cannot be stored", "invalid_product", "order_catalogue_invalid"],
   ] as const)("refuses %s generically, without naming it, and stores nothing", async (_case, reason, logged) => {
     const repo = fakeRepository();
@@ -489,6 +489,15 @@ describe("order dependencies", () => {
     expect(wired.rateLimiter).not.toBeNull();
     expect(wired.clientKey).toMatch(/^[0-9a-f]{64}$/);
     expect(wired.clientKey).not.toContain(CLIENT_IP);
+  });
+
+  it("builds the tracking adapters from request headers alone, as a server page has them (review Minor 7)", () => {
+    const headers = new Headers({ "x-forwarded-for": CLIENT_IP });
+    const deps = createTrackingDependencies(headers, { ...ON, trackingEnabled: true }, { ...SUPABASE, LEAD_IP_HASH_SECRET: "s".repeat(32) });
+    expect(deps.enabled).toBe(true);
+    expect(deps.repository).not.toBeNull();
+    expect(deps.clientKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(deps.clientKey).not.toContain(CLIENT_IP);
   });
 
   it("records the CMS consent version when the database will accept it", async () => {

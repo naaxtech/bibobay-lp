@@ -77,9 +77,12 @@ export async function createOrderDependencies(
   };
 }
 
-/** The adapters for one tracking lookup (app/api/orders/track, and Task 7b's /orders/[token] page). */
+/**
+ * The adapters for one tracking lookup (app/api/orders/track, and Task 7b's /orders/[token] page).
+ * It takes the request headers only, so a server page can pass `await headers()`.
+ */
 export function createTrackingDependencies(
-  request: Request,
+  requestHeaders: Headers,
   settings: SiteSettings,
   env: Record<string, string | undefined> = process.env,
 ): TrackingDependencies {
@@ -88,7 +91,7 @@ export function createTrackingDependencies(
     enabled: isTrackingEnabled(settings),
     repository: client ? createSupabaseOrderRepository(client) : null,
     rateLimiter: client ? createSupabaseRateLimiter(client) : null,
-    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    clientKey: hashSecret ? clientKeyFromHeaders(requestHeaders, hashSecret) : "",
     log: logTrackingEvent,
   };
 }

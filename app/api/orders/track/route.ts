@@ -64,6 +64,6 @@ async function handle(request: Request) {
     return refusal(400, ORDER_COPY.tracking.failed);
   }
 
-  const result = await trackOrder(input, createTrackingDependencies(request, settings));
+  const result = await trackOrder(input, createTrackingDependencies(request.headers, settings));
   return respond(result.status, result.body, "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined);
 }

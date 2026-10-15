@@ -80,6 +80,9 @@ create table if not exists public.orders (
   freight_minor               integer,
   payment_url                 text,
   quote_sent_at               timestamptz,
+  -- Retention metadata (spec §11): when this order may be deleted or anonymised. Empty until the
+  -- owner adopts a retention policy; nothing in this migration sets or acts on it.
+  retain_until                timestamptz,
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now(),
   constraint orders_reference_key unique (reference),
