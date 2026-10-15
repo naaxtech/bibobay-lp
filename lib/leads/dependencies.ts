@@ -7,7 +7,9 @@ import { getStaffNotificationEmail, createEmailSenderFromEnv } from "@/lib/email
 import { createSupabaseRateLimiter } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient, getSupabaseAdminEnvironment } from "@/lib/supabase/admin";
 import { createSupabaseLeadRepository } from "@/lib/supabase/leads";
-import { getLandingPage, getLegalSettings } from "@/lib/sanity/fetch";
+import { absoluteFileUrl } from "@/lib/content/freebie";
+import { getLandingPage, getLegalSettings, getSiteSettings } from "@/lib/sanity/fetch";
+import { seoEnvironment } from "@/lib/seo/metadata";
 import { clientKeyFromHeaders } from "./http";
 import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } from "./submit";
 
@@ -73,10 +75,14 @@ export function logLeadEvent(entry: LeadLogEvent): void {
 
 export async function createLeadDependencies(request: Request, env: Record<string, string | undefined> = process.env): Promise<LeadSubmissionDependencies> {
   // Both reads fall back to safe repository content when Sanity is unconfigured or unreachable.
-  const [content, legal] = await Promise.all([getLandingPage(), getLegalSettings()]);
+  const [content, legal, settings] = await Promise.all([getLandingPage(), getLegalSettings(), getSiteSettings()]);
   const { lead } = content;
   const copy = { successMessage: lead.successMessage, errorMessage: lead.errorMessage };
-  const magnet = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? { title: lead.leadMagnet.title, fileUrl: lead.leadMagnet.fileUrl } : null;
+  // R66: a repository file needs the site's verified origin to work from an inbox; until that is
+  // known the email leaves the pack out rather than send a link that cannot open.
+  const origin = seoEnvironment(settings, env).baseUrl;
+  const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
+  const magnet = magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
 
   const admin = getSupabaseAdminEnvironment(env);
   const hashSecret = hashSecretFrom(env);

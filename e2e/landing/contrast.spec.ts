@@ -149,8 +149,10 @@ for (const { name, use } of VIEWPORTS) {
  * The colour change a keyboard focus ring makes at `point` (page coordinates): the contrast between
  * the pixel there before and after the element takes focus. WCAG 2.4.11/1.4.11 want at least 3:1.
  */
-async function ringChange(page: Page, focus: () => Promise<void>, point: { x: number; y: number }) {
+async function ringChange(page: Page, focus: () => Promise<void>, locate: () => Promise<{ x: number; y: number }>) {
   const sample = async () => {
+    // Re-located each time: tabbing through the page can scroll it between the two samples.
+    const point = await locate();
     const clip = { x: Math.max(0, Math.round(point.x) - 1), y: Math.max(0, Math.round(point.y) - 1), width: 3, height: 3 };
     const png = (await page.screenshot({ clip, animations: "disabled" })).toString("base64");
     return page.evaluate(async (data) => {
@@ -196,10 +198,15 @@ for (const { name, use } of VIEWPORTS) {
         await page.goto("/");
         const element = page.locator(selector);
         await element.scrollIntoViewIfNeeded();
-        const box = (await element.boundingBox())!;
         // Just outside the element's left edge, halfway down: where the 3px ring sits 3px out.
-        const point = { x: box.x - 4.5, y: box.y + box.height / 2 };
-        const change = await ringChange(page, () => tabTo(page, selector), point);
+        const locate = async () => {
+          const box = (await element.boundingBox())!;
+          return { x: box.x - 4.5, y: box.y + box.height / 2 };
+        };
+        const change = await ringChange(page, async () => {
+          await tabTo(page, selector);
+          await element.scrollIntoViewIfNeeded();
+        }, locate);
         expect(change.ratio, `${label}: ${change.before} -> ${change.after}`).toBeGreaterThanOrEqual(3);
       });
     }
@@ -217,12 +224,15 @@ for (const { name, use } of VIEWPORTS) {
         await page.mouse.click(1, 1);
         const element = page.locator(selector);
         await element.scrollIntoViewIfNeeded();
-        const box = (await element.boundingBox())!;
-        const point = { x: box.x - 4.5, y: box.y + box.height / 2 };
+        const locate = async () => {
+          const box = (await element.boundingBox())!;
+          return { x: box.x - 4.5, y: box.y + box.height / 2 };
+        };
         const change = await ringChange(page, async () => {
           await page.locator("#characters [role='tab'][aria-selected='true']").focus();
           if (selector.includes("tabpanel")) await tabTo(page, selector);
-        }, point);
+          await element.scrollIntoViewIfNeeded();
+        }, locate);
         expect(change.ratio, `${selector}: ${change.before} -> ${change.after}`).toBeGreaterThanOrEqual(3);
       }
     });

@@ -372,7 +372,8 @@ describe("mobile navigation menu", () => {
     expect(button.getAttribute("aria-expanded")).toBe("true");
     expect(within(dialog).getByRole("link", { name: "Meet the friends" }).getAttribute("href")).toBe("#characters");
     expect(within(dialog).getByRole("link", { name: "Watch" }).getAttribute("href")).toBe("#episodes");
-    expect(within(dialog).getByRole("link", { name: "Join the list" }).getAttribute("href")).toBe("#lead");
+    expect(within(dialog).getByRole("link", { name: "Free activity pack" }).getAttribute("href")).toBe("#lead");
+    expect(within(dialog).getByRole("link", { name: /Subscribe on YouTube/ }).getAttribute("href")).toMatch(/sub_confirmation=1$/);
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
   });
 

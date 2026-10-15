@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
+import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import type { LegalSettings } from "@/lib/content/types";
 import { ackSendLimitPerHour, createLeadDependencies, leadStorageConfigured } from "@/lib/leads/dependencies";
 
@@ -11,6 +11,7 @@ const cms = vi.hoisted(() => ({ legal: null as LegalSettings | null }));
 vi.mock("@/lib/sanity/fetch", () => ({
   getLandingPage: async () => SAFE_FALLBACK_CONTENT,
   getLegalSettings: async () => cms.legal ?? SAFE_FALLBACK_LEGAL,
+  getSiteSettings: async () => SAFE_FALLBACK_SETTINGS,
 }));
 
 const SECRET_32 = "s".repeat(32);
@@ -108,5 +109,17 @@ describe("global send cap setting (R40)", () => {
   it("hands the cap to the signup flow", async () => {
     const deps = await createLeadDependencies(request(), { LEAD_ACK_SEND_LIMIT_PER_HOUR: "12" });
     expect(deps.sendLimitPerHour).toBe(12);
+  });
+});
+
+describe("the activity pack in the acknowledgement email (R66)", () => {
+  it("links the pack by its full address once the site's public origin is known", async () => {
+    const deps = await createLeadDependencies(request(), { NEXT_PUBLIC_APP_URL: "https://bibobay.example" });
+    expect(deps.leadMagnet).toEqual({ title: "Bibo Bay Activity Pack", fileUrl: "https://bibobay.example/freebies/bibo-bay-activity-pack.pdf" });
+  });
+
+  it("leaves the pack out of the email while the origin is unknown, rather than send a broken link", async () => {
+    const deps = await createLeadDependencies(request(), {});
+    expect(deps.leadMagnet).toBeNull();
   });
 });

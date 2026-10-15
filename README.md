@@ -70,6 +70,7 @@ See [docs/cms-operations.md](docs/cms-operations.md) and [studio/README.md](stud
 | `npm run verify:bundle` | Scans the built client output for secrets (run after `npm run build`) |
 | `npm run verify:deployment -- <url>` | Checks a running deployment; add `--browser` for a Chromium pass |
 | `npm run brand:generate` | Regenerates the derived logo assets from `public/bibo-logo.svg` |
+| `uv run scripts/freebie/build_activity_pack.py` | Rebuilds the free activity pack PDF and its previews (needs [uv](https://docs.astral.sh/uv/); see `docs/cms-operations.md`) |
 | `npm --prefix studio run dev` / `build` / `typecheck` / `seed` | Studio commands |
 
 The full pre-release list, including running Playwright against a production build, is in

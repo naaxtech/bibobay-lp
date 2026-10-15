@@ -13,7 +13,7 @@ const publicRead = async (query: string) => (await evaluate(parse(query), { data
 describe("seeded tokenless published landing read", () => {
   it("gives all collection documents and their references public root-path IDs", () => {
     const documents = buildSeedDocuments();
-    expect(documents).toHaveLength(31);
+    expect(documents).toHaveLength(32);
     expect(documents.every((document) => !document._id.includes("."))).toBe(true);
     const landing = documents.find((document) => document._id === "landingPage")!;
     for (const key of ["characters", "episodes", "pillars", "ecosystem", "faqs"]) {

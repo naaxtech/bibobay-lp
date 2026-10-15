@@ -53,7 +53,7 @@ describe("truthful offline content", () => {
 
   it("does not fabricate audience size, view counts, delivery, expert proof, or testimonials", () => {
     const text = JSON.stringify(SAFE_FALLBACK_CONTENT).toLowerCase();
-    expect(text).not.toMatch(/11.minute|12.minute|pilot episode|as seen on|educator.approved|created with early childhood educators|starter kit|download free|free printable|thousands of families/);
+    expect(text).not.toMatch(/11.minute|12.minute|pilot episode|as seen on|educator.approved|created with early childhood educators|starter kit|thousands of families/);
     expect(text).not.toMatch(/\bsubscribers\b|\bviews\b|million|\d+k\b|award|#1|best.selling/);
     expect(SAFE_FALLBACK_CONTENT.testimonials).toEqual([]);
     expect(SAFE_FALLBACK_CONTENT.sections.find((s) => s.id === "testimonials")?.visible).toBe(false);

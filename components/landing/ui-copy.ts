@@ -27,6 +27,10 @@ export const UI_COPY = {
   watchStory: "Watch the story",
   /** A published video's way out, when it lives on YouTube (ruling R57: no embed). */
   watchOnYouTube: "Watch on YouTube",
+  /** The download card's button; the file's own title follows for assistive technology. */
+  downloadFreebie: "Download the free pack",
+  /** The repository pack's format line, from its real page count and size. */
+  freebieMeta: (pages: number, bytes: number) => `PDF · ${pages} pages · ${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`,
   /** Joins a video's title to its way out, for assistive technology ("Watch on YouTube: <title>"). */
   videoLinkTitle: (title: string) => `: ${title}`,
   /** Which story concept of how many is open (read by assistive technology with the open story). */

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { brandTokens } from "@/lib/brand/tokens";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { CmsArt } from "./CmsArt";
+import { FreebieCard } from "./FreebieCard";
 import { PaperEdge, SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
 
@@ -57,12 +58,9 @@ export function LeadCapture({ section, lead, form, art }: LeadCaptureProps) {
           </h2>
           {lead.description ? <p className="mt-5 max-w-[46ch] text-lead text-(--ink-soft)">{lead.description}</p> : null}
           {magnet ? (
-            <p className="lead-magnet mt-8">
-              <a href={magnet.fileUrl} className="text-link font-display text-lead font-semibold">
-                {magnet.title}
-              </a>
-              {magnet.description ? <span className="mt-1 block text-(--ink-soft)">{magnet.description}</span> : null}
-            </p>
+            <div className="mt-8">
+              <FreebieCard magnet={{ ...magnet, fileUrl: magnet.fileUrl! }} />
+            </div>
           ) : null}
           {art && form ? <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 20rem, 90vw" className="mt-10 max-w-[20rem]" /> : null}
         </div>

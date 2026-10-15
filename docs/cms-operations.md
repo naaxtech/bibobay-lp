@@ -96,10 +96,25 @@ eyebrow renders nothing.
 
 ## Downloads (lead magnets)
 
-The signup section shows a download link only when the referenced `leadMagnet` has
-**File exists and may be offered** ticked **and** a verified https file URL. The Studio will not let
-you tick the box without a URL. The acknowledgement email includes the link only under the same
-condition. Never tick it for a file that does not exist yet: the page would then promise it.
+The signup section shows a download card only when the referenced `leadMagnet` has
+**File exists and may be offered** ticked **and** a verified file URL: an https file, or a PDF the
+site serves itself from `/freebies/`. The Studio will not let you tick the box without a URL. Never
+tick it for a file that does not exist yet: the page would then promise it.
+
+The seeded download is the **Bibo Bay Activity Pack** (`/freebies/bibo-bay-activity-pack.pdf`):
+eight printable pages built from the site's own copy and the channel's stills, offered with no
+sign-up. For that file the card also shows renders of its pages and its real size; any other file
+shows its title and description only. Removing the reference from the signup section removes the
+card.
+
+The acknowledgement email repeats the link once the site's public address is known (a verified
+canonical URL in Site settings, or `NEXT_PUBLIC_APP_URL`); until then it leaves the download out
+rather than send a link that cannot open from an inbox.
+
+To change the pack, edit `scripts/freebie/build_activity_pack.py` (or the site copy it reads) and
+run `uv run scripts/freebie/build_activity_pack.py` from the repository root. It rewrites the PDF,
+its page previews and `lib/content/activity-pack.manifest.json`; `tests/freebie` checks that the
+three still agree and that every link in the PDF goes to the channel or one of its videos.
 
 ## Tab sections: one long text makes every panel tall
 

@@ -86,7 +86,7 @@ describe("repository art in empty CMS slots", () => {
     expect(hero.getAttribute("decoding")).toBe("async");
     for (const image of imagesIn(document.querySelector("main")!)) {
       expect(image.getAttribute("src"), image.outerHTML.slice(0, 80)).not.toContain("/_next/image");
-      expect(image.getAttribute("srcset"), image.outerHTML.slice(0, 80)).toMatch(/\/brand\/art\/[\w-]+\.webp \d+w/);
+      expect(image.getAttribute("srcset"), image.outerHTML.slice(0, 80)).toMatch(/\/(?:brand\/art|freebies)\/[\w-]+\.webp \d+w/);
     }
   });
 
@@ -94,7 +94,8 @@ describe("repository art in empty CMS slots", () => {
     renderPage();
     const files = imagesIn(document.querySelector("main")!).map(shownFile);
     expect(files.length).toBeGreaterThan(10);
-    for (const file of files) expect(file, file).toMatch(/^\/brand\/art\/[\w-]+\.webp$/);
+    // Channel art, and the free activity pack's own page renders (R66).
+    for (const file of files) expect(file, file).toMatch(/^\/(?:brand\/art|freebies)\/[\w-]+\.webp$/);
   });
 });
 

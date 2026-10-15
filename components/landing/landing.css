@@ -1680,6 +1680,97 @@
     max-inline-size: 40ch;
   }
 
+  /*
+   * The free activity pack (R66): real page renders fanned like printed sheets beside the title,
+   * the download button and the file's real format line. Stacked on phones, side by side from 40rem.
+   */
+  .freebie-card {
+    display: grid;
+    gap: 1.5rem;
+    max-inline-size: 36rem;
+    padding: 1.25rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: var(--bibo-color-paper);
+    box-shadow: var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+  }
+
+  .freebie-card__pages {
+    position: relative;
+    justify-self: center;
+    inline-size: min(13rem, 62vw);
+    aspect-ratio: 1 / 1.08;
+  }
+
+  .freebie-card__page {
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inline-size: 68%;
+    block-size: auto;
+    border-radius: 0.4rem;
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0.125rem 0.25rem rgb(40 59 99 / 0.12), 0 0.5rem 1.25rem rgb(40 59 99 / 0.16);
+  }
+
+  .freebie-card__page--0 {
+    z-index: 3;
+    inset-inline-start: 16%;
+    rotate: -3deg;
+  }
+
+  .freebie-card__page--1 {
+    z-index: 2;
+    inset-inline-start: 32%;
+    rotate: 7deg;
+  }
+
+  .freebie-card__page--2 {
+    z-index: 1;
+    inset-inline-start: 0;
+    rotate: -10deg;
+  }
+
+  .freebie-card__title {
+    font-family: var(--bibo-font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .freebie-card__description {
+    margin-block-start: 0.5rem;
+    color: var(--bibo-color-navy-soft, #4a5878);
+  }
+
+  .freebie-card__download {
+    margin-block-start: 1.25rem;
+    gap: 0.5rem;
+  }
+
+  .freebie-card__glyph {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    flex: none;
+  }
+
+  .freebie-card__meta {
+    margin-block-start: 0.625rem;
+    color: var(--bibo-color-navy-soft, #4a5878);
+    font-size: 0.875rem;
+  }
+
+  @media (min-width: 40rem) {
+    .freebie-card--pages {
+      grid-template-columns: 11rem minmax(0, 1fr);
+      align-items: center;
+      padding: 1.5rem;
+    }
+
+    .freebie-card__pages {
+      inline-size: 11rem;
+    }
+  }
+
   /* ---------- FAQ ---------- */
 
   .faq-list {

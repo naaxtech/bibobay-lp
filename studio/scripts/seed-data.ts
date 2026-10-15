@@ -63,13 +63,15 @@ export function buildSeedDocuments(): SeedDocument[] {
     ...values.map(([id, title, description, prompts]) => ({ _id: collectionId("brandPillar", id), _type: "brandPillar", title, description, prompts: [...prompts] })),
     ...extensions.map(([id, name, tagline]) => ({ _id: collectionId("ecosystemEntry", id), _type: "ecosystemEntry", name, tagline, description: `A possible future space for ${tagline.toLowerCase()}.`, status: "idea" })),
     ...questions.map(([id, question, answer]) => ({ _id: collectionId("faqItem", id), _type: "faqItem", question, answer })),
+    // The one download: the activity pack this repository ships in public/freebies (R66).
+    { _id: "leadMagnet-activity-pack", _type: "leadMagnet", title: "Bibo Bay Activity Pack", description: "Eight printable pages: colour the sea friends, count with Bob, match fruit with Tula, practise bubble breathing, a bedtime chart and a watch-together page.", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: true },
   ];
   const siteSettings: SeedDocument = {
     _id: "siteSettings", _type: "siteSettings", title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.",
     seo: seo(...SEO),
     commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false,
     socialLinks: [{ _type: "socialLink", _key: "youtube", platform: "youtube", url: CHANNEL, verified: true }],
-    navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes"), cta("Join the list", "#lead")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: subscribeOnYouTube(), commerceLabel: "Shop" },
+    navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes"), cta("Free activity pack", "#lead")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: subscribeOnYouTube(), commerceLabel: "Shop" },
     footer: { _type: "footerSettings", text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [cta("Privacy", "/privacy"), cta("Terms", "/terms")].map((item, index) => ({ ...item, _key: `legal-${index}` })), contactLabel: "Contact" },
   };
   const landingPage: SeedDocument = {
@@ -92,7 +94,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     ecosystemIntro: intro("A wider world", "Ideas beyond the Bay.", "The wider BIBO ecosystem is a vision for future experiences, not a list of available products or services."),
     ecosystem: extensions.map(([id]) => ref("ecosystemEntry", id)),
     testimonialsIntro: intro("Family voices", "Experiences from families", "Verified experiences will appear here when available."), testimonials: [],
-    lead: { ...intro("Founding families", "Be first to hear about new adventures.", "Adults can join the list for updates about BIBO Bay. Joining does not promise a download or an email delivery.", "leadSection"), buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates. I can unsubscribe at any time.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again." },
+    lead: { ...intro("Free activity pack", "Print, play and learn with the friends.", "Our free activity pack is yours to download right here, with no sign-up. Grown-ups can also join the list to hear about new adventures.", "leadSection"), buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates. I can unsubscribe at any time.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again.", leadMagnet: { _type: "reference", _ref: "leadMagnet-activity-pack" } },
     faqIntro: intro("Questions", "A little more about the Bay.", "What families ask about BIBO Bay."),
     faqs: questions.map(([id]) => ref("faqItem", id)),
     finalCta: { ...intro("Come say hello", "Dive into Bibo Bay.", "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", "finalCtaSection"), cta: subscribeOnYouTube() },

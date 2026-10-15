@@ -248,16 +248,34 @@ describe("lead capture", () => {
     expect(within(section("hero")).getByRole("link", { name: "Meet Tula, Bob & Lumi" }).getAttribute("href")).toBe("#characters");
   });
 
+  it("offers the repository's activity pack by default, with its page previews and real size", () => {
+    renderPage();
+    const lead = section("lead");
+    const link = within(lead).getByRole("link", { name: /^Download the free pack/ });
+    expect(link.getAttribute("href")).toBe("/freebies/bibo-bay-activity-pack.pdf");
+    expect(link.hasAttribute("download")).toBe(true);
+    expect(link.textContent).toContain("Bibo Bay Activity Pack");
+    const cover = within(lead).getByRole("img", { name: /activity pack/i });
+    expect(cover.getAttribute("src")).toMatch(/^\/freebies\/activity-pack-cover-\d+\.webp$/);
+    expect(within(lead).getByText(/^PDF · 8 pages · \d+(\.\d)? MB$/)).toBeTruthy();
+  });
+
   it("offers a download only when the CMS marks a real file available", () => {
-    const { unmount } = renderPage();
-    expect(screen.queryByRole("link", { name: "Bay colouring sheet" })).toBeNull();
+    const { unmount } = renderPage(landingContent((draft) => {
+      delete draft.lead.leadMagnet;
+    }));
+    expect(screen.queryByRole("link", { name: /Download/ })).toBeNull();
     unmount();
     renderPage(landingContent((draft) => {
       draft.lead.leadMagnet = { title: "Bay colouring sheet", description: "One printable page of the Bay.", fileUrl: "https://cdn.sanity.io/files/abc/production/sheet.pdf", available: true };
     }));
-    const link = within(section("lead")).getByRole("link", { name: "Bay colouring sheet" });
+    const link = within(section("lead")).getByRole("link", { name: /^Download the free pack/ });
     expect(link.getAttribute("href")).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
+    expect(link.textContent).toContain("Bay colouring sheet");
     expect(within(section("lead")).getByText("One printable page of the Bay.")).toBeTruthy();
+    // The repository's previews and size describe only the repository's own pack.
+    expect(within(section("lead")).queryByRole("img", { name: /activity pack/i })).toBeNull();
+    expect(within(section("lead")).queryByText(/^PDF ·/)).toBeNull();
   });
 });
 

@@ -1,3 +1,4 @@
+import { ACTIVITY_PACK } from "./freebie";
 import type { Character, EpisodePreview, LandingPageContent, LegalSettings, SiteSettings, SectionId } from "./types";
 
 /*
@@ -92,7 +93,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
   ].map(([id, name, tagline]) => ({ id: id!, name: name!, tagline: tagline!, description: `A possible future space for ${tagline!.toLowerCase()}.`, status: "idea" as const })),
   testimonialsIntro: { eyebrow: "Family voices", heading: "Experiences from families", description: "Verified experiences will appear here when available." },
   testimonials: [],
-  lead: { eyebrow: "Founding families", heading: "Be first to hear about new adventures.", description: "Adults can join the list for updates about BIBO Bay. Joining does not promise a download or an email delivery.", buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates. I can unsubscribe at any time.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again." },
+  lead: { eyebrow: "Free activity pack", heading: "Print, play and learn with the friends.", description: "Our free activity pack is yours to download right here, with no sign-up. Grown-ups can also join the list to hear about new adventures.", buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates. I can unsubscribe at any time.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again.", leadMagnet: { title: "Bibo Bay Activity Pack", description: "Eight printable pages: colour the sea friends, count with Bob, match fruit with Tula, practise bubble breathing, a bedtime chart and a watch-together page.", fileUrl: ACTIVITY_PACK.fileUrl, available: true } },
   faqIntro: { eyebrow: "Questions", heading: "A little more about the Bay.", description: "What families ask about BIBO Bay." },
   faqs: [
     { id: "what", question: "What is BIBO Bay?", answer: "BIBO Bay is a gentle underwater world of mindful content for curious little learners ages 2–6: songs, stories and playful adventures with Tula, Bob and Lumi." },
@@ -107,7 +108,7 @@ export const SAFE_FALLBACK_SETTINGS: SiteSettings = {
   title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.", seo: SAFE_FALLBACK_CONTENT.seo,
   commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false,
   socialLinks: [{ platform: "youtube", url: BIBO_YOUTUBE_CHANNEL_URL, verified: true }],
-  navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Join the list", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
+  navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Free activity pack", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
   footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact" },
 };
 export const SAFE_FALLBACK_LEGAL: LegalSettings = { privacy: [], terms: [], consentCopyVersion: "1" };

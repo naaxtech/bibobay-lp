@@ -40,7 +40,13 @@ export const faqItem = defineType({ name: "faqItem", title: "Question and answer
 ] });
 export const leadMagnet = defineType({ name: "leadMagnet", title: "Download (only when real)", type: "document", fields: [
   defineField({ name: "title", type: "string" }), defineField({ name: "description", type: "text" }),
-  defineField({ name: "fileUrl", title: "Verified HTTPS download URL", type: "url", validation: (rule) => rule.uri({ scheme: ["https"] }) }),
+  defineField({
+    name: "fileUrl",
+    title: "Verified download URL",
+    type: "url",
+    description: "An https file, or a PDF the site itself serves from /freebies/ (the activity pack is /freebies/bibo-bay-activity-pack.pdf).",
+    validation: (rule) => rule.uri({ scheme: ["https"], allowRelative: true }).custom((value) => !value || /^https:\/\//.test(value) || /^\/freebies\/[a-z0-9][a-z0-9-]*\.pdf$/.test(value) || "Use an https URL or a /freebies/<name>.pdf path"),
+  }),
   defineField({ name: "available", title: "File exists and may be offered", type: "boolean", initialValue: false, validation: (rule) => rule.custom((value, context) => value !== true || !!(context.document?.fileUrl) || "A real verified file URL is required before enabling this download") }),
 ] });
 export const productCategory = defineType({ name: "productCategory", title: "Product category", type: "document", fields: [

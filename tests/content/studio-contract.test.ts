@@ -77,7 +77,10 @@ describe("claim-safe editorial seed", () => {
     expect(landing.characters).toHaveLength(3);
     expect(landing.ecosystem).toHaveLength(8);
     expect((landing.sections as Array<{ id: string; visible: boolean }>).find((s) => s.id === "testimonials")?.visible).toBe(false);
-    expect((landing.lead as Record<string, unknown>).leadMagnet).toBeUndefined();
+    // The one download: the activity pack this repository ships (R66).
+    expect((landing.lead as Record<string, unknown>).leadMagnet).toEqual({ _type: "reference", _ref: "leadMagnet-activity-pack" });
+    const pack = docs.find((d) => d._id === "leadMagnet-activity-pack")!;
+    expect(pack).toMatchObject({ _type: "leadMagnet", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: true });
     for (const episode of docs.filter((d) => d._type === "episodePreview")) {
       expect(episode.status).toBe("published");
       const id = /^https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})$/.exec(String(episode.mediaUrl))?.[1];
@@ -87,7 +90,8 @@ describe("claim-safe editorial seed", () => {
     // Media and verification appear only where checked above; prices, private contacts and downloads never.
     const others = docs.filter((d) => d._type !== "episodePreview" && d._id !== "siteSettings");
     expect(JSON.stringify(others)).not.toMatch(/"(?:verified|mediaUrl)"\s*:/);
-    expect(JSON.stringify(docs)).not.toMatch(/"(?:price|currency|canonicalUrl|studioUrl|contactEmail|fileUrl)"\s*:/);
+    expect(JSON.stringify(docs)).not.toMatch(/"(?:price|currency|canonicalUrl|studioUrl|contactEmail)"\s*:/);
+    expect(docs.filter((d) => "fileUrl" in d).map((d) => d._id)).toEqual(["leadMagnet-activity-pack"]);
   });
 });
 

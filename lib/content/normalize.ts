@@ -1,3 +1,4 @@
+import { FREEBIE_PATH } from "./freebie";
 import { DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
 import type { BrandPillar, Character, Cta, EcosystemEntry, EpisodePreview, FaqItem, ImageWithAlt, LandingPageContent, LegalSettings, PortableContent, SectionConfig, SectionId, SectionIntro, Seo, SiteSettings, SocialLink, Testimonial } from "./types";
 
@@ -8,6 +9,18 @@ const text = (value: unknown, fallback = ""): string => typeof value === "string
 const optionalText = (value: unknown): string | undefined => text(value) || undefined;
 const stringList = (value: unknown, fallback: string[]): string[] => Array.isArray(value) ? value.filter((s): s is string => typeof s === "string" && !!s.trim()).map((s) => s.trim()) : fallback;
 const validUrl = (value: unknown): string | undefined => { if (typeof value !== "string") return; try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : undefined; } catch { return; } };
+/** A download: an https file, or a PDF this site serves from public/freebies (R66). */
+const fileUrl = (value: unknown): string | undefined => typeof value === "string" && FREEBIE_PATH.test(value) ? value : validUrl(value);
+/**
+ * The lead section's download. A CMS lead section decides for itself (its reference, or none); a
+ * landing document with no lead section keeps the repository's pack like every other fallback.
+ * Only an available file at an accepted location is offered.
+ */
+const leadMagnet = (rawLead: unknown, fallback: LandingPageContent["lead"]["leadMagnet"]): { leadMagnet?: NonNullable<typeof fallback> } => {
+  if (!rawLead || typeof rawLead !== "object") return fallback ? { leadMagnet: fallback } : {};
+  const magnet = record(record(rawLead).leadMagnet), url = fileUrl(magnet.fileUrl);
+  return magnet.available === true && url ? { leadMagnet: { title: text(magnet.title), description: text(magnet.description), fileUrl: url, available: true } } : {};
+};
 const href = (value: unknown): string | undefined => typeof value === "string" && /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(value) ? value : validUrl(value);
 const cta = (raw: unknown, fallback: Cta): Cta => {
   const value = record(raw);
@@ -92,7 +105,7 @@ export function normalizeLandingContent(raw: unknown, options: { testimonialsEna
     pillarsIntro: intro(v.pillarsIntro, f.pillarsIntro), pillars: items(v.pillars, f.pillars, (entry): BrandPillar | undefined => { const id = itemId(entry), title = text(entry.title); if (!id || !title) return; const art = image(entry.image, title); return { id, title, description: text(entry.description), prompts: stringList(entry.prompts, []), ...(art ? { image: art } : {}) }; }),
     ecosystemIntro: intro(v.ecosystemIntro, f.ecosystemIntro), ecosystem: items(v.ecosystem, f.ecosystem, (entry): EcosystemEntry | undefined => { const id = itemId(entry), name = text(entry.name); if (!id || !name) return; const art = image(entry.image, name); return { id, name, tagline: text(entry.tagline), description: text(entry.description), status: entry.status === "available" || entry.status === "in-development" ? entry.status : "idea", ...(art ? { image: art } : {}), ...(entry.status === "available" && record(entry.cta).label ? { cta: cta(entry.cta, { label: name, href: "#ecosystem" }) } : {}) }; }),
     testimonialsIntro: intro(v.testimonialsIntro, f.testimonialsIntro), testimonials: allowProof ? testimonials : [],
-    lead: { ...intro(lead, f.lead), buttonLabel: text(lead.buttonLabel, f.lead.buttonLabel), consentCopy: text(lead.consentCopy, f.lead.consentCopy), successMessage: text(lead.successMessage, f.lead.successMessage), errorMessage: text(lead.errorMessage, f.lead.errorMessage), ...(record(lead.leadMagnet).available === true && validUrl(record(lead.leadMagnet).fileUrl) ? { leadMagnet: { title: text(record(lead.leadMagnet).title), description: text(record(lead.leadMagnet).description), fileUrl: validUrl(record(lead.leadMagnet).fileUrl), available: true } } : {}) },
+    lead: { ...intro(lead, f.lead), buttonLabel: text(lead.buttonLabel, f.lead.buttonLabel), consentCopy: text(lead.consentCopy, f.lead.consentCopy), successMessage: text(lead.successMessage, f.lead.successMessage), errorMessage: text(lead.errorMessage, f.lead.errorMessage), ...leadMagnet(v.lead, f.lead.leadMagnet) },
     faqIntro: intro(v.faqIntro, f.faqIntro), faqs: items(v.faqs, f.faqs, (entry): FaqItem | undefined => { const id = itemId(entry), question = text(entry.question), answer = text(entry.answer); return id && question && answer ? { id, question, answer } : undefined; }),
     finalCta: { ...intro(finalCta, f.finalCta), cta: cta(finalCta.cta, f.finalCta.cta) },
   };

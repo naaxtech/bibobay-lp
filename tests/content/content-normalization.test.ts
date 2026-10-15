@@ -83,3 +83,26 @@ describe("the watch section's call to action (YouTube-first)", () => {
       .toEqual({ label: "Our playlists", href: "https://www.youtube.com/@bibobay-tv/playlists", external: true });
   });
 });
+
+describe("download file locations", () => {
+  const magnet = (fileUrl: string) => normalizeLandingContent({ lead: { leadMagnet: { title: "Pack", description: "Pages", fileUrl, available: true } } }).lead.leadMagnet;
+  it("accepts an https file or a PDF this site serves from its freebies folder", () => {
+    expect(magnet("https://cdn.sanity.io/files/abc/production/sheet.pdf")?.fileUrl).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
+    expect(magnet("/freebies/bibo-bay-activity-pack.pdf")?.fileUrl).toBe("/freebies/bibo-bay-activity-pack.pdf");
+  });
+  it("refuses anything else, and with it the download", () => {
+    for (const bad of ["//evil.example/x.pdf", "/freebies/../secret.pdf", "/freebies/x.exe", "/other/x.pdf", "javascript:alert(1)", "http://bibobay.example/x.pdf"]) {
+      expect(magnet(bad), bad).toBeUndefined();
+    }
+  });
+});
+
+describe("the lead section's download", () => {
+  it("keeps the repository's activity pack when there is no lead section at all", () => {
+    expect(normalizeLandingContent({}).lead.leadMagnet).toEqual(SAFE_FALLBACK_CONTENT.lead.leadMagnet);
+  });
+  it("offers nothing when an editor's lead section has no download, or marks it unavailable", () => {
+    expect(normalizeLandingContent({ lead: { heading: "Join us" } }).lead.leadMagnet).toBeUndefined();
+    expect(normalizeLandingContent({ lead: { leadMagnet: { title: "Pack", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: false } } }).lead.leadMagnet).toBeUndefined();
+  });
+});
