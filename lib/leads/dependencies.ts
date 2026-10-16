@@ -8,8 +8,11 @@ import { createSupabaseRateLimiter } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient, getSupabaseAdminEnvironment } from "@/lib/supabase/admin";
 import { createSupabaseLeadRepository } from "@/lib/supabase/leads";
 import { absoluteFileUrl } from "@/lib/content/freebie";
+import type { LandingPageContent, SiteSettings } from "@/lib/content/types";
+import type { LeadMagnetLink } from "@/lib/email/lead-emails";
 import { getLandingPage, getLegalSettings, getSiteSettings } from "@/lib/sanity/fetch";
 import { reportEvent } from "@/lib/observability/report";
+import { SERVER_SECRET_MIN_LENGTH } from "@/lib/security/secrets";
 import { seoEnvironment } from "@/lib/seo/metadata";
 import { clientKeyFromHeaders } from "./http";
 import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } from "./submit";
@@ -26,8 +29,9 @@ import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } fr
 /**
  * Review M8: with a short secret, anyone holding the bucket table could brute-force it over the IPv4
  * space, so a shorter one counts as missing. scripts/verify-env.ts fails a production build with one.
+ * N4: the number itself lives once, in lib/security/secrets.ts.
  */
-export const LEAD_IP_HASH_SECRET_MIN_LENGTH = 32;
+export const LEAD_IP_HASH_SECRET_MIN_LENGTH = SERVER_SECRET_MIN_LENGTH;
 
 /** The client-address hashing secret, or null when missing or too short (also used by lib/orders/dependencies.ts). */
 export function hashSecretFrom(env: Record<string, string | undefined>): string | null {
@@ -77,7 +81,8 @@ const WARNING_EVENT = /_(failed|unavailable|unconfigured|invalid)$/;
  */
 export function logLeadEvent(entry: LeadLogEvent): void {
   const line = JSON.stringify({ scope: "leads", ...entry });
-  const warning = WARNING_EVENT.test(entry.event);
+  // Task 8a: a row parked for a human (R91) is a warning too.
+  const warning = WARNING_EVENT.test(entry.event) || entry.event === "delivery_expired";
   if (warning) console.warn(line);
   else console.info(line);
   if (warning || entry.event === "delivery_send_capped") {
@@ -85,16 +90,30 @@ export function logLeadEvent(entry: LeadLogEvent): void {
   }
 }
 
+/**
+ * R66: the lead magnet the acknowledgement may link to. A repository file needs the site's
+ * verified origin to work from an inbox; until that is known the email leaves the pack out rather
+ * than send a link that cannot open. Shared with the outbox worker (Task 8a), so a retried
+ * acknowledgement links to the same file.
+ */
+export function leadMagnetFrom(lead: LandingPageContent["lead"], settings: SiteSettings, env: Record<string, string | undefined> = process.env): LeadMagnetLink | null {
+  const origin = seoEnvironment(settings, env).baseUrl;
+  const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
+  return magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
+}
+
 export async function createLeadDependencies(request: Request, env: Record<string, string | undefined> = process.env): Promise<LeadSubmissionDependencies> {
   // Both reads fall back to safe repository content when Sanity is unconfigured or unreachable.
   const [content, legal, settings] = await Promise.all([getLandingPage(), getLegalSettings(), getSiteSettings()]);
   const { lead } = content;
   const copy = { successMessage: lead.successMessage, errorMessage: lead.errorMessage };
-  // R66: a repository file needs the site's verified origin to work from an inbox; until that is
-  // known the email leaves the pack out rather than send a link that cannot open.
-  const origin = seoEnvironment(settings, env).baseUrl;
-  const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
-  const magnet = magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
+  const magnet = leadMagnetFrom(lead, settings, env);
+  /*
+   * Moved into leadMagnetFrom above in Task 8a (the worker needs the same link); kept for history:
+   *   const origin = seoEnvironment(settings, env).baseUrl;
+   *   const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
+   *   const magnet = magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
+   */
 
   const admin = getSupabaseAdminEnvironment(env);
   const hashSecret = hashSecretFrom(env);

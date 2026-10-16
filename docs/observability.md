@@ -148,6 +148,32 @@ failure of `/api/leads` is reported as `lead_route_failed` and answered with the
 
 Set a Sentry alert on `delivery_send_capped` and `lead_store_failed`.
 
+### Alerts from the email outbox (Task 8a)
+
+The sends made right after an answer and the cron worker (`/api/cron/email-outbox`) share one
+attempt step (`lib/outbox/attempt.ts`). Its log lines (`scope: "outbox"`, with `channel` `leads`,
+`orders` or `worker`; signup sends log under `scope: "leads"`) carry event names, message kinds,
+counts and short codes only, never an address, a name, an order reference or a row id. These are
+also sent to Sentry as warnings, tagged with the event, kind and code only:
+
+- `delivery_send_capped` and `delivery_send_cap_unavailable`: the shared hourly send budget was
+  spent or could not be checked; the row was handed back and stays due.
+- `delivery_claim_failed`: a claim function failed (database or answer shape); nothing was sent.
+- `delivery_message_invalid`: a claimed row could not be turned into a truthful email (for example a
+  staff alert with no staff address, or a quote with a non-https payment link); it is recorded as
+  `failed` with `message_invalid`.
+- `delivery_record_failed`: the outcome could not be recorded; the row stays `sending` and is
+  re-sent after 15 minutes under the same idempotency key.
+- `delivery_expired`: rows parked for a human (8 attempts, or an unconfirmed send older than 23
+  hours, `stale_unconfirmed`).
+
+Routine lines, not reported: `delivery_attempted` (with `status` and a failure code),
+`delivery_skipped` (a withdrawn lead or a superseded quote, as a count) and `worker_run` (one line
+per cron run with `sent`, `failed`, `skipped` and `deferred`). An unexpected failure of the cron
+route is reported as `outbox_worker_failed` (area `outbox`) and answered 500 `{ ok: false }`.
+
+Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
+
 ### Notes for staff reading lead records
 
 - `rejoin_requested_at` can be set by anyone who submits a listed address again, so it is not proof

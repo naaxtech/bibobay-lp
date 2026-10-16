@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
-import type { DeliveryKind, DeliveryOutcome, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
+import type { DeliveryKind, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
+import * as leadSubmitModule from "@/lib/leads/submit";
 import { ACK_SEND_LIMIT, LEAD_RATE_LIMIT, submitLead, type LeadSubmissionDependencies } from "@/lib/leads/submit";
+import type { ClaimedLeadDelivery, OutboxOutcome } from "@/lib/outbox/types";
 import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
 
 vi.mock("server-only", () => ({}));
@@ -21,7 +25,7 @@ const COPY = {
 /** Words that would claim an email reached someone, or promise a file. Public copy must never say them. */
 const DELIVERY_CLAIM = /\b(sent|deliver(ed|y)?|inbox|check your (email|mail)|we('ve| have) emailed|download)\b/i;
 
-interface StoredEvent { id: string; leadId: string; kind: DeliveryKind; status: "pending" | "sending" | "sent" | "failed"; attempts: number; providerMessageId?: string; errorCode?: string }
+interface StoredEvent { id: string; leadId: string; kind: DeliveryKind; status: "pending" | "sending" | "sent" | "failed" | "skipped"; attempts: number; providerMessageId?: string; errorCode?: string }
 
 interface StoredLead {
   id: string;
@@ -35,9 +39,11 @@ interface StoredLead {
 
 /**
  * An in-memory stand-in for the Supabase repository, logging each call in order. It models
- * migration 0001 exactly: one row per normalised email; on a conflicting email only the
- * bookkeeping columns change (ruling R38); one outbox row per lead and kind; and an
- * acknowledgement for a withdrawn adult is never claimed for an immediate send.
+ * migrations 0001 and 0006 exactly: one row per normalised email; on a conflicting email only the
+ * bookkeeping columns change (ruling R38); one outbox row per lead and kind; an acknowledgement for
+ * a withdrawn adult is never claimed for an immediate send; and the claim (migration 0006) takes
+ * due rows only, counts the attempt, skips every kind of a withdrawn lead (R92) and hands each row
+ * to one caller only.
  */
 function fakeRepository() {
   const calls: string[] = [];
@@ -64,18 +70,45 @@ function fakeRepository() {
       const existing = events.get(key);
       if (existing) return { eventId: existing.id, status: existing.status, created: false };
       const withdrawn = [...leads.values()].some((lead) => lead.id === leadId && lead.consentState === "withdrawn");
-      const claimed = claim && !(kind === "acknowledgement" && withdrawn);
+      const claimed = claim && !withdrawn;
       const event: StoredEvent = { id: `event-${events.size + 1}`, leadId, kind, status: claimed ? "sending" : "pending", attempts: claimed ? 1 : 0 };
       events.set(key, event);
       return { eventId: event.id, status: event.status, created: true };
     },
-    async recordDeliveryAttempt(eventId, outcome: DeliveryOutcome) {
+    async claimDeliveries({ ownerId, kinds, limit }) {
+      calls.push(`claim:${kinds.join("+")}`);
+      const due = [...events.values()]
+        .filter((event) => (!ownerId || event.leadId === ownerId) && kinds.includes(event.kind) && (event.status === "pending" || event.status === "failed"))
+        .slice(0, limit);
+      let skipped = 0;
+      const claimed: ClaimedLeadDelivery[] = [];
+      for (const event of due) {
+        const lead = [...leads.values()].find((entry) => entry.id === event.leadId)!;
+        if (lead.consentState === "withdrawn") {
+          event.status = "skipped";
+          skipped += 1;
+          continue;
+        }
+        event.status = "sending";
+        event.attempts += 1;
+        claimed.push({ id: event.id, kind: event.kind, attempt: event.attempts, email: lead.input.email, firstName: lead.input.firstName ?? null, ageBand: lead.input.ageBand ?? null, source: lead.input.source });
+      }
+      return { claimed, skipped, expired: 0 };
+    },
+    async recordDeliveryAttempt(eventId, outcome: OutboxOutcome) {
       calls.push(`record:${outcome.status}`);
       const event = [...events.values()].find((entry) => entry.id === eventId);
       if (!event) throw new Error("unknown event");
+      if (event.status !== "sending") return false;
+      if (outcome.status === "deferred") {
+        event.attempts -= 1;
+        event.status = event.attempts === 0 ? "pending" : "failed";
+        return true;
+      }
       event.status = outcome.status;
       if (outcome.status === "sent") event.providerMessageId = outcome.providerMessageId;
       else event.errorCode = outcome.errorCode;
+      return true;
     },
   };
   /** A lead that is already on the list (as staff or an earlier signup left it), with no outbox rows. */
@@ -278,11 +311,11 @@ describe("persistence comes first", () => {
     expect(repo.calls).toEqual([]);
   });
 
-  it("stores the lead, then writes the outbox row, then attempts the email", async () => {
+  it("stores the lead, then writes the outbox row, then claims it through the shared claim and attempts the email (R88)", async () => {
     const repo = fakeRepository();
     const { mailer } = fakeMailer();
     await submitLead(VALID, dependencies({ repository: repo.repository, mailer }));
-    expect(repo.calls).toEqual(["submitLead", "enqueue:acknowledgement", "record:sent"]);
+    expect(repo.calls).toEqual(["submitLead", "enqueue:acknowledgement", "claim:acknowledgement", "record:sent"]);
   });
 });
 
@@ -341,6 +374,20 @@ describe("email outbox", () => {
     expect(result.status).toBe(200);
     expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, message: COPY.successMessage });
     expect(sent).toEqual([]);
+  });
+
+  it("claims only the rows this signup wrote: none for a kind whose outbox row could not be written", async () => {
+    const repo = fakeRepository();
+    const { mailer } = fakeMailer();
+    const noAlertRow: LeadRepository = {
+      ...repo.repository,
+      enqueueDelivery: async (leadId, kind, options) => {
+        if (kind === "staff_alert") throw new Error("outbox down");
+        return repo.repository.enqueueDelivery(leadId, kind, options);
+      },
+    };
+    await submitLead(VALID, dependencies({ repository: noAlertRow, mailer, staffEmail: "team@bibobay.example" }));
+    expect(repo.calls.filter((call) => call.startsWith("claim:"))).toEqual(["claim:acknowledgement"]);
   });
 
   it("keeps the success when recording the attempt fails after the provider accepted the email", async () => {
@@ -480,7 +527,7 @@ describe("global immediate-send cap (ruling R40)", () => {
 });
 
 describe("sending without holding up the answer (M4)", () => {
-  it("writes the claimed outbox rows, answers, and only then sends when sends can run after the response", async () => {
+  it("writes the outbox rows unclaimed, answers, and only then claims and sends when sends can run after the response (R88)", async () => {
     const repo = fakeRepository();
     const { mailer, sent } = fakeMailer();
     const deferred: Array<() => Promise<void>> = [];
@@ -493,12 +540,48 @@ describe("sending without holding up the answer (M4)", () => {
     expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
     expect(sent).toEqual([]);
     expect(repo.calls).toEqual(["submitLead", "enqueue:acknowledgement", "enqueue:staff_alert"]);
-    expect([...repo.events.values()].map((event) => event.status)).toEqual(["sending", "sending"]);
+    expect([...repo.events.values()].map((event) => event.status)).toEqual(["pending", "pending"]);
     expect(deferred).toHaveLength(1);
 
     await deferred[0]!();
     expect(sent.map((message) => message.to).sort()).toEqual([["parent@example.com"], ["team@bibobay.example"]]);
     expect([...repo.events.values()].map((event) => event.status)).toEqual(["sent", "sent"]);
+    expect([...repo.events.values()].map((event) => event.attempts)).toEqual([1, 1]);
+  });
+
+  it("checks the global send budget only after the answer, so a new address and a listed one do the same work before it (N1)", async () => {
+    const repo = fakeRepository();
+    repo.seed({ email: "listed@example.com", consentVersion: "1", source: "landing" }, "granted");
+    const consume = vi.fn(allowAll.consume);
+    const deferred: Array<() => Promise<void>> = [];
+    const deps = dependencies({ repository: repo.repository, rateLimiter: { consume }, mailer: fakeMailer().mailer, staffEmail: "team@bibobay.example", runAfterResponse: (task) => { deferred.push(task); } });
+
+    await submitLead({ ...VALID, email: "new@example.com" }, deps);
+    const beforeNew = { calls: [...repo.calls], keys: consume.mock.calls.map(([key]) => key) };
+    repo.calls.length = 0;
+    consume.mockClear();
+    await submitLead({ ...VALID, email: "listed@example.com" }, deps);
+    const beforeListed = { calls: [...repo.calls], keys: consume.mock.calls.map(([key]) => key) };
+
+    expect(beforeNew).toEqual(beforeListed);
+    expect(beforeNew.keys).toEqual([`${LEAD_RATE_LIMIT.scope}:client-hash`]);
+    // Only the new signup has anything to send after its answer, and only then is the budget spent.
+    expect(deferred).toHaveLength(1);
+    consume.mockClear();
+    await deferred[0]!();
+    expect(consume.mock.calls.map(([key]) => key)).toEqual([ACK_SEND_LIMIT.key, ACK_SEND_LIMIT.key]);
+  });
+
+  it("sends nothing after the answer for a row the outbox worker claimed first (no double send)", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const deferred: Array<() => Promise<void>> = [];
+    await submitLead(VALID, dependencies({ repository: repo.repository, mailer, runAfterResponse: (task) => { deferred.push(task); } }));
+    // The worker's claim takes the row between the answer and the after-response task.
+    await repo.repository.claimDeliveries({ kinds: ["acknowledgement"], limit: 50 });
+    await deferred[0]!();
+    expect(sent).toEqual([]);
+    expect(repo.event("acknowledgement")).toMatchObject({ status: "sending", attempts: 1 });
   });
 
   it("sends the acknowledgement and the staff alert at the same time, not one after the other", async () => {
@@ -604,5 +687,17 @@ describe("truthful messages", () => {
     expect(log).toHaveBeenCalled();
     expect(logged).not.toContain("secret.parent");
     expect(logged).not.toContain("Zelda");
+  });
+});
+
+describe("the pre-outbox flow (Task 5 re-review N3)", () => {
+  it("is no longer exported: it would send with an always-allow limiter, past the global cap", () => {
+    expect(Object.keys(leadSubmitModule)).not.toContain("deliverSequentially");
+  });
+
+  it("is kept in the source, marked deprecated, with its reason", () => {
+    const source = readFileSync(resolve("lib/leads/submit.ts"), "utf8");
+    expect(source).toMatch(/@deprecated[^]*?async function deliverSequentially\(/);
+    expect(source).not.toMatch(/export async function deliverSequentially/);
   });
 });

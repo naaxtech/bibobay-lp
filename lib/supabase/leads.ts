@@ -1,16 +1,19 @@
 import "server-only";
 
-import type { DeliveryKind, DeliveryOutcome, DeliveryStatus, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
+import type { DeliveryKind, DeliveryStatus, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
+import type { OutboxOutcome } from "@/lib/outbox/types";
+import { claimLeadDeliveries, outcomeArguments, recordedFrom } from "./outbox";
 import { RpcError, callRpc, firstRow, type RpcClient } from "./rpc";
 
-const DELIVERY_STATUSES: readonly DeliveryStatus[] = ["pending", "sending", "sent", "failed"];
+/** Every status an outbox row can report. `skipped` (migration 0006, R92) must stay a queued row. */
+const DELIVERY_STATUSES: readonly DeliveryStatus[] = ["pending", "sending", "sent", "failed", "skipped"];
 
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 /**
- * Lead storage through migration 0001's service-role RPCs. Nothing here reads a lead back: the
- * database answers only with ids, flags and outbox status.
+ * Lead storage through the service-role RPCs of migrations 0001 and 0006. Nothing here reads a lead
+ * back except a claimed delivery (migration 0006), which carries only what its email needs.
  */
 export function createSupabaseLeadRepository(client: RpcClient): LeadRepository {
   return {
@@ -38,13 +41,13 @@ export function createSupabaseLeadRepository(client: RpcClient): LeadRepository 
       return { eventId: row.event_id, status: status as DeliveryStatus, created: row.created };
     },
 
-    async recordDeliveryAttempt(eventId: string, outcome: DeliveryOutcome) {
-      await callRpc(client, "record_lead_delivery_attempt", {
-        p_event_id: eventId,
-        p_status: outcome.status,
-        p_provider_message_id: outcome.status === "sent" ? outcome.providerMessageId : null,
-        p_error_code: outcome.status === "failed" ? outcome.errorCode : null,
-      });
+    claimDeliveries(options) {
+      return claimLeadDeliveries(client, options);
+    },
+
+    async recordDeliveryAttempt(eventId: string, outcome: OutboxOutcome) {
+      const data = await callRpc(client, "record_lead_delivery_attempt", { p_event_id: eventId, ...outcomeArguments(outcome) });
+      return recordedFrom("record_lead_delivery_attempt", data);
     },
   };
 }

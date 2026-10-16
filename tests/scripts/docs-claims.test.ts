@@ -90,3 +90,40 @@ describe("rebrand docs (rebrand review C1, M3)", () => {
     for (const name of ["public/brand/art/", "lib/content/brand-art.ts", "ReefBackdrop"]) expect(map, name).toContain(name);
   });
 });
+
+describe("email outbox worker docs (Task 8a)", () => {
+  it("documents the worker as built in the README, and the staff side as still to come", () => {
+    const readme = read("README.md").split(/\r?\n/);
+    expect(readme.find((line) => line.includes("outbox worker")) ?? "", "README worker row").toMatch(/\| built \(Task 8a/);
+    expect(readme.find((line) => line.startsWith("| Staff order administration")) ?? "", "README staff row").toMatch(/not built yet \(Task 8b, 8c\)/);
+  });
+
+  it("documents CRON_SECRET as used, its 32-character minimum, and the once-a-day schedule with how to raise it (R88)", () => {
+    const deployment = read("docs/deployment.md");
+    const row = deployment.split(/\r?\n/).find((line) => line.startsWith("| `CRON_SECRET` |")) ?? "";
+    expect(row).not.toMatch(/not used yet|Nothing reads it/);
+    expect(row).toMatch(/32/);
+    const vercel = JSON.parse(read("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
+    expect(deployment).toContain(`\`${vercel.crons[0]!.schedule}\``);
+    expect(deployment).toContain(`\`${vercel.crons[0]!.path}\``);
+    expect(deployment).toMatch(/Hobby/);
+    expect(deployment).toMatch(/Pro/);
+    const example = read(".env.example").split(/\r?\n/);
+    const index = example.indexOf("CRON_SECRET=");
+    expect(example[index - 1]).toMatch(/^# .*32/);
+  });
+
+  it("lists the outbox functions, their grants and the skipped status in the database notes", () => {
+    const database = read("docs/database-security.md");
+    for (const name of ["claim_lead_deliveries", "claim_order_emails", "record_order_email_attempt", "outbox_failure_unconfirmed", "idempotency_key", "quote_revision", "stale_unconfirmed", "`skipped`"]) {
+      expect(database, name).toContain(name);
+    }
+    expect(database).not.toMatch(/Not built yet \(Task 8\)/);
+  });
+
+  it("maps the cron route and names the outbox's alerts", () => {
+    expect(read("docs/architecture.md").split(/\r?\n/).find((line) => line.startsWith("| `/api/cron/email-outbox` |")) ?? "").toMatch(/CRON_SECRET/);
+    const observability = read("docs/observability.md");
+    for (const event of ["delivery_claim_failed", "delivery_message_invalid", "delivery_expired", "outbox_worker_failed", "worker_run"]) expect(observability, event).toContain(`\`${event}\``);
+  });
+});

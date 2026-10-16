@@ -58,6 +58,7 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/api/leads` | ƒ | POST: founding-family signup |
 | `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
 | `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
+| `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run once a day by Vercel Cron (`vercel.json`); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
 | `/api/health` | ƒ | GET: liveness, `{status, version, time}` |
 | `/api/readiness` | ƒ | GET: configuration booleans; 200 when ready, 503 otherwise |
 | `/api/revalidate` | ƒ | POST: signed Sanity webhook that expires cache tags |
@@ -132,11 +133,18 @@ LeadForm (browser)  --POST JSON-->  /api/leads  ->  lib/leads/submit.ts
                                       3 storage configured?  no -> 503
                                       4 rate limit (DB, 5 per 10 min per hashed client) -> 429 / 503 if the limiter fails
                                       5 submit_lead()    -> 500 if the write fails
-                                      6 outbox rows (acknowledgement, staff alert)
+                                      6 outbox rows (acknowledgement, staff alert), unclaimed
                                       7 200 {ok, persisted: true, acknowledgementQueued}
-                                      8 after the response: send email if Resend is configured
-                                        and the global send cap allows
+                                      8 after the response, for a new signup: claim each row
+                                        (claim_lead_deliveries), spend the global send cap, send
+                                        if Resend is configured, record the outcome
+                                      9 later: /api/cron/email-outbox retries what is still due
 ```
+
+- Steps 8 and 9 use the same claim, budget, send and record step (`lib/outbox/attempt.ts`), so a
+  row is never sent by both, and nothing that differs between a new and a listed address happens
+  before the answer (Task 8a). Order requests follow the same pattern for the buyer acknowledgement
+  and the staff order alert (`lib/outbox/orders.ts`).
 
 - Success is shown only for `ok && persisted === true`. A mail failure after the write never turns
   the answer into an error, and no message claims an email was delivered.

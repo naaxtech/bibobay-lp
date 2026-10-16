@@ -37,8 +37,8 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-/** A credential-free https URL, or null. */
-function safeHttpsUrl(raw: string): string | null {
+/** A credential-free https URL, or null. Also used by the order emails (lib/email/order-emails.ts). */
+export function safeHttpsUrl(raw: string): string | null {
   try {
     const url = new URL(raw);
     return url.protocol === "https:" && !url.username && !url.password ? url.toString() : null;
@@ -47,8 +47,8 @@ function safeHttpsUrl(raw: string): string | null {
   }
 }
 
-/** Table-free, inline-styled shell: email clients ignore the site's stylesheet. */
-function shell(bodyHtml: string): string {
+/** Table-free, inline-styled shell: email clients ignore the site's stylesheet. Shared with the order emails. */
+export function shell(bodyHtml: string): string {
   return `<!doctype html><html lang="en"><body style="margin:0;padding:24px;background:${CREAM};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${NAVY}">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;padding:28px;border-radius:20px">
 <p style="margin:0 0 20px;font-size:18px;font-weight:700;letter-spacing:.04em;color:${TEAL_INK}">${BRAND}</p>
@@ -57,7 +57,12 @@ ${bodyHtml}
 </div></body></html>`;
 }
 
-const paragraph = (html: string) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.6">${html}</p>`;
+export const paragraph = (html: string) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.6">${html}</p>`;
+
+/** The muted colour of the closing lines, for the order emails' small print. */
+export const EMAIL_MUTED = NAVY_SOFT;
+/** The link colour. */
+export const EMAIL_LINK = TEAL_INK;
 
 export function buildLeadAcknowledgement({ firstName, leadMagnet }: { firstName?: string | null; leadMagnet?: LeadMagnetLink | null }): RenderedEmail {
   const name = firstName?.trim();
@@ -96,6 +101,11 @@ export interface StaffLeadSummary {
   source: string;
   /** False when the address was already listed; ruling R38 means nothing on that record changed. */
   created: boolean;
+  /**
+   * Task 8a: a retry by the outbox worker. The alert is built from the record on file, which may
+   * differ from what a later submission contained, so it says so instead of the two intros above.
+   */
+  fromOutbox?: boolean;
 }
 
 /**
@@ -111,9 +121,11 @@ export function buildStaffLeadAlert(lead: StaffLeadSummary): RenderedEmail {
     ["Age range", lead.ageBand ? FORM_COPY.ageBands[lead.ageBand] : "Not given"],
     ["Source", lead.source],
   ];
-  const intro = lead.created
-    ? "A new signup joined the founding-family list."
-    : "An address already on the founding-family list was submitted again. Nothing on the existing record was changed; the details below are what this submission contained.";
+  const intro = lead.fromOutbox
+    ? "This alert could not be sent when the address was submitted, so it was sent later. The details below are the signup on file."
+    : lead.created
+      ? "A new signup joined the founding-family list."
+      : "An address already on the founding-family list was submitted again. Nothing on the existing record was changed; the details below are what this submission contained.";
   const width = Math.max(...rows.map(([label]) => label.length));
   const text = [intro, "", ...rows.map(([label, value]) => `${label.padEnd(width)} ${value}`), "", "Consent was given on the signup form."].join("\n");
   const html = shell([

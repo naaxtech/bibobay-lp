@@ -66,6 +66,19 @@ describe("operational warnings (ruling R52)", () => {
     logLeadEvent({ event: "lead_stored", created: true });
     logLeadEvent({ event: "lead_rate_limited" });
     logLeadEvent({ event: "lead_honeypot" });
+    logLeadEvent({ event: "delivery_skipped", count: 1 });
     expect(reported.events).toEqual([]);
+  });
+
+  it("reports the outbox claim's warnings: a failed claim, an unbuildable message and parked rows (Task 8a)", () => {
+    logLeadEvent({ event: "delivery_claim_failed", code: "PGRST301" });
+    logLeadEvent({ event: "delivery_message_invalid", kind: "staff_alert" });
+    logLeadEvent({ event: "delivery_expired", count: 2 });
+    expect(reported.events).toEqual([
+      ["delivery_claim_failed", { code: "PGRST301" }],
+      ["delivery_message_invalid", { kind: "staff_alert" }],
+      ["delivery_expired", {}],
+    ]);
+    expect(console.warn).toHaveBeenCalledTimes(3);
   });
 });

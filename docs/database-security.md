@@ -3,8 +3,9 @@
 The Supabase database as defined in `supabase/migrations/`: `0001_leads_and_security.sql` covers
 founding-family leads, their email outbox and the shared rate limit; `0002` to `0005` cover order
 requests, their lines, audit trail and email outbox, order tracking and tracking-token rotation
-(see [Orders](#orders-migrations-0002-to-0005)). Staff tables and staff access are not built yet
-(Task 8).
+(see [Orders](#orders-migrations-0002-to-0005)); `0006` adds the email outbox worker's claim and
+record functions for both outboxes (see [Email outbox](#email-outbox-migration-0006)). Staff tables
+and staff access are not built yet (Task 8b).
 
 ## Principles
 
@@ -33,8 +34,9 @@ requests, their lines, audit trail and email outbox, order tracking and tracking
 | Function | Does | Executable by |
 |---|---|---|
 | `submit_lead(email, consent, consent_version, first_name, age_band, source, locale, utm)` → `(lead_id, created)` | Re-validates every argument in SQL, normalises the email, requires consent, inserts a new row. On an existing address it changes nothing about the person (see below). Errors never repeat submitted values. | `service_role` only |
-| `enqueue_lead_delivery(lead_id, kind, claim)` → `(event_id, status, created)` | Writes the outbox row once per lead and kind. With `claim`, a new row starts as `sending` (attempt 1) for an immediate send. An acknowledgement for a withdrawn adult is never claimed. | `service_role` only |
-| `record_lead_delivery_attempt(event_id, status, provider_message_id, error_code)` → `boolean` | Records the result of a claimed (`sending`) row: `sent` with the provider id, or `failed` with a short code and exponential backoff capped at 6 hours. | `service_role` only |
+| `enqueue_lead_delivery(lead_id, kind, claim)` → `(event_id, status, created)` | Writes the outbox row once per lead and kind. With `claim`, a new row starts as `sending` (attempt 1) for an immediate send. Since `0006` no kind is ever claimed, or written as anything but `skipped`, for a withdrawn adult; the website no longer claims here at all (it claims through `claim_lead_deliveries`). | `service_role` only |
+| `claim_lead_deliveries(limit, lead_id, kinds)` → JSON (`0006`) | The one claim both send paths use: see [Email outbox](#email-outbox-migration-0006). | `service_role` only |
+| `record_lead_delivery_attempt(event_id, status, provider_message_id, error_code)` → `boolean` | Records the result of a claimed (`sending`) row: `sent` with the provider id, `failed` with a short code and exponential backoff capped at 6 hours, or (`0006`) `deferred`, which hands the claim back uncounted. | `service_role` only |
 | `consume_rate_limit(bucket_key, max_hits, window_seconds)` → `(allowed, remaining, retry_after_seconds)` | Counts one hit atomically (one upsert). Arguments are bounded (1 to 10000 hits, 1 s to 1 day). | `service_role` only |
 | `purge_expired_rate_limit_buckets()` → `integer` | Deletes windows that ended over a day ago. | nobody but its owner (revoked from `public`, `anon`, `authenticated` and `service_role`) |
 
@@ -60,22 +62,26 @@ Consequences for staff:
 
 ## Outbox states
 
-`pending` → `sending` → `sent`, or `sending` → `failed` → (retry) `sending`.
+`pending` → `sending` → `sent`, or `sending` → `failed` → (retry) `sending`, or `skipped` (final:
+the claim refused to send it). Both outboxes use the same states.
 
 - Without Resend configured, rows stay `pending`. `acknowledgementQueued: true` in the API answer
   means the row exists, never that an email went out.
-- If the provider accepts an email but recording the result fails, the row stays `sending`.
-- **Not built yet (Task 8):** the worker that sends `pending` and `failed` rows and re-claims stale
-  `sending` ones. When it is built it must skip every delivery (acknowledgement and staff alert) for
-  withdrawn leads, spend the same global send budget (below), and use the idempotency key
-  `lead-delivery/<event id>` so a retry cannot email twice.
+- If the provider accepts an email but recording the result fails, the row stays `sending`; after
+  15 minutes a claim takes it again and re-sends it under the same provider idempotency key, so the
+  provider does not deliver it twice.
+- The cron worker (`/api/cron/email-outbox`, Task 8a) sends due `pending` and `failed` rows and
+  re-claims stale `sending` ones through the same claim functions as the sends made right after
+  each answer, spends the same global send budget (below), and uses the idempotency keys
+  `lead-delivery/<event id>` and `order-email/<row id>`. Every delivery kind of a withdrawn lead is
+  `skipped` in SQL. Details: [Email outbox](#email-outbox-migration-0006).
 
 ## Rate limits
 
 | Limit | Key | Value |
 |---|---|---|
 | Signups per client | `lead:<HMAC of the client address>` | 5 per 10 minutes. IPv4 addresses are counted whole; IPv6 addresses per /64; an IPv4-mapped IPv6 address as IPv4; anything unreadable in one shared bucket. |
-| Emails sent straight from the form | `ack-send:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), shared by acknowledgements and staff alerts. Over the cap the signup is still stored and the email waits `pending`. |
+| Emails sent straight from the form | `ack-send:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), shared by acknowledgements, staff alerts, the order emails and the outbox worker. Over the cap the signup or order is still stored and the email waits `pending`. |
 
 The limiter is the database whenever Supabase is configured. If it is unavailable the signup fails
 closed with 503. The in-memory limiter in `lib/security/rate-limit.ts` is for tests only.
@@ -95,7 +101,7 @@ and no payment detail is ever stored.
 | `orders` | One row per order request | Human-readable `reference` (`BB-XXXX-XXXX`), `submission_key` (the order form's random key for the request, unique: one order per key), `status` (`new`, `confirmed`, `paid`, `dispatched`, `closed`, `cancelled`), `status_changed_at`, adult contact and delivery details (each bounded: name 120, email 254, phone 32, address lines 200, city and region 100, postal code 16, notes 1000, a two-letter country), `consent_version`, `consent_granted_at`, `tracking_token_hash` (SHA-256 only, never the token), `tracking_token_expires_at`, `tracking_token_rotated_at`, and the staff quote columns (`currency`, `subtotal_minor`, `freight_minor`, `payment_url`, `quote_sent_at`), empty until Task 8, and `retain_until` (retention metadata), empty until a retention policy is adopted: nothing sets or acts on it yet. |
 | `order_items` | The CMS snapshot of each product at ordering time | `sanity_id`, `title`, `sku`, `variant`, `pack`, `quantity` (1 to 999), `line_number` (1 to 40). One line per product. |
 | `order_events` | The audit trail | `actor` (`customer`, `staff`, `system`), `event_type`, `old_status`, `new_status`, `metadata` (a small JSON object). |
-| `order_email_outbox` | Order emails waiting for the Task 8 worker | Shaped like `lead_delivery_events`: `kind` (`acknowledgement` or `staff_alert`), `status`, `attempts`, `next_attempt_at`, `provider_message_id`, `last_error_code`. Unique on `(order_id, kind)`. |
+| `order_email_outbox` | Order emails, sent right after the order and retried by the outbox worker | Shaped like `lead_delivery_events`: `kind` (`acknowledgement`, `staff_alert`, and since `0006` `quote`), `status` (plus `skipped`), `attempts`, `next_attempt_at`, `provider_message_id`, `last_error_code`; since `0006` also `quote_revision` (quotes only), `unconfirmed_since` and `idempotency_key` (see [Email outbox](#email-outbox-migration-0006)). |
 
 | Function | Does | Executable by |
 |---|---|---|
@@ -123,6 +129,44 @@ Order rate limits reuse `consume_rate_limit` (ruling R79; no second limiter tabl
 | Order requests per client | `order:<HMAC of the client address>` | 5 per hour |
 | Tracking lookups per client | `order-track:<HMAC of the client address>` | 10 per 10 minutes, found or not |
 
+## Email outbox (migration 0006)
+
+`0006_order_events_and_email_outbox.sql` gives both outboxes one claim function each, used by both
+send paths (ruling R88): the attempt made right after the API answer, which names its lead or
+order and one message kind, and the cron worker (`/api/cron/email-outbox`), which names neither. No
+table privilege changes: the outbox tables stay unreachable except through these functions.
+
+| Function | Does | Executable by |
+|---|---|---|
+| `claim_lead_deliveries(limit, lead_id, kinds)` → JSON | Claims up to `limit` (1 to 50) due rows, optionally of one lead and some kinds, `for update skip locked`, so two callers never hold the same row. Each claimed row becomes `sending` with its attempt counted, and is returned with only what its email needs: `{id, kind, attempt, email, firstName, ageBand, source}`. Answers `{"claimed": [...], "skipped": n, "expired": n}`. | `service_role` only |
+| `claim_order_emails(limit, order_id, kinds)` → JSON | The same for order emails. Each claimed row carries the order reference, contact name, email, each line's title, variant, pack and quantity, and for a quote its currency, subtotal, freight, payment link and revision. Never the tracking token or its hash, an address, phone, notes or SKU. | `service_role` only |
+| `record_lead_delivery_attempt(event_id, status, provider_message_id, error_code)`, `record_order_email_attempt(email_id, status, provider_message_id, error_code)` → `boolean` | Records a claimed row's result: `sent`, `failed` (backoff 2, 4, 8 … minutes, capped at 6 hours) or `deferred` (the global send budget was spent: the claim is handed back with its earlier status and attempt count, still due). `false` when the row was no longer claimed. When the provider accepts a `quote`, the same statement sets `orders.quote_sent_at` (R90). | `service_role` only |
+| `outbox_failure_unconfirmed(error_code)` | Internal: whether a failure code means the send may have reached the provider (a timeout, an abort, a dropped connection, a provider server error). | nobody but its owner (revoked from `public`, `anon`, `authenticated` and `service_role`) |
+
+Claim rules:
+
+- **Due** means `pending` or `failed` with `next_attempt_at` reached, or `sending` for over 15
+  minutes (a crash or a lost result). A stale `sending` row is sent again under the same provider
+  idempotency key, the row id, so an email the provider already accepted is not repeated (R91).
+- **Unconfirmed sends** (`unconfirmed_since`): the provider keeps an idempotency key for 24 hours, so
+  a send whose outcome is unknown is retried only within 23 hours. After that the claim parks it as
+  `failed` with `stale_unconfirmed` and `next_attempt_at` = infinity, for a human to check; it is
+  counted as `expired`.
+- **At most 8 attempts.** The eighth failure, and a provider answer that the idempotency key was
+  already used for another message (`invalid_idempotent_request`), are final: `failed` with
+  `next_attempt_at` = infinity. Infinity is the terminal marker; no status value was added for it.
+- **Withdrawn leads** (R92): every delivery kind of a withdrawn lead is marked `skipped`
+  (`lead_withdrawn`) by the claim and never returned, so no caller can email a withdrawn adult even
+  with a bug. A later `enqueue_lead_delivery` for that lead answers `skipped`, not created.
+- **Quotes** (queued by Task 8b): `orders.quote_revision` (default 0) counts the order's quotes. A
+  quote email whose revision is no longer the order's current one, whose order was cancelled, or
+  whose quote figures are incomplete is `skipped`, never sent with figures it was not queued for.
+- **Idempotency key** (R90): `order_email_outbox.idempotency_key` is a stored generated column,
+  `<order id>:<kind>` for the acknowledgement and staff alert and `<order id>:quote:<revision>` for
+  a quote, and unique. It replaces the old unique `(order_id, kind)` rule, which still holds for
+  the two submit kinds through the key.
+- `lead_submissions.acknowledgement_status` follows the acknowledgement row, `skipped` included.
+
 ## Tests
 
 - `tests/leads/migration-policy.test.ts`: static checks of the SQL text (forced RLS, revokes,
@@ -133,9 +177,12 @@ Order rate limits reuse `consume_rate_limit` (ruling R79; no second limiter tabl
 - Against a real project (Task 11): `supabase test db` runs the same pgTAP file. PGlite proves the
   policy logic, not Supabase's own role setup, so the real run is the authority.
 - `tests/orders/migration-policy.test.ts` and `tests/orders/migration-database.test.ts` do the same
-  for the order migrations: the second applies `0001` to `0005` in order and runs every pgTAP file
-  (`supabase/tests/0002_orders_rls.sql`, `0003_tracking_grants.sql` and the lead file) against the
-  result.
+  for the order migrations: the second applies `0001` to `0006` in order and runs every pgTAP file
+  (`supabase/tests/0002_orders_rls.sql`, `0003_tracking_grants.sql`, `0004_email_outbox.sql` and the
+  lead file) against the result.
+- `tests/outbox/migration-policy.test.ts` pins the outbox statuses, kinds and limits in `0006` to
+  `lib/outbox/constants.ts`; `supabase/tests/0004_email_outbox.sql` checks the outbox grants and
+  every claim, skip, backoff and stale rule in PGlite.
 
 ## Migration rules
 

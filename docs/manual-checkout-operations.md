@@ -4,10 +4,12 @@
 The commerce gate and order pad (Task 6), the order database, the order request API and the
 tracking API (Task 7a; see [database-security.md](database-security.md#orders-migrations-0002-to-0005)),
 the shop's catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b), and the order request
-and tracking pages, `/order`, `/track` and `/orders/[token]` (Task 7c), all exist. The staff area,
-quote emails and the outbox worker are not built yet (Task 8; see the plan in
-`docs/superpowers/plans/`). `commerceEnabled` is `false` by default and must stay off: switching it
-on today lets customers send order requests that nobody can see, answer or manage yet.
+and tracking pages, `/order`, `/track` and `/orders/[token]` (Task 7c), all exist. The email outbox
+worker and the order emails (buyer acknowledgement, staff order alert, and the quote email for when
+staff can send one) exist too (Task 8a). The staff area and quote sending are not built yet (Task 8b
+and 8c; see the plan in `docs/superpowers/plans/`). `commerceEnabled` is `false` by default and
+must stay off: switching it on today lets customers send order requests that nobody can see,
+answer or manage yet.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been

@@ -230,22 +230,28 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
     });
     rpcAnswers.submit_lead = () => ({ data: [{ lead_id: LEAD_ID, created: true }], error: null });
     rpcAnswers.enqueue_lead_delivery = (args) => ({ data: [{ event_id: EVENT_ID, status: args.p_claim ? "sending" : "pending", created: true }], error: null });
+    rpcAnswers.claim_lead_deliveries = () => ({
+      data: { claimed: [{ id: EVENT_ID, kind: "acknowledgement", attempt: 1, email: "parent@example.com", firstName: "Ana", ageBand: "6-8", source: "landing" }], skipped: 0, expired: 0 },
+      error: null,
+    });
     rpcAnswers.record_lead_delivery_attempt = () => ({ data: true, error: null });
     resendSend.mockResolvedValue({ data: { id: "re_fixture" }, error: null, headers: null });
   });
 
-  it("spends one unit of the global send budget, claims the outbox row, answers, and only then sends", async () => {
+  it("writes the outbox row unclaimed, answers, and only then claims it, spends one unit of the global send budget and sends (R88, N1)", async () => {
     const response = await post(VALID);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
-    expect(rpcCalls.map(([fn]) => fn)).toEqual(["consume_rate_limit", "submit_lead", "consume_rate_limit", "enqueue_lead_delivery"]);
-    expect(rpcCalls[2]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 60, window_seconds: 3600 });
-    expect(rpcCalls[3]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: true });
-    // Nothing has gone to the provider while the adult waits for the answer.
+    expect(rpcCalls.map(([fn]) => fn)).toEqual(["consume_rate_limit", "submit_lead", "enqueue_lead_delivery"]);
+    expect(rpcCalls[2]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
+    // Nothing has gone to the provider, and no budget was checked, while the adult waits for the answer.
     expect(resendSend).not.toHaveBeenCalled();
     expect(afterTasks).toHaveLength(1);
 
     await afterTasks[0]!();
+    expect(rpcCalls.slice(3).map(([fn]) => fn)).toEqual(["claim_lead_deliveries", "consume_rate_limit", "record_lead_delivery_attempt"]);
+    expect(rpcCalls[3]?.[1]).toEqual({ p_limit: 1, p_lead_id: LEAD_ID, p_kinds: ["acknowledgement"] });
+    expect(rpcCalls[4]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 60, window_seconds: 3600 });
     expect(resendSend).toHaveBeenCalledTimes(1);
     const [payload, options] = resendSend.mock.calls[0]!;
     expect(payload).toMatchObject({ from: "BIBO Bay <hello@bibobay.example>", to: ["parent@example.com"] });
@@ -257,17 +263,19 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
   it("reads the global send cap from LEAD_ACK_SEND_LIMIT_PER_HOUR", async () => {
     vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "5");
     await post(VALID);
-    expect(rpcCalls[2]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 5, window_seconds: 3600 });
+    await afterTasks[0]!();
+    expect(rpcCalls.find(([fn, args]) => fn === "consume_rate_limit" && args.bucket_key === "ack-send:global")?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 5, window_seconds: 3600 });
   });
 
-  it("past the global send cap: stores the lead, leaves the acknowledgement pending, sends nothing, and answers the same", async () => {
+  it("past the global send cap: stores the lead, answers the same, sends nothing and hands the claim back for the worker", async () => {
     sendAllowed = false;
     const response = await post(VALID);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
-    expect(rpcCalls[3]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
-    expect(afterTasks).toEqual([]);
+    expect(rpcCalls[2]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
+    await afterTasks[0]!();
     expect(resendSend).not.toHaveBeenCalled();
+    expect(rpcCalls.at(-1)).toEqual(["record_lead_delivery_attempt", { p_event_id: EVENT_ID, p_status: "deferred", p_provider_message_id: null, p_error_code: null }]);
   });
 });
 

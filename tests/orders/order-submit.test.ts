@@ -330,6 +330,39 @@ describe("storing the order", () => {
   });
 });
 
+describe("the queued order emails (Task 8a, R88)", () => {
+  it("are attempted for the stored order only after the answer, through the outbox", async () => {
+    const sendQueuedEmails = vi.fn(async (orderId: string) => void orderId);
+    const tasks: Array<() => Promise<void>> = [];
+    const { dependencies } = deps({ sendQueuedEmails, runAfterResponse: (task) => { tasks.push(task); } });
+    const result = await submitOrder(VALID, dependencies);
+    expect(result.body).toMatchObject({ ok: true, persisted: true, reference: REFERENCE });
+    expect(sendQueuedEmails).not.toHaveBeenCalled();
+    expect(tasks).toHaveLength(1);
+    await tasks[0]!();
+    expect(sendQueuedEmails).toHaveBeenCalledWith(ORDER_ID);
+  });
+
+  it("never change the answer, even when the attempt fails", async () => {
+    const plain = await submitOrder(VALID, deps().dependencies);
+    const failing = vi.fn(async () => { throw new Error("provider down for parent@example.com"); });
+    expect(await submitOrder(VALID, deps({ sendQueuedEmails: failing }).dependencies)).toEqual(plain);
+    expect(failing).toHaveBeenCalledWith(ORDER_ID);
+    const tasks: Array<() => Promise<void>> = [];
+    expect(await submitOrder(VALID, deps({ sendQueuedEmails: failing, runAfterResponse: (task) => { tasks.push(task); } }).dependencies)).toEqual(plain);
+    await expect(tasks[0]!()).resolves.toBeUndefined();
+  });
+
+  it("are not attempted for a repeated submission key (nothing new was queued, R81) or an order that was not stored", async () => {
+    const sendQueuedEmails = vi.fn(async () => {});
+    const duplicate = fakeRepository({ trackingToken: null, trackingTokenExpiresAt: null, acknowledgementQueued: false, duplicate: true });
+    await submitOrder(VALID, deps({ repository: duplicate.repository, sendQueuedEmails }).dependencies);
+    await submitOrder(VALID, deps({ repository: fakeRepository(new RpcError("submit_order", "23505")).repository, sendQueuedEmails }).dependencies);
+    await submitOrder({ ...VALID, website: "x" }, deps({ sendQueuedEmails }).dependencies);
+    expect(sendQueuedEmails).not.toHaveBeenCalled();
+  });
+});
+
 describe("order copy", () => {
   const strings = JSON.stringify(ORDER_COPY);
 
@@ -580,6 +613,16 @@ describe("order dependencies", () => {
     expect(wired.rateLimiter).not.toBeNull();
     expect(wired.clientKey).toMatch(/^[0-9a-f]{64}$/);
     expect(wired.clientKey).not.toContain(CLIENT_IP);
+  });
+
+  it("attempts the queued emails after the answer only with storage and email configured (R88)", async () => {
+    const RESEND = { RESEND_API_KEY: "re_fixture_only", RESEND_FROM: "BIBO Bay <hello@bibobay.example>" };
+    expect((await createOrderDependencies(request(), ON, {})).sendQueuedEmails).toBeNull();
+    expect((await createOrderDependencies(request(), ON, { ...SUPABASE, LEAD_IP_HASH_SECRET: "s".repeat(32) })).sendQueuedEmails).toBeNull();
+    expect((await createOrderDependencies(request(), ON, RESEND)).sendQueuedEmails).toBeNull();
+    const wired = await createOrderDependencies(request(), ON, { ...SUPABASE, LEAD_IP_HASH_SECRET: "s".repeat(32), ...RESEND });
+    expect(typeof wired.sendQueuedEmails).toBe("function");
+    expect(typeof wired.runAfterResponse).toBe("function");
   });
 
   it("builds the tracking adapters from request headers alone, as a server page has them (review Minor 7)", () => {

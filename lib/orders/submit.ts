@@ -19,8 +19,10 @@ import { isHoneypotFilled, validateOrderSubmission, type OrderFieldErrors } from
  * published CMS (./catalogue.ts). `submit_order` stores the order, its lines, its audit event and
  * the two outbox rows (buyer acknowledgement, staff alert) in one transaction, so the answer says
  * the order was received only once all of it committed (no fake success), and
- * `acknowledgementQueued` mirrors what the database reports. Nothing is sent from here: the Task 8
- * worker sends the queued messages. Every refusal is generic and never names a product.
+ * `acknowledgementQueued` mirrors what the database reports. Nothing is sent before the answer:
+ * once it has gone out, the two queued emails are attempted through the outbox's shared claim
+ * (Task 8a, R88), and the cron worker retries what is left. Every refusal is generic and never
+ * names a product.
  *
  * Ruling R81: the form sends one random submission key per order attempt and the same key on every
  * retry. A retry of a request that was stored (its answer lost on the way) gets the first order's
@@ -109,6 +111,14 @@ export interface OrderSubmissionDependencies {
   clientKey: string;
   /** Structured, PII-free operational log. */
   log: (event: OrderLogEvent) => void;
+  /**
+   * Task 8a (R88): attempts the stored order's queued emails (the buyer acknowledgement and the
+   * staff alert) through the outbox's shared claim, so the cron worker can never send them too.
+   * Null or absent while storage or email is unconfigured: the rows wait for the worker.
+   */
+  sendQueuedEmails?: ((orderId: string) => Promise<void>) | null;
+  /** Runs work once the answer has gone out (the route passes `after()` from next/server). */
+  runAfterResponse?: (task: () => Promise<void>) => void;
 }
 
 export interface OrderApiBody {
@@ -237,6 +247,22 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
     };
   }
   log({ event: "order_stored", lines: record.lines.length });
+
+  // R88: the two emails submit_order queued are attempted once the answer has gone out. Whatever
+  // happens to them is recorded on their outbox rows; it never delays or changes this answer.
+  const sendQueuedEmails = dependencies.sendQueuedEmails;
+  if (sendQueuedEmails) {
+    const { orderId } = stored;
+    const task = async () => {
+      try {
+        await sendQueuedEmails(orderId);
+      } catch {
+        // Nothing to record here: an unsent row stays due for the outbox worker.
+      }
+    };
+    if (dependencies.runAfterResponse) dependencies.runAfterResponse(task);
+    else await task();
+  }
 
   return {
     status: 200,

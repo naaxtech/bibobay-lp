@@ -212,6 +212,12 @@ describe("Vercel build settings", () => {
     expect(config).toMatchObject({ framework: "nextjs", installCommand: "npm ci", buildCommand: "npm run build && npm run verify:bundle" });
     expect(JSON.stringify(config)).not.toMatch(/\bbunx?\b|\$\{|secret|token/i);
   });
+
+  it("schedules the email outbox worker once a day, which a Hobby plan accepts (Task 8a, R88)", () => {
+    const config = JSON.parse(readFileSync(resolve("vercel.json"), "utf8")) as { crons?: unknown };
+    expect(config.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "0 6 * * *" }]);
+    expect(existsSync(resolve("app/api/cron/email-outbox/route.ts"))).toBe(true);
+  });
 });
 
 describe("deployment verifier step (rebrand review C1)", () => {

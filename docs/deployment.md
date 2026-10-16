@@ -41,7 +41,7 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. |
 | `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Global hourly cap on emails sent straight from the form (1 to 10000, default 60). |
 | `PAYMENT_HOST_ALLOWLIST` | server | not used yet | BIBO Bay owner | Reserved for manual checkout payment links (Task 8). Nothing reads it today. |
-| `CRON_SECRET` | server | not used yet | BIBO Bay owner (random) | Reserved for the outbox worker (Task 8). Nothing reads it today. |
+| `CRON_SECRET` | server | for email retries | BIBO Bay owner (random, 32+ characters) | Authorises the email outbox worker: Vercel Cron sends it as `Authorization: Bearer <secret>`. Without it (or with a shorter one) the worker answers 503 and failed emails are not retried; a production build fails with a shorter one. |
 
 Set by the platform, not by you: `VERCEL_ENV` (only `production` is indexable and gets HSTS),
 `VERCEL_GIT_COMMIT_SHA` (shown as `version` by `/api/health`).
@@ -64,12 +64,37 @@ Not created yet (Task 11). Settings to use:
   `bun.lock` and every deployment's client bundle is scanned with its own secret values.
 - Node.js 26 (matches `.nvmrc`).
 - The build runs `npm run verify:env -- production` first; it fails on a forbidden public name or a
-  short `LEAD_IP_HASH_SECRET`.
+  short `LEAD_IP_HASH_SECRET` or `CRON_SECRET`.
 - Production branch: keep the feature branch until review; choose the production branch deliberately
   after approval.
 - Add the variables above per environment. Keep Preview and Production Supabase projects or at least
   their secrets separate where possible.
 - After each deployment run the verifier against its URL (below).
+
+## Email outbox worker (Task 8a)
+
+Every email (signup acknowledgement and staff alert, order acknowledgement and staff order alert,
+and later quotes) is written to a database outbox first, then attempted right after the API answer
+(ruling R88). The cron worker is the retry net for what that attempt could not send: a provider
+failure, the hourly send cap, or Resend not yet configured.
+
+- `vercel.json` schedules `/api/cron/email-outbox` at `0 6 * * *` (once a day, 06:00 UTC). A Vercel
+  **Hobby** plan accepts at most one run a day, so a failed email can wait up to a day for its
+  retry. On **Pro**, raise the schedule in `vercel.json` (for example `*/15 * * * *`); the worker
+  needs no other change, since every run claims only rows that are due.
+- Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
+  (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
+  other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
+  `{ sent, failed, skipped, deferred }`.
+- One run stops claiming after 45 seconds or 100 rows per outbox, and every send spends one unit of
+  the same hourly budget as the forms (`LEAD_ACK_SEND_LIMIT_PER_HOUR`). Rows the budget did not
+  cover stay due for the next run.
+- To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
+  https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
+  secret store; never paste the secret into a document or a chat.
+- A row the worker gave up on (8 attempts, or an unconfirmed send older than 23 hours, ruling R91)
+  stays `failed` with `next_attempt_at` set to infinity, and is reported as `delivery_expired`
+  ([observability.md](observability.md)). See [database-security.md](database-security.md#outbox-states).
 
 ## Sanity webhook and Studio origin
 

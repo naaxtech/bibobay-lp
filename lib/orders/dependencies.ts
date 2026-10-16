@@ -1,14 +1,22 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 import type { LegalSettings, SiteSettings } from "@/lib/content/types";
-import { CONSENT_VERSION_PATTERN, hashSecretFrom } from "@/lib/leads/dependencies";
+import { createEmailSenderFromEnv, getStaffNotificationEmail } from "@/lib/email/client";
+import { ackSendLimitPerHour, CONSENT_VERSION_PATTERN, hashSecretFrom } from "@/lib/leads/dependencies";
 import { clientKeyFromHeaders } from "@/lib/leads/http";
 import { reportEvent } from "@/lib/observability/report";
+import { orderTrackingForEmail } from "@/lib/outbox/config";
+import { outboxLogger } from "@/lib/outbox/log";
+import { createOrderEmailSender } from "@/lib/outbox/orders";
+import { budgetedSends } from "@/lib/outbox/send";
 import { getLegalSettings } from "@/lib/sanity/fetch";
 import { createSupabaseRateLimiter } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient, getSupabaseAdminEnvironment } from "@/lib/supabase/admin";
+import { createSupabaseOrderEmailOutbox } from "@/lib/supabase/outbox";
 import { createSupabaseOrderRepository } from "@/lib/supabase/orders";
 import { resolveCanonicalOrderLines } from "./catalogue";
 import type { OrderLogEvent, OrderSubmissionDependencies } from "./submit";
@@ -70,6 +78,7 @@ export async function createOrderDependencies(
 ): Promise<OrderSubmissionDependencies> {
   const legal = await getLegalSettings();
   const { client, hashSecret } = storageFrom(env);
+  const email = createEmailSenderFromEnv(env);
   return {
     commerceEnabled: isCommerceEnabled(settings),
     trackingEnabled: isTrackingEnabled(settings),
@@ -80,6 +89,17 @@ export async function createOrderDependencies(
     orderCountries: settings.orderCountries,
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
     log: logOrderEvent,
+    // Task 8a (R88): the two queued emails are attempted after the answer through the outbox's
+    // claim, spending the shared send budget; without storage or email they wait for the worker.
+    sendQueuedEmails:
+      client && email
+        ? createOrderEmailSender(
+            createSupabaseOrderEmailOutbox(client),
+            { staffEmail: getStaffNotificationEmail(env), replyTo: email.replyTo, tracking: orderTrackingForEmail(settings, env) },
+            budgetedSends({ rateLimiter: createSupabaseRateLimiter(client), sendLimitPerHour: ackSendLimitPerHour(env), mailer: email.sender, log: outboxLogger("orders") }),
+          )
+        : null,
+    runAfterResponse: (task) => after(task),
   };
 }
 

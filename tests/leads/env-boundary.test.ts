@@ -88,6 +88,22 @@ describe("address-hash secret strength (M8)", () => {
   });
 });
 
+describe("cron secret strength (Task 8a, N4)", () => {
+  it("fails a production check when CRON_SECRET is set but shorter than the shared 32-character minimum, without echoing it", () => {
+    const secret = "c".repeat(31);
+    const report = verifyEnvironment({ CRON_SECRET: secret }, "production");
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(["CRON_SECRET must be at least 32 characters"]);
+    expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
+  it("passes with 32 or more characters, with none (the worker answers 503), and for short local values", () => {
+    expect(verifyEnvironment({ CRON_SECRET: "c".repeat(32) }, "production").ok).toBe(true);
+    expect(verifyEnvironment({}, "production").ok).toBe(true);
+    expect(verifyEnvironment({ CRON_SECRET: "short" }, "development").ok).toBe(true);
+  });
+});
+
 /** Relative and `@/` imports of one source file, resolved to files on disk. */
 function localImports(file: string): string[] {
   const source = readFileSync(file, "utf8");

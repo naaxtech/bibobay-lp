@@ -1,5 +1,6 @@
 import { analyticsConfig } from "../lib/analytics/config";
 import { sentryDsnFrom } from "../lib/observability/sentry-dsn";
+import { SERVER_SECRET_MIN_LENGTH } from "../lib/security/secrets";
 import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -58,8 +59,8 @@ export const ALLOWED_PUBLIC_NAMES: ReadonlySet<string> = allowedPublicNames;
 /** Server names whose values are credentials; their values must never reach a public name or the client bundle. */
 export const PRIVATE_NAME_PATTERN = /(?:_SECRET(?:_|$)|_TOKEN$|_PRIVATE_KEY$|_SERVICE_ROLE_KEY$|_API_KEY$)/i;
 
-/** Matches lib/leads/dependencies.ts: a shorter address-hashing secret leaves lead storage unconfigured. */
-export const LEAD_IP_HASH_SECRET_MIN_LENGTH = 32;
+/** The value lib/leads/dependencies.ts uses (N4: both read lib/security/secrets.ts): a shorter address-hashing secret leaves lead storage unconfigured. */
+export const LEAD_IP_HASH_SECRET_MIN_LENGTH = SERVER_SECRET_MIN_LENGTH;
 
 /** Reject public server credentials by name and secret-key values; never echo values. */
 export function verifyEnvironment(
@@ -96,6 +97,12 @@ export function verifyEnvironment(
   const weak = phase === "production" && hashSecret.length > 0 && hashSecret.length < LEAD_IP_HASH_SECRET_MIN_LENGTH
     ? [`LEAD_IP_HASH_SECRET must be at least ${LEAD_IP_HASH_SECRET_MIN_LENGTH} characters`]
     : [];
+  // Task 8a: the outbox worker treats a shorter CRON_SECRET as unset (503 on every run), so a
+  // production build fails instead of shipping a worker that never runs. Name only, never the value.
+  const cronSecret = env.CRON_SECRET?.trim() ?? "";
+  if (phase === "production" && cronSecret.length > 0 && cronSecret.length < SERVER_SECRET_MIN_LENGTH) {
+    weak.push(`CRON_SECRET must be at least ${SERVER_SECRET_MIN_LENGTH} characters`);
+  }
 
   // Review M6: monitoring values that are set but malformed would leave analytics or error reports
   // silently off. Fail instead, naming the variable but never its value.

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { applyMigrations, createSupabaseStandIn, migrationFiles, pgtapFiles, readPgtap, runTap, summariseTap } from "@/tests/support/supabase-db";
 
 /*
- * Applies every migration (0001-0005) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
+ * Applies every migration (0001-0006) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
  * and runs every pgTAP file against the result, so each file proves its policy holds alongside all
  * the others. This is the same set Task 11 runs against the real project with `supabase test db`.
  */
@@ -20,18 +20,19 @@ afterAll(async () => {
 });
 
 describe("every migration in Postgres", () => {
-  it("applies 0001 to 0005 in order", () => {
+  it("applies 0001 to 0006 in order", () => {
     expect(migrationFiles()).toEqual([
       "0001_leads_and_security.sql",
       "0002_orders.sql",
       "0003_order_tracking.sql",
       "0004_lock_tracking_payload.sql",
       "0005_shared_rate_limits_and_token_rotation.sql",
+      "0006_order_events_and_email_outbox.sql",
     ]);
   });
 
-  it("has a pgTAP file for the leads, the orders and the tracking grants", () => {
-    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql"]);
+  it("has a pgTAP file for the leads, the orders, the tracking grants and the email outbox", () => {
+    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql"]);
   });
 
   it.each(pgtapFiles())("passes every pgTAP assertion in supabase/tests/%s", async (file) => {
@@ -67,9 +68,34 @@ describe("every migration in Postgres", () => {
   it("can apply every migration a second time without error (idempotent objects)", async () => {
     await expect(applyMigrations(db, migrationFiles())).resolves.toBeUndefined();
   }, 120_000);
+
+  it("keeps the outbox rules after a second application of every migration", async () => {
+    const { planned, passed, failures } = summariseTap(await runTap(db, readPgtap("0004_email_outbox.sql")));
+    expect(failures).toEqual([]);
+    expect(passed).toBe(planned);
+  }, 120_000);
+
+  it("leaves every outbox function owned by a role that bypasses RLS", async () => {
+    const { rows } = await db.query<{ name: string; owner: string }>(
+      `select distinct proname as name, pg_get_userbyid(proowner) as owner from pg_proc
+        where pronamespace = 'public'::regnamespace
+          and proname in ('claim_lead_deliveries', 'claim_order_emails', 'record_order_email_attempt', 'record_lead_delivery_attempt', 'enqueue_lead_delivery', 'outbox_failure_unconfirmed')
+        order by proname`,
+    );
+    expect(rows.map((row) => row.owner)).toEqual(Array(6).fill("migrator"));
+  });
 });
 
 describe("migration preconditions", () => {
+  it("refuses to apply the outbox migration before the lead and order migrations", async () => {
+    const fresh = await createSupabaseStandIn();
+    try {
+      await expect(applyMigrations(fresh, ["0006_order_events_and_email_outbox.sql"])).rejects.toThrow(/must be applied before 0006/);
+    } finally {
+      await fresh.close();
+    }
+  }, 120_000);
+
   it("refuses to apply the orders migration before migration 0001", async () => {
     const fresh = await createSupabaseStandIn();
     try {
