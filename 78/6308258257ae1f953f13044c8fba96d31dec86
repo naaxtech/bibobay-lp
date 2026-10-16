@@ -1,0 +1,43 @@
+e2e/landing/responsive.spec.ts
+  s_36fcf8940d4895::t_643bc3bb2d1fb8 1-19,21-212
+  s_36fcf8940d4895::t_9c9ab6549e0c98 213-261
+  s_36fcf8940d4895::t_e47712c85d0d09 20
+e2e/crawl/public-routes.spec.ts
+  s_36fcf8940d4895::t_eab2ed1da0008a 1-82,86-215,217-219,221-247
+  s_36fcf8940d4895::t_eaad359e454ca0 216,220
+  s_36fcf8940d4895::t_475ac637906da4 248-287,290-296
+  s_36fcf8940d4895::t_24037b1adb5de7 289
+  s_36fcf8940d4895::t_9c9ab6549e0c98 288
+  s_36fcf8940d4895::t_551e240c7c7674 83-85
+e2e/ops/health.spec.ts
+  s_36fcf8940d4895::t_c32869edb75a50 1-84
+e2e/landing/accessibility.spec.ts
+  s_36fcf8940d4895::t_c54e9f36fed425 1-415
+e2e/commerce/disabled.spec.ts
+  s_36fcf8940d4895::t_fa72f48a10097d 1-61,64-81
+  s_36fcf8940d4895::t_bc67f1ec0c752e 62-63
+docs/qa-report-2026-10-02.md
+  s_36fcf8940d4895::t_5610ed0bc5f475 1-98
+e2e/admin/admin-security.spec.ts
+  s_36fcf8940d4895::t_e57dab275cc5a7 19-21,147-148
+  s_36fcf8940d4895::t_5207973d2dfb01 1-18,22-88,91-146,149-162,167,171-172,175-176,179-200,202-238
+  s_36fcf8940d4895::t_0d9d5962d56413 163-166,168-170,173-174,177-178
+  s_36fcf8940d4895::t_b9769f8ef5156d 89-90
+  s_36fcf8940d4895::t_213712fb20ab7a 201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "786308258257ae1f953f13044c8fba96d31dec86",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
