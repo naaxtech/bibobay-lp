@@ -1,0 +1,56 @@
+docs/manual-checkout-operations.md
+  s_36fcf8940d4895::t_a558c47df18500 102
+components/forms/LeadForm.tsx
+  s_36fcf8940d4895::t_9ca595cb8622cd 73-75
+e2e/ops/health.spec.ts
+  s_36fcf8940d4895::t_774d6b95ba35fd 65
+  s_36fcf8940d4895::t_9ca595cb8622cd 8,10-12
+docs/database-security.md
+  s_36fcf8940d4895::t_a558c47df18500 79,147,211
+e2e/support/vercel-bypass.ts
+  s_36fcf8940d4895::t_286004d67fc224 1-41
+docs/qa-checklist.md
+  s_36fcf8940d4895::t_3e4453ae8780c3 95-103
+tests/scripts/protection-bypass.test.ts
+  s_36fcf8940d4895::t_df50e94f5e3fd3 71,74-76
+tests/scripts/vercel-bypass-setup.test.ts
+  s_36fcf8940d4895::t_df50e94f5e3fd3 1-49,51-71
+  s_36fcf8940d4895::t_3e4453ae8780c3 50
+e2e/admin/admin-security.spec.ts
+  s_36fcf8940d4895::t_bd9c30090dc47d 131-132
+  s_36fcf8940d4895::t_9ca595cb8622cd 128-130,133,136
+playwright.config.ts
+  s_36fcf8940d4895::t_286004d67fc224 3-4,7-9,18,21-23
+docs/observability.md
+  s_36fcf8940d4895::t_6f33f6ddc41ecb 159-160
+  s_36fcf8940d4895::t_a558c47df18500 153-158
+e2e/support/vercel-bypass.setup.ts
+  s_36fcf8940d4895::t_286004d67fc224 1-30
+tests/shop/order-request.test.tsx
+  s_36fcf8940d4895::t_d4895995614835 1-52
+  s_36fcf8940d4895::t_9a3eecb754fe6e 53-54
+e2e/ops/environment.ts
+  s_36fcf8940d4895::t_9ca595cb8622cd 12-13
+components/shop/OrderRequest.tsx
+  s_36fcf8940d4895::t_79688e564b395f 42-45,54-55,57-61,66,68-72
+docs/qa-report-2026-10-02.md
+  s_36fcf8940d4895::t_3e4453ae8780c3 94
+tests/scripts/docs-claims.test.ts
+  s_36fcf8940d4895::t_e595fd6cd746ac 338-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7432c330b6231e2d3bad8cd343d21ffb1364e5a2",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
