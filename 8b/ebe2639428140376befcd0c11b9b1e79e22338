@@ -1,0 +1,48 @@
+app/api/cron/email-outbox/route.ts
+  h_0549c11fec2ab0 27-28,36
+docs/database-security.md
+  h_0549c11fec2ab0 37,158-165,168-169,171-174
+docs/deployment.md
+  h_0549c11fec2ab0 83-86,92,98-100
+docs/observability.md
+  h_0549c11fec2ab0 167-169
+lib/email/lead-emails.ts
+  h_0549c11fec2ab0 105-108
+lib/outbox/attempt.ts
+  h_0549c11fec2ab0 3,25-32,51-56,91-100,106-110,114,163,178
+lib/outbox/constants.ts
+  h_0549c11fec2ab0 33-66,68-72
+lib/outbox/dependencies.ts
+  h_0549c11fec2ab0 24,40,42,45
+lib/outbox/leads.ts
+  h_0549c11fec2ab0 19-24,55-56
+lib/outbox/worker.ts
+  h_0549c11fec2ab0 23-24,27-28
+supabase/migrations/0006_order_events_and_email_outbox.sql
+  h_0549c11fec2ab0 74-77,101,113-117,126-130,142-147,189,253,261,275,282,284,293,295,368-369,372,437,446,452,456-457,468,473,475,483-484,560-561,564
+supabase/tests/0004_email_outbox.sql
+  h_0549c11fec2ab0 22,85-86,208,213,222,239,281-283,301-316,473-485,491,498,506,515
+tests/outbox/attempt.test.ts
+  h_0549c11fec2ab0 17,20,22,29,197-228
+tests/outbox/channels.test.ts
+  h_0549c11fec2ab0 37-39,42,44
+tests/outbox/migration-policy.test.ts
+  h_0549c11fec2ab0 5,107-108,124-140
+tests/outbox/order-send-now.test.ts
+  h_0549c11fec2ab0 125,132
+tests/outbox/worker.test.ts
+  h_0549c11fec2ab0 128-147
+tests/scripts/docs-claims.test.ts
+  h_0549c11fec2ab0 130-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8bebe2639428140376befcd0c11b9b1e79e22338",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
