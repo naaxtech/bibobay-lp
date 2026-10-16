@@ -1,0 +1,112 @@
+supabase/migrations/0007_staff_access.sql
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-448
+tests/admin/admin-routes.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-155
+app/api/admin/session/route.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-18
+tests/admin/staff-migration-policy.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-160
+tests/security/headers.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 178,181-182
+tests/admin/staff-cookie-options.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-34
+next.config.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 5,38-39
+docs/deployment.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 24-25,43,104-117
+  s_36fcf8940d4895::t_2fe3375a4d5a5a 118
+lib/admin/dependencies.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-73
+lib/security/headers.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 162-171
+app/api/admin/orders/[reference]/quote/route.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-15
+lib/orders/admin.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-491
+lib/admin/http.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-103
+docs/manual-checkout-operations.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 3,9-13,65-108,129,152-153
+tests/admin/payment-url.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-160
+app/api/admin/orders/[reference]/status/route.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-14
+proxy.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 5-46,53-54,56-58,60,62-75,81-84,94
+lib/admin/orders.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-181
+tests/content/legal-pages.test.tsx
+  s_36fcf8940d4895::t_1f3f639ee7425b 237-246
+supabase/tests/0005_staff_access.sql
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-461
+tests/admin/quote-idempotency.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-218
+README.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 27-28
+tests/scripts/docs-claims.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 4,6-9,102-103,150-207
+tests/admin/staff-auth.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-464
+app/api/admin/orders/[reference]/tracking-link/route.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-15
+docs/architecture.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 62-65,76,97-101,164-192,223-228
+lib/security/payment-url.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-91
+lib/supabase/staff-session.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-105
+components/admin/admin-copy.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-65
+tests/admin/order-controls.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-469
+tests/support/pglite-staff.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-110
+docs/database-security.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 7-9,15-17,99-100,104,114,176-178,185-233,244-252
+package.json
+  s_36fcf8940d4895::t_1f3f639ee7425b 28
+lib/supabase/auth.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-192
+tests/support/supabase-db.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 26-39
+docs/observability.md
+  s_36fcf8940d4895::t_1f3f639ee7425b 178-204
+.env.example
+  s_36fcf8940d4895::t_1f3f639ee7425b 40
+scripts/verify-env.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 3,123-134,136,139
+tests/admin/admin-copy.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-51
+tests/observability/monitoring-env.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 64,66,70,74
+tests/orders/migration-database.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 23,31,35-36,88-105,109-128
+lib/content/legal-fallback.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 19,64
+tests/admin/admin-headers.test.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-219
+lib/admin/session.ts
+  s_36fcf8940d4895::t_1f3f639ee7425b 1-155
+supabase/tests/0002_orders_rls.sql
+  s_36fcf8940d4895::t_1f3f639ee7425b 43-47,158-160
+tests/analytics/wiring.test.tsx
+  s_36fcf8940d4895::t_1f3f639ee7425b 47,50,54
+package-lock.json
+  s_36fcf8940d4895::t_67ef8fd66db799 15,3726-3737,5521-5533
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b9254beb09ed21741eb99011293d933015b8c606",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
