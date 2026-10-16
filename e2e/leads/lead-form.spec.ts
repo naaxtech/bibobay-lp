@@ -195,8 +195,10 @@ for (const { name, use } of VIEWPORTS) {
       await expect(statusLine(page)).toHaveText(SUCCESS);
       await expect(emailField(page)).toHaveValue("");
       await expect(consentBox(page)).not.toBeChecked();
-      // Review M6: focus moves to the outcome, so the success is where the keyboard user is.
-      await expect(statusLine(page)).toBeFocused();
+      // Review M6 and Task 5 N4: a focused live region is announced twice, so the live region alone
+      // announces the success once and the keyboard user stays on the button.
+      await expect(statusLine(page)).not.toBeFocused();
+      await expect(submitButton(page)).toBeFocused();
       await expectFocusKept(page);
 
       // Adult details and page metadata only, every key on the allow-list (review M7); the honeypot travels empty.
