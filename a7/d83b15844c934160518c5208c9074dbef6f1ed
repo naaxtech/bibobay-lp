@@ -1,0 +1,24 @@
+docs/deployment.md
+  h_0549c11fec2ab0 86-88,93-95
+lib/outbox/attempt.ts
+  h_0549c11fec2ab0 101,103,109-111
+lib/outbox/log.ts
+  h_0549c11fec2ab0 14-15
+supabase/migrations/0006_order_events_and_email_outbox.sql
+  h_0549c11fec2ab0 271-275,288,298-299,471-474,485,494
+supabase/tests/0004_email_outbox.sql
+  h_0549c11fec2ab0 22,218-220,235-238,532-536
+tests/outbox/attempt.test.ts
+  h_0549c11fec2ab0 229-238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a7d83b15844c934160518c5208c9074dbef6f1ed",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
