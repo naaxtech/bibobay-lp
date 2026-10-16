@@ -1,0 +1,34 @@
+components/forms/OrderForm.tsx
+  h_0549c11fec2ab0 4,108-114,140-142,196,209-215,243-246
+components/forms/order-copy.ts
+  h_0549c11fec2ab0 92
+components/shop/OrderRequest.tsx
+  h_0549c11fec2ab0 99-105,107
+docs/manual-checkout-operations.md
+  h_0549c11fec2ab0 37-43
+e2e/shop/order-flow.spec.ts
+  h_0549c11fec2ab0 279-304
+studio/schemaTypes/consent.ts
+  h_0549c11fec2ab0 1-16
+studio/schemaTypes/documents/singletons.ts
+  h_0549c11fec2ab0 3,76
+tests/content/studio-contract.test.ts
+  h_0549c11fec2ab0 1,8-12,143-165
+tests/orders/order-form.test.tsx
+  h_0549c11fec2ab0 11-12,35,362-423
+tests/orders/order-page.test.tsx
+  h_0549c11fec2ab0 13
+tests/orders/order-status.test.tsx
+  h_0549c11fec2ab0 141-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f8d758e84cc761d7ce41d6a35a1afbc646b375c2",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
