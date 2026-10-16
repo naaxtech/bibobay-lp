@@ -1,0 +1,86 @@
+components/admin/admin.css
+  s_36fcf8940d4895::t_f1fa93e004c08c 149-477
+app/admin/page.tsx
+  s_36fcf8940d4895::t_20bba4d7842a73 1-10
+tests/scripts/docs-claims.test.ts
+  s_36fcf8940d4895::t_9b66e5ba1c4a8e 102-103,151,159-161,197
+README.md
+  s_36fcf8940d4895::t_3afea742dbb528 28
+app/admin/orders/page.tsx
+  s_36fcf8940d4895::t_6ec205fbfb3797 1-82
+components/admin/useOrderAction.ts
+  s_36fcf8940d4895::t_70baa0ec39eb94 1-93
+tests/scripts/docs-hygiene.test.ts
+  s_36fcf8940d4895::t_bd21635e347c35 186,189-193
+  s_36fcf8940d4895::t_aeff77d9fc8e93 197,199-204,206
+tests/leads/lead-copy.test.tsx
+  s_36fcf8940d4895::t_94432d0460c436 288-289,294-296
+e2e/admin/admin-pages.spec.ts
+  s_36fcf8940d4895::t_e4efaf2c898d1c 124-129,131-142,144-146,148-184
+  s_36fcf8940d4895::t_a8c96a590cf320 130,143,147
+components/admin/StatusControls.tsx
+  s_36fcf8940d4895::t_20bba4d7842a73 50
+  s_36fcf8940d4895::t_a4c0a82d30339b 1-49,51-73
+components/admin/page-copy.ts
+  s_36fcf8940d4895::t_6e2255ba2cdb63 99,139,150,177
+  s_36fcf8940d4895::t_15e5d663902b57 67-98,100-138,140-149,151-176,178-231,233-238
+  s_36fcf8940d4895::t_20ae5bc7114d87 232
+components/admin/OrderControls.tsx
+  s_36fcf8940d4895::t_d5df10ffa5025c 1-62,64-79
+  s_36fcf8940d4895::t_20bba4d7842a73 63
+app/admin/orders/[reference]/page.tsx
+  s_36fcf8940d4895::t_7a9b1ce490c51b 1-254
+components/admin/TrackingLinkControl.tsx
+  s_36fcf8940d4895::t_ba519c5f86ad63 88
+  s_36fcf8940d4895::t_0a4549d6d2915c 1-87,89-109
+docs/architecture.md
+  s_36fcf8940d4895::t_8387798ea4e045 29,67-68,88-92,100,194-212
+  s_36fcf8940d4895::t_2092722206eaf2 213
+docs/manual-checkout-operations.md
+  s_36fcf8940d4895::t_9b66e5ba1c4a8e 3,10-14,68-69,96,111-160,204-205
+components/admin/OrdersTable.tsx
+  s_36fcf8940d4895::t_20bba4d7842a73 1-60
+components/admin/QuoteForm.tsx
+  s_36fcf8940d4895::t_dabb34c82948f2 1-290
+app/admin/orders/[reference]/not-found.tsx
+  s_36fcf8940d4895::t_6ec205fbfb3797 1-28
+tests/admin/ui-order-controls.test.tsx
+  s_36fcf8940d4895::t_ab70d4acd6a23b 1-586
+tests/admin/page-copy.test.ts
+  s_36fcf8940d4895::t_87121b7f923821 40-42
+  s_36fcf8940d4895::t_61a334bf588881 7
+  s_36fcf8940d4895::t_226774ee01dfd2 96-111
+  s_36fcf8940d4895::t_cc3c1a65f4e979 112
+tests/content/legal-pages.test.tsx
+  s_36fcf8940d4895::t_2343bff2a6a15a 221-225
+components/admin/AdminNotice.tsx
+  s_36fcf8940d4895::t_20bba4d7842a73 1-15
+docs/deployment.md
+  s_36fcf8940d4895::t_8387798ea4e045 117
+tests/admin/ui-admin-pages.test.tsx
+  s_36fcf8940d4895::t_863f41e1123d00 289
+  s_36fcf8940d4895::t_c1819ae3cf0698 96
+  s_36fcf8940d4895::t_8b2b41a10346bd 1-95,97-288,290-422
+components/forms/LeadForm.tsx
+  s_36fcf8940d4895::t_f631860f641d1c 172-173,346-347
+components/forms/lead-form.css
+  s_36fcf8940d4895::t_7fff793b2f7f0d 129
+lib/content/legal-fallback.ts
+  s_36fcf8940d4895::t_ca6e03994fe097 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d367187b4f81e3867854ae3e5e8ec7ba6324196e",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
