@@ -59,6 +59,10 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
 | `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
 | `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run once a day by Vercel Cron (`vercel.json`); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
+| `/api/admin/session` | ƒ | POST: staff sign-in (email and password, Supabase Auth; rate-limited; one generic refusal); DELETE: sign-out. Same-origin JSON only; 503 without Supabase (Task 8b) |
+| `/api/admin/orders/[reference]/quote` | ƒ | POST: active staff save a quote (`intent: "save"`, never notifies) or send one saved revision (`intent: "send"`, queued once, emailed after the answer) (Task 8b) |
+| `/api/admin/orders/[reference]/status` | ƒ | POST: active staff move an order one step, naming the status they saw (`{from, to}`); 409 if it moved on (Task 8b) |
+| `/api/admin/orders/[reference]/tracking-link` | ƒ | POST: active staff issue a new private tracking link, shown once; the old one stops working (Task 8b) |
 | `/api/health` | ƒ | GET: liveness, `{status, version, time}` |
 | `/api/readiness` | ƒ | GET: configuration booleans; 200 when ready, 503 otherwise |
 | `/api/revalidate` | ƒ | POST: signed Sanity webhook that expires cache tags |
@@ -69,7 +73,7 @@ Planned, not in the code:
 
 | Route | State |
 |---|---|
-| `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8): staff order administration |
+| `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8c): the staff pages over the Task 8b APIs |
 
 The robots rules keep crawlers out of the private and transactional paths (`/order`, `/orders/`,
 `/track`, `/admin`; `ROBOTS_DISALLOW` in `lib/seo/metadata.ts`), and the sitemap never lists them.
@@ -90,8 +94,11 @@ sitemap lists `/shop` and the listed product pages only while commerce is on.
   imports `server-only`, so importing it from a client component is a build error:
   `lib/sanity/{client,fetch,image}.ts`, `lib/leads/{submit,dependencies,http}.ts`,
   `lib/orders/{catalogue,submit,track,dependencies}.ts`,
-  `lib/email/client.ts`, `lib/supabase/{admin,leads,orders,server}.ts`, `lib/security/rate-limit.ts`,
-  `lib/ops/readiness.ts`. (`lib/sanity/env.ts` reads only the public project id, dataset and API
+  `lib/email/client.ts`, `lib/supabase/{admin,auth,leads,orders,server}.ts`, `lib/security/rate-limit.ts`,
+  `lib/ops/readiness.ts`, and the staff modules `lib/admin/{dependencies,http,orders,session}.ts` and
+  `lib/orders/admin.ts` (Task 8b). `lib/supabase/staff-session.ts` (the staff cookie rules) is not
+  server-only because `proxy.ts` imports it; it holds nothing secret, only the public Supabase URL
+  and publishable key. (`lib/sanity/env.ts` reads only the public project id, dataset and API
   version; `lib/sanity/draft-mode.ts` is used only by server routes and pages.)
 - The browser form imports only `lib/leads/fields.ts` (no Zod, no `process.env`); a test walks its
   import graph (`tests/leads/env-boundary.test.ts`). The order and tracking forms likewise import
@@ -154,6 +161,35 @@ LeadForm (browser)  --POST JSON-->  /api/leads  ->  lib/leads/submit.ts
   per /64) under `LEAD_IP_HASH_SECRET`.
 - The database side (tables, functions, grants) is in [database-security.md](database-security.md).
 
+## Staff flow (Task 8b)
+
+```
+staff browser  --same-origin JSON + session cookies-->  /api/admin/...  ->  lib/admin/orders.ts
+                                      1 cross-site or not JSON         -> 403, no detail, session not read
+                                      2 Supabase unconfigured          -> 503
+                                      3 auth.getUser() (Auth verifies the token; 5 s bound)
+                                          no or refused session -> 401 · Auth unreachable -> 503
+                                      4 own staff_users row, read under RLS: not active -> 403
+                                      5 reference malformed -> 404 · body unreadable or invalid -> 400
+                                      6 staff RPC as the signed-in user (migration 0007)
+                                          not found 404 · stale 409 · not possible now 409
+                                      7 200; a newly queued quote is emailed after the answer
+                                        (Task 8a's claim, service role)
+```
+
+- Staff sign in with an email and password the owner created in Supabase Auth (`signInWithPassword`
+  through `@supabase/ssr`). The session lives in cookies only the server writes: httpOnly, Secure
+  outside localhost, SameSite=Lax, path `/`. There is no sign-up, reset or magic-link route.
+- Sign-in attempts are counted per hashed client address and per keyed digest of the email (the
+  Task 5 limiter, service role), before Auth is asked. A wrong password and a correct password on
+  an account with no active `staff_users` row get the same 401; the second is signed out at once.
+- Being signed in grants nothing: reads and writes run as the user, and the database lets them
+  through only while their `staff_users` row is active. The service role is used for the sign-in
+  limiter and the quote email only. Details in [database-security.md](database-security.md#staff-access-migration-0007).
+- Quote payment links must be https on a host listed exactly in `PAYMENT_HOST_ALLOWLIST`
+  (`lib/security/payment-url.ts`). Copy: `components/admin/admin-copy.ts`; no answer says an email
+  was delivered or a payment taken.
+
 ## Security headers and why pages are dynamic
 
 `proxy.ts` makes a fresh nonce for every document request and sends this policy (production build):
@@ -184,6 +220,12 @@ upgrade-insecure-requests            (Vercel deployments only)
 - `/orders/*` (the private order pages, Task 7c) sends `Referrer-Policy: no-referrer` instead, so
   the tracking token in their address never leaves them, plus `Cache-Control: private, no-store` and
   `X-Robots-Tag: noindex, nofollow` (`PRIVATE_LINK_HEADER_RULE`).
+- `/admin/*` and `/api/admin/*` (staff, Task 8b) send the same three headers
+  (`ADMIN_HEADER_RULES`), and every staff API answer sets them itself too.
+- On `/admin` and `/api/admin` requests only, and only when a Supabase session cookie is present,
+  `proxy.ts` refreshes an expired staff session before the page or route runs, and hands the new
+  cookies to both the browser and the route (a refresh token can be used once). It waits at most
+  5 seconds for Supabase Auth (`STAFF_AUTH_TIMEOUT_MS`). `/api/admin` gets no page policy.
 - **Why every page is rendered per request:** the HTML carries inline React Server Components
   scripts, and Next can stamp the nonce on them only when it renders the page for that request.
   The root layout awaits `connection()`; that keeps the Sanity reads in the Data Cache, so a request

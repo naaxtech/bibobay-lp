@@ -175,11 +175,11 @@ describe("proxy.ts", () => {
     vi.unstubAllEnvs();
   });
 
-  it("puts a fresh nonce in the response policy and hands the same policy to the renderer", () => {
+  it("puts a fresh nonce in the response policy and hands the same policy to the renderer", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
-    const first = proxy(new NextRequest("https://bibo.example/privacy"));
-    const second = proxy(new NextRequest("https://bibo.example/privacy"));
+    const first = await proxy(new NextRequest("https://bibo.example/privacy"));
+    const second = await proxy(new NextRequest("https://bibo.example/privacy"));
     const policy = first.headers.get("content-security-policy") ?? "";
     const nonce = /'nonce-([^']+)'/.exec(policy)?.[1];
     expect(nonce).toBeTruthy();

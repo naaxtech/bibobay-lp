@@ -1,15 +1,16 @@
 # Manual checkout operations
 
-**Status: the customer side is built; the staff side is not built yet, so it is not usable yet.**
+**Status: the customer side and the staff APIs are built; the staff pages are not built yet (Task 8c), so it is not usable yet.**
 The commerce gate and order pad (Task 6), the order database, the order request API and the
 tracking API (Task 7a; see [database-security.md](database-security.md#orders-migrations-0002-to-0005)),
 the shop's catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b), and the order request
 and tracking pages, `/order`, `/track` and `/orders/[token]` (Task 7c), all exist. The email outbox
 worker and the order emails (buyer acknowledgement, staff order alert, and the quote email for when
-staff can send one) exist too (Task 8a). The staff area and quote sending are not built yet (Task 8b
-and 8c; see the plan in `docs/superpowers/plans/`). `commerceEnabled` is `false` by default and
-must stay off: switching it on today lets customers send order requests that nobody can see,
-answer or manage yet.
+staff can send one) exist too (Task 8a). Staff sign-in, the staff access rules and the staff APIs
+for quotes, status changes and new tracking links exist (Task 8b; see [Staff access](#staff-access));
+the staff pages that use them do not (Task 8c; see the plan in `docs/superpowers/plans/`).
+`commerceEnabled` is `false` by default and must stay off: switching it on today lets customers send
+order requests that staff could only see and answer through raw API calls.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been
@@ -61,6 +62,50 @@ of that copy can run `e2e/shop/commerce-on.spec.ts` and `e2e/shop/order-flow.spe
 the browser (`page.route`), and `/orders/<token>` shows its "tracking unavailable" state. It refuses
 to touch this repository or any folder inside a git work tree, and nothing in the site imports it.
 
+## Staff access
+
+Built in Task 8b; the staff pages that use it come in Task 8c. Database details:
+[database-security.md](database-security.md#staff-access-migration-0007).
+
+**Adding a staff member** (the owner, in the Supabase dashboard)
+
+1. Authentication: add the user with their email address and a strong password, and hand the
+   password over through a channel you trust. Keep public sign-ups switched off
+   ([deployment.md](deployment.md#staff-access-task-8b)).
+2. SQL editor, with the user's id from the Authentication user list (the display name is optional,
+   at most 80 characters):
+
+   ```sql
+   insert into public.staff_users (user_id, display_name) values ('<user id>', '<first name>');
+   ```
+
+Signed in without an active `staff_users` row, a person can see and change nothing: the database
+itself refuses them, whatever the website does.
+
+**Removing access**: `update public.staff_users set active = false, disabled_at = now() where user_id = '<user id>';`
+Their next request is refused. Prefer this to deleting the Auth user: the audit trail records each
+change with the staff member's user id, and the disabled row still says whose id it was.
+
+**Signing in**: email and password only (no sign-up, reset or magic link on the website; a
+forgotten password is reset by the owner in Supabase). At most 10 attempts per network address and
+5 per email address in each 15 minutes. A wrong password and an account without staff access get
+the same answer. The session is kept in cookies that page scripts cannot read.
+
+**What staff can do** (the API; the pages in Task 8c will call it)
+
+- Save a quote: currency (a three-letter ISO 4217 code, e.g. `AUD`), subtotal and freight in the currency's minor
+  units (cents), and the payment link, which must be https on a host listed exactly in
+  `PAYMENT_HOST_ALLOWLIST`. Only while the order is `new` or `confirmed`. Saving never emails
+  anyone; each save is a new revision of the quote.
+- Send a saved quote: queues the quote email for that revision once. Sending the same revision again
+  queues nothing; a newer save makes an older queued email obsolete (it is skipped, never sent with
+  the wrong figures). Sending does not change the order's status: staff move it themselves.
+- Change the status one step at a time (`new` → `confirmed` → `paid` → `dispatched` → `closed`), or
+  cancel before `closed`. Each change names the status the staff member saw, so if a colleague
+  changed it first nothing happens and the order must be reloaded.
+- Issue a new private tracking link: shown once to the staff member, the old link stops working.
+- Every one of these is recorded in the order's history with the staff member's user id.
+
 ## What the specification requires
 
 **For customers**
@@ -81,7 +126,7 @@ to touch this repository or any folder inside a git work tree, and nothing in th
 - Staff sign in through Supabase Auth and must also have an active row in `staff_users`. Being
   signed in alone grants nothing.
 - Staff set subtotal, freight and currency, and a **payment link whose host must be on an approved
-  list** (`PAYMENT_HOST_ALLOWLIST`, not used by any code yet). BIBO Bay never collects card numbers
+  list** (`PAYMENT_HOST_ALLOWLIST`, enforced since Task 8b). BIBO Bay never collects card numbers
   or bank details.
 - Sending the quote and payment link is a separate, explicit action, and sending it twice cannot
   email twice (outbox with an idempotency key).
@@ -104,5 +149,5 @@ to touch this repository or any folder inside a git work tree, and nothing in th
 - QA orders on any shared environment are labelled `QA test … - delete me` and removed afterwards,
   and their removal is checked.
 
-Until Tasks 6 to 8 are built, reviewed and tested end to end, there is nothing for operations staff
-to run.
+Until Task 8c adds the staff pages and the whole flow is reviewed and tested end to end, there is
+nothing for operations staff to run.

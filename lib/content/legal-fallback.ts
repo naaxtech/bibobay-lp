@@ -16,7 +16,7 @@ import type { PortableContent, SiteSettings } from "./types";
  *
  * Commerce (Task 7b): the text follows the CMS commerce switch (`legalFallbackFor`). Off, the
  * default, nothing is sold here and the text says so. On, those lines are replaced by what an order
- * request stores (supabase/migrations/0002_orders.sql to 0005: the order, its products, its history
+ * request stores (supabase/migrations/0002_orders.sql to 0007: the order, its products, its history
  * and its email records; the order fields in lib/orders/fields.ts) and how payment works: a quote and
  * a payment link sent later by email, never card details. No retention period is stated: none is
  * set (`orders.retain_until` is inert). tests/content/legal-pages.test.tsx asserts every claim.
@@ -61,7 +61,7 @@ function privacyText(commerce: boolean): PortableContent {
       () => paragraph("Your consent: that you ticked the consent box, the version of the wording you agreed to, and when you agreed."),
       () => paragraph("The products you asked for and how many of each, as each product was described in the shop when you sent the request: the shop's own reference for it, its name, and its product code, variant and pack where it has them."),
       () => paragraph("The order's reference, its status and when the status last changed, and when you sent the request."),
-      () => paragraph("A record of what has happened to the order, such as your sending it and any replacement of its tracking link, and who did it: you, the BIBO Bay team or the website itself."),
+      () => paragraph("A record of what has happened to the order, such as your sending it, each change of its status, each quote the team saves or queues for email, and any replacement of its tracking link, and who did it: you, the BIBO Bay team or the website itself."),
       () => paragraph("A one-way code (a hash) made from the order's private tracking link, and when that link stops working. The link itself is not stored, so it cannot be read back from the database. The team can replace the link with a new one, and the old one then stops working."),
       () => paragraph("When the team replies with a quote: the currency, the amounts quoted, the payment link they send you and when they sent it."),
       () => paragraph("Before you send it, your order list stays in this browser's storage on your device, holding only which products you added and how many. It reaches us only as part of an order request."),

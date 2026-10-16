@@ -21,8 +21,8 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `NEXT_PUBLIC_SANITY_PROJECT_ID` | public | every deployed environment | Sanity project | Sanity project. Without it the site serves the repository fallback content. |
 | `NEXT_PUBLIC_SANITY_DATASET` | public | every deployed environment | Sanity project | Dataset name (e.g. `production`). |
 | `NEXT_PUBLIC_SANITY_API_VERSION` | public | optional | Sanity project | API date, `YYYY-MM-DD`; default `2026-03-01`. |
-| `NEXT_PUBLIC_SUPABASE_URL` | public | for lead storage | Supabase project | Project URL (https; http only for a local stack). |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | not used yet | Supabase project | Reserved for staff sign-in (Task 8); nothing reads it today. A secret key here is refused. |
+| `NEXT_PUBLIC_SUPABASE_URL` | public | for lead storage and staff sign-in | Supabase project | Project URL (https; http only for a local stack). |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | for staff sign-in | Supabase project | Lets the server sign staff in and act as them, under row level security (Task 8b). Read on the server only; the browser never talks to Supabase. Without it the staff API answers 503. A secret key here is refused. |
 | `NEXT_PUBLIC_POSTHOG_KEY` | public | for visit statistics | PostHog project (BIBO Bay owner account) | Project key (`phc_…`). Empty: no analytics, no request to PostHog, no "Analytics choices" link. A personal API key (`phx_…`) is refused. See `docs/observability.md`. |
 | `NEXT_PUBLIC_SENTRY_DSN` | public | for error monitoring | Sentry project (BIBO Bay owner account) | Project DSN (https, public key only). Empty: no Sentry, no request, no SDK download in the browser. The ingest host is added to CSP `connect-src`. See `docs/observability.md`. |
 | `SENTRY_AUTH_TOKEN` | server | optional (build) | Sentry organisation | Uploads source maps at build time, then removes them from the deployment. Without it nothing is uploaded and no browser source maps are published. Never public. |
@@ -40,7 +40,7 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up). |
 | `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. |
 | `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Global hourly cap on emails sent straight from the form (1 to 10000, default 60). |
-| `PAYMENT_HOST_ALLOWLIST` | server | not used yet | BIBO Bay owner | Reserved for manual checkout payment links (Task 8). Nothing reads it today. |
+| `PAYMENT_HOST_ALLOWLIST` | server | for staff quotes | BIBO Bay owner | Comma-separated exact host names of the payment providers a quote's payment link may point to, e.g. `pay.example.com,checkout.example.net` (no `https://`, no wildcards; a subdomain needs its own entry). Empty: staff cannot save any quote. An entry that is not one exact host fails `verify-env` (Task 8b). |
 | `CRON_SECRET` | server | for email retries | BIBO Bay owner (random, 32+ characters) | Authorises the email outbox worker: Vercel Cron sends it as `Authorization: Bearer <secret>`. Without it (or with a shorter one) the worker answers 503 and failed emails are not retried; a production build fails with a shorter one. |
 
 Set by the platform, not by you: `VERCEL_ENV` (only `production` is indexable and gets HSTS),
@@ -100,6 +100,21 @@ failure, the hourly send cap, or Resend not yet configured.
   another message, or an unconfirmed send older than 23 hours, ruling R91) stays `failed` with
   `next_attempt_at` set to infinity, and is reported as `delivery_expired`
   ([observability.md](observability.md)). See [database-security.md](database-security.md#outbox-states).
+
+## Staff access (Task 8b)
+
+The staff APIs (`/api/admin/...`) need `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+migration `0007_staff_access.sql`, and for sign-in also `SUPABASE_SERVICE_ROLE_KEY` and
+`LEAD_IP_HASH_SECRET` (the sign-in rate limit; without them sign-in answers 503 rather than run
+unthrottled). Quotes need `PAYMENT_HOST_ALLOWLIST`; the quote email needs Resend like every email.
+
+- In the Supabase dashboard (Authentication settings), switch off public sign-ups; the owner adds
+  each staff user from the dashboard instead. A sign-up would grant nothing (access needs an
+  active `staff_users` row), but nobody needs an account they cannot use.
+- Create each staff member and their `staff_users` row as described in
+  [manual-checkout-operations.md](manual-checkout-operations.md#staff-access).
+- `/admin` and `/api/admin` are private (`Cache-Control: private, no-store`, `noindex`, no referrer)
+  and disallowed in `robots.txt`. The staff pages themselves come in Task 8c.
 
 ## Sanity webhook and Studio origin
 

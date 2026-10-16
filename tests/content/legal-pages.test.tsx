@@ -234,8 +234,16 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
     expect(migrations).toContain("'tracking_token_rotated'");
     expect(privacy).toMatch(/your sending it/i);
     expect(privacy).toMatch(/replacement of its tracking link/i);
-    // Status changes are recorded once a migration writes them (staff administration, Task 8).
-    if (!/'status_changed'/.test(migrations)) expect(privacy).not.toMatch(/change of its status/i);
+    // Status changes and quotes are recorded once a migration writes them (staff administration,
+    // Task 8b, migration 0007); the text names each event exactly when one does.
+    for (const [event, wording] of [
+      ["status_changed", /each change of its status/i],
+      ["quote_saved", /each quote the team saves/i],
+      ["quote_queued", /queues for email/i],
+    ] as const) {
+      if (new RegExp(`'${event}'`).test(migrations)) expect(privacy, event).toMatch(wording);
+      else expect(privacy, event).not.toMatch(wording);
+    }
   });
 
   it("states the rate-limit windows the code uses (review Minor 4)", () => {

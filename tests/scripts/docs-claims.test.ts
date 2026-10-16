@@ -1,8 +1,12 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+// lib/admin/session.ts (the staff sign-in limits) is server-only.
+vi.mock("server-only", () => ({}));
+
+import { STAFF_SIGN_IN_RATE_LIMIT } from "@/lib/admin/session";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { MAX_WEBHOOK_BODY_BYTES } from "@/lib/security/revalidation";
 
@@ -95,7 +99,8 @@ describe("email outbox worker docs (Task 8a)", () => {
   it("documents the worker as built in the README, and the staff side as still to come", () => {
     const readme = read("README.md").split(/\r?\n/);
     expect(readme.find((line) => line.includes("outbox worker")) ?? "", "README worker row").toMatch(/\| built \(Task 8a/);
-    expect(readme.find((line) => line.startsWith("| Staff order administration")) ?? "", "README staff row").toMatch(/not built yet \(Task 8b, 8c\)/);
+    // Task 8b built the staff sign-in and APIs; the staff pages are still to come (Task 8c).
+    expect(readme.find((line) => line.startsWith("| Staff order administration pages")) ?? "", "README staff pages row").toMatch(/not built yet \(Task 8c\)/);
   });
 
   it("documents CRON_SECRET as used, its 32-character minimum, and the once-a-day schedule with how to raise it (R88)", () => {
@@ -142,3 +147,61 @@ describe("outbox docs after the Task 8a review", () => {
   });
 });
 
+describe("staff access docs (Task 8b)", () => {
+  it("documents the staff sign-in and APIs as built and the staff pages as still to come", () => {
+    const readme = read("README.md").split(/\r?\n/);
+    expect(readme.find((line) => line.startsWith("| Staff sign-in and the staff order APIs")) ?? "", "README staff API row").toMatch(/\| built \(Task 8b/);
+    const architecture = read("docs/architecture.md");
+    const rows = architecture.split(/\r?\n/);
+    for (const route of ["`/api/admin/session`", "`/api/admin/orders/[reference]/quote`", "`/api/admin/orders/[reference]/status`", "`/api/admin/orders/[reference]/tracking-link`"]) {
+      expect(rows.find((line) => line.startsWith(`| ${route}`)) ?? "", route).toMatch(/^\| [^|]+ \| ƒ \|/);
+    }
+    expect(rows.find((line) => line.startsWith("| `/admin/login`")) ?? "").toMatch(/not built yet \(Task 8c\)/);
+    for (const path of ["lib/admin/{dependencies,http,orders,session}.ts", "lib/orders/admin.ts", "lib/supabase/{admin,auth,leads,orders,server}.ts", "lib/supabase/staff-session.ts"]) {
+      expect(architecture, path).toContain(path);
+    }
+  });
+
+  it("documents PAYMENT_HOST_ALLOWLIST and the Supabase public settings as used", () => {
+    const rows = read("docs/deployment.md").split(/\r?\n/);
+    for (const name of ["PAYMENT_HOST_ALLOWLIST", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"]) {
+      const row = rows.find((line) => line.startsWith(`| \`${name}\` |`)) ?? "";
+      expect(row, name).not.toMatch(/not used yet|nothing reads it/i);
+      expect(row, name).toMatch(/staff/i);
+    }
+    expect(rows.find((line) => line.startsWith("| `PAYMENT_HOST_ALLOWLIST` |"))).toMatch(/exact host/i);
+    const example = read(".env.example").split(/\r?\n/);
+    expect(example[example.indexOf("PAYMENT_HOST_ALLOWLIST=") - 1]).toMatch(/^# .*exact hosts/);
+  });
+
+  it("lists the staff table, policies and functions, and the sign-in limits the code uses, in the database notes", () => {
+    const database = read("docs/database-security.md");
+    for (const name of ["0007_staff_access.sql", "staff_users", "is_active_staff", "staff_save_order_quote", "staff_queue_order_quote", "staff_advance_order_status", "staff_rotate_order_tracking_token", "_staff_read", "supabase/tests/0005_staff_access.sql", "tests/admin/staff-migration-policy.test.ts"]) {
+      expect(database, name).toContain(name);
+    }
+    expect(database).not.toMatch(/staff access are not built yet|Task 8b must raise/);
+    const { client, email } = STAFF_SIGN_IN_RATE_LIMIT;
+    expect(database).toContain(`\`${client.scope}:<HMAC of the client address>\` | ${client.maxHits} per ${client.windowSeconds / 60} minutes`);
+    expect(database).toContain(`\`${email.scope}:<HMAC of the email>\` | ${email.maxHits} per ${email.windowSeconds / 60} minutes`);
+  });
+
+  it("gives the owner the staff steps, and keeps commerce off until the staff pages exist", () => {
+    const operations = read("docs/manual-checkout-operations.md");
+    expect(operations).not.toMatch(/not used by any code yet|staff area and quote sending are not built yet/);
+    expect(operations).toMatch(/insert into public\.staff_users \(user_id, display_name\)/);
+    expect(operations).toMatch(/set active = false, disabled_at = now\(\)/);
+    expect(operations).toMatch(/sign-ups/i);
+    expect(operations).toMatch(/Task 8c/);
+    expect(operations).toMatch(/`commerceEnabled` is `false` by default and\s+must stay off/);
+  });
+
+  it("names every staff API warning in the observability notes", () => {
+    // The warning events are the AdminLogEvent names lib/admin/http.ts sends to Sentry.
+    const source = read("lib/admin/http.ts");
+    const pattern = new RegExp(/const WARNING_EVENT = \/(.+)\/;/.exec(source)![1]!);
+    const events = [...source.matchAll(/\{ event: "(\w+)"/g)].map((match) => match[1]!).filter((event) => pattern.test(event));
+    expect(events.length).toBeGreaterThanOrEqual(5);
+    const observability = read("docs/observability.md");
+    for (const event of events) expect(observability, event).toContain(`\`${event}\``);
+  });
+});

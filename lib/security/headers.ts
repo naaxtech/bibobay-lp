@@ -159,3 +159,13 @@ export const PRIVATE_LINK_HEADER_RULE: { source: string; headers: Array<{ key: s
     { key: "X-Robots-Tag", value: "noindex, nofollow" },
   ],
 };
+
+/**
+ * Task 8b (ruling R99): the staff pages and the staff API are private in the same way. Their
+ * answers carry a staff session and order details, so nothing may keep, index or refer them.
+ * `/admin/:path*` matches `/admin` itself too. next.config.ts lists these after the site-wide rule.
+ */
+export const ADMIN_HEADER_RULES: ReadonlyArray<{ source: string; headers: Array<{ key: string; value: string }> }> = ["/admin/:path*", "/api/admin/:path*"].map((source) => ({
+  source,
+  headers: PRIVATE_LINK_HEADER_RULE.headers.map((header) => ({ ...header })),
+}));

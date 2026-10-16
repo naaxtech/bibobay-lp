@@ -175,6 +175,33 @@ route is reported as `outbox_worker_failed` (area `outbox`) and answered 500 `{ 
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
 
+### Alerts from the staff API (Task 8b)
+
+`logAdminEvent` (`lib/admin/http.ts`) writes the staff routes' log lines (`scope: "admin"`): an
+event name and at most a reason, a status or a short code, never an email, a name, a password,
+an order reference, a tracking link or a configuration value. These are also sent to Sentry as
+warnings, tagged with the event and code only:
+
+- `admin_unconfigured`: a staff request arrived while Supabase's URL or publishable key is missing,
+  or a sign-in while the rate limiter cannot run (no service role key or `LEAD_IP_HASH_SECRET`);
+  answered 503.
+- `admin_auth_unavailable`: Supabase Auth or the `staff_users` read did not answer, or not within
+  5 seconds (answered 503; nothing changed).
+- `staff_sign_in_unavailable`: Auth or the sign-in rate limiter did not answer during a sign-in.
+- `staff_sign_out_unavailable`: the session cookies were cleared but Auth did not confirm it
+  revoked the session.
+- `admin_action_failed`: an unexpected failure of a staff route (also reported as an error with
+  area `admin`); answered 500 with the generic copy.
+
+Routine lines, not reported: `admin_request_refused` (with `cross_site`, `signed_out` or
+`not_staff`), `admin_order_not_found`, `admin_fields_refused`, `admin_conflict` (`stale` or
+`not_allowed`), `admin_quote_saved`, `admin_quote_queued`, `admin_status_changed`,
+`admin_tracking_link_rotated`, `staff_signed_in`, `staff_sign_in_refused`,
+`staff_sign_in_rate_limited` and `staff_signed_out`. A run of `staff_sign_in_refused` or
+`staff_sign_in_rate_limited` lines means someone is guessing passwords.
+
+Set a Sentry alert on `admin_auth_unavailable` and `admin_action_failed`.
+
 ### Notes for staff reading lead records
 
 - `rejoin_requested_at` can be set by anyone who submits a listed address again, so it is not proof

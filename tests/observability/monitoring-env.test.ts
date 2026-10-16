@@ -61,17 +61,17 @@ describe("Sentry DSN", () => {
 });
 
 describe("monitoring hosts in the content security policy (connect-src only)", () => {
-  it("adds nothing without keys", () => {
+  it("adds nothing without keys", async () => {
     expect(monitoringConnectSources({})).toEqual([]);
-    const policy = proxy(new NextRequest("https://bibo.example/")).headers.get("content-security-policy") ?? "";
+    const policy = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
     expect(policy).toMatch(/connect-src 'self'(;|$)/);
   });
 
-  it("adds the Sentry ingest origin and the PostHog host when configured, never to script-src", () => {
+  it("adds the Sentry ingest origin and the PostHog host when configured, never to script-src", async () => {
     const env = { NEXT_PUBLIC_SENTRY_DSN: DSN, NEXT_PUBLIC_POSTHOG_KEY: KEY, NEXT_PUBLIC_POSTHOG_HOST: "https://ph.example.com" };
     expect(monitoringConnectSources(env)).toEqual(["https://o0.ingest.example.com", "https://ph.example.com"]);
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
-    const policy = proxy(new NextRequest("https://bibo.example/")).headers.get("content-security-policy") ?? "";
+    const policy = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
     const directive = (name: string) => policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? "";
     expect(directive("connect-src")).toBe("connect-src 'self' https://o0.ingest.example.com https://ph.example.com");
     expect(directive("script-src")).not.toMatch(/example\.com|posthog|sentry/);

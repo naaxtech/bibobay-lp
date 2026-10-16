@@ -1,5 +1,6 @@
 import { analyticsConfig } from "../lib/analytics/config";
 import { sentryDsnFrom } from "../lib/observability/sentry-dsn";
+import { parsePaymentHostAllowlist } from "../lib/security/payment-url";
 import { SERVER_SECRET_MIN_LENGTH } from "../lib/security/secrets";
 import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
@@ -119,11 +120,23 @@ export function verifyEnvironment(
     monitoring.push("NEXT_PUBLIC_SENTRY_DSN: not an https DSN with a public key and a numeric project; error reports would stay off");
   }
 
+  // Task 8b (ruling R97): quotes accept payment links only to the exact hosts listed. An entry that
+  // is not one exact host is ignored by the app, so a typo would silently refuse that provider's
+  // links: fail instead, with a count only, never the value. Unset or empty is allowed (no payment
+  // links are accepted until the owner lists the providers).
+  const payment: string[] = [];
+  const { invalid } = parsePaymentHostAllowlist(env.PAYMENT_HOST_ALLOWLIST);
+  if (invalid > 0) {
+    payment.push(
+      `PAYMENT_HOST_ALLOWLIST: ${invalid} ${invalid === 1 ? "entry is" : "entries are"} not one exact host (no wildcards, schemes, paths, ports or IP addresses) and would be ignored`,
+    );
+  }
+
   return {
-    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0,
+    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0 && payment.length === 0,
     phase,
     forbiddenPublic,
-    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring],
+    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring, ...payment],
   };
 }
 

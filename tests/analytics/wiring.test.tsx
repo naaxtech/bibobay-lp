@@ -44,14 +44,14 @@ describe("analytics environment", () => {
 });
 
 describe("content security policy", () => {
-  it("lets the page send events to the configured PostHog host only", () => {
+  it("lets the page send events to the configured PostHog host only", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
-    const without = proxy(new NextRequest("https://bibo.example/")).headers.get("content-security-policy") ?? "";
+    const without = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
     expect(without).not.toMatch(/posthog|ph\.example/);
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", KEY);
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://ph.example.com");
-    const policy = proxy(new NextRequest("https://bibo.example/")).headers.get("content-security-policy") ?? "";
+    const policy = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
     expect(/connect-src ([^;]*)/.exec(policy)?.[1]).toContain("https://ph.example.com");
     // Never as a script source: the SDK is bundled, and 'strict-dynamic' stays nonce-only.
     expect(/script-src ([^;]*)/.exec(policy)?.[1]).not.toContain("ph.example.com");

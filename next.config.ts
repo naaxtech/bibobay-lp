@@ -2,7 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 import { sentryDsnFrom } from "./lib/observability/monitoring-env";
-import { API_CONTENT_SECURITY_POLICY, PRIVATE_LINK_HEADER_RULE, securityEnvironment, staticSecurityHeaders } from "./lib/security/headers";
+import { ADMIN_HEADER_RULES, API_CONTENT_SECURITY_POLICY, PRIVATE_LINK_HEADER_RULE, securityEnvironment, staticSecurityHeaders } from "./lib/security/headers";
 
 const nextConfig: NextConfig = {
   // src: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins · next 16.3.8 · 2026-10-05
@@ -35,6 +35,8 @@ const nextConfig: NextConfig = {
       { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: API_CONTENT_SECURITY_POLICY }] },
       // Task 7b: no referrer from the private order pages; after the site-wide rule, so it wins.
       PRIVATE_LINK_HEADER_RULE,
+      // Task 8b (R99): the staff pages and API, private in the same way; after the API rule too.
+      ...ADMIN_HEADER_RULES,
     ];
   },
 };

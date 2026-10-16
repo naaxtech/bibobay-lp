@@ -23,6 +23,20 @@ export const SUPABASE_STAND_IN = `
   alter default privileges for role migrator in schema public grant all on tables to anon, authenticated, service_role;
   alter default privileges for role migrator in schema public grant all on functions to anon, authenticated, service_role;
   alter default privileges for role migrator in schema public grant all on sequences to anon, authenticated, service_role;
+  -- Supabase Auth, test-only (Task 8b): the users table staff_users references, and auth.uid(),
+  -- which reads the caller's JWT subject the way Supabase's does (PostgREST sets request.jwt.claims;
+  -- older versions set request.jwt.claim.sub). A real project has both already; never put them in
+  -- a migration.
+  create schema auth;
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+  create function auth.uid() returns uuid language sql stable as $$
+    select coalesce(
+      nullif(current_setting('request.jwt.claim.sub', true), ''),
+      (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+    )::uuid
+  $$;
+  grant usage on schema auth to anon, authenticated, service_role, migrator;
+  grant references, select on auth.users to migrator;
   set search_path = public, extensions;
 `;
 

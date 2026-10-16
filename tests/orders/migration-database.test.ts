@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 
 describe("every migration in Postgres", () => {
-  it("applies 0001 to 0006 in order", () => {
+  it("applies 0001 to 0007 in order", () => {
     expect(migrationFiles()).toEqual([
       "0001_leads_and_security.sql",
       "0002_orders.sql",
@@ -28,11 +28,12 @@ describe("every migration in Postgres", () => {
       "0004_lock_tracking_payload.sql",
       "0005_shared_rate_limits_and_token_rotation.sql",
       "0006_order_events_and_email_outbox.sql",
+      "0007_staff_access.sql",
     ]);
   });
 
-  it("has a pgTAP file for the leads, the orders, the tracking grants and the email outbox", () => {
-    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql"]);
+  it("has a pgTAP file for the leads, the orders, the tracking grants, the email outbox and staff access", () => {
+    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql", "0005_staff_access.sql"]);
   });
 
   it.each(pgtapFiles())("passes every pgTAP assertion in supabase/tests/%s", async (file) => {
@@ -84,9 +85,47 @@ describe("every migration in Postgres", () => {
     );
     expect(rows.map((row) => row.owner)).toEqual(Array(6).fill("migrator"));
   });
+
+  it("leaves every staff function and staff_users owned by a role that bypasses RLS (Task 8b)", async () => {
+    const { rows } = await db.query<{ name: string; owner: string }>(
+      `select distinct proname as name, pg_get_userbyid(proowner) as owner from pg_proc
+        where pronamespace = 'public'::regnamespace
+          and proname in ('is_active_staff', 'staff_save_order_quote', 'staff_queue_order_quote', 'staff_advance_order_status', 'staff_rotate_order_tracking_token')
+        order by proname`,
+    );
+    expect(rows.map((row) => row.owner)).toEqual(Array(5).fill("migrator"));
+    const table = await db.query<{ owner: string }>("select pg_get_userbyid(relowner) as owner from pg_class where oid = 'public.staff_users'::regclass");
+    expect(table.rows).toEqual([{ owner: "migrator" }]);
+  });
+
+  it("keeps the staff access rules after a second application of every migration", async () => {
+    const { planned, passed, failures } = summariseTap(await runTap(db, readPgtap("0005_staff_access.sql")));
+    expect(failures).toEqual([]);
+    expect(passed).toBe(planned);
+  }, 120_000);
 });
 
 describe("migration preconditions", () => {
+  it("refuses to apply the staff migration before the outbox migration", async () => {
+    const fresh = await createSupabaseStandIn();
+    try {
+      await expect(applyMigrations(fresh, migrationFiles().filter((file) => !file.startsWith("0006") && !file.startsWith("0007")))).resolves.toBeUndefined();
+      await expect(applyMigrations(fresh, ["0007_staff_access.sql"])).rejects.toThrow(/must be applied before 0007/);
+    } finally {
+      await fresh.close();
+    }
+  }, 120_000);
+
+  it("refuses to apply the staff migration without Supabase Auth", async () => {
+    const fresh = await createSupabaseStandIn();
+    try {
+      await fresh.exec("drop function auth.uid();");
+      await expect(applyMigrations(fresh, migrationFiles())).rejects.toThrow(/needs Supabase Auth/);
+    } finally {
+      await fresh.close();
+    }
+  }, 120_000);
+
   it("refuses to apply the outbox migration before the lead and order migrations", async () => {
     const fresh = await createSupabaseStandIn();
     try {

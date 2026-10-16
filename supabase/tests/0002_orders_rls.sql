@@ -40,8 +40,11 @@ select ok(
 );
 select is_empty(
   $$ select tablename::text from pg_catalog.pg_policies
-     where schemaname = 'public' and tablename in ('orders', 'order_items', 'order_events', 'order_email_outbox') $$,
-  'no row policies on the order tables: every API role is denied by default'
+     where schemaname = 'public' and tablename in ('orders', 'order_items', 'order_events', 'order_email_outbox')
+       -- Migration 0007 (Task 8b) adds one staff read policy per table, for signed-in users; it
+       -- passes for active staff only (supabase/tests/0005_staff_access.sql). Nothing else.
+       and not (cmd = 'SELECT' and roles = array['authenticated']::name[] and policyname like '%\_staff\_read') $$,
+  'no row policies on the order tables beyond the staff reads of 0007: every API role is denied by default'
 );
 
 select table_privs_are('public', 'orders', 'anon', array[]::text[], 'anon has no privilege on orders');
@@ -152,7 +155,9 @@ reset role;
 set local role authenticated;
 
 select throws_ok($$ select * from public.orders $$, '42501', null, 'authenticated cannot read orders');
-select throws_ok($$ select * from public.order_events $$, '42501', null, 'authenticated cannot read the order audit trail');
+-- Since migration 0007 staff may read the audit trail's columns, under a policy that passes for
+-- active staff only: a signed-in user who is not staff (here: no user at all) reads no row.
+select is_empty($$ select * from public.order_events $$, 'authenticated reads nothing of the order audit trail without an active staff row');
 select throws_ok($$ select * from public.order_email_outbox $$, '42501', null, 'authenticated cannot read the order outbox');
 select throws_ok($$ select pg_temp.try_order() $$, '42501', null, 'authenticated cannot call submit_order');
 
