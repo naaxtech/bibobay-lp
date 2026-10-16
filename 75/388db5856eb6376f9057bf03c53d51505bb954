@@ -1,0 +1,60 @@
+lib/outbox/constants.ts
+  s_36fcf8940d4895::t_144a2a92916ce9 65
+app/orders/[token]/page.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 13,27
+lib/leads/submit.ts
+  s_36fcf8940d4895::t_75aa6102ac4331 111
+app/(commerce)/shop/[slug]/page.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 15,29
+components/forms/order-copy.ts
+  s_36fcf8940d4895::t_75aa6102ac4331 92
+app/(commerce)/shop/page.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 12,22
+tests/smoke/global-error.test.tsx
+  s_36fcf8940d4895::t_7682f913aecb28 1-51
+tests/scripts/docs-claims.test.ts
+  s_36fcf8940d4895::t_75aa6102ac4331 307
+tests/orders/order-page.test.tsx
+  s_36fcf8940d4895::t_828cbc4b2b5c17 18-19,53,87,94,160,166,179,198,211,225
+tests/observability/lead-reporting.test.ts
+  s_36fcf8940d4895::t_7682f913aecb28 54,58
+tests/orders/track-pages.test.tsx
+  s_36fcf8940d4895::t_828cbc4b2b5c17 16,58,70,179,236
+  s_36fcf8940d4895::t_c6f5f799943e4d 17-18
+tests/shop/order-pad-mount.test.tsx
+  s_36fcf8940d4895::t_828cbc4b2b5c17 16-17,34,52,59,68
+tests/shop/shop-pages.test.tsx
+  s_36fcf8940d4895::t_828cbc4b2b5c17 15-16,52,69,77,135,166,173,195,206,213,222,231
+app/orders/[token]/not-found.tsx
+  s_36fcf8940d4895::t_a092b688b0ba5c 10,21
+tests/commerce/gate-freshness.test.ts
+  s_36fcf8940d4895::t_d31e493f436829 1-3,77-84,86-95
+  s_36fcf8940d4895::t_a092b688b0ba5c 85
+  s_36fcf8940d4895::t_975398cfe93f57 96
+docs/qa-report-2026-10-02.md
+  s_36fcf8940d4895::t_75aa6102ac4331 23
+components/shop/OrderPadMount.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 5,15
+app/(commerce)/order/page.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 14,28
+tests/orders/order-form.test.tsx
+  s_36fcf8940d4895::t_7682f913aecb28 418,421-423
+app/track/page.tsx
+  s_36fcf8940d4895::t_75aa6102ac4331 9,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "75388db5856eb6376f9057bf03c53d51505bb954",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
