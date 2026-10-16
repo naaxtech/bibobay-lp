@@ -1,0 +1,37 @@
+app/admin/layout.tsx
+  s_36fcf8940d4895::t_0becf36eae6aa0 2,8,13,24-31
+components/shop/order-pad-copy.ts
+  s_36fcf8940d4895::t_5a46ccf2c0daef 1-10
+components/shop/OrderPadSummary.tsx
+  s_36fcf8940d4895::t_94fca72dc0fb47 4,8,22-25,31-35,37-53,57,60-62,68,73,77-81,105,118,122
+components/admin/useOrderAction.ts
+  s_36fcf8940d4895::t_0becf36eae6aa0 4,59-61,69,83-84,94-95
+components/admin/LoginForm.tsx
+  s_36fcf8940d4895::t_0becf36eae6aa0 133,156
+tests/admin/ui-admin-frame.test.tsx
+  s_36fcf8940d4895::t_b36e42b85af565 18-19,37,157-166,211-238
+components/admin/AdminFrame.tsx
+  s_36fcf8940d4895::t_0becf36eae6aa0 10-11,21,42
+tests/admin/ui-login-form.test.tsx
+  s_36fcf8940d4895::t_b36e42b85af565 163-177
+tests/admin/ui-order-controls.test.tsx
+  s_36fcf8940d4895::t_be2310c8d27c1c 2,588-640
+tests/shop/order-pad-summary.test.tsx
+  s_36fcf8940d4895::t_008626c0ca6eb1 1-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7757e6e96a29f0a5519974d160b5cf8fa0fe2c3d",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
