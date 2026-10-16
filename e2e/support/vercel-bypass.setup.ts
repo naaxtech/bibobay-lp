@@ -1,4 +1,5 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { request, type FullConfig } from "@playwright/test";
 
 import { bypassCookieUrl, bypassStorageStatePath, selectBypassCookies } from "./vercel-bypass";
@@ -23,7 +24,10 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     if (cookies.length === 0) {
       throw new Error("The deployment set no bypass cookie: check VERCEL_AUTOMATION_BYPASS_SECRET and that Protection Bypass for Automation is enabled.");
     }
-    await writeFile(bypassStorageStatePath(), JSON.stringify({ cookies, origins: [] }), { encoding: "utf8", mode: 0o600 });
+    const path = bypassStorageStatePath();
+    // Not recursive: fails if the folder already exists, so nothing pre-created by someone else is reused.
+    await mkdir(dirname(path), { recursive: false, mode: 0o700 });
+    await writeFile(path, JSON.stringify({ cookies, origins: [] }), { encoding: "utf8", mode: 0o600 });
   } finally {
     await context.dispose();
   }

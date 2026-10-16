@@ -1,10 +1,12 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, relative, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { bypassCookieUrl, bypassStorageStatePath, selectBypassCookies } from "../../e2e/support/vercel-bypass";
+import globalTeardown from "../../e2e/support/vercel-bypass.teardown";
+import { BYPASS_STATE_ENV, bypassCookieUrl, bypassStateDir, bypassStorageStatePath, newBypassStatePath, selectBypassCookies } from "../../e2e/support/vercel-bypass";
 
 /*
  * Residual fixer, item 4: the bypass secret used to travel as `extraHTTPHeaders`, which Playwright
@@ -42,12 +44,52 @@ describe("selectBypassCookies", () => {
   });
 });
 
-describe("bypassStorageStatePath", () => {
-  it("lives in the OS temp folder, never in the repository", () => {
-    const path = bypassStorageStatePath();
-    expect(isAbsolute(path)).toBe(true);
-    expect(relative(tmpdir(), path).startsWith("..")).toBe(false);
-    expect(path.startsWith(resolve("."))).toBe(false);
+describe("the per-run storage state location", () => {
+  const saved = process.env[BYPASS_STATE_ENV];
+  afterEach(() => {
+    if (saved === undefined) delete process.env[BYPASS_STATE_ENV];
+    else process.env[BYPASS_STATE_ENV] = saved;
+  });
+
+  it("is random per run, under the OS temp folder and outside the repository", () => {
+    const first = newBypassStatePath();
+    expect(newBypassStatePath()).not.toBe(first);
+    expect(isAbsolute(first)).toBe(true);
+    expect(relative(tmpdir(), first).startsWith("..")).toBe(false);
+    expect(first.startsWith(resolve("."))).toBe(false);
+    expect(bypassStateDir(first)).toBe(dirname(first));
+  });
+
+  it("is read from the environment by the single accessor, and fails loudly when the config did not set it", () => {
+    delete process.env[BYPASS_STATE_ENV];
+    expect(() => bypassStorageStatePath()).toThrow(BYPASS_STATE_ENV);
+    process.env[BYPASS_STATE_ENV] = "somewhere";
+    expect(bypassStorageStatePath()).toBe("somewhere");
+  });
+
+  it("only treats a bypass folder directly under the temp folder as removable", () => {
+    expect(bypassStateDir(resolve("state.json"))).toBeNull();
+    expect(bypassStateDir(`${tmpdir()}/other/state.json`)).toBeNull();
+  });
+
+  it("the setup's non-recursive mkdir refuses an existing folder, and the teardown removes the folder", async () => {
+    const path = newBypassStatePath();
+    const dir = dirname(path);
+    await mkdir(dir, { recursive: false, mode: 0o700 });
+    await expect(mkdir(dir, { recursive: false, mode: 0o700 })).rejects.toThrow();
+    if (process.platform !== "win32") expect(statSync(dir).mode & 0o077).toBe(0);
+    await writeFile(path, "{}", { mode: 0o600 });
+    process.env[BYPASS_STATE_ENV] = path;
+    await globalTeardown();
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("the teardown leaves a folder that is not a bypass folder alone", async () => {
+    const dir = await mkdtemp(`${tmpdir()}/unrelated-`);
+    process.env[BYPASS_STATE_ENV] = `${dir}/state.json`;
+    await globalTeardown();
+    expect(existsSync(dir)).toBe(true);
+    await rm(dir, { recursive: true, force: true });
   });
 });
 
@@ -59,6 +101,8 @@ describe("wiring", () => {
     expect(config).not.toContain("extraHTTPHeaders");
     expect(config).toMatch(/storageState:\s*bypassSecret/);
     expect(config).toContain("globalSetup");
+    expect(config).toContain("globalTeardown");
+    expect(config).toMatch(/process\.env\[BYPASS_STATE_ENV\] \?\?= newBypassStatePath\(\)/);
     expect(config).toMatch(/trace:\s*bypassSecret \? "off"/);
   });
 
@@ -66,6 +110,7 @@ describe("wiring", () => {
     const setup = source("e2e/support/vercel-bypass.setup.ts");
     expect(setup).toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
     expect(setup).toMatch(/if \(!secret\) return/);
+    expect(setup).toMatch(/mkdir\(dirname\(path\), \{ recursive: false, mode: 0o700 \}\)/);
     expect(setup).not.toMatch(/console\.\w+\([^)]*(secret|url)/i);
   });
 });

@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 /*
  * Vercel Deployment Protection bypass for the browser specs (residual fixer, item 4).
@@ -35,7 +36,26 @@ export function selectBypassCookies<T extends StoredCookie>(cookies: readonly T[
   return cookies.filter((cookie) => cookie.domain.replace(/^\./, "") === host);
 }
 
-/** Where the storage state is written: the OS temp folder, one fixed name so config and workers agree. */
+export const BYPASS_STATE_ENV = "BIBOBAY_BYPASS_STATE";
+const STATE_DIR_PREFIX = "bibobay-bypass-";
+
+/** A fresh, unpredictable location for one run's storage state: a new folder under the OS temp folder. */
+export function newBypassStatePath(): string {
+  return join(tmpdir(), `${STATE_DIR_PREFIX}${randomUUID()}`, "state.json");
+}
+
+/**
+ * Where this run's storage state is: the single accessor. The config decides the location once
+ * (`process.env[BYPASS_STATE_ENV] ??= newBypassStatePath()`) so the global setup, teardown and workers agree.
+ */
 export function bypassStorageStatePath(): string {
-  return join(tmpdir(), "bibobay-playwright-vercel-bypass-state.json");
+  const path = process.env[BYPASS_STATE_ENV];
+  if (!path) throw new Error(`${BYPASS_STATE_ENV} is not set: the Playwright config decides it once per run.`);
+  return path;
+}
+
+/** The private folder holding the state file, only if it is a bypass folder of this tool directly under the OS temp folder. */
+export function bypassStateDir(path: string): string | null {
+  const dir = dirname(path);
+  return dirname(dir) === tmpdir() && basename(dir).startsWith(STATE_DIR_PREFIX) ? dir : null;
 }

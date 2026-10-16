@@ -97,7 +97,8 @@ signup removal channel, that is email sending or a Studio contact address, must 
   (`scripts/lib/protection-bypass.ts`). Playwright spends it once, in a global setup
   (`e2e/support/vercel-bypass.setup.ts`) that requests the preview's root with
   `x-vercel-protection-bypass=<secret>&x-vercel-set-bypass-cookie=true`, keeps the cookies the preview
-  sets for its own host as a storage state file in the OS temp folder (never in the repository), and
+  sets for its own host as a storage state file in a private, random folder under the OS temp folder
+  (never in the repository), which a global teardown removes after the run, and
   loads that cookie in the browser; the browser sends no bypass header, so YouTube, Sanity and PostHog
   never see the secret. Set it in the shell or the CI secret store only; nothing prints it, and
   Playwright keeps no trace while it is set, because a trace records cookies.
