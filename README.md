@@ -14,7 +14,7 @@ What exists today and what does not:
 | Area | State |
 |---|---|
 | Landing page, every section editable in Sanity, with a safe built-in fallback | built |
-| Founding-family signup (`/api/leads`), consent record, email outbox, shared rate limit | built |
+| Founding-family signup (`/api/leads`), consent record, email outbox, shared rate limit | built (stores signups only where a removal channel exists: email sending or a contact address in the Studio; otherwise it answers "not open yet") |
 | Privacy and terms pages with plain-language fallback text, `/thank-you` | built (legal text not yet reviewed, so these pages are noindex) |
 | Metadata, Open Graph image, robots, sitemap, manifest, structured data | built |
 | Signed Sanity revalidation webhook, Studio draft preview | built (needs secrets; see [docs/deployment.md](docs/deployment.md)) |
@@ -26,15 +26,15 @@ What exists today and what does not:
 | Order and tracking pages (`/order`, `/track`, `/orders/[token]`), idempotent order requests, order consent and countries from the CMS | built (Task 7c) |
 | Staff sign-in and the staff order APIs (`/api/admin/session`, `/api/admin/orders/[reference]/{quote,status,tracking-link}`): staff access rules, quotes, status changes, new tracking links | built (Task 8b; needs Supabase Auth accounts, `staff_users` rows and `PAYMENT_HOST_ALLOWLIST`) |
 | Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`): sign in, the order list, an order with its quote, status and tracking-link controls | built (Task 8c; needs Supabase Auth accounts and `staff_users` rows; the signed-in pages are proven in unit tests, a live pass on a preview waits for Task 12) |
-| Email outbox worker (`/api/cron/email-outbox`, daily Vercel cron), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase and Resend) |
+| Email outbox worker (`/api/cron/email-outbox`, Vercel cron every 15 minutes), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase, Resend and a Vercel Pro plan) |
 | Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
-| Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11) |
+| Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11); Vercel needs a Pro plan, because Hobby is for non-commercial use only |
 
 "Task N" refers to the numbered tasks in the implementation plan under `docs/superpowers/plans/`.
 
 ## Requirements
 
-- Node.js 26 (the version in [`.nvmrc`](.nvmrc); `package.json` `engines` also accepts `^22.22.2` and `^24.15.0`).
+- Node.js 24 (the version in [`.nvmrc`](.nvmrc), which CI runs and Vercel resolves from `package.json` `engines`; `engines` also accepts `^22.22.2` and `>=26.0.0`, so 26 works locally).
 - npm. The repository's lockfile is `package-lock.json`. `bun.lock` is kept for history only; do not use bun.
 
 ## Run it locally
@@ -89,6 +89,7 @@ The full pre-release list, including running Playwright against a production bui
 - [docs/observability.md](docs/observability.md): cookieless visit statistics (PostHog): what is counted, what never is, setup.
 - [docs/manual-checkout-operations.md](docs/manual-checkout-operations.md): the manual ordering workflow: what exists and what is still to come.
 - [docs/qa-checklist.md](docs/qa-checklist.md): release checklist with exact commands.
+- [docs/incident-runbook.md](docs/incident-runbook.md): removal requests, parked emails, rollback, switching commerce off, secret rotation.
 - [AGENTS.md](AGENTS.md): instructions for coding agents working in this repository.
 - `docs/superpowers/`: the design specification and implementation plan the work follows.
 
@@ -105,20 +106,18 @@ The full pre-release list, including running Playwright against a production bui
 
 ## The old GitHub Pages site
 
-The `main` branch still holds the original Vite prototype (`index.html`, `src/`, `vite.config.ts`).
-GitHub Pages serves the **`gh-pages` branch**, which contains only the built `dist/` output of
-`main`. Pages does not build Vite projects: serving `main` directly gives a blank page, because
-`index.html` loads `/src/main.tsx`, which the browser cannot run.
+GitHub Pages serves the **`gh-pages` branch**, which contains only the built `dist/` output of the
+original Vite prototype. That branch is frozen: this branch is the Next.js site, `package.json` has no
+Vite, and nothing here builds or republishes the prototype. Its source files (`index.html`, `src/`,
+`vite.config.ts`) stay at the repository root, unbuilt and unused, kept for history. Pages does not
+build Vite projects, so serving the root directly would show a blank page: `index.html` loads
+`/src/main.tsx`, which the browser cannot run.
 
-To republish the old site after `main` changes:
-
-1. Check out `main` in a separate folder and build it with that branch's own tooling (its lockfile
-   is bun's; `vite build` writes `dist/`).
-2. Commit the contents of `dist/` to the `gh-pages` branch (only the build output lives there).
-3. Request a Pages build, e.g. `gh api -X POST repos/<owner>/<repo>/pages/builds`. Changing the
-   Pages source alone does not start a build.
-4. Check the result: `npm run verify:deployment -- https://<owner>.github.io/<repo>/` must show no
-   failing asset (it fails if any script, such as `/src/main.tsx`, does not load).
-
-The new Next.js site replaces it once it is deployed to Vercel (Task 11). The old prototype still
-shows claims the new site deliberately removed (stock-photo testimonials, a promised activity pack).
+The prototype still shows claims the new site deliberately removed (stock-photo testimonials, a
+promised activity pack), so do not republish it. At launch (Task 11) retire the Pages site or redirect
+it to the Vercel URL. If it must ever be rebuilt, do it in a separate checkout of the last commit
+before the Next.js migration, with that commit's own tooling (its lockfile is bun's), commit only the
+build output to `gh-pages`, request a Pages build (`gh api -X POST repos/<owner>/<repo>/pages/builds`;
+changing the Pages source alone does not start one) and check
+`npm run verify:deployment -- https://<owner>.github.io/<repo>/`, which fails if any script, such as
+`/src/main.tsx`, does not load.

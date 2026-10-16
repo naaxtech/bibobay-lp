@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { ADMIN_COPY } from "@/components/admin/admin-copy";
 import { PAGE_COPY } from "@/components/admin/page-copy";
+import { CONFIGURED } from "../ops/environment";
 import { VIEWPORTS, guardApisAndStorage, hydrated, tabTo } from "../shop/shop-helpers";
 
 /*
@@ -9,6 +10,13 @@ import { VIEWPORTS, guardApisAndStorage, hydrated, tabTo } from "../shop/shop-he
  * no flag. Nothing here signs in for real: the sign-in answers come from page.route (the shared
  * guard fails any other /api call), and the signed-in pages are proven in Vitest. Covers the
  * sign-in page, the admin headers and noindex, and that no public page links to /admin.
+ *
+ * E2E_CONFIGURED=1 (final review O-I3) marks a server with Supabase configured, such as the preview:
+ * a signed-out visit to the orders pages then redirects to the sign-in page instead of showing the
+ * unconfigured notice (app/admin/orders/page.tsx and app/admin/orders/[reference]/page.tsx:
+ * `staffPageAccess()` is checked first, `signed_out` -> `redirect("/admin/login")`, so even a
+ * malformed reference gets the redirect), and the mocked sign-in's follow-up navigation to
+ * /admin/orders lands back on the sign-in page because the mock sets no session cookie.
  */
 guardApisAndStorage();
 
@@ -77,8 +85,10 @@ for (const { name, use } of VIEWPORTS) {
       await form.getByLabel(PAGE_COPY.login.emailLabel).fill("staff@example.com");
       await form.getByLabel(PAGE_COPY.login.passwordLabel).fill("a long enough password");
       await form.getByRole("button", { name: PAGE_COPY.login.submit }).click();
-      // Whatever the orders page shows on this server, the browser was sent there.
-      await expect(page).toHaveURL(/\/admin\/orders$/);
+      // Whatever the orders page shows on this server, the browser was sent there (configured: and from there
+      // back to sign-in, since the mocked answer set no session).
+      await expect(page).toHaveURL(CONFIGURED ? /\/admin\/(?:orders|login)$/ : /\/admin\/orders$/);
+      await expect.poll(() => sent.length).toBe(1);
       expect(sent).toHaveLength(1);
       expect(sent[0]).toMatchObject({ method: "POST", contentType: "application/json", body: { email: "staff@example.com", password: "a long enough password" } });
       expect(new URL(sent[0]!.origin ?? "").origin).toBe(new URL(page.url()).origin);
@@ -148,9 +158,16 @@ for (const { name, use } of VIEWPORTS) {
     });
 
     for (const path of ORDER_PAGES) {
-      test(`${path} shows the unconfigured notice with the admin headers, noindex and a Staff title`, async ({ page }) => {
+      test(`${path} ${CONFIGURED ? "sends a signed-out visitor to sign-in" : "shows the unconfigured notice"} with the admin headers, noindex and a Staff title`, async ({ page }) => {
         const response = await page.goto(path);
         expect(response?.status()).toBe(200);
+        if (CONFIGURED) {
+          await expect(page).toHaveURL(/\/admin\/login$/);
+          await expect(page.getByRole("heading", { level: 1, name: PAGE_COPY.login.heading })).toBeVisible();
+          await expect(page.getByRole("table")).toHaveCount(0);
+          expect(response!.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+          return;
+        }
         const headers = response!.headers();
         if (!process.env.PLAYWRIGHT_DEV_SERVER) expect(headers["cache-control"]).toContain("no-store");
         expect(headers["x-robots-tag"]).toBe("noindex, nofollow");
@@ -171,13 +188,15 @@ for (const { name, use } of VIEWPORTS) {
     test("a malformed reference gets the same page as any other: nothing is looked up, nothing is revealed", async ({ page }) => {
       const response = await page.goto("/admin/orders/not-a-reference");
       expect(response?.status()).toBe(200);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(PAGE_COPY.notices.unconfigured.title);
+      if (CONFIGURED) await expect(page).toHaveURL(/\/admin\/login$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(CONFIGURED ? PAGE_COPY.login.heading : PAGE_COPY.notices.unconfigured.title);
     });
 
     test("/admin goes to the orders", async ({ page }) => {
       await page.goto("/admin");
-      await expect(page).toHaveURL(/\/admin\/orders$/);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(PAGE_COPY.notices.unconfigured.title);
+      // Configured: /admin -> /admin/orders -> (signed out) /admin/login (app/admin/page.tsx, then the orders page).
+      await expect(page).toHaveURL(CONFIGURED ? /\/admin\/login$/ : /\/admin\/orders$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(CONFIGURED ? PAGE_COPY.login.heading : PAGE_COPY.notices.unconfigured.title);
     });
   });
 }

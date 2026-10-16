@@ -39,7 +39,7 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `RESEND_REPLY_TO` | server | optional | BIBO Bay owner | Where replies (removal requests) go; default: the sender. |
 | `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up). |
 | `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. |
-| `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Global hourly cap on emails sent straight from the form (1 to 10000, default 60). |
+| `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Hourly cap on emails sent straight away, applied PER MESSAGE KIND (final review D-I1): the lead acknowledgement, lead staff alert, order acknowledgement and order staff alert each have their own bucket (`send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`), and staff quotes their own (`send:quote`), all with this cap (1 to 10000, default 60). A full bucket defers only its own kind: a flood of signups cannot hold back a quote. |
 | `PAYMENT_HOST_ALLOWLIST` | server | for staff quotes | BIBO Bay owner | Comma-separated exact host names of the payment providers a quote's payment link may point to, e.g. `pay.example.com,checkout.example.net` (no `https://`, no wildcards; a subdomain needs its own entry). Empty: staff cannot save any quote. An entry that is not one exact host fails `verify-env` (Task 8b). |
 | `CRON_SECRET` | server | for email retries | BIBO Bay owner (random, 32+ characters) | Authorises the email outbox worker: Vercel Cron sends it as `Authorization: Bearer <secret>`. Without it (or with a shorter one) the worker answers 503 and failed emails are not retried; a production build fails with a shorter one. |
 
@@ -47,7 +47,8 @@ Set by the platform, not by you: `VERCEL_ENV` (only `production` is indexable an
 `VERCEL_GIT_COMMIT_SHA` (shown as `version` by `/api/health`).
 
 Studio variables (set where the Studio is built or deployed, not on the website):
-`SANITY_STUDIO_PROJECT_ID`, `SANITY_STUDIO_DATASET`, optional `SANITY_STUDIO_PREVIEW_URL`.
+`SANITY_STUDIO_PROJECT_ID`, `SANITY_STUDIO_DATASET`, optional `SANITY_STUDIO_PREVIEW_URL` (the website's origin;
+without it the Studio has no Presentation tool and no draft preview).
 
 Generate random secrets with, for example, `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`.
 
@@ -62,7 +63,15 @@ Not created yet (Task 11). Settings to use:
 - Framework Next.js, root directory = repository root. `vercel.json` pins `installCommand: npm ci`
   and `buildCommand: npm run build && npm run verify:bundle`, so Vercel never installs from
   `bun.lock` and every deployment's client bundle is scanned with its own secret values.
-- Node.js 26 (matches `.nvmrc`).
+- **Node.js 24** on Vercel and in CI (final review O-I1, ruling R133). Vercel offers 24.x (its default)
+  and 22.x, and takes the version from the project's Node.js setting or `package.json` `engines`,
+  never from `.nvmrc`. `engines` (`^22.22.2 || ^24.15.0 || >=26.0.0`) resolves to 24.x there, and
+  `.nvmrc` says `24` so every CI job runs the production runtime. Node 26 is accepted locally (the
+  local gates ran on it); check again when Vercel lists 26.
+- **A Vercel Pro plan is required** (final review O-I2, ruling R134). Vercel's Hobby plan is
+  restricted to non-commercial personal use, and this site keeps a mailing list and takes order
+  requests, which is commercial use. Hobby is acceptable only for a private preview before anything
+  commercial is reachable. Pro also lets the email cron run every 15 minutes (below).
 - The build runs `npm run verify:env -- production` first; it fails on a forbidden public name or a
   short `LEAD_IP_HASH_SECRET` or `CRON_SECRET`.
 - Production branch: keep the feature branch until review; choose the production branch deliberately
@@ -78,21 +87,23 @@ and later quotes) is written to a database outbox first, then attempted right af
 (ruling R88). The cron worker is the retry net for what that attempt could not send: a provider
 failure, the hourly send cap, or Resend not yet configured.
 
-- `vercel.json` schedules `/api/cron/email-outbox` at `0 6 * * *` (once a day, 06:00 UTC). A Vercel
-  **Hobby** plan accepts at most one run a day, so a failed email can wait up to a day for its
-  retry, and Vercel may start a Hobby run anywhere in its hour. A send whose outcome is unknown (a
-  timeout, a provider server error) is retried only within 23 hours of that attempt, so on Hobby it
-  gets at most one retry, and one made in the hour after a run is parked for a human before any
-  retry (reported as `delivery_expired`; nothing is claimed as sent). On **Pro**, raise the
-  schedule in `vercel.json` (for example `*/15 * * * *`); the worker needs no other change, since
+- `vercel.json` schedules `/api/cron/email-outbox` at `*/15 * * * *` (every 15 minutes), which needs a
+  Vercel **Pro** plan (ruling R134). A **Hobby** plan accepts at most one run a day and is not for
+  commercial use, so it is not an option for launch (see [Vercel project](#vercel-project)). A failed
+  email is retried within about 15 minutes. A send whose outcome is unknown (a timeout, a provider
+  server error) is retried only within 23 hours of that attempt, which on a 15-minute schedule leaves
+  many tries; one still unconfirmed after 23 hours is parked for a human (reported as
+  `delivery_expired`; nothing is claimed as sent; see
+  [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change, since
   every run claims only rows that are due.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
   `{ sent, failed, skipped, deferred }`.
 - One run stops claiming 40 seconds after the request started, or after 100 rows per outbox, and
-  every send spends one unit of the same hourly budget as the forms
-  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`). Rows the budget did not cover stay due for the next run.
+  every send spends one unit of the hourly bucket of its own message kind
+  (`send:<kind>`, cap `LEAD_ACK_SEND_LIMIT_PER_HOUR`; quotes use `send:quote`). Rows the budget did
+  not cover stay due for the next run.
 - To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.
@@ -124,8 +135,9 @@ unthrottled). Quotes need `PAYMENT_HOST_ALLOWLIST`; the quote email needs Resend
   for a signed body that is not a `{_type}` JSON object, and 200 otherwise (`revalidated: false`
   when the document type maps to no cache tag).
 - CORS origins in Sanity: only the verified local, preview, production and Studio origins.
-- `SANITY_STUDIO_ORIGIN` on the site, and `previewMode.enable: "/api/draft-mode/enable"` in the
-  Studio's `presentationTool` config (still to do, Task 11). Details: [cms-operations.md](cms-operations.md#preview-draft-mode).
+- `SANITY_STUDIO_ORIGIN` on the site, and `SANITY_STUDIO_PREVIEW_URL` (the website's origin) where the Studio
+  is built or run: the Studio's `presentationTool` then opens `/api/draft-mode/enable` with a one-time
+  secret (`previewMode.enable` is wired in `studio/sanity.config.ts`). Details: [cms-operations.md](cms-operations.md#preview-draft-mode).
 - Studio deploys (`npx sanity deploy` in `studio/`) are run by the owner, not by CI.
 
 ## Security headers and HSTS
@@ -140,9 +152,18 @@ The per-request CSP and the other headers are described in
 | Route | Answers | Use |
 |---|---|---|
 | `GET /api/health` | Always `200 {"status":"ok","version":"<commit sha or local>","time":"…"}`, `no-store`. No configuration detail, no dependency call. | Uptime checks. |
-| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret) and revalidation are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`. | Release gate. `email` and `legalReviewed` are reported, not required. |
+| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret), revalidation and a signup removal channel (below) are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`, `leadRemovalChannel`. | Release gate. `email` and `legalReviewed` are reported, not required; `leadRemovalChannel` is required (see below). |
 
 Neither route ever returns a configuration value.
+
+**Signups need a way to be removed (ruling R125).** `/api/leads` answers 503 with "signups are not
+open yet" and stores nothing unless a removal channel exists: email sending is configured
+(`RESEND_API_KEY` and `RESEND_FROM`, so the acknowledgement email can be replied to) or the Studio's
+`siteSettings.contactEmail` is set. `leadRemovalChannel` in `/api/readiness` reports whether one
+exists, and readiness is 503 without it. The consent sentence, the privacy and terms fallbacks and `/thank-you` name the channel that
+exists ("reply to the acknowledgement email", or "write to <the contact address>") and promise nothing
+when there is none; the signup form then shows the 503 message. Set one of the two before launch.
+Handling a request: [incident-runbook.md](incident-runbook.md#removal-requests).
 
 ## Verifying a deployment
 
@@ -215,9 +236,16 @@ fails to build. CI has no secrets and checks names, strings and token shapes onl
 | `verify` | `npm ci`, `npm --prefix studio ci` (root typecheck and tests import the Studio schema), `npm run verify:env`, typecheck, lint, `npm run test:run`, `npm run build`, `npm run verify:bundle`, `npm audit --omit=dev --audit-level=high` (blocking), full `npm audit --audit-level=high` (reported in the job summary and kept as an artifact, not blocking) |
 | `studio` | `npm --prefix studio ci`, typecheck, build with placeholder `SANITY_STUDIO_PROJECT_ID=ci-placeholder` / `SANITY_STUDIO_DATASET=production`, Studio audit (reported, not blocking) |
 | `e2e` (after `verify`) | `npm ci` only, as Vercel installs (so it proves the site builds without the Studio: `next build` type-checks `tsconfig.build.json`, which leaves tests out), Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
+| `e2e-commerce` (after `verify`) | The commerce-on browser run (ruling R130): copies the checkout without `.git` and `node_modules` to `../commerce-copy`, `node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy` (the script refuses any folder inside a git work tree), then in the copy `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3100 -H 127.0.0.1` with a wait on `/api/health`, and `E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npx playwright test e2e/shop e2e/commerce`; the report is uploaded on failure as `playwright-report-commerce` |
+| `e2e-keyed` (after `verify`) | The analytics and Sentry browser run (ruling R130): `npm ci`, Playwright Chromium, `npm run build` with the placeholder `NEXT_PUBLIC_POSTHOG_KEY=phc_e2eplaceholder0000000000000000000000000`, `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` and `NEXT_PUBLIC_SENTRY_DSN=https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1`, `next start -p 3200 -H 127.0.0.1` with the placeholder `CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef`, and `E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability`; the report is uploaded on failure as `playwright-report-keyed` |
 
-The end-to-end tests never reach a real service: every lead request is mocked, and no
-configuration is present in CI.
+The end-to-end tests never reach a real service: every lead and order request is mocked or
+answered by the fixture, every PostHog and Sentry request goes to a reserved example domain that
+Playwright answers itself, and no configuration or secret is present in CI (the values above are
+placeholders). `e2e-commerce` and `e2e-keyed` run the commands in
+[qa-checklist.md](qa-checklist.md#2-browser-tests-against-a-production-build) (the ports aside). They were
+written from the commands the controller ran by hand on Windows; the first push proves them on
+Linux, and a red first run is fixed forward.
 
 Pinned actions (full commit SHA, version in a comment), checked on 2026-10-13 with
 `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` (each tag points directly at the commit) and
@@ -259,6 +287,7 @@ reports this audit without blocking. The upgrade path is a newer `sanity` releas
 
 ## The old GitHub Pages site
 
-GitHub Pages serves the `gh-pages` branch: the built `dist/` of the old Vite prototype on `main`.
-How to republish it is in the [README](../README.md#the-old-github-pages-site). The new site
-replaces it once Vercel is live (Task 11).
+GitHub Pages serves the `gh-pages` branch: the built `dist/` of the original Vite prototype. That
+branch is frozen: nothing in this repository builds or republishes it (`package.json` has no Vite),
+and the prototype's files stay at the root, unbuilt. At launch, retire the Pages site or redirect it
+to the Vercel URL (Task 11). See the [README](../README.md#the-old-github-pages-site).

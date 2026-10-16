@@ -1,5 +1,7 @@
 import { expect, test, type APIResponse, type Page } from "@playwright/test";
 
+import { CONFIGURED } from "../ops/environment";
+
 /*
  * Task 12 (local pass), spec §16 "Unauthorized API and admin access rejection". Real requests to
  * the keyless production server: there is no staff project here, so a request that clears the
@@ -10,6 +12,11 @@ import { expect, test, type APIResponse, type Page } from "@playwright/test";
  *
  * The browser tests use a second origin that exists only as a page.route stand-in; the only host
  * any test calls is the base URL.
+ *
+ * E2E_CONFIGURED=1 (final review O-I3) marks a server that HAS Supabase configured, such as the
+ * preview: the same requests then pass "not configured" and meet the real checks. The expectations
+ * below branch on it, each citing the route code it mirrors; the 403 refusals do not change, because
+ * the origin and JSON gate runs before anything else (lib/admin/http.ts `isAdminWrite`).
  */
 
 const SESSION = "/api/admin/session";
@@ -27,13 +34,23 @@ const sameSite = { ...JSON_HEADERS, "sec-fetch-site": "same-site" };
 
 const named = (path: string) => path.replace(REFERENCE, "<reference>");
 
+/**
+ * What a same-origin JSON `{}` reaches, past the origin gate.
+ * Keyless: 503 "not configured" for every route (lib/admin/session.ts `handleSignIn`, lib/admin/orders.ts `admit`).
+ * Configured: the sign-in route reads the body and refuses it as incomplete credentials, 400
+ * (lib/admin/session.ts `credentialsFrom` -> `checkDetails`); an order route finds no session, 401
+ * (lib/admin/orders.ts `admit`: `access.reason === "signed_out"`).
+ */
+const pastTheGate = (path: string) => (!CONFIGURED ? 503 : path === SESSION ? 400 : 401);
+
 /** Every staff API answer, whatever its status, is private, unindexed and sends no referrer. */
-function expectAdminHeaders(response: APIResponse, label: string) {
+function expectAdminHeaders(response: APIResponse, label: string, { allowCookie = false }: { allowCookie?: boolean } = {}) {
   const headers = response.headers();
   expect(headers["cache-control"], `${label}: cache-control`).toBe("private, no-store");
   expect(headers["x-robots-tag"], `${label}: x-robots-tag`).toBe("noindex, nofollow");
   expect(headers["referrer-policy"], `${label}: referrer-policy`).toBe("no-referrer");
-  expect(headers["set-cookie"], `${label}: no cookie is set on a refusal`).toBeUndefined();
+  // Sign-out is the one staff answer that may set cookies (it expires them); every refusal sets none.
+  if (!allowCookie) expect(headers["set-cookie"], `${label}: no cookie is set on a refusal`).toBeUndefined();
 }
 
 async function expectNoDetail(response: APIResponse, label: string) {
@@ -62,9 +79,9 @@ test.describe("the staff APIs refuse a request that is not from this site's own 
       }
     });
 
-    test(`POST ${named(path)} from this site with JSON reaches "not configured" (503), not a 5xx crash`, async ({ request }) => {
+    test(`POST ${named(path)} from this site with JSON ${CONFIGURED ? `reaches the real checks (${pastTheGate(path)})` : 'reaches "not configured" (503)'}, not a 5xx crash`, async ({ request }) => {
       const response = await request.post(path, { headers: sameOrigin, data: "{}" });
-      expect(response.status()).toBe(503);
+      expect(response.status()).toBe(pastTheGate(path));
       expectAdminHeaders(response, path);
       await expectNoDetail(response, path);
     });
@@ -94,10 +111,11 @@ test.describe("the staff APIs refuse a request that is not from this site's own 
     }
   });
 
-  test("DELETE /api/admin/session from this site with JSON reaches \"not configured\" (503) here", async ({ request }) => {
+  // Configured: sign-out always answers 200 and clears this device's cookies (lib/admin/session.ts `handleSignOut`).
+  test(`DELETE /api/admin/session from this site with JSON ${CONFIGURED ? "signs out (200)" : 'reaches "not configured" (503) here'}`, async ({ request }) => {
     const response = await request.delete(SESSION, { headers: sameOrigin, data: "{}" });
-    expect(response.status()).toBe(503);
-    expectAdminHeaders(response, "sign-out");
+    expect(response.status()).toBe(CONFIGURED ? 200 : 503);
+    expectAdminHeaders(response, "sign-out", { allowCookie: CONFIGURED });
   });
 
   test("GET /api/admin/session is 405", async ({ request }) => {
@@ -106,10 +124,13 @@ test.describe("the staff APIs refuse a request that is not from this site's own 
     expectAdminHeaders(response, "GET session");
   });
 
-  test("an oversized or malformed JSON body from this site is a client error or 503, never a crash", async ({ request }) => {
+  // Keyless: the unconfigured 503 comes before the body is read (lib/admin/session.ts), so every body gets it.
+  // Configured: the body is read next (lib/admin/http.ts `readAdminJson`): over 16 KiB is 413, anything that
+  // is not a credentials object is 400.
+  test(`an oversized or malformed JSON body from this site ${CONFIGURED ? "is a 400 or 413" : "gets the unconfigured 503, before the body is read"}, never a crash`, async ({ request }) => {
     for (const data of ["{not json", `{"email":"${"a".repeat(40_000)}"}`, "null", "[]"]) {
       const response = await request.post(SESSION, { headers: sameOrigin, data });
-      expect([400, 413, 503], `body ${data.slice(0, 12)}`).toContain(response.status());
+      expect(response.status(), `body ${data.slice(0, 12)}`).toBe(CONFIGURED ? (data.length > 16 * 1024 ? 413 : 400) : 503);
       expectAdminHeaders(response, `body ${data.slice(0, 12)}`);
     }
   });
@@ -125,11 +146,20 @@ test.describe("the staff APIs refuse a request that is not from this site's own 
     }
   });
 
-  test("the order-submission and tracking APIs are not staff routes: they answer without any session and set no cookie", async ({ request }) => {
+  // QA-2 / T-I1: assert the property the test is named for, not "no crash". These public routes need no
+  // session, so a staff-style 401 or 403 would be a defect, and they never set a cookie or carry the staff
+  // headers. Their answer depends on the server: 404 (commerce off), 400 (the empty body is refused), 200,
+  // or 503 (commerce on but order storage or tracking not available): app/api/orders/route.ts and
+  // app/api/orders/track/route.ts.
+  test("the order-submission and tracking APIs are not staff routes: they answer without any session, set no cookie and carry no staff headers", async ({ request }) => {
     for (const path of ["/api/orders", "/api/orders/track"]) {
       const response = await request.post(path, { headers: sameOrigin, data: "{}" });
-      expect(response.status(), path).toBeLessThan(500);
-      expect(response.headers()["set-cookie"], path).toBeUndefined();
+      expect([200, 400, 404, 503], `${path} answered ${response.status()}`).toContain(response.status());
+      expect([401, 403], `${path}: a session was asked for`).not.toContain(response.status());
+      const headers = response.headers();
+      expect(headers["set-cookie"], `${path}: set-cookie`).toBeUndefined();
+      expect(headers["x-robots-tag"], `${path}: staff x-robots-tag`).not.toBe("noindex, nofollow");
+      expect(headers["referrer-policy"], `${path}: staff referrer-policy`).not.toBe("no-referrer");
     }
   });
 });
@@ -178,13 +208,13 @@ test.describe("a page on another site cannot use a staff's browser against the s
     expect(answers.filter((status) => status !== 403)).toEqual([]);
   });
 
-  test("the same JSON POST from this site's own page is not refused for its origin (503: not configured here)", async ({ page }) => {
+  test(`the same JSON POST from this site's own page is not refused for its origin (${pastTheGate(SESSION)}: ${CONFIGURED ? "past the gate, incomplete credentials" : "not configured here"})`, async ({ page }) => {
     await page.goto("/admin/login");
     const outcome = await page.evaluate(async (path) => {
       const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       return { status: response.status, noStore: response.headers.get("cache-control") };
     }, SESSION);
-    expect(outcome).toEqual({ status: 503, noStore: "private, no-store" });
+    expect(outcome).toEqual({ status: pastTheGate(SESSION), noStore: "private, no-store" });
   });
 });
 
@@ -217,10 +247,13 @@ test.describe("what keeps the staff surface out of public view", () => {
     });
   }
 
-  test("the staff pages are noindex wherever they answer, including when the orders pages are absent", async ({ request }) => {
+  // Keyless: the login page and both orders pages answer 200 (the orders pages show the unconfigured notice,
+  // e2e/admin/admin-pages.spec.ts). Configured: a signed-out visit to the orders pages redirects to sign-in
+  // (app/admin/orders/page.tsx `redirect("/admin/login")`), a 307, or 200 when the redirect is streamed.
+  test("the staff pages are noindex wherever they answer", async ({ request }) => {
     for (const path of ["/admin/login", "/admin/orders", `/admin/orders/${REFERENCE}`]) {
       const response = await request.get(path, { maxRedirects: 0 });
-      expect(response.status(), named(path)).toBeLessThan(500);
+      expect(CONFIGURED && path !== "/admin/login" ? [200, 307] : [200], `${named(path)} answered ${response.status()}`).toContain(response.status());
       const headers = response.headers();
       expect(headers["x-robots-tag"], named(path)).toBe("noindex, nofollow");
       expect(headers["referrer-policy"], named(path)).toBe("no-referrer");
@@ -229,9 +262,10 @@ test.describe("what keeps the staff surface out of public view", () => {
 
   test("a signed-out visit to /admin/orders shows no order data", async ({ page }) => {
     const response = await page.goto("/admin/orders");
-    // The orders pages are Task 8c part 2: until they exist the site's 404 answers; once they do, a
-    // signed-out visitor is sent to sign in or told it is not set up. Never a 5xx, never a table.
-    expect(response?.status()).toBeLessThan(500);
+    // A signed-out visitor is told staff access is not set up (keyless) or sent to sign in (configured):
+    // either way the page that loads answers 200. Never a 5xx, never a table.
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(CONFIGURED ? /\/admin\/login$/ : /\/admin\/orders$/);
     await expect(page.getByRole("table")).toHaveCount(0);
     await expect(page.getByText(/BB-[0-9A-Z]{4}-[0-9A-Z]{4}/)).toHaveCount(0);
   });

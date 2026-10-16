@@ -8,7 +8,10 @@ vi.mock("server-only", () => ({}));
 
 import { STAFF_SIGN_IN_RATE_LIMIT } from "@/lib/admin/session";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
+import { ADMIN_ORDER_ROUTE, maskAdminOrderPaths } from "@/lib/observability/admin-paths";
+import { SEND_BUDGETS, sendBudgetKey } from "@/lib/outbox/constants";
 import { MAX_WEBHOOK_BODY_BYTES } from "@/lib/security/revalidation";
+import { parse } from "yaml";
 
 /*
  * Claims in the operations docs that the Task 10 review found wrong or missing, pinned against the
@@ -187,7 +190,7 @@ describe("staff access docs (Task 8b)", () => {
     expect(database).toContain(`\`${email.scope}:<HMAC of the email>\` | ${email.maxHits} per ${email.windowSeconds / 60} minutes`);
   });
 
-  it("gives the owner the staff steps, and keeps commerce off until the staff pages exist", () => {
+  it("gives the owner the staff steps, and keeps commerce off until the live preview pass has been done", () => {
     const operations = read("docs/manual-checkout-operations.md");
     expect(operations).not.toMatch(/not used by any code yet|staff area and quote sending are not built yet/);
     expect(operations).toMatch(/insert into public\.staff_users \(user_id, display_name\)/);
@@ -205,5 +208,131 @@ describe("staff access docs (Task 8b)", () => {
     expect(events.length).toBeGreaterThanOrEqual(5);
     const observability = read("docs/observability.md");
     for (const event of events) expect(observability, event).toContain(`\`${event}\``);
+  });
+});
+
+
+describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", () => {
+  const deployment = () => read("docs/deployment.md");
+  const lines = (file: string) => read(file).split(/\r?\n/);
+
+  it("names Node 24 as the runtime on Vercel and in CI, with 26 accepted locally (O-I1, R133)", () => {
+    expect(read(".nvmrc").trim()).toBe("24");
+    expect(deployment()).toMatch(/\*\*Node\.js 24\*\* on Vercel and in CI/);
+    expect(deployment()).toMatch(/never from `\.nvmrc`/);
+    expect(deployment()).toMatch(/Node 26 is accepted locally/);
+    expect(deployment()).not.toMatch(/Node\.js 26 \(matches/);
+    expect(read("README.md")).toMatch(/Node\.js 24 \(the version in \[`\.nvmrc`\]/);
+    expect(read("README.md")).not.toMatch(/Node\.js 26 \(the version/);
+  });
+
+  it("requires a Pro plan, because Hobby is non-commercial, and runs the cron every 15 minutes (O-I2, R134)", () => {
+    const vercel = JSON.parse(read("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
+    expect(vercel.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "*/15 * * * *" }]);
+    expect(deployment()).toMatch(/\*\*A Vercel Pro plan is required\*\*/);
+    expect(deployment().replace(/\s+/g, " ")).toMatch(/Hobby plan is restricted to non-commercial personal use/);
+    expect(deployment()).not.toMatch(/once a day, 06:00 UTC|accepts at most one run a day, so a failed email can wait/);
+    expect(read("README.md")).toMatch(/Vercel needs a Pro plan, because Hobby is for non-commercial use only/);
+    expect(read("docs/observability.md")).toMatch(/every 15 minutes/);
+    for (const file of ["README.md", "docs/architecture.md", "docs/observability.md"]) expect(read(file), file).not.toMatch(/once a day|daily Vercel cron/i);
+  });
+
+  it("documents every order, tracking and staff-page event that reaches Sentry (O-I5)", () => {
+    const observability = read("docs/observability.md");
+    const warning = /_(failed|unavailable|unconfigured|invalid)$/;
+    const loggedEvents = (file: string) => [...read(file).matchAll(/\{ event: "(\w+)"/g)].map((match) => match[1]!);
+    const reported = [...loggedEvents("lib/orders/submit.ts"), ...loggedEvents("lib/orders/track.ts")].filter((event) => warning.test(event));
+    expect(reported.length).toBeGreaterThanOrEqual(8);
+    const thrown = ["app/api/orders/route.ts", "app/api/orders/track/route.ts", "app/admin/orders/page.tsx", "app/admin/orders/[reference]/page.tsx", "lib/admin/orders.ts", "lib/admin/session.ts"].flatMap((file) =>
+      [...read(file).matchAll(/(?:reportError\([^)]*event: |guarded\(deps, )"(\w+)"/g)].map((match) => match[1]!),
+    );
+    expect([...thrown].sort()).toEqual(["admin_order_read_failed", "admin_orders_list_failed", "admin_quote_failed", "admin_status_failed", "admin_tracking_link_failed", "order_route_failed", "order_track_route_failed", "staff_sign_in_failed", "staff_sign_out_failed"]);
+    for (const event of [...reported, ...thrown]) expect(observability, event).toContain(`\`${event}\``);
+    expect(observability).toMatch(/Alerts from the order and tracking routes/);
+    expect(observability).toMatch(/Set a Sentry alert on this one/);
+  });
+
+  it("describes the pre-merge state no more (O-I7): the release rows, the Vite prototype, orders management", () => {
+    const rows = lines("docs/qa-checklist.md");
+    const six = rows.find((line) => line.startsWith("| 6 |")) ?? "";
+    const seven = rows.find((line) => line.startsWith("| 7 |")) ?? "";
+    for (const row of [six, seven]) expect(row).not.toMatch(/not built yet/i);
+    expect(seven).toMatch(/not yet tried end to end on a live preview/);
+    for (const file of ["README.md", "docs/architecture.md", "docs/deployment.md"]) {
+      expect(read(file), file).not.toMatch(/`main` (?:branch )?still (?:holds|builds)|`main` holds|Vite prototype on `main`|the old Vite prototype on/);
+    }
+    expect(read("README.md")).toMatch(/That branch is frozen/);
+    expect(read("README.md").replace(/\s+/g, " ")).toMatch(/`package\.json` has no Vite/);
+    expect(read("docs/architecture.md")).toMatch(/`package\.json` has no Vite/);
+    expect(read("docs/deployment.md")).toMatch(/\(`package\.json` has no Vite\)/);
+    expect(read("docs/cms-operations.md")).not.toMatch(/Nobody can manage orders yet/);
+    expect(read("docs/cms-operations.md")).toMatch(/Staff can manage orders from `\/admin\/orders`/);
+    expect(read("docs/manual-checkout-operations.md")).not.toMatch(/It is not a procedure/);
+    const manifest = JSON.parse(read("package.json")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect({ ...manifest.dependencies, ...manifest.devDependencies }).not.toHaveProperty("vite");
+  });
+
+  it("documents the two extra CI jobs with the workflow's own commands, and the same commands in the QA checklist (O-I4, T-I6, R130)", () => {
+    const workflow = parse(read(".github/workflows/ci.yml")) as { jobs: Record<string, { steps: Array<{ run?: string; env?: Record<string, string> }> }> };
+    const table = deployment();
+    for (const id of ["e2e-commerce", "e2e-keyed"]) expect(lines("docs/deployment.md").find((line) => line.startsWith(`| \`${id}\` (after \`verify\`) |`)), id).toBeTruthy();
+    const keyedBuild = workflow.jobs["e2e-keyed"]!.steps.find((step) => step.run === "npm run build")!.env!;
+    expect(Object.keys(keyedBuild).sort()).toEqual(["NEXT_PUBLIC_POSTHOG_HOST", "NEXT_PUBLIC_POSTHOG_KEY", "NEXT_PUBLIC_SENTRY_DSN"]);
+    for (const [name, value] of Object.entries(keyedBuild)) {
+      expect(table, name).toContain(`${name}=${value}`);
+      expect(read("docs/qa-checklist.md"), name).toContain(`${name}=${value}`);
+    }
+    expect(table).toContain("CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef");
+    expect(read("docs/qa-checklist.md")).toContain("CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef");
+    expect(read("docs/qa-checklist.md")).toContain("node scripts/e2e/enable-commerce-fixture.mjs <copy>");
+    expect(read("docs/qa-checklist.md")).toContain("E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3260 npx playwright test e2e/shop e2e/commerce");
+    expect(read("docs/qa-checklist.md")).toContain("E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3261 npx playwright test e2e/analytics e2e/observability");
+    expect(table).toContain("E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npx playwright test e2e/shop e2e/commerce");
+    expect(table).toContain("E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability");
+  });
+
+  it("names the preview-pass switch and the protection-bypass secret where the owner reads them (O-I3)", () => {
+    for (const file of ["docs/qa-checklist.md", "docs/qa-report-2026-10-02.md"]) {
+      expect(read(file), file).toContain("E2E_CONFIGURED=1");
+      expect(read(file), file).toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
+    }
+    expect(read("docs/qa-checklist.md")).toContain("x-vercel-protection-bypass");
+    expect(read("docs/qa-checklist.md")).toMatch(/E2E_PRODUCTION=1 E2E_CONFIGURED=1 PLAYWRIGHT_BASE_URL=https:\/\/<preview-url> npx playwright test/);
+  });
+
+  it("keeps the QA report free of counts from an earlier commit and honest about what nothing proves (O-M8, T-I5)", () => {
+    const report = read("docs/qa-report-2026-10-02.md");
+    expect(report).toMatch(/Final verification: appended by the controller after the fix wave/);
+    expect(report).not.toMatch(/\b300 passed\b|\b10 failed\b|\b165 passed\b|c703a2e/);
+    expect(report).toMatch(/nothing renders `app\/global-error\.tsx`/);
+    expect(report).toMatch(/never sees 401 for a signed-out visitor or 403/);
+    expect(report).toMatch(/proven in Vitest only/);
+  });
+
+  it("documents the analytics exclusion and the staff-path masking exactly as the code does (8c-M1)", () => {
+    const observability = read("docs/observability.md");
+    expect(read("lib/analytics/events.ts")).toContain("export function isExcludedPagePath");
+    expect(read("lib/analytics/events.ts")).toContain("(?:admin|studio)");
+    expect(observability).toContain("`isExcludedPagePath`");
+    expect(observability).toMatch(/under `\/admin` or `\/studio`/);
+    expect(maskAdminOrderPaths("https://x.example/admin/orders/BB-AB12-CD34")).toBe(`https://x.example${ADMIN_ORDER_ROUTE}`);
+    expect(observability).toContain(`\`${ADMIN_ORDER_ROUTE}\``);
+    expect(maskAdminOrderPaths("/api/admin/orders/BB-AB12-CD34/quote")).toBe("/api/admin/orders/[reference]/quote");
+    expect(observability).toContain("`/api/admin/orders/[reference]/quote`");
+  });
+
+  it("documents each per-kind send bucket and the removal-channel readiness key by their code names (D-I1, P-I1)", () => {
+    const deploymentText = read("docs/deployment.md");
+    const buckets = [...Object.values(SEND_BUDGETS.leads), ...Object.values(SEND_BUDGETS.orders)];
+    expect(buckets).toHaveLength(5);
+    for (const budget of buckets) {
+      expect(deploymentText, budget).toContain(`\`${sendBudgetKey(budget)}\``);
+      expect(read("docs/database-security.md"), budget).toContain(`\`${sendBudgetKey(budget)}\``);
+    }
+    expect(deploymentText).not.toContain("ack-send:global");
+    expect(read("docs/database-security.md")).not.toContain("ack-send:global");
+    expect(read("lib/ops/readiness.ts")).toContain("leadRemovalChannel: boolean");
+    expect(deploymentText).toContain("`leadRemovalChannel`");
+    expect(deploymentText).toMatch(/readiness is 503 without it/);
   });
 });

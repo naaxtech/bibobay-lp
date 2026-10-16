@@ -61,7 +61,8 @@ Consequences for staff:
 - `rejoin_requested_at` can be set by anyone who types the address. It is not proof that the person
   asked to re-join.
 - Withdrawal is a staff action that marks the row withdrawn and keeps it; there is no delete path in
-  the code. There is no staff tool for it yet (it needs SQL by the owner).
+  the code. There is no staff tool for it yet: the owner runs the SQL in
+  [incident-runbook.md](incident-runbook.md#removal-requests).
 
 ## Outbox states
 
@@ -84,7 +85,7 @@ the claim refused to send it). Both outboxes use the same states.
 | Limit | Key | Value |
 |---|---|---|
 | Signups per client | `lead:<HMAC of the client address>` | 5 per 10 minutes. IPv4 addresses are counted whole; IPv6 addresses per /64; an IPv4-mapped IPv6 address as IPv4; anything unreadable in one shared bucket. |
-| Emails sent straight from the form | `ack-send:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), shared by acknowledgements, staff alerts, the order emails and the outbox worker. Over the cap the signup or order is still stored and the email waits `pending`. |
+| Emails sent straight away | `send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`, `send:quote` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) in each bucket; the outbox worker spends the bucket of the row's kind. A full bucket defers only its own kind. Over the cap the signup or order is still stored and the email waits `pending`. |
 
 The limiter is the database whenever Supabase is configured. If it is unavailable the signup fails
 closed with 503. The in-memory limiter in `lib/security/rate-limit.ts` is for tests only.

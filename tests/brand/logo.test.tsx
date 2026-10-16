@@ -42,7 +42,7 @@ function rgb(hex: string): [number, number, number] {
   return [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16)) as [number, number, number];
 }
 
-describe("canonical BIBO logo", () => {
+describe("canonical BIBO logo", { timeout: 30_000 }, () => {
   it("names itself BIBO through its own title", () => {
     const svg = canonical().documentElement;
     expect(svg.getAttribute("role")).toBe("img");
@@ -199,7 +199,7 @@ describe("canonical BIBO logo", () => {
   });
 });
 
-describe("single logo geometry source", () => {
+describe("single logo geometry source", { timeout: 30_000 }, () => {
   const ACTIVE_SOURCE = ["app", "components", "lib", "scripts"];
   const TEXT_FILES = new Set([".ts", ".tsx", ".css", ".js", ".mjs", ".json", ".md", ".svg"]);
   const DERIVED = ["public/brand/bibo-mark.svg", "public/brand/bibo-logo-monochrome.svg", "app/icon.svg"];

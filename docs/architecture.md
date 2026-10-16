@@ -15,7 +15,7 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 | Email | Resend 6.32, optional |
 | Validation | Zod 4.6 on the server; shared field rules in `lib/leads/fields.ts` for the browser |
 | Tests | Vitest (jsdom) with PGlite + pgTAP for the database; Playwright (Chromium) for the browser |
-| Hosting | Vercel (`vercel.json` pins `npm ci`); not provisioned yet (Task 11) |
+| Hosting | Vercel Pro (`vercel.json` pins `npm ci`; Hobby is non-commercial only); not provisioned yet (Task 11) |
 
 ## Folders
 
@@ -59,7 +59,7 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/api/leads` | ƒ | POST: founding-family signup |
 | `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
 | `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
-| `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run once a day by Vercel Cron (`vercel.json`); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
+| `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run every 15 minutes by Vercel Cron (`vercel.json`; needs a Pro plan); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
 | `/api/admin/session` | ƒ | POST: staff sign-in (email and password, Supabase Auth; rate-limited; one generic refusal); DELETE: sign-out. Same-origin JSON only; 503 without Supabase (Task 8b) |
 | `/api/admin/orders/[reference]/quote` | ƒ | POST: active staff save a quote (`intent: "save"`, never notifies) or send one saved revision (`intent: "send"`, queued once, emailed after the answer) (Task 8b) |
 | `/api/admin/orders/[reference]/status` | ƒ | POST: active staff move an order one step, naming the status they saw (`{from, to}`); 409 if it moved on (Task 8b) |
@@ -265,8 +265,9 @@ upgrade-insecure-requests            (Vercel deployments only)
   short-lived secret; `@sanity/preview-url-secret` checks it with the server-only
   `SANITY_API_READ_TOKEN`. On success Next's draft-mode cookie is set and the browser is sent to a
   same-origin path only. Pages then read drafts without caching, show a "draft preview" notice and
-  become `noindex`. `/api/draft-mode/disable` turns it off. The Studio side still needs
-  `previewMode.enable` wired in `studio/sanity.config.ts` (Task 11).
+  become `noindex`. `/api/draft-mode/disable` turns it off. The Studio side is wired:
+  `presentationTool` in `studio/sanity.config.ts` passes `previewMode.enable: "/api/draft-mode/enable"`
+  with the origin from `SANITY_STUDIO_PREVIEW_URL`. It works once the projects and secrets exist (Task 11).
 
 ## Metadata and indexing
 
@@ -284,7 +285,7 @@ Kept on purpose and never deleted. They are excluded from typecheck, lint and te
 
 | File | What it is |
 |---|---|
-| `index.html`, `src/`, `vite.config.ts` | The original Vite prototype. `main` still builds the old GitHub Pages site from them (see the README). Not used by the Next.js app; left unedited because the Pages build uses `index.html`. |
+| `index.html`, `src/`, `vite.config.ts` | The original Vite prototype. Not built, not used by the Next.js app and not a dependency (`package.json` has no Vite); kept unedited for history. The `gh-pages` branch holds its last build and is frozen (see the README). |
 | `metadata.json` | Prototype metadata from the tool that generated the prototype. Unused. JSON cannot carry a comment, so it is left as it is. |
 | `bibo-skeleton-1` | A zip archive (no extension) of the original prototype export. Reference only. |
 | `bun.lock` | The prototype's bun lockfile. npm and `package-lock.json` are canonical; do not run bun. |

@@ -2,8 +2,8 @@
 
 **Date:** October 2, 2026  
 **Status:** Approved for autonomous execution by the user's explicit instruction to complete the project end-to-end without intermediate approval pauses.  
-**Repository:** `D:/Work/Development/JoNicole/bibobay/bibobay-lp`  
-**Implementation branch/worktree:** `feat/bibobay-production-ready` / `D:/Work/Development/JoNicole/bibobay/bibobay-lp-worktrees/production-ready`
+**Repository:** the public `bibobay-lp` repository (the workspace path is omitted on purpose)  
+**Implementation branch/worktree:** `feat/bibobay-production-ready`, built in a separate git worktree of the same repository
 
 ## 1. Product intent
 
@@ -25,7 +25,7 @@ The primary launch conversion is a founding-family email signup. The manual shop
 - No official BIBO Bay social profile or custom domain was verified on October 2, 2026.
 - No final character art, episode media, starter-pack file, verified testimonials, named educational experts, or public research citations exist in the repository.
 - The current logo SVG is an approximation and is duplicated in two files.
-- Appity and Intric provide the reference manual-order architecture; Appity is the later and more reusable baseline.
+- Two earlier private projects by the same owner provide the reference manual-order architecture; the later one is the more reusable baseline.
 
 ## 3. Binding product rulings
 
@@ -42,7 +42,7 @@ The primary launch conversion is a founding-family email signup. The manual shop
 
 ## 4. Chosen architecture
 
-Migrate the root web application from Vite to **Next.js 16.3.8 App Router**, React 19.3, TypeScript, and Tailwind CSS. This is preferred over extending the Vite SPA because the project now requires server rendering, secure server actions/routes, previews, revalidation, SEO, protected admin surfaces, and Vercel deployment. It also aligns with the proven Appity/Intric implementation.
+Migrate the root web application from Vite to **Next.js 16.3.8 App Router**, React 19.3, TypeScript, and Tailwind CSS. This is preferred over extending the Vite SPA because the project now requires server rendering, secure server actions/routes, previews, revalidation, SEO, protected admin surfaces, and Vercel deployment. It also aligns with the proven implementation in those two earlier projects.
 
 The repository will contain:
 

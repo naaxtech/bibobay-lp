@@ -13,9 +13,10 @@ see [Using the staff pages](#using-the-staff-pages)). Only a unit-test and keyle
 has covered the signed-in pages so far; a pass on a live preview with real staff accounts comes in
 Task 12. `commerceEnabled` is `false` by default and must stay off until that pass has been done.
 
-This page lists what the design specification requires, so operations staff know what is coming.
-It is not a procedure: the real steps will be written here once the workflow exists and has been
-tested. Do not take orders by any other route in the meantime.
+This page holds the procedures for what exists ([Staff access](#staff-access) and
+[Using the staff pages](#using-the-staff-pages)) and, under "What the specification requires", the
+rules the whole flow must meet. The live pass (Task 12) may add to the procedures. Do not take
+orders by any other route in the meantime.
 
 ## What exists today
 

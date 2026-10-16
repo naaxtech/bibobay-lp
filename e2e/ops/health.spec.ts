@@ -1,15 +1,20 @@
 import { expect, test } from "@playwright/test";
 
+import { CONFIGURED } from "./environment";
+
 /*
  * Task 12 (local pass), spec §15/§16: the two operational probes answer the way a monitor expects.
  * Liveness (`/api/health`) is always 200 with { status, version, time } and no configuration;
  * readiness (`/api/readiness`) is 200 when Sanity, lead storage and revalidation are configured and
  * 503 otherwise, with booleans only. On the keyless e2e server nothing is configured, so readiness
- * is 503 there; a configured server (the preview pass) answers 200 and is not asserted here.
+ * is 503 there. With E2E_CONFIGURED=1 (a server with Supabase, Sanity and the revalidation secret, such
+ * as the preview) it must be 200 with those three booleans true (app/api/readiness/route.ts: status is
+ * `checks.ready ? 200 : 503`; lib/ops/readiness.ts: ready = sanity && supabase && revalidation).
  * Both are never cached, answer HEAD, and refuse POST.
  */
 
-const READINESS_KEYS = ["email", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
+const READINESS_KEYS = ["email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
+const READINESS_STATUS = CONFIGURED ? 200 : 503;
 
 test.describe("GET /api/health", () => {
   test("answers 200 JSON { status: ok, version, time } and is never cached", async ({ request }) => {
@@ -45,23 +50,23 @@ test.describe("GET /api/health", () => {
 });
 
 test.describe("GET /api/readiness", () => {
-  test("answers 503 on a server with nothing configured, booleans only, never cached", async ({ request }) => {
+  test(`answers ${READINESS_STATUS} on ${CONFIGURED ? "a configured server" : "a server with nothing configured"}, booleans only, never cached`, async ({ request }) => {
     const response = await request.get("/api/readiness");
-    expect(response.status()).toBe(503);
+    expect(response.status()).toBe(READINESS_STATUS);
     expect(response.headers()["content-type"]).toContain("application/json");
     expect(response.headers()["cache-control"]).toBe("no-store");
     const body = (await response.json()) as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(READINESS_KEYS);
     for (const [key, value] of Object.entries(body)) expect(typeof value, key).toBe("boolean");
-    expect(body.ready).toBe(false);
-    expect(body.sanity).toBe(false);
-    expect(body.supabase).toBe(false);
-    expect(body.revalidation).toBe(false);
+    expect(body.ready).toBe(CONFIGURED);
+    expect(body.sanity).toBe(CONFIGURED);
+    expect(body.supabase).toBe(CONFIGURED);
+    expect(body.revalidation).toBe(CONFIGURED);
   });
 
   test("answers HEAD with the same status and refuses POST", async ({ request }) => {
     const head = await request.head("/api/readiness");
-    expect(head.status()).toBe(503);
+    expect(head.status()).toBe(READINESS_STATUS);
     expect(head.headers()["cache-control"]).toBe("no-store");
     expect((await request.post("/api/readiness")).status()).toBe(405);
     expect((await request.delete("/api/readiness")).status()).toBe(405);

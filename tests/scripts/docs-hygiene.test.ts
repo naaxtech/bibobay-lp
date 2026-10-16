@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { posix, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /*
  * Repository hygiene (rulings R45, R47, R48). The repository is public, so no tracked file may hold
@@ -12,6 +12,9 @@ import { describe, expect, it } from "vitest";
  * private reference project or internal tooling; and the docs must describe the code as it is: every
  * command they mention exists, every environment name is documented, and unbuilt parts say so.
  */
+
+// Final review T-I3: these suites scan the tree or import cold (after `npm ci`, as CI does) and outrun the 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
 
 const DOCS_DIR = resolve("docs");
 const docFiles = () => [
@@ -23,11 +26,12 @@ const docFiles = () => [
 ];
 /**
  * Review M5: every tracked text file is public, not just the docs, so all of them are scanned: code
- * comments, tests, specs, workflows and configuration included. Left out: the planning documents
- * under docs/superpowers/ (an owner decision is pending on them), lockfiles (generated), binary
- * files, and the legacy skeleton archive (never edited).
+ * comments, tests, specs, workflows and configuration included. The planning documents under
+ * docs/superpowers/ are scanned like every other document (final review O-C1, ruling R132, which
+ * superseded R46). Left out: lockfiles (generated), binary files, and the legacy skeleton archive
+ * (never edited).
  */
-const HYGIENE_EXCLUDED = [/^docs\/superpowers\//, /(^|\/)(package-lock\.json|bun\.lock)$/, /^bibo-skeleton-1$/];
+const HYGIENE_EXCLUDED = [/(^|\/)(package-lock\.json|bun\.lock)$/, /^bibo-skeleton-1$/];
 const BINARY_FILE = /\.(png|jpe?g|gif|webp|avif|ico|svg|woff2?|ttf|otf|eot|pdf|zip|gz|mp4|webm|glb)$/i;
 const trackedFiles = () => execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
 const hygieneFiles = () => trackedFiles().filter((file) => !BINARY_FILE.test(file) && !HYGIENE_EXCLUDED.some((pattern) => pattern.test(file)) && existsSync(resolve(file)));
@@ -46,6 +50,7 @@ const REQUIRED_DOCS = [
   "docs/cms-operations.md",
   "docs/database-security.md",
   "docs/deployment.md",
+  "docs/incident-runbook.md",
   "docs/manual-checkout-operations.md",
   "docs/qa-checklist.md",
 ];
@@ -69,7 +74,7 @@ function addressDomainsIn(text: string): string[] {
  * so this public test does not publish them itself (two private reference projects and an internal
  * agent tool). Any word token in a scanned file is hashed and compared; `privateWordsIn` returns the
  * offending tokens. The git-ignored working ledger is caught separately by its dotted folder name
- * (`docs/superpowers/`, where the spec and plan live, is a tracked public path and is allowed).
+ * (`docs/superpowers/`, where the spec and plan live, is a tracked public path and is allowed and scanned).
  */
 const PRIVATE_WORD_HASHES = new Set([
   "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180",
@@ -106,7 +111,13 @@ describe("public-repository hygiene", () => {
     expect(hygieneFiles()).toContain(file);
   });
 
-  it("leaves out only the pending planning docs, lockfiles, binaries and the legacy archive", () => {
+  it("scans the planning documents under docs/superpowers/ (R132)", () => {
+    const files = hygieneFiles();
+    expect(files).toContain("docs/superpowers/specs/2026-10-02-bibobay-production-platform-design.md");
+    expect(files).toContain("docs/superpowers/plans/2026-10-02-bibobay-production-platform.md");
+  });
+
+  it("leaves out only lockfiles, binaries and the legacy archive, so the whole docs tree is scanned", () => {
     const scanned = new Set(hygieneFiles());
     const skipped = trackedFiles().filter((file) => !scanned.has(file));
     for (const file of skipped) expect(BINARY_FILE.test(file) || HYGIENE_EXCLUDED.some((pattern) => pattern.test(file)), file).toBe(true);

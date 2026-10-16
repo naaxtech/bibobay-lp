@@ -6,8 +6,8 @@ what neither ever collects. Both are off until their environment variables are s
 
 ## What is counted
 
-PostHog runs on every public page (not the Studio) whenever `NEXT_PUBLIC_POSTHOG_KEY` holds a
-project key. There is no consent banner, because nothing is stored on the visitor's device:
+PostHog runs on every public page (not the Studio, and not the staff pages under `/admin`) whenever
+`NEXT_PUBLIC_POSTHOG_KEY` holds a project key. There is no consent banner, because nothing is stored on the visitor's device:
 
 | Event | When | Properties |
 |---|---|---|
@@ -41,8 +41,13 @@ PostHog strips the address before GeoIP runs, so no location is added. Tag links
 - No private order link: the token in a `/orders/<token>` address (the tracking page, Task 7c)
   never leaves the browser. Every address, path and label is sent as `/orders/[token]`
   (`lib/privacy/private-links.ts`), and those pages send no referrer.
+- No staff page and no Studio page: a staff page's path carries an order reference. Cookieless
+  statistics (ruling R101) stand for the public pages only. `cleanCapture` drops every event whose
+  address or path is under `/admin` or `/studio` (`isExcludedPagePath`, `lib/analytics/events.ts`), also
+  for a page reached by client-side navigation after PostHog started, and the provider does not start
+  on a hard load of one (final review 8c-M1).
 - `before_send` (`lib/analytics/events.ts` `cleanCapture`) is the one gate: it drops any event not
-  in the table above, any property not allowed for that event (PostHog's own `token`,
+  in the table above, any event on a staff or Studio page, any property not allowed for that event (PostHog's own `token`,
   `distinct_id` and page `title` are kept: it refuses events without them), query strings other than campaign
   tags, the referrer's path and query, ad-click identifiers (`gclid`, `fbclid`, `msclkid` and
   similar), person properties, initial-visit copies, and any value that looks like an email address,
@@ -65,6 +70,7 @@ PostHog strips the address before GeoIP runs, so no location is added. Tag links
   including the 404 page, and even if an editor removes the legal links). The choice is kept in
   `localStorage` (`bibo.analytics.v1`), which is the only thing analytics ever store, and only after
   that choice; where storage is blocked it lasts for the page.
+- Anyone on a staff page (`/admin`) or in the Studio (`/studio`): see "What is never collected".
 - Automated browsers: PostHog drops events from known bots and from browsers driven by automation
   (`navigator.webdriver`), so crawlers and test runs do not inflate the numbers. The e2e spec
   stands in for a person's browser for that reason.
@@ -130,7 +136,10 @@ project); otherwise nothing loads and nothing is sent.
   a malformed escape never stops the check), loses any query (also a path's query in mid-text),
   and has email-shaped text
   replaced by `[email]` and a private order link's token by `/orders/[token]` (any 64-digit hex
-  run becomes `[token]`).
+  run becomes `[token]`). A staff order reference is masked the same way: `/admin/orders/BB-…` becomes
+  `/admin/orders/[reference]`, and `/api/admin/orders/BB-…/quote` (and `/status`, `/tracking-link`)
+  becomes `/api/admin/orders/[reference]/quote`, in request URLs, transaction names and the browser's
+  fetch breadcrumbs, also when percent-encoded (`lib/observability/admin-paths.ts`, final review 8c-M1).
 - **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.
   There is no `SENTRY_ENVIRONMENT` setting: Sentry's browser SDK reads that name itself, so listing
   it in `.env.example` would make `verify:bundle` flag the SDK chunk.
@@ -156,8 +165,8 @@ attempt step (`lib/outbox/attempt.ts`). Its log lines (`scope: "outbox"`, with `
 counts and short codes only, never an address, a name, an order reference or a row id. These are
 also sent to Sentry as warnings, tagged with the event, kind and code only:
 
-- `delivery_send_capped` and `delivery_send_cap_unavailable`: the shared hourly send budget was
-  spent or could not be checked; the row was handed back and stays due.
+- `delivery_send_capped` and `delivery_send_cap_unavailable`: the hourly send bucket of that message
+  kind (`send:<kind>`, one per kind, `LEAD_ACK_SEND_LIMIT_PER_HOUR` each) was spent or could not be checked; the row was handed back and stays due.
 - `delivery_claim_failed`: a claim function failed (database or answer shape); nothing was sent.
 - `delivery_message_invalid`: a claimed row could not be turned into a truthful email (for example a
   staff alert with no staff address, or a quote with a non-https payment link); it is recorded as
@@ -172,6 +181,11 @@ Routine lines, not reported: `delivery_attempted` (with `status` and a failure c
 `delivery_skipped` (a withdrawn lead or a superseded quote, as a count) and `worker_run` (one line
 per cron run with `sent`, `failed`, `skipped` and `deferred`). An unexpected failure of the cron
 route is reported as `outbox_worker_failed` (area `outbox`) and answered 500 `{ ok: false }`.
+
+The cron worker runs every 15 minutes (`vercel.json`; a Vercel Pro plan, see
+[deployment.md](deployment.md#email-outbox-worker-task-8a)), so a failed send is retried within about a
+quarter of an hour. A `delivery_expired` alert therefore means the retries are used up and a person has to
+act: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
 
@@ -201,6 +215,48 @@ Routine lines, not reported: `admin_request_refused` (with `cross_site`, `signed
 `staff_sign_in_rate_limited` lines means someone is guessing passwords.
 
 Set a Sentry alert on `admin_auth_unavailable` and `admin_action_failed`.
+
+### Alerts from the order and tracking routes (final review O-I5)
+
+The order request route (`/api/orders`) and the tracking route (`/api/orders/track`, also read by the
+`/track` and `/orders/<token>` pages) log under `scope: "orders"` and `scope: "order-tracking"`
+(`lib/orders/dependencies.ts`). Every event whose name ends in `_failed`, `_unavailable`,
+`_unconfigured` or `_invalid` is also sent to Sentry as a warning, tagged with the event and a short
+code only (never a name, an address, a reference, a token or a product). This is the money path, so
+these are the alerts that matter most once commerce is on:
+
+| Event | Meaning | What to do |
+|---|---|---|
+| `order_store_failed` | An order request passed every check but could not be stored (code: the database's). The customer was told it was not confirmed. | Check Supabase status and the database logs now; orders are being lost. Set a Sentry alert on this one. |
+| `order_route_failed` | An unexpected failure of the order route itself (also reported as an error, area `orders`); answered with the generic failure copy. | Read the Sentry event; an unhandled code path. Set an alert. |
+| `order_storage_unconfigured` | Commerce is on but Supabase's URL, the service role key or `LEAD_IP_HASH_SECRET` (32+ characters) is missing, so orders answer 503 and store nothing. | Fix the environment; switch commerce off in the Studio until then ([incident-runbook.md](incident-runbook.md#switching-commerce-off-now)). |
+| `order_rate_limit_unavailable` | The shared rate limiter could not run (code); the route fails closed and answers 503. | Check Supabase; the same cause usually raises `order_store_failed`. |
+| `order_catalogue_unavailable` | The product catalogue could not be read from Sanity, so no order line can be checked; answered 503. | Check Sanity status and `NEXT_PUBLIC_SANITY_*`. |
+| `order_catalogue_invalid` | A product in an order has a catalogue record the server cannot snapshot: its name, SKU, variant or pack is empty, too long or has a line break (answered 400, "products unavailable"). | Fix that product in the Studio. |
+| `order_config_invalid` | The CMS order consent version cannot be stored (code `consent_version_invalid`); the built-in order sentence and version are used instead. | Fix `orderConsentCopyVersion` in the Studio ([cms-operations.md](cms-operations.md)). |
+| `order_track_failed` | A tracking lookup failed unexpectedly (code); the visitor sees the generic failure. | Check Supabase. |
+| `order_track_route_failed` | An unexpected failure of the tracking route (area `orders`). | Read the Sentry event. |
+| `order_track_storage_unconfigured`, `order_track_rate_limit_unavailable` | The tracking counterparts of the two storage events above; answered 503. | As above. |
+
+Routine lines, not reported: `order_stored` (with a line count), `order_duplicate` (the same
+submission key sent again), `order_rate_limited`, `order_commerce_disabled`, `order_honeypot`,
+`order_products_refused`, `order_tracked`, `order_track_miss`, `order_track_rate_limited` and
+`order_tracking_disabled`.
+
+### Alerts from the staff pages and sign-in (final review O-I5)
+
+Besides the warnings in the staff API section below, these are sent to Sentry as errors (area
+`admin`, tagged with the event only):
+
+| Event | Meaning |
+|---|---|
+| `admin_quote_failed`, `admin_status_failed`, `admin_tracking_link_failed` | An unexpected failure of a staff action (save or queue a quote, change a status, make a tracking link). The action did not complete; the staff member saw the generic failure. Logged alongside as `admin_action_failed`. |
+| `staff_sign_in_failed`, `staff_sign_out_failed` | An unexpected failure of the sign-in or sign-out route. |
+| `admin_orders_list_failed` | The order list page could not read the orders; staff saw the could-not-load notice. |
+| `admin_order_read_failed` | An order page could not read its order; the same notice. |
+
+Set a Sentry alert on `admin_orders_list_failed` and `admin_order_read_failed` too: staff cannot work
+the queue while they fire.
 
 ### Notes for staff reading lead records
 

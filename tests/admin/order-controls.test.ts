@@ -433,9 +433,16 @@ describe("POST /api/admin/orders/[reference]/quote", () => {
 
   it("refuses everyone but active staff, writing nothing", async () => {
     const order = await seedOrder(db);
-    for (const access of [async () => ({ ok: false, reason: "signed_out" }) as const, async () => ({ ok: false, reason: "not_staff" }) as const, async () => staffAccess(STAFF_FIXTURE.inactive)]) {
+    // Final review T-M1: the exact code for each, as the status and tracking-link tests pin them. Signed out
+    // is 401 ("sign in"); a user who is not staff, and inactive staff the database refuses, are 403.
+    const refused = [
+      ["signed out", async () => ({ ok: false, reason: "signed_out" }) as const, 401],
+      ["not staff", async () => ({ ok: false, reason: "not_staff" }) as const, 403],
+      ["inactive staff", async () => staffAccess(STAFF_FIXTURE.inactive), 403],
+    ] as const;
+    for (const [label, access, expected] of refused) {
       const { status } = await answer(await handleQuoteRequest(adminRequest("/x", { intent: "save", revision: 0, ...QUOTE }), order.reference, dependencies({ access }).deps));
-      expect([401, 403]).toContain(status);
+      expect(status, label).toBe(expected);
     }
     const crossSite = await handleQuoteRequest(adminRequest("/x", { intent: "save", revision: 0, ...QUOTE }, { origin: "https://evil.example", "sec-fetch-site": "cross-site" }), order.reference, dependencies().deps);
     expect(crossSite.status).toBe(403);

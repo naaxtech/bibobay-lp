@@ -3,5 +3,5 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm run build && npm run verify:bundle",
-  "crons": [{ "path": "/api/cron/email-outbox", "schedule": "0 6 * * *" }]
+  "crons": [{ "path": "/api/cron/email-outbox", "schedule": "*/15 * * * *" }]
 }

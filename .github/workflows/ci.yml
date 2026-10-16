@@ -174,3 +174,133 @@ jobs:
             next-start.log
           if-no-files-found: ignore
           retention-days: 14
+
+  # Final review T-I6 (ruling R130): the commerce-on and the keyed (analytics and Sentry) browser runs
+  # the ledger records, so they no longer depend on someone running them by hand. Both mirror the exact
+  # local commands in docs/qa-checklist.md section 2, use no secret (placeholder values only; nothing
+  # leaves the runner) and run after `verify`.
+  e2e-commerce:
+    name: Playwright, commerce switched on (scratch copy with the fixture)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_PRODUCTION: "1"
+      E2E_COMMERCE: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3100
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # The fixture script refuses the repository itself, a folder inside it and anything inside a git work tree,
+      # so the copy is a sibling of the workspace and carries no .git folder and no node_modules.
+      - name: Copy the checkout to a sibling folder and switch commerce on there
+        shell: bash
+        run: |
+          mkdir ../commerce-copy
+          tar --exclude=./.git --exclude=./node_modules --exclude=./.next -cf - . | tar -xf - -C ../commerce-copy
+          node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy
+      - name: Install (from the lockfile) in the copy
+        working-directory: ../commerce-copy
+        run: npm ci
+      - name: Install Chromium for Playwright
+        working-directory: ../commerce-copy
+        run: npx playwright install --with-deps chromium
+      - name: Production build of the copy
+        working-directory: ../commerce-copy
+        run: npm run build
+      - name: Start the copy and wait for /api/health
+        working-directory: ../commerce-copy
+        shell: bash
+        run: |
+          nohup npx next start -p 3100 -H 127.0.0.1 > next-start.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3100/api/health > /dev/null; then
+              echo "next start is healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "next start did not answer /api/health within 60s"
+          cat next-start.log
+          exit 1
+      - name: Playwright, shop and commerce specs (orders are always mocked; nothing reaches a real service)
+        working-directory: ../commerce-copy
+        run: npx playwright test e2e/shop e2e/commerce --reporter=github,html
+      - name: Keep the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-commerce
+          path: |
+            ../commerce-copy/playwright-report/
+            ../commerce-copy/test-results/
+            ../commerce-copy/next-start.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e-keyed:
+    name: Playwright, analytics and Sentry keys present (placeholders)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_PRODUCTION: "1"
+      E2E_ANALYTICS: "1"
+      E2E_SENTRY: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3200
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (from the lockfile; root only)
+        run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      # The NEXT_PUBLIC_ values are inlined at build time, so they belong to the build step. They are
+      # placeholders on reserved example domains: the specs intercept every request to them.
+      - name: Production build with placeholder analytics and Sentry settings
+        env:
+          NEXT_PUBLIC_POSTHOG_KEY: phc_e2eplaceholder0000000000000000000000000
+          NEXT_PUBLIC_POSTHOG_HOST: https://ph.example.com
+          NEXT_PUBLIC_SENTRY_DSN: https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1
+        run: npm run build
+      - name: Start the production server (with a placeholder cron secret) and wait for /api/health
+        env:
+          CRON_SECRET: e2e-placeholder-cron-secret-0123456789abcdef
+        shell: bash
+        run: |
+          nohup npx next start -p 3200 -H 127.0.0.1 > next-start.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3200/api/health > /dev/null; then
+              echo "next start is healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "next start did not answer /api/health within 60s"
+          cat next-start.log
+          exit 1
+      - name: Playwright, analytics and observability specs (every PostHog and Sentry request is intercepted)
+        run: npx playwright test e2e/analytics e2e/observability --reporter=github,html
+      - name: Keep the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-keyed
+          path: |
+            playwright-report/
+            test-results/
+            next-start.log
+          if-no-files-found: ignore
+          retention-days: 14

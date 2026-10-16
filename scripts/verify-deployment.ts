@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import { deriveSecretRules } from "./lib/bundle-secrets";
 import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
+import { bypassFetch, bypassSecretFrom, carriesBypass } from "./lib/protection-bypass";
 import { ALLOWED_PUBLIC_NAMES } from "./verify-env";
 
 /*
@@ -24,6 +25,12 @@ import { ALLOWED_PUBLIC_NAMES } from "./verify-env";
  * violations and same-origin responses >= 400. The lead form is never submitted: any request to
  * /api/leads is blocked and reported as a failure.
  *
+ * A deployment behind Vercel Deployment Protection (every new preview) is reached with the project's
+ * "Protection Bypass for Automation" secret in VERCEL_AUTOMATION_BYPASS_SECRET. It is sent as the
+ * `x-vercel-protection-bypass` header on EVERY request to the named origin, fetches and Chromium
+ * alike (a query-string token would be dropped from each follow-up URL), to no other host, and is
+ * never printed (scripts/lib/protection-bypass.ts).
+ *
  * Exit codes: 0 pass, 1 a check failed, 2 usage or network error.
  */
 
@@ -43,6 +50,13 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
   const observation: BrowserObservation = { origin: options.url.origin, consoleErrors: [], pageErrors: [], cspViolations: [], responses: [], headingVisible: false, leadRequests: [] };
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const secret = bypassSecretFrom(process.env);
+    if (secret) {
+      await context.route(
+        (url) => carriesBypass(url.href, options.url.origin),
+        (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": secret } }),
+      );
+    }
     // Verification must never write a lead: block and record any request to the lead route.
     await context.route((url) => url.pathname.replace(/\/+$/, "") === "/api/leads", async (route) => {
       observation.leadRequests.push(`${route.request().method()} ${displayUrl(new URL(route.request().url()))}`);
@@ -101,9 +115,11 @@ async function main(): Promise<number> {
   nextEnv.loadEnvConfig(process.cwd(), false);
   const scanRules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, env: process.env });
   const results: CheckResult[] = [];
+  const secret = bypassSecretFrom(process.env);
   try {
     results.push(
       ...(await runFetchChecks(options.url, {
+        ...(secret ? { fetch: bypassFetch(fetch, options.url.origin, secret) } : {}),
         requireReady: options.requireReady,
         production: options.production,
         scanRules,

@@ -41,6 +41,9 @@ afterEach(() => {
   cleanup();
 });
 
+// Final review T-I3: these suites scan the tree or import cold (after `npm ci`, as CI does) and outrun the 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("safe redirect paths", () => {
   it.each([
     ["/", "/"],

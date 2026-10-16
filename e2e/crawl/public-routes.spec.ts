@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { CONFIGURED } from "../ops/environment";
 import { NOT_FOUND_TITLE } from "../shop/shop-helpers";
 
 /*
@@ -11,7 +12,11 @@ import { NOT_FOUND_TITLE } from "../shop/shop-helpers";
  * host other than the base URL (external links are inspected, never followed).
  *
  * Run it against the keyless production server; with E2E_COMMERCE=1 the shop family is a different
- * set of pages and is covered by e2e/shop instead, so those rows are skipped.
+ * set of pages and is covered by e2e/shop instead, so those rows are skipped. With E2E_CONFIGURED=1
+ * (final review O-I3: a server that has Supabase configured, such as the preview) two rows change:
+ * readiness answers 200 (app/api/readiness/route.ts: `checks.ready ? 200 : 503`), and a signed-out visit
+ * to a staff orders page redirects to the sign-in page (app/admin/orders/page.tsx), so the document that
+ * ends up loaded is the sign-in page.
  */
 
 const COMMERCE_ON = process.env.E2E_COMMERCE === "1";
@@ -25,7 +30,7 @@ interface PageRoute {
   why: string;
   /** Rows that exist only while commerce is off. */
   commerceOffOnly?: true;
-  /** Rows whose answer depends on the staff orders pages existing (Task 8c part 2). */
+  /** Staff orders pages: the unconfigured notice when keyless, the sign-in page after a redirect when configured; 200 either way. */
   ordersPages?: true;
   noindex?: true;
 }
@@ -43,10 +48,9 @@ export const PAGE_ROUTES: PageRoute[] = [
   { path: `/orders/${TOKEN}`, status: 404, why: "private order link; commerce is off, so even a well-formed token is not found", commerceOffOnly: true },
   { path: "/no-such-page", status: 404, why: "no such route: the branded not-found page" },
   { path: "/admin/login", status: 200, why: "staff sign-in page (noindex, admin headers)", noindex: true },
-  // On a server without the staff orders pages these are the site's 404; with them, a signed-out visit is
-  // redirected to sign-in (200 after the redirect) or shows the unconfigured notice. Never a 5xx.
-  { path: "/admin/orders", status: 404, why: "staff orders list (Task 8c part 2)", ordersPages: true, noindex: true },
-  { path: "/admin/orders/BB-0000-0000", status: 404, why: "staff order detail (Task 8c part 2)", ordersPages: true, noindex: true },
+  // Keyless: the unconfigured notice. Configured: a signed-out visit is redirected to sign-in. Both end on a 200 page.
+  { path: "/admin/orders", status: 200, why: "staff orders list: the unconfigured notice, or sign-in when configured", ordersPages: true, noindex: true },
+  { path: "/admin/orders/BB-0000-0000", status: 200, why: "staff order detail: the unconfigured notice, or sign-in when configured", ordersPages: true, noindex: true },
 ];
 
 interface FileRoute {
@@ -59,7 +63,7 @@ interface FileRoute {
 /** Non-HTML routes and their expected answers. */
 export const FILE_ROUTES: FileRoute[] = [
   { path: "/api/health", type: /application\/json/, status: 200, why: "liveness" },
-  { path: "/api/readiness", type: /application\/json/, status: 503, why: "readiness is 503 until Sanity, lead storage and revalidation are configured" },
+  { path: "/api/readiness", type: /application\/json/, status: CONFIGURED ? 200 : 503, why: "readiness is 503 until Sanity, lead storage and revalidation are configured" },
   { path: "/robots.txt", type: /text\/plain/, status: 200, why: "crawler rules" },
   { path: "/sitemap.xml", type: /xml/, status: 200, why: "sitemap" },
   { path: "/manifest.webmanifest", type: /json/, status: 200, why: "web app manifest" },
@@ -79,10 +83,16 @@ const VIEWPORTS = [
 /** Console errors, uncaught exceptions and failed requests, minus the document the route is meant to answer with. */
 function collectProblems(page: Page, documentUrl: () => string) {
   const problems: string[] = [];
+  let documentStatus: number | undefined;
+  page.on("response", (response) => {
+    if (response.url() === documentUrl()) documentStatus = response.status();
+  });
   page.on("console", (message) => {
     if (message.type() !== "error" || message.text().includes("/_next/hmr")) return;
     // Chromium logs "Failed to load resource" for a document that answers 404 on purpose; that line is the route, not a defect.
-    if (message.location().url === documentUrl()) return;
+    // Only that one line, only when the document itself answered 404 (final review T-M3): any other console
+    // error located at the document URL, such as a CSP refusal of an inline script, is a real problem.
+    if (documentStatus === 404 && message.text().startsWith("Failed to load resource") && message.location().url === documentUrl()) return;
     problems.push(`console: ${message.text()}`);
   });
   page.on("pageerror", (error) => problems.push(`uncaught: ${error.message}`));
@@ -119,12 +129,7 @@ for (const { name, use } of VIEWPORTS) {
         const response = await page.goto(route.path);
         const status = response?.status() ?? 0;
 
-        if (route.ordersPages) {
-          // Either the page does not exist yet (404) or it exists and gates itself; never an error.
-          expect(status, "status").toBeLessThan(500);
-        } else {
-          expect(status, "status").toBe(route.status);
-        }
+        expect(status, "status").toBe(route.status);
         expect(response?.headers()["content-type"], "content type").toContain("text/html");
 
         // Metadata a person or a crawler reads.
@@ -139,7 +144,7 @@ for (const { name, use } of VIEWPORTS) {
         if (route.path === "/" || route.path === "/privacy" || route.path === "/terms") {
           await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
         }
-        if (status === 404 && route.path !== "/admin/orders" && !route.path.startsWith("/admin/orders/")) {
+        if (status === 404) {
           await expect(page.getByRole("heading", { level: 1, name: NOT_FOUND_TITLE })).toBeVisible();
         }
         await expect(page.getByRole("main")).toHaveCount(1);

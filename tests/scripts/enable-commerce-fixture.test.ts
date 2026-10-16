@@ -77,6 +77,9 @@ function loadGenerated(source: string): { e2eCommerceFixture: (groq: string, par
 }
 const snapshot = (folder: string) => Object.fromEntries(TOUCHED.map((file) => [file, readFileSync(join(folder, file), "utf8")]));
 
+// Final review T-I3: these suites scan the tree or import cold (after `npm ci`, as CI does) and outrun the 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("enable-commerce-fixture refusals", () => {
   // Review Minor 5: asked directly, never by running the file-writing script against the repository,
   // so a broken refusal fails here without switching commerce on in the work tree.

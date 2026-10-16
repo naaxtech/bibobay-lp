@@ -116,12 +116,12 @@ describe("CI workflow", () => {
     expect(engines).toMatch(new RegExp(`(?:\\^${major}\\.|>=\\s*(?:${major}|${major - 2}|${major - 4})\\.)`));
   });
 
-  it("has the verify, studio and e2e jobs, with e2e after verify", () => {
-    expect(Object.keys(workflow().jobs).sort()).toEqual(["e2e", "studio", "verify"]);
-    expect([job("e2e").needs].flat()).toEqual(["verify"]);
+  it("has the verify, studio and three browser jobs, each browser job after verify", () => {
+    expect(Object.keys(workflow().jobs).sort()).toEqual(["e2e", "e2e-commerce", "e2e-keyed", "studio", "verify"]);
+    for (const id of ["e2e", "e2e-commerce", "e2e-keyed"]) expect([job(id).needs].flat(), id).toEqual(["verify"]);
     expect(job("verify").needs).toBeUndefined();
     expect(job("studio").needs).toBeUndefined();
-    for (const id of ["verify", "studio", "e2e"]) {
+    for (const id of ["verify", "studio", "e2e", "e2e-commerce", "e2e-keyed"]) {
       expect(job(id)["runs-on"], id).toBe("ubuntu-latest");
       expect(job(id)["timeout-minutes"], id).toBeGreaterThan(0);
     }
@@ -185,6 +185,48 @@ describe("CI workflow", () => {
     expect(String(upload?.with?.path)).toContain("playwright-report");
   });
 
+  it("e2e-commerce mirrors the local commerce run: a sibling copy with the fixture, its own install and build, the shop and commerce specs (T-I6, R130)", () => {
+    const commerce = job("e2e-commerce");
+    expect(commerce.env).toMatchObject({ E2E_PRODUCTION: "1", E2E_COMMERCE: "1", PLAYWRIGHT_BASE_URL: "http://127.0.0.1:3100" });
+    const commands = runs("e2e-commerce");
+    const order = ["node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy", "npm ci", "npx playwright install --with-deps chromium", "npm run build", "next start -p 3100 -H 127.0.0.1", "npx playwright test e2e/shop e2e/commerce"].map((command) =>
+      commands.findIndex((run) => run.includes(command)),
+    );
+    expect(order.every((index) => index >= 0), String(order)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // The copy has no .git folder (the fixture refuses one) and the install, build and run all happen inside it.
+    expect(stepRunning("e2e-commerce", "enable-commerce-fixture")?.run).toContain("--exclude=./.git");
+    for (const command of ["npm ci", "npx playwright install", "npm run build", "next start", "npx playwright test"]) {
+      expect(stepRunning("e2e-commerce", command)?.["working-directory" as keyof Step], command).toBe("../commerce-copy");
+    }
+    expect(stepRunning("e2e-commerce", "next start")?.run).toContain("http://127.0.0.1:3100/api/health");
+    const upload = commerce.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+    expect(upload?.if).toBe("failure()");
+    expect(String(upload?.with?.path)).toContain("playwright-report");
+  });
+
+  it("e2e-keyed mirrors the local keyed run: placeholder keys at build time, a placeholder cron secret at start, the analytics and observability specs (T-I6, R130)", () => {
+    const keyed = job("e2e-keyed");
+    expect(keyed.env).toMatchObject({ E2E_PRODUCTION: "1", E2E_ANALYTICS: "1", E2E_SENTRY: "1", PLAYWRIGHT_BASE_URL: "http://127.0.0.1:3200" });
+    const build = stepRunning("e2e-keyed", "npm run build");
+    expect(build?.env).toEqual({
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_e2eplaceholder0000000000000000000000000",
+      NEXT_PUBLIC_POSTHOG_HOST: "https://ph.example.com",
+      NEXT_PUBLIC_SENTRY_DSN: "https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1",
+    });
+    const start = stepRunning("e2e-keyed", "next start");
+    expect(start?.env).toEqual({ CRON_SECRET: "e2e-placeholder-cron-secret-0123456789abcdef" });
+    expect(start?.run).toContain("next start -p 3200 -H 127.0.0.1");
+    expect(start?.run).toContain("http://127.0.0.1:3200/api/health");
+    const commands = runs("e2e-keyed");
+    const order = ["npm ci", "npx playwright install --with-deps chromium", "npm run build", "next start", "npx playwright test e2e/analytics e2e/observability"].map((command) => commands.findIndex((run) => run.includes(command)));
+    expect(order.every((index) => index >= 0), String(order)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    const upload = keyed.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+    expect(upload?.if).toBe("failure()");
+    expect(String(upload?.with?.path)).toContain("playwright-report");
+  });
+
   it("only calls npm scripts that exist, and never bun", () => {
     const rootScripts = Object.keys((JSON.parse(readFileSync(resolve("package.json"), "utf8")) as { scripts: Record<string, string> }).scripts);
     const studioScripts = Object.keys((JSON.parse(readFileSync(resolve("studio/package.json"), "utf8")) as { scripts: Record<string, string> }).scripts);
@@ -213,9 +255,9 @@ describe("Vercel build settings", () => {
     expect(JSON.stringify(config)).not.toMatch(/\bbunx?\b|\$\{|secret|token/i);
   });
 
-  it("schedules the email outbox worker once a day, which a Hobby plan accepts (Task 8a, R88)", () => {
+  it("schedules the email outbox worker every 15 minutes, which needs a Pro plan (final review O-I2, R134; supersedes the once-a-day Hobby schedule of R88)", () => {
     const config = JSON.parse(readFileSync(resolve("vercel.json"), "utf8")) as { crons?: unknown };
-    expect(config.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "0 6 * * *" }]);
+    expect(config.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "*/15 * * * *" }]);
     expect(existsSync(resolve("app/api/cron/email-outbox/route.ts"))).toBe(true);
   });
 });

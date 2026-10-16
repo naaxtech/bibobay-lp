@@ -48,7 +48,7 @@ Collections:
 
 | Toggle | Default | Effect today |
 |---|---|---|
-| `commerceEnabled` | `false` | Adds the shop link (labelled with the navigation's shop label) to the header and footer, opens `/shop` and the product pages (Task 7b), lists them in the sitemap, switches the privacy and terms fallback text to its order-request version, and opens the order page `/order` and the order API (`/api/orders`) (Task 7c). Nobody can manage orders yet (Task 8), so leave it off. |
+| `commerceEnabled` | `false` | Adds the shop link (labelled with the navigation's shop label) to the header and footer, opens `/shop` and the product pages (Task 7b), lists them in the sitemap, switches the privacy and terms fallback text to its order-request version, and opens the order page `/order` and the order API (`/api/orders`) (Task 7c). Staff can manage orders from `/admin/orders` (Task 8c), but the whole flow has not been tried end to end on a live preview with real staff accounts and mail (Task 12), so leave it off until that pass is done. |
 | `trackingEnabled` | `false` | With commerce on, opens the tracking page `/track`, the private order links `/orders/<token>` and the tracking API (`/api/orders/track`), adds "Track an order" to the footer, and shows a new order's private link on the order page (Task 7c). |
 | `orderCountries` | empty | The countries the order form offers, as two-letter ISO 3166-1 codes in capitals (`GB`, `PH`, `AU`). Empty means every country. The server refuses an order for any other country. The team quotes delivery for each order, so listing a country promises nothing about it. |
 | `testimonialsEnabled` | `false` | Allows the testimonials section to render, and then only entries marked verified. |
@@ -150,11 +150,13 @@ length.
 
 The site side is built: `/api/draft-mode/enable` checks the Presentation tool's short-lived secret
 with the server-only `SANITY_API_READ_TOKEN` (Viewer role), then shows drafts with a "draft
-preview" notice and `noindex`; `/api/draft-mode/disable` exits. Still to do when the projects are
-provisioned (Task 11): set `SANITY_API_READ_TOKEN` and `SANITY_STUDIO_ORIGIN` on the site, and change
-`presentationTool` in `studio/sanity.config.ts` to use
-`previewUrl: { origin, previewMode: { enable: "/api/draft-mode/enable" } }`. Until then the
-Presentation tool shows published content only.
+preview" notice and `noindex`; `/api/draft-mode/disable` exits. The Studio side is wired too:
+`presentationTool` in `studio/sanity.config.ts` uses
+`previewUrl: { origin, previewMode: { enable: "/api/draft-mode/enable" } }`, with the origin from
+`SANITY_STUDIO_PREVIEW_URL`. To use it once the projects are provisioned (Task 11): set
+`SANITY_STUDIO_PREVIEW_URL` where the Studio runs, and `SANITY_API_READ_TOKEN` and
+`SANITY_STUDIO_ORIGIN` on the site. Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no
+Presentation tool at all.
 
 ## Publishing and when the site updates
 
@@ -165,7 +167,10 @@ Published content is cached by the site and expired by a signed webhook:
    `{_type, _id}`, secret = the site's `SANITY_REVALIDATE_SECRET`.
 2. On publish, the site expires the cache tag for that document type, and the next visitor sees the
    change. Publishing a download (`leadMagnet`) refreshes the landing page.
-3. The site caches published content with no time limit, and that cache persists across deployments
+3. The site caches published content with no time limit, except the two commerce switches
+   (`commerceEnabled`, `trackingEnabled`), which the server gates also re-read at least every 300
+   seconds, so switching commerce off reaches the order routes within five minutes even if the
+   webhook is broken (ruling R127). The rest of that cache persists across deployments
    (the Next.js `fetch` Data Cache), so a redeploy does not refresh it. Without the webhook (or the
    secret), published changes do not appear until the webhook is set up and the document is
    published again; `/api/readiness` reports `revalidation: false` meanwhile.
