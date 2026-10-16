@@ -1,0 +1,36 @@
+docs/observability.md
+  h_0549c11fec2ab0 129-131
+e2e/observability/sentry.spec.ts
+  h_0549c11fec2ab0 41-42
+lib/analytics/events.ts
+  h_0549c11fec2ab0 2,57-59
+lib/observability/sentry-config.ts
+  h_0549c11fec2ab0 3,34-39,112,195-196,210-212
+lib/privacy/decode.ts
+  h_0549c11fec2ab0 1-31
+package-lock.json
+  h_0549c11fec2ab0 30
+package.json
+  h_0549c11fec2ab0 43
+scripts/verify-env.ts
+  h_0549c11fec2ab0 107-109
+sentry.server.config.ts
+  h_0549c11fec2ab0 14-15
+tests/analytics/events.test.ts
+  h_0549c11fec2ab0 154-170
+tests/observability/sentry-scrub.test.ts
+  h_0549c11fec2ab0 184,366-378
+tests/security/env-names.test.ts
+  h_0549c11fec2ab0 86-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3a605d0230332132b7ff2328703444ab2127d0df",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
