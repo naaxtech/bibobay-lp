@@ -20,6 +20,8 @@ export interface RenderedEmail {
 export interface LeadMagnetLink {
   title: string;
   fileUrl: string;
+  /** Set for a signed link, whose lifetime the site controls; an https file has none to state. */
+  expiresInDays?: number;
 }
 
 const BRAND = "BIBO Bay";
@@ -68,13 +70,14 @@ export function buildLeadAcknowledgement({ firstName, leadMagnet }: { firstName?
   const name = firstName?.trim();
   const greeting = name ? `Hi ${name},` : "Hello,";
   const fileUrl = leadMagnet ? safeHttpsUrl(leadMagnet.fileUrl) : null;
+  const leadIn = leadMagnet?.expiresInDays ? `Here is your free download; the link works for ${leadMagnet.expiresInDays} days:` : "Here is your free download:";
   const fileTitle = leadMagnet?.title.trim() || "Your BIBO Bay file";
 
   const lines = [
     greeting,
     "",
     `Thank you for joining the ${BRAND} founding-family list. You're on it, and we will write when there is news about ${BRAND}.`,
-    ...(fileUrl ? ["", "As a thank-you, here is a file from the Bay:", `${fileTitle}: ${fileUrl}`] : []),
+    ...(fileUrl ? ["", leadIn, `${fileTitle}: ${fileUrl}`] : []),
     "",
     "If you would rather not hear from us, reply to this email and we will remove you from the list.",
     "",
@@ -85,7 +88,7 @@ export function buildLeadAcknowledgement({ firstName, leadMagnet }: { firstName?
     paragraph(escapeHtml(greeting)),
     paragraph(`Thank you for joining the ${BRAND} founding-family list. You&#39;re on it, and we will write when there is news about ${BRAND}.`),
     fileUrl
-      ? paragraph(`As a thank-you, here is a file from the Bay: <a href="${escapeHtml(fileUrl)}" style="color:${TEAL_INK};font-weight:600">${escapeHtml(fileTitle)}</a>`)
+      ? paragraph(`${escapeHtml(leadIn)} <a href="${escapeHtml(fileUrl)}" style="color:${TEAL_INK};font-weight:600">${escapeHtml(fileTitle)}</a>`)
       : "",
     `<p style="margin:0;font-size:14px;line-height:1.6;color:${NAVY_SOFT}">If you would rather not hear from us, reply to this email and we will remove you from the list.</p>`,
   ].join("\n"));

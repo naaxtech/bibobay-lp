@@ -60,6 +60,8 @@ const LEAD_ID = "4f8c1c1e-1b51-4a43-9d1c-0d7c1d1f1a11";
 const EVENT_ID = "9d7c2a10-7a8b-4c4e-8c0f-1a2b3c4d5e6f";
 const CLIENT_IP = "203.0.113.9";
 const HASH_SECRET = "fixture-hash-secret-0123456789abcdef";
+/** R140: a stored signup's answer carries the signed link to the pack (the token itself changes per call). */
+const PACK_DOWNLOAD = { title: "Bibo Bay Activity Pack", url: expect.stringMatching(/^\/api\/freebies\/download\?t=[\w-]+\.[\w-]+$/) };
 const { successMessage, errorMessage } = SAFE_FALLBACK_CONTENT.lead;
 
 function configureSupabase() {
@@ -197,7 +199,7 @@ describe("POST /api/leads with Supabase configured (mocked), removal by writing 
   it("limits, stores and queues the acknowledgement through service-role RPCs, then reports the signup stored", async () => {
     const response = await post(VALID);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage, download: PACK_DOWNLOAD });
     expect(rpcCalls.map(([fn]) => fn)).toEqual(["consume_rate_limit", "submit_lead", "enqueue_lead_delivery"]);
     expect(rpcCalls[1]?.[1]).toMatchObject({ p_email: "parent@example.com", p_consent: true, p_consent_version: "1", p_age_band: "6-8" });
     // Resend is not configured, so the outbox row stays pending for the retry worker.
@@ -239,7 +241,7 @@ describe("POST /api/leads with Supabase configured (mocked), removal by writing 
     rpcAnswers.enqueue_lead_delivery = () => ({ data: null, error: { code: "53300", message: "too many connections" } });
     const response = await post(VALID);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, message: successMessage });
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: false, message: successMessage, download: PACK_DOWNLOAD });
   });
 
   it("gives every address in one IPv6 /64 the same lead bucket, and another /64 a different one", async () => {
@@ -281,7 +283,7 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
   it("writes the outbox row unclaimed, answers, and only then claims it, spends one unit of the global send budget and sends (R88, N1)", async () => {
     const response = await post(VALID);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage, download: PACK_DOWNLOAD });
     expect(rpcCalls.map(([fn]) => fn)).toEqual(["consume_rate_limit", "submit_lead", "enqueue_lead_delivery"]);
     expect(rpcCalls[2]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
     // Nothing has gone to the provider, and no budget was checked, while the adult waits for the answer.
@@ -311,7 +313,7 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
     sendAllowed = false;
     const response = await post(VALID);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage });
+    expect(await response.json()).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: successMessage, download: PACK_DOWNLOAD });
     expect(rpcCalls[2]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
     await afterTasks[0]!();
     expect(resendSend).not.toHaveBeenCalled();

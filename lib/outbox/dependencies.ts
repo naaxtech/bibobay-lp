@@ -17,8 +17,9 @@ import { runOutboxWorker } from "./worker";
 /**
  * Wires the cron worker (Task 8a) from the environment and the CMS, or answers null while Supabase
  * (URL and server key) or Resend (key and sender) is unconfigured: then the route answers 503 and
- * the rows wait. The worker hashes no client address, so `LEAD_IP_HASH_SECRET` is not needed here.
- * The emails it builds are the ones the request paths build (same lead magnet, R66; same tracking
+ * the rows wait. The worker hashes no client address, but it signs the download link of a retried
+ * acknowledgement (R140), so it needs `LEAD_IP_HASH_SECRET` for that; without it the email simply
+ * omits the pack. The emails it builds are the ones the request paths build (same lead magnet, R140; same tracking
  * line, R89; same staff address and reply-to).
  */
 export async function createOutboxWorker(env: Record<string, string | undefined> = process.env): Promise<{ run(startedAt?: number): Promise<OutboxTally> } | null> {

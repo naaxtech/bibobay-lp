@@ -59,7 +59,7 @@ export function LeadCapture({ section, lead, form, art }: LeadCaptureProps) {
           {lead.description ? <p className="mt-5 max-w-[46ch] text-lead text-(--ink-soft)">{lead.description}</p> : null}
           {magnet ? (
             <div className="mt-8">
-              <FreebieCard magnet={{ ...magnet, fileUrl: magnet.fileUrl! }} />
+              <FreebieCard magnet={{ ...magnet, fileUrl: magnet.fileUrl! }} anchor={form ? "#lead-form" : "#lead"} />
             </div>
           ) : null}
           {art && form ? <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 20rem, 90vw" className="mt-10 max-w-[20rem]" /> : null}

@@ -14,7 +14,8 @@ Run from the repository root:
 
     uv run scripts/freebie/build_activity_pack.py
 
-It writes public/freebies/bibo-bay-activity-pack.pdf, the page previews beside it and
+It writes content/freebies/bibo-bay-activity-pack.pdf (not public: served only by the signed route,
+ruling R140), the page previews in public/freebies and
 lib/content/activity-pack.manifest.json, which the site and the tests read.
 
 - Copy comes from the site's own fallback content (scripts/freebie/export-content.ts), so the pack
@@ -58,7 +59,8 @@ from svglib.svglib import svg2rlg
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "public" / "brand" / "art"
-OUT_DIR = ROOT / "public" / "freebies"
+PREVIEW_DIR = ROOT / "public" / "freebies"
+PDF_DIR = ROOT / "content" / "freebies"
 PDF_NAME = "bibo-bay-activity-pack.pdf"
 MANIFEST = ROOT / "lib" / "content" / "activity-pack.manifest.json"
 PREVIEW_WIDTHS = (480, 960)
@@ -956,7 +958,7 @@ def write_previews(pdf_path: Path) -> list[dict]:
         for width in PREVIEW_WIDTHS:
             height = round(width * H / W)
             resized = image.resize((width, height), Image.LANCZOS)
-            target = OUT_DIR / f"activity-pack-{name}-{width}.webp"
+            target = PREVIEW_DIR / f"activity-pack-{name}-{width}.webp"
             resized.save(target, "WEBP", quality=80, method=6)
             variants.append({"src": f"/freebies/{target.name}", "width": width, "height": height})
         previews.append({"page": name, "alt": alt, "variants": variants})
@@ -967,8 +969,9 @@ def write_previews(pdf_path: Path) -> list[dict]:
 def main() -> None:
     load_fonts()
     content = load_content()
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    pdf_path = OUT_DIR / PDF_NAME
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    pdf_path = PDF_DIR / PDF_NAME
     pack = Pack(pdf_path, content)
     builders = [page_friends, page_colour, page_count, page_breathe, page_fruit, page_bedtime, page_watch]
     total = len(builders) + 1

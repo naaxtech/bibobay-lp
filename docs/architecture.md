@@ -142,12 +142,14 @@ LeadForm (browser)  --POST JSON-->  /api/leads  ->  lib/leads/submit.ts
                                       4 rate limit (DB, 5 per 10 min per hashed client) -> 429 / 503 if the limiter fails
                                       5 submit_lead()    -> 500 if the write fails
                                       6 outbox rows (acknowledgement, staff alert), unclaimed
-                                      7 200 {ok, persisted: true, acknowledgementQueued}
+                                      7 200 {ok, persisted: true, acknowledgementQueued, download?}
                                       8 after the response, for a new signup: claim each row
                                         (claim_lead_deliveries), spend the global send cap, send
                                         if Resend is configured, record the outcome
                                       9 later: /api/cron/email-outbox retries what is still due
 ```
+
+The `download` in the answer is a 24-hour signed link to `/api/freebies/download`; the acknowledgement email carries a 30-day one.
 
 - Steps 8 and 9 use the same claim, budget, send and record step (`lib/outbox/attempt.ts`), so a
   row is never sent by both, and nothing that differs between a new and a listed address happens

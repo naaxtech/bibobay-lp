@@ -253,6 +253,8 @@ jobs:
       E2E_PRODUCTION: "1"
       E2E_ANALYTICS: "1"
       E2E_SENTRY: "1"
+      # Server-only and a placeholder: the build, `next start` and the freebie download spec all see it.
+      LEAD_IP_HASH_SECRET: e2e-placeholder-hash-secret-0123456789abcdef
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3200
       PLAYWRIGHT_HTML_OPEN: never
     steps:
@@ -268,7 +270,8 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
       # The NEXT_PUBLIC_ values are inlined at build time, so they belong to the build step. They are
-      # placeholders on reserved example domains: the specs intercept every request to them.
+      # placeholders on reserved example domains: the specs intercept every request to them. The
+      # job-level LEAD_IP_HASH_SECRET placeholder is server-only; the freebie download spec mints a token with it.
       - name: Production build with placeholder analytics and Sentry settings
         env:
           NEXT_PUBLIC_POSTHOG_KEY: phc_e2eplaceholder0000000000000000000000000
@@ -291,8 +294,8 @@ jobs:
           echo "next start did not answer /api/health within 60s"
           cat next-start.log
           exit 1
-      - name: Playwright, analytics and observability specs (every PostHog and Sentry request is intercepted)
-        run: npx playwright test e2e/analytics e2e/observability --reporter=github,html
+      - name: Playwright, analytics, observability and freebie download specs (every PostHog and Sentry request is intercepted)
+        run: npx playwright test e2e/analytics e2e/observability e2e/freebies --reporter=github,html
       - name: Keep the Playwright report and traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

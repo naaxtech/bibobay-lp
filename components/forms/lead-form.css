@@ -215,6 +215,35 @@
     color: var(--lead-form-error);
   }
 
+  /* The download block sits below the reserved outcome line, so showing it never moves the status text. */
+  .lead-form__download-block {
+    display: grid;
+    gap: 0.625rem;
+    justify-items: start;
+  }
+
+  .lead-form__download-lead {
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+  }
+
+  .lead-form .lead-form__download {
+    --btn-lip: color-mix(in srgb, var(--bibo-color-navy) 70%, #000000);
+    gap: 0.5rem;
+    background-color: var(--bibo-color-navy);
+    color: var(--bibo-color-cream);
+  }
+
+  @media (max-width: 39.99rem) {
+    .lead-form__download-block {
+      justify-items: stretch;
+    }
+
+    .lead-form .lead-form__download {
+      inline-size: 100%;
+    }
+  }
+
   .lead-form__noscript {
     color: var(--lead-form-error);
     font-weight: 600;

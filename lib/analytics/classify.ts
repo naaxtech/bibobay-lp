@@ -1,4 +1,4 @@
-import { FREEBIE_PATH } from "../content/freebie-path";
+import { DOWNLOAD_ROUTE, FREEBIE_PATH } from "../content/freebie-path";
 import type { AnalyticsEvent, AnalyticsProperties } from "./events";
 
 /**
@@ -50,7 +50,8 @@ function classifyLink(link: HTMLAnchorElement): ClassifiedClick | null {
   if (url.protocol === "mailto:" || url.protocol === "tel:") return null;
   const video = youtube(url);
   if (video) return { event: "youtube_clicked", properties: { ...video, section, label: words } };
-  if (url.origin === window.location.origin && FREEBIE_PATH.test(url.pathname)) {
+  // The signed route carries a secret token in its query string: only the pathname is ever recorded (R140).
+  if (url.origin === window.location.origin && (FREEBIE_PATH.test(url.pathname) || url.pathname === DOWNLOAD_ROUTE)) {
     return { event: "freebie_downloaded", properties: { file: url.pathname, section, label: words } };
   }
   const destination = url.origin === window.location.origin ? "internal" : "external";

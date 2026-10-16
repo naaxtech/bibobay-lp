@@ -10,7 +10,7 @@ const text = (value: unknown, fallback = ""): string => typeof value === "string
 const optionalText = (value: unknown): string | undefined => text(value) || undefined;
 const stringList = (value: unknown, fallback: string[]): string[] => Array.isArray(value) ? value.filter((s): s is string => typeof s === "string" && !!s.trim()).map((s) => s.trim()) : fallback;
 const validUrl = (value: unknown): string | undefined => { if (typeof value !== "string") return; try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : undefined; } catch { return; } };
-/** A download: an https file, or a PDF this site serves from public/freebies (R66). */
+/** A download: an https file, or a PDF in content/freebies, served only by the signed route (R140). */
 const fileUrl = (value: unknown): string | undefined => typeof value === "string" && FREEBIE_PATH.test(value) ? value : validUrl(value);
 /**
  * The lead section's download. A CMS lead section decides for itself (its reference, or none); a

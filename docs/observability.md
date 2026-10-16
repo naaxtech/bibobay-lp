@@ -13,7 +13,7 @@ PostHog runs on every public page (not the Studio, and not the staff pages under
 |---|---|---|
 | `$pageview`, `$pageleave` | Every page, including client-side navigation; leave carries time on page and scroll depth | Page address cut to origin + path + `utm_source/medium/campaign/content/term` (a path holding an email address becomes `/`); referring site (origin only); browser and its full user agent, OS, device type, screen and viewport size, browser language, time zone |
 | `youtube_clicked` | A link to the channel, its subscribe prompt or a video | `kind` (`channel`, `subscribe`, `video`), `video_id`, `section`, `label` |
-| `freebie_downloaded` | The activity pack (or any `/freebies/*.pdf`) | `file`, `section` |
+| `freebie_downloaded` | The activity pack: a click on the signed download route `/api/freebies/download` (or any `/freebies/*.pdf`); `file` is the pathname only, never the token | `file`, `section` |
 | `cta_clicked` | Any other link (click or middle-click) | `destination` (`anchor`, `internal`, `external`), `section`, `label` |
 | `section_viewed` | A landing section reaches the middle of the screen (once per page view, also after client-side navigation; a section seen while statistics are off counts once they are on) | `section` |
 | `tab_selected` | A friend or video tab other than the one showing | `section`, `label` |

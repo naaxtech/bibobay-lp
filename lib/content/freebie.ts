@@ -1,11 +1,11 @@
 import manifest from "./activity-pack.manifest.json";
 import { FREEBIE_PATH } from "./freebie-path";
 
-/** A PDF this site serves from public/freebies: one path segment, no dot segments, no protocol. */
+/** A PDF in content/freebies, served only by the signed route (R140): one path segment, no dot segments, no protocol. */
 export { FREEBIE_PATH };
 
 /**
- * The free Bibo Bay Activity Pack (rulings R66-R69): a printable PDF in public/freebies, built by
+ * The free Bibo Bay Activity Pack (rulings R66-R69): a printable PDF in content/freebies, built by
  * scripts/freebie/build_activity_pack.py from the site's own copy and the channel's stills. The
  * generator writes activity-pack.manifest.json; tests/freebie pins the file to it.
  */
@@ -33,11 +33,12 @@ export function isRepositoryPack(fileUrl: string | undefined): boolean {
 }
 
 /**
- * The address a download can be reached at from outside the site (an email): https files as they
- * are, repository files against the site's verified origin, and nothing while that is unknown.
+ * The address an https download can be reached at from outside the site, and nothing for anything
+ * unsafe. A repository file (FREEBIE_PATH) has no public address since R140: it is reached only
+ * through the signed route (lib/leads/dependencies.ts), so it gives null here.
  */
-export function absoluteFileUrl(fileUrl: string, origin: URL | null): string | null {
-  if (FREEBIE_PATH.test(fileUrl)) return origin ? new URL(fileUrl, origin).toString() : null;
+export function absoluteFileUrl(fileUrl: string): string | null {
+  if (FREEBIE_PATH.test(fileUrl)) return null;
   try {
     const url = new URL(fileUrl);
     return url.protocol === "https:" && !url.username && !url.password ? url.toString() : null;

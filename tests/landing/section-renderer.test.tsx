@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LeadForm } from "@/components/forms/LeadForm";
 import { LandingPage } from "@/components/landing/LandingPage";
 import type { LandingPageContent, SectionId, SiteSettings, Testimonial } from "@/lib/content/types";
 import { DEFAULT_RENDERED_SECTIONS, landingContent, siteSettings } from "./fixtures";
@@ -74,9 +75,19 @@ describe("section order and visibility", () => {
     }
   });
 
+  it("points the freebie card at #lead without a form and at #lead-form with one", () => {
+    const hrefOfCard = () => document.querySelector<HTMLAnchorElement>(".freebie-card__download")!.getAttribute("href");
+    const { unmount } = renderPage();
+    expect(hrefOfCard()).toBe("#lead");
+    unmount();
+    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+    expect(hrefOfCard()).toBe("#lead-form");
+  });
+
   it("points every in-page link at an element that exists", () => {
     for (const content of [landingContent(), landingContent((draft) => { draft.sections = draft.sections.filter((entry) => entry.id !== "lead"); })]) {
-      const { unmount } = renderPage(content);
+      // The locked card points at the form (#lead-form), so the page is rendered with the real form, as app/page.tsx does.
+      const { unmount } = renderPage(content, siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
       const anchors = linkHrefs().filter((href): href is string => !!href?.startsWith("#"));
       expect(anchors.length).toBeGreaterThan(0);
       for (const href of anchors) expect(document.getElementById(href.slice(1)), href).not.toBeNull();
@@ -248,31 +259,36 @@ describe("lead capture", () => {
     expect(within(section("hero")).getByRole("link", { name: "Meet Tula, Bob & Lumi" }).getAttribute("href")).toBe("#characters");
   });
 
-  it("offers the repository's activity pack by default, with its page previews and real size", () => {
-    renderPage();
+  it("locks the repository's activity pack behind the signup, with its page previews and real size", () => {
+    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
     const lead = section("lead");
-    const link = within(lead).getByRole("link", { name: /^Download the free pack/ });
-    expect(link.getAttribute("href")).toBe("/freebies/bibo-bay-activity-pack.pdf");
-    expect(link.hasAttribute("download")).toBe(true);
+    // R140: no link to the file anywhere in the card; the button leads to the form.
+    expect(lead.querySelector("[data-freebie] a[href$='.pdf']")).toBeNull();
+    expect(lead.querySelector("a[href='/freebies/bibo-bay-activity-pack.pdf']")).toBeNull();
+    const link = within(lead).getByRole("link", { name: /^Get the free pack/ });
+    expect(link.getAttribute("href")).toBe("#lead-form");
+    expect(link.hasAttribute("download")).toBe(false);
     // The link's whole name, one label: "<visible words>: <pack title>".
-    expect(link.getAttribute("aria-label")).toBe("Download the free pack: Bibo Bay Activity Pack");
+    expect(link.getAttribute("aria-label")).toBe("Get the free pack: Bibo Bay Activity Pack");
+    expect(within(lead).getByText("Free for everyone on the list.")).toBeTruthy();
     const cover = within(lead).getByRole("img", { name: /activity pack/i });
     expect(cover.getAttribute("src")).toMatch(/^\/freebies\/activity-pack-cover-\d+\.webp$/);
     expect(within(lead).getByText(/^PDF · 8 pages · \d+(\.\d)? MB$/)).toBeTruthy();
   });
 
-  it("offers a download only when the CMS marks a real file available", () => {
+  it("offers the card only when the CMS marks a real file available, and never links the file", () => {
     const { unmount } = renderPage(landingContent((draft) => {
       delete draft.lead.leadMagnet;
     }));
-    expect(screen.queryByRole("link", { name: /Download/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /free pack/ })).toBeNull();
     unmount();
     renderPage(landingContent((draft) => {
       draft.lead.leadMagnet = { title: "Bay colouring sheet", description: "One printable page of the Bay.", fileUrl: "https://cdn.sanity.io/files/abc/production/sheet.pdf", available: true };
-    }));
-    const link = within(section("lead")).getByRole("link", { name: /^Download the free pack/ });
-    expect(link.getAttribute("href")).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
-    expect(link.getAttribute("aria-label")).toBe("Download the free pack: Bay colouring sheet");
+    }), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+    const link = within(section("lead")).getByRole("link", { name: /^Get the free pack/ });
+    expect(link.getAttribute("href")).toBe("#lead-form");
+    expect(link.getAttribute("aria-label")).toBe("Get the free pack: Bay colouring sheet");
+    expect(section("lead").querySelector("a[href*='sheet.pdf']")).toBeNull();
     expect(within(section("lead")).getByText("One printable page of the Bay.")).toBeTruthy();
     // The repository's previews and size describe only the repository's own pack.
     expect(within(section("lead")).queryByRole("img", { name: /activity pack/i })).toBeNull();

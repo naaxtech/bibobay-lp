@@ -143,6 +143,7 @@ function dependencies(overrides: Partial<LeadSubmissionDependencies> = {}): Lead
     clientKey: "client-hash",
     staffEmail: null,
     leadMagnet: null,
+    download: null,
     replyTo: null,
     log: () => {},
     // P-I1 (Ruling R125): a way to ask for removal exists; tests of the closed state pass null.
@@ -763,5 +764,33 @@ describe("the pre-outbox flow (Task 5 re-review N3)", () => {
     const source = readFileSync(resolve("lib/leads/submit.ts"), "utf8");
     expect(source).toMatch(/@deprecated[^]*?async function deliverSequentially\(/);
     expect(source).not.toMatch(/export async function deliverSequentially/);
+  });
+});
+
+describe("the download link in the answer (R140)", () => {
+  const DOWNLOAD = { url: "/api/freebies/download?t=abc", title: "Bibo Bay Activity Pack" };
+
+  it("carries exactly the configured download on a stored signup", async () => {
+    const result = await submitLead(VALID, dependencies({ download: DOWNLOAD }));
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: expect.any(Boolean), message: COPY.successMessage, download: DOWNLOAD });
+  });
+
+  it("has no download key when none is configured", async () => {
+    const result = await submitLead(VALID, dependencies({ download: null }));
+    expect(result.status).toBe(200);
+    expect("download" in result.body).toBe(false);
+  });
+
+  it("never carries it on a refusal", async () => {
+    const download = DOWNLOAD;
+    const invalid = await submitLead({ consent: true }, dependencies({ download }));
+    const closed = await submitLead(VALID, dependencies({ download, repository: null }));
+    const limited = await submitLead(VALID, dependencies({ download, rateLimiter: { async consume() { return { allowed: false, remaining: 0, retryAfterSeconds: 30 }; } } }));
+    const failing = fakeRepository();
+    failing.repository.submitLead = async () => { throw new Error("write failed"); };
+    const failed = await submitLead(VALID, dependencies({ download, repository: failing.repository }));
+    expect([invalid.status, closed.status, limited.status, failed.status]).toEqual([400, 503, 429, 500]);
+    for (const result of [invalid, closed, limited, failed]) expect("download" in result.body).toBe(false);
   });
 });

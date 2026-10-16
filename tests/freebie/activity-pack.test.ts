@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -12,6 +12,8 @@ import { ACTIVITY_PACK, absoluteFileUrl, activityPackPreviews } from "@/lib/cont
  */
 const root = process.cwd();
 const fromPublic = (path: string) => readFileSync(join(root, "public", path));
+// Ruling R140: the PDF is not a public file; it lives in content/ and is served by the signed route.
+const fromContent = (path: string) => readFileSync(join(root, "content", path));
 const manifest = JSON.parse(readFileSync(join(root, "lib/content/activity-pack.manifest.json"), "utf8")) as {
   sha256: string; bytes: number; pages: string[]; links: string[]; qr?: Array<{ page: number; url: string }>;
   videos: Array<{ id: string; title: string; url: string }>; characters: string[];
@@ -31,7 +33,7 @@ function webpSize(bytes: Buffer): { width: number; height: number } {
 }
 
 describe("the Bibo Bay activity pack (freebie)", () => {
-  const pdf = fromPublic(ACTIVITY_PACK.fileUrl);
+  const pdf = fromContent(ACTIVITY_PACK.fileUrl);
   const body = pdf.toString("latin1");
 
   it("is a real PDF in the repository, inside its weight budget, exactly as the generator recorded it", () => {
@@ -109,7 +111,7 @@ describe("the Bibo Bay activity pack (freebie)", () => {
     }
   });
 
-  it("is what the site's fallback copy offers, available and free", () => {
+  it("is what the site's fallback copy offers, available behind the signup", () => {
     expect(SAFE_FALLBACK_CONTENT.lead.leadMagnet).toEqual({
       title: "Bibo Bay Activity Pack",
       description: expect.stringMatching(/printable pages/),
@@ -117,17 +119,21 @@ describe("the Bibo Bay activity pack (freebie)", () => {
       available: true,
     });
   });
+
+  it("is never a public file again: the signup is the only way to the PDF (ruling R140)", () => {
+    expect(existsSync(join(root, "public", ACTIVITY_PACK.fileUrl))).toBe(false);
+    expect(existsSync(join(root, "content", ACTIVITY_PACK.fileUrl))).toBe(true);
+  });
 });
 
-describe("absoluteFileUrl (for the acknowledgement email)", () => {
-  const origin = new URL("https://bibobay.example/");
-  it("resolves a repository file against the site's verified origin", () => {
-    expect(absoluteFileUrl(ACTIVITY_PACK.fileUrl, origin)).toBe("https://bibobay.example/freebies/bibo-bay-activity-pack.pdf");
+describe("absoluteFileUrl (https files for the acknowledgement email)", () => {
+  it("gives nothing for a repository file: it has no public address (ruling R140)", () => {
+    expect(absoluteFileUrl(ACTIVITY_PACK.fileUrl)).toBeNull();
   });
-  it("keeps an https file as it is, and gives nothing for a repository file while the origin is unknown", () => {
-    expect(absoluteFileUrl("https://cdn.sanity.io/files/abc/production/sheet.pdf", null)).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
-    expect(absoluteFileUrl(ACTIVITY_PACK.fileUrl, null)).toBeNull();
-    expect(absoluteFileUrl("javascript:alert(1)", origin)).toBeNull();
-    expect(absoluteFileUrl("//evil.example/x.pdf", origin)).toBeNull();
+  it("keeps an https file as it is, and gives nothing for an unsafe address", () => {
+    expect(absoluteFileUrl("https://cdn.sanity.io/files/abc/production/sheet.pdf")).toBe("https://cdn.sanity.io/files/abc/production/sheet.pdf");
+    expect(absoluteFileUrl(ACTIVITY_PACK.fileUrl)).toBeNull();
+    expect(absoluteFileUrl("javascript:alert(1)")).toBeNull();
+    expect(absoluteFileUrl("//evil.example/x.pdf")).toBeNull();
   });
 });

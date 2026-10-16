@@ -8,3 +8,9 @@
  * minimum (Task 8a): a shorter one counts as unconfigured.
  */
 export const SERVER_SECRET_MIN_LENGTH = 32;
+
+/** The client-address hashing secret, or null when missing or too short (also keys the download links, lib/freebies/token.ts). */
+export function hashSecretFrom(env: Record<string, string | undefined>): string | null {
+  const secret = env.LEAD_IP_HASH_SECRET?.trim();
+  return secret && secret.length >= SERVER_SECRET_MIN_LENGTH ? secret : null;
+}

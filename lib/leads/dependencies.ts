@@ -8,11 +8,13 @@ import { createSupabaseRateLimiter } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient, getSupabaseAdminEnvironment } from "@/lib/supabase/admin";
 import { createSupabaseLeadRepository } from "@/lib/supabase/leads";
 import { absoluteFileUrl } from "@/lib/content/freebie";
+import { FREEBIE_PATH } from "@/lib/content/freebie-path";
+import { EMAIL_DOWNLOAD_TTL_SECONDS, IMMEDIATE_DOWNLOAD_TTL_SECONDS, downloadPath, signDownloadToken } from "@/lib/freebies/token";
 import type { LandingPageContent, SiteSettings } from "@/lib/content/types";
 import type { LeadMagnetLink } from "@/lib/email/lead-emails";
 import { getLandingPage, getLegalSettings, getSiteSettings } from "@/lib/sanity/fetch";
 import { reportEvent } from "@/lib/observability/report";
-import { SERVER_SECRET_MIN_LENGTH } from "@/lib/security/secrets";
+import { SERVER_SECRET_MIN_LENGTH, hashSecretFrom } from "@/lib/security/secrets";
 import { seoEnvironment } from "@/lib/seo/metadata";
 import { clientKeyFromHeaders } from "./http";
 import { removalChannelFrom } from "./removal-channel";
@@ -34,11 +36,8 @@ import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } fr
  */
 export const LEAD_IP_HASH_SECRET_MIN_LENGTH = SERVER_SECRET_MIN_LENGTH;
 
-/** The client-address hashing secret, or null when missing or too short (also used by lib/orders/dependencies.ts). */
-export function hashSecretFrom(env: Record<string, string | undefined>): string | null {
-  const secret = env.LEAD_IP_HASH_SECRET?.trim();
-  return secret && secret.length >= LEAD_IP_HASH_SECRET_MIN_LENGTH ? secret : null;
-}
+/** Re-exported for lib/orders and lib/admin; the one definition is in lib/security/secrets.ts. */
+export { hashSecretFrom } from "@/lib/security/secrets";
 
 export function leadStorageConfigured(env: Record<string, string | undefined> = process.env): boolean {
   return getSupabaseAdminEnvironment(env) !== null && hashSecretFrom(env) !== null;
@@ -98,15 +97,40 @@ export function logLeadEvent(entry: LeadLogEvent): void {
 }
 
 /**
- * R66: the lead magnet the acknowledgement may link to. A repository file needs the site's
- * verified origin to work from an inbox; until that is known the email leaves the pack out rather
- * than send a link that cannot open. Shared with the outbox worker (Task 8a), so a retried
- * acknowledgement links to the same file.
+ * R140 (overrides R66's "the link is the file"): the lead magnet the acknowledgement may link to.
+ * A repository file is never linked directly; the email carries a signed link to the download route
+ * (30 days), signed here at call time, so a retried acknowledgement gets a fresh token. It needs the
+ * site's verified origin to work from an inbox and the signing secret; without either, the email
+ * leaves the pack out rather than send a link that cannot open. An https CMS file is linked as it is.
+ * Shared with the outbox worker (Task 8a), which calls it at send time.
  */
 export function leadMagnetFrom(lead: LandingPageContent["lead"], settings: SiteSettings, env: Record<string, string | undefined> = process.env): LeadMagnetLink | null {
+  const magnet = lead.leadMagnet;
+  if (!magnet?.available || !magnet.fileUrl) return null;
   const origin = seoEnvironment(settings, env).baseUrl;
-  const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
-  return magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
+  if (FREEBIE_PATH.test(magnet.fileUrl)) {
+    if (!origin) return null;
+    const token = signDownloadToken({ fileUrl: magnet.fileUrl, ttlSeconds: EMAIL_DOWNLOAD_TTL_SECONDS }, env);
+    return token ? { title: magnet.title, fileUrl: new URL(downloadPath(token), origin).toString(), expiresInDays: EMAIL_DOWNLOAD_TTL_SECONDS / 86400 } : null;
+  }
+  const url = absoluteFileUrl(magnet.fileUrl);
+  return url ? { title: magnet.title, fileUrl: url } : null;
+}
+
+/**
+ * R140: the download the 200 answer of a stored signup carries. A repository file becomes a
+ * same-origin signed path (24 hours; no origin needed, the page uses it relative); an https CMS file
+ * is handed over as it is; anything else, or a missing secret, means no download.
+ */
+export function immediateDownloadFrom(lead: LandingPageContent["lead"], env: Record<string, string | undefined> = process.env): { url: string; title: string } | null {
+  const magnet = lead.leadMagnet;
+  if (!magnet?.available || !magnet.fileUrl) return null;
+  if (FREEBIE_PATH.test(magnet.fileUrl)) {
+    const token = signDownloadToken({ fileUrl: magnet.fileUrl, ttlSeconds: IMMEDIATE_DOWNLOAD_TTL_SECONDS }, env);
+    return token ? { url: downloadPath(token), title: magnet.title } : null;
+  }
+  const url = absoluteFileUrl(magnet.fileUrl);
+  return url ? { url, title: magnet.title } : null;
 }
 
 export async function createLeadDependencies(request: Request, env: Record<string, string | undefined> = process.env): Promise<LeadSubmissionDependencies> {
@@ -115,12 +139,7 @@ export async function createLeadDependencies(request: Request, env: Record<strin
   const { lead } = content;
   const copy = { successMessage: lead.successMessage, errorMessage: lead.errorMessage };
   const magnet = leadMagnetFrom(lead, settings, env);
-  /*
-   * Moved into leadMagnetFrom above in Task 8a (the worker needs the same link); kept for history:
-   *   const origin = seoEnvironment(settings, env).baseUrl;
-   *   const magnetUrl = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? absoluteFileUrl(lead.leadMagnet.fileUrl, origin) : null;
-   *   const magnet = magnetUrl && lead.leadMagnet ? { title: lead.leadMagnet.title, fileUrl: magnetUrl } : null;
-   */
+  const download = immediateDownloadFrom(lead, env);
 
   const admin = getSupabaseAdminEnvironment(env);
   const hashSecret = hashSecretFrom(env);
@@ -140,6 +159,7 @@ export async function createLeadDependencies(request: Request, env: Record<strin
     // while Resend is unconfigured it waits in the outbox as `pending` for the Task 8 worker.
     staffEmail: getStaffNotificationEmail(env),
     leadMagnet: magnet,
+    download,
     replyTo: email?.replyTo ?? null,
     log: logLeadEvent,
     sendLimitPerHour: ackSendLimitPerHour(env),

@@ -326,7 +326,10 @@ describe("truthful copy", () => {
       if (typeof value === "string") strings.push(value);
       else if (value && typeof value === "object") Object.values(value).forEach(collect);
     };
-    collect(FORM_COPY);
+    // R140: the one string that names a download is shown only after the server confirms the signup was stored.
+    const { downloadReady, ...rest } = FORM_COPY;
+    expect(downloadReady).toBe("Your download is ready:");
+    collect(rest);
     expect(strings.length).toBeGreaterThan(10);
     for (const text of strings) expect(text, text).not.toMatch(DELIVERY_CLAIM);
   });

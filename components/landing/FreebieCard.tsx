@@ -1,23 +1,17 @@
 import { ACTIVITY_PACK, activityPackPreviews, isRepositoryPack } from "@/lib/content/freebie";
 import type { LeadMagnet } from "@/lib/content/types";
+import { DownloadGlyph } from "./DownloadGlyph";
 import { UI_COPY } from "./ui-copy";
 
-/** A down arrow into a tray. Decorative: the button's words say what it does. */
-function DownloadGlyph() {
-  return (
-    <svg className="freebie-card__glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 3.5v11M7 10l5 5 5-5M4.5 16.5v2.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 /**
- * The section's free download (R66). It is offered only when the CMS marks a real file available.
- * For the repository's own activity pack the card fans out real renders of its pages and states
- * its real size; any other file shows its CMS title and description alone. No sign-up: the link
- * is the file.
+ * The section's free download (R140, which overrides R66's "no sign-up"). It is offered only when the
+ * CMS marks a real file available. For the repository's own activity pack the card fans out real
+ * renders of its pages and states its real size; any other file shows its CMS title and
+ * description alone. The card never links the file: its button leads to the signup form, which
+ * shows the download only once the server has stored the signup. The `fileUrl` only decides which
+ * previews to show.
  */
-export function FreebieCard({ magnet }: { magnet: LeadMagnet & { fileUrl: string } }) {
+export function FreebieCard({ magnet, anchor }: { magnet: LeadMagnet & { fileUrl: string }; anchor: string }) {
   const ours = isRepositoryPack(magnet.fileUrl);
   const previews = ours ? activityPackPreviews().slice(0, 3) : [];
   return (
@@ -49,15 +43,11 @@ export function FreebieCard({ magnet }: { magnet: LeadMagnet & { fileUrl: string
         <h3 className="freebie-card__title">{magnet.title}</h3>
         {magnet.description ? <p className="freebie-card__description">{magnet.description}</p> : null}
         {/* One label, starting with the visible words: a hidden span would be block-level, and Chromium then names it "… : <title>". */}
-        <a
-          href={magnet.fileUrl}
-          className="btn btn-primary freebie-card__download"
-          aria-label={`${UI_COPY.downloadFreebie}: ${magnet.title}`}
-          {...(ours ? { download: "" } : {})}
-        >
+        <a href={anchor} className="btn btn-primary freebie-card__download" aria-label={`${UI_COPY.getFreebie}: ${magnet.title}`}>
           <DownloadGlyph />
-          {UI_COPY.downloadFreebie}
+          {UI_COPY.getFreebie}
         </a>
+        <p className="freebie-card__gate">{UI_COPY.freebieGate}</p>
         {ours ? <p className="freebie-card__meta">{UI_COPY.freebieMeta(ACTIVITY_PACK.pages, ACTIVITY_PACK.bytes)}</p> : null}
       </div>
     </div>

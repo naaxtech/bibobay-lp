@@ -22,7 +22,7 @@ const VIEWPORTS = [
 // Repository fallback copy (lib/content/fallback.ts); the e2e server has no Sanity project.
 const SUCCESS = "You joined the founding-family list.";
 const ERROR = "We could not save your request. Please try again.";
-const BUTTON = "Join the list";
+const BUTTON = "Get the free pack";
 const SUMMARY_TITLE = "Please check the form";
 
 /** The route's exact 503 body while storage is not configured (app/api/leads/route.ts, lib/leads/submit.ts). */

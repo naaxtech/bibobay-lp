@@ -161,6 +161,16 @@ export const PRIVATE_LINK_HEADER_RULE: { source: string; headers: Array<{ key: s
 };
 
 /**
+ * R140: the signed download answers carry a token in the address, so they get the same private
+ * rule as the order pages. Listed after the site-wide rule in next.config.ts so these values win;
+ * the route handler sets the same headers itself.
+ */
+export const FREEBIE_DOWNLOAD_HEADER_RULE: { source: string; headers: Array<{ key: string; value: string }> } = {
+  source: "/api/freebies/download",
+  headers: PRIVATE_LINK_HEADER_RULE.headers.map((header) => ({ ...header })),
+};
+
+/**
  * Task 8b (ruling R99): the staff pages and the staff API are private in the same way. Their
  * answers carry a staff session and order details, so nothing may keep, index or refer them.
  * `/admin/:path*` matches `/admin` itself too. next.config.ts lists these after the site-wide rule.

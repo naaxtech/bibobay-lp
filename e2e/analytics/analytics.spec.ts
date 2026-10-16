@@ -77,14 +77,36 @@ test.describe("visit statistics (cookieless PostHog)", () => {
     const video = page.locator("#episodes [role='tabpanel']:not([inert]) a[href*='youtube.com/watch']");
     const [popup] = await Promise.all([page.waitForEvent("popup"), video.click()]);
     await popup.close();
-    const pack = page.locator("#lead [data-freebie] a[download]");
-    await pack.scrollIntoViewIfNeeded();
-    await Promise.all([page.waitForEvent("download"), pack.click()]);
+    // R140: the pack is offered only after a stored signup. Answer the signup as the server would, with a
+    // signed link carrying a fake token, then click it: the click is counted by its pathname alone.
+    await page.route("**/api/leads", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, persisted: true, acknowledgementQueued: false, message: "You joined the founding-family list.", download: { url: "/api/freebies/download?t=e2e-fake-token", title: "Bibo Bay Activity Pack" } }),
+      });
+    });
+    // The dev/preview server has no signing key, so answer the link here; the click only needs to be harmless.
+    await page.route("**/api/freebies/download**", (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "Not found" }));
+    const signup = page.getByRole("form", { name: "Founding-family signup" });
+    await signup.scrollIntoViewIfNeeded();
+    await expect(signup.locator('button[type="submit"]')).toBeEnabled();
+    await signup.getByRole("textbox", { name: "Email", exact: true }).fill("parent@example.com");
+    await signup.getByRole("checkbox").check();
+    await signup.locator('button[type="submit"]').click();
+    const pack = page.locator("#lead-form a[download]");
+    await expect(pack).toHaveAccessibleName(/^Download the free pack/);
+    await expect(pack).toHaveAttribute("href", "/api/freebies/download?t=e2e-fake-token");
+    await pack.click();
 
     await expect.poll(() => named(events, "youtube_clicked").length, { timeout: 15_000 }).toBeGreaterThan(0);
     await expect.poll(() => named(events, "freebie_downloaded").length, { timeout: 15_000 }).toBeGreaterThan(0);
     expect(named(events, "youtube_clicked")[0]!.properties).toMatchObject({ kind: "video", section: "episodes" });
-    expect(named(events, "freebie_downloaded")[0]!.properties).toMatchObject({ file: "/freebies/bibo-bay-activity-pack.pdf", section: "lead" });
+    expect(named(events, "freebie_downloaded")[0]!.properties).toMatchObject({ file: "/api/freebies/download", section: "lead" });
+    // The signed token never reaches analytics.
+    expect(JSON.stringify(named(events, "freebie_downloaded"))).not.toContain("e2e-fake-token");
+    expect(JSON.stringify(events)).not.toContain("e2e-fake-token");
     await expect.poll(() => named(events, "section_viewed").map((event) => event.properties.section)).toContain("lead");
 
     // Only ingestion requests: no scripts, flags or remote configuration fetched from PostHog.
