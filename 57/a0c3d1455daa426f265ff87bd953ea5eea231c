@@ -1,0 +1,37 @@
+tests/security/env-names.test.ts
+  s_36fcf8940d4895::t_b76ebdf28bf292 52
+  s_36fcf8940d4895::t_795ab955fc97cf 5,58-75
+tests/scripts/bundle-secrets.test.ts
+  s_36fcf8940d4895::t_795ab955fc97cf 17,29,58-62
+scripts/lib/bundle-secrets.ts
+  s_36fcf8940d4895::t_4e0ce2fe2ac32f 55-56,99,103,106,172
+docs/deployment.md
+  s_36fcf8940d4895::t_21ec25da1460a3 75-76
+eslint.config.mjs
+  s_36fcf8940d4895::t_21ec25da1460a3 22,24-26
+  s_36fcf8940d4895::t_b76ebdf28bf292 23
+scripts/verify-deployment.ts
+  s_36fcf8940d4895::t_4e0ce2fe2ac32f 8,116
+scripts/verify-env.ts
+  s_36fcf8940d4895::t_4e0ce2fe2ac32f 42-44,50,52-53,57-65,92
+  s_36fcf8940d4895::t_b76ebdf28bf292 45-49,54
+scripts/verify-bundle-secrets.ts
+  s_36fcf8940d4895::t_4e0ce2fe2ac32f 6,48
+  s_36fcf8940d4895::t_b76ebdf28bf292 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "57a0c3d1455daa426f265ff87bd953ea5eea231c",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
