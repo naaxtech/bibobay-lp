@@ -9,6 +9,8 @@
 @import "../components/shop/shop.css";
 /* The order page, the tracking page and the order status view (Task 7c); after the shop and form. */
 @import "../components/orders/order.css";
+/* The staff frame, the sign-in page and the sign-out button (Task 8c); after the form styles it builds on. */
+@import "../components/admin/admin.css";
 
 /*
  * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and

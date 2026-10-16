@@ -1,0 +1,149 @@
+/*
+ * The staff pages (Task 8c): the plain frame (components/admin/AdminFrame.tsx), the sign-in page
+ * and the sign-out button. Imported by app/globals.css after the order styles, so it builds on
+ * .landing-container, .skip-link, .btn and the .lead-form field styles, and on the --bibo-*
+ * tokens. Plain on purpose: paper ground, navy ink, nothing decorative, no motion beyond the
+ * shared button press (zero-length under reduced motion). Targets are at least 3rem tall.
+ */
+
+@layer components {
+  .admin-shell {
+    min-block-size: 100dvh;
+    background-color: var(--ground);
+    color: var(--ink);
+    --admin-error: var(--bibo-color-orange-ink);
+    --admin-success: var(--bibo-color-teal-ink);
+  }
+
+  .admin-header {
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 1px 0 var(--bibo-color-line);
+  }
+
+  .admin-header__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    min-block-size: 4rem;
+    padding-block: 0.5rem;
+  }
+
+  .admin-header__name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-block-size: 3rem;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--bibo-font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  a.admin-header__name:hover .admin-header__site {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  /* The label that tells staff this is not the public site: navy on sand, 11:1. */
+  .admin-header__label {
+    padding: 0.125rem 0.75rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-sand);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-body);
+    font-size: var(--bibo-text-small);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .admin-main {
+    padding-block: clamp(1.5rem, 1rem + 3vw, 3rem) clamp(3rem, 2rem + 5vw, 6rem);
+  }
+
+  .admin-main:focus {
+    outline: none;
+  }
+
+  /* A plain secondary button: navy outline on paper. */
+  .admin-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: 3rem;
+    padding: 0.5rem 1.25rem;
+    border: 2px solid var(--bibo-color-navy);
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.15;
+    cursor: pointer;
+  }
+
+  .admin-button:hover {
+    background-color: var(--bibo-color-sand);
+  }
+
+  .admin-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .admin-button[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  .admin-signout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .admin-signout__status {
+    margin: 0;
+    max-inline-size: 28rem;
+    color: var(--admin-error);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+  }
+
+  .admin-signout__status:empty {
+    display: none;
+  }
+
+  /* ---------- Sign-in page ---------- */
+
+  .admin-login {
+    display: grid;
+    gap: 1rem;
+    max-inline-size: 30rem;
+    margin-inline: auto;
+  }
+
+  .admin-login__title {
+    margin: 0;
+    font-size: var(--bibo-text-h2);
+    line-height: var(--bibo-leading-h2);
+  }
+
+  .admin-login__lead {
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: var(--bibo-leading-body);
+  }
+
+  /* The sign-in form's live region keeps its height: no jump when a message appears. */
+  .admin-form .admin-status {
+    min-block-size: 2.9em;
+    margin: 0;
+  }
+}
