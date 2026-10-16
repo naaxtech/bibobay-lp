@@ -98,22 +98,30 @@ eyebrow renders nothing.
 ## Downloads (lead magnets)
 
 The signup section shows a download card only when the referenced `leadMagnet` has
-**File exists and may be offered** ticked **and** a verified file URL: an https file, or a PDF the
-site serves itself from `/freebies/`. The Studio will not let you tick the box without a URL. Never
+**File exists and may be offered** ticked **and** a verified file URL: an https file (public at its
+own address, so the signup gate does not protect it), or a repository PDF named `/freebies/<name>.pdf`,
+which lives in `content/freebies` and is offered only through the signed download after a signup. The Studio will not let you tick the box without a URL. Never
 tick it for a file that does not exist yet: the page would then promise it.
 
 The seeded download is the **Bibo Bay Activity Pack** (`/freebies/bibo-bay-activity-pack.pdf`):
-eight printable pages built from the site's own copy and the channel's stills, offered with no
-sign-up. For that file the card also shows renders of its pages and its real size; any other file
-shows its title and description only. Removing the reference from the signup section removes the
-card.
+eight printable pages built from the site's own copy and the channel's stills, offered only after
+the visitor joins the founding-family list (ruling R140). The file lives in `content/freebies/`, not
+in `public/`, so it has no address on the site: it is served only by the signed route
+`/api/freebies/download?t=...`, with a link that the signup answer (24 hours) and the acknowledgement
+email (30 days) carry. `/freebies/*.pdf` in the CMS is therefore the identity of a repository file,
+not an address a browser can open; opening it directly answers 404. For that file the card also
+shows renders of its pages and its real size; any other file shows its title and description only.
+Removing the reference from the signup section removes the card.
 
-The acknowledgement email repeats the link once the site's public address is known (a verified
+A dataset seeded before 2026-10-16 keeps the old lead description and button label ("...with no
+sign-up", "Join the list"), because seeding creates only missing documents; edit the lead section by hand.
+
+The acknowledgement email carries the signed link once the site's public address is known (a verified
 canonical URL in Site settings, or `NEXT_PUBLIC_APP_URL`); until then it leaves the download out
 rather than send a link that cannot open from an inbox.
 
 To change the pack, edit `scripts/freebie/build_activity_pack.py` (or the site copy it reads) and
-run `uv run scripts/freebie/build_activity_pack.py` from the repository root. It rewrites the PDF,
+run `uv run scripts/freebie/build_activity_pack.py` from the repository root. It rewrites the PDF (in `content/freebies/`),
 its page previews and `lib/content/activity-pack.manifest.json`; `tests/freebie` checks that the
 three still agree, and that every link and QR code in the PDF goes to the channel or one of its
 videos. The build is reproducible: the fonts are pinned to a google/fonts commit and checked by

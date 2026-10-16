@@ -81,7 +81,11 @@ export const UI_COPY = {
     turnOff: "Turn statistics off",
     turnOn: "Turn statistics on",
   },
-  /** The download card's button; the file's own title follows for assistive technology. */
+  /** The locked card's button: it leads to the signup form (R140); the file's own title follows for assistive technology. */
+  getFreebie: "Get the free pack",
+  /** The line under the locked card's button. */
+  freebieGate: "Free for everyone on the list.",
+  /** The form's download button, shown only after the server confirms the signup. */
   downloadFreebie: "Download the free pack",
   /** The repository pack's format line, from its real page count and size. */
   freebieMeta: (pages: number, bytes: number) => `PDF · ${pages} pages · ${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`,

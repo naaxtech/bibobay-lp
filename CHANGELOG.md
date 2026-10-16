@@ -2,6 +2,21 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-16 — Free activity pack behind the signup
+
+### Changed
+
+- The free activity pack can be downloaded only after joining the founding-family list.
+- The signup answer and the acknowledgement email carry signed download links (24 hours and 30 days).
+- The site no longer serves the PDF at a public address; it is downloaded only through the signed route.
+
+### Decisions recorded
+
+- R140: the pack sits behind the email signup, overriding R66's "the link is the file"; the signing key is derived from the existing address-hashing secret, so there is no new setting.
+- R141: download links are signed tokens that name only the file and an expiry, never a visitor.
+- R142: the privacy page states that the confirmation email also carries the download link; every other legal wording item stays with the owner.
+- R143: the repository is public and holds the PDF; the gate collects emails, it is not copy protection.
+
 ## 2026-10-16 — Production platform (branch `feat/bibobay-production-ready`)
 
 Replaces the Vite prototype with a CMS-driven Next.js platform. Every task of the production-platform

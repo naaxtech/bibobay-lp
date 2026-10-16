@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 // The generator's manifest is the pack's record (lib/content/freebie.ts reads the same file).
-const manifest = JSON.parse(readFileSync(join(process.cwd(), "lib/content/activity-pack.manifest.json"), "utf8")) as { file: string; bytes: number };
-const ACTIVITY_PACK = { fileUrl: manifest.file, bytes: manifest.bytes };
+const manifest = JSON.parse(readFileSync(join(process.cwd(), "lib/content/activity-pack.manifest.json"), "utf8")) as { file: string };
+const ACTIVITY_PACK = { fileUrl: manifest.file };
 
 const VIEWPORTS = [
   { name: "mobile", use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
@@ -14,13 +14,13 @@ const VIEWPORTS = [
 
 const SUBSCRIBE = /^https:\/\/www\.youtube\.com\/channel\/UC[\w-]{22}\?sub_confirmation=1$/;
 
-// R66: the free activity pack is a real file this site serves, offered without a sign-up; and every
+// R140 (overrides R66): the free activity pack is a real file served only through a signed route after an email signup; and every
 // page call to action leads to YouTube, where Bibo Bay is watched (owner directive 2026-10-15).
 for (const { name, use } of VIEWPORTS) {
   test.describe(`free activity pack and YouTube calls to action on ${name}`, () => {
     test.use(use);
 
-    test("offers the pack with its real page renders, and the file downloads as the stated PDF", async ({ page }) => {
+    test("locks the pack behind the signup form, with its real page renders and no public file", async ({ page }) => {
       await page.goto("/#lead");
       const card = page.locator("#lead [data-freebie]");
       await card.scrollIntoViewIfNeeded();
@@ -30,26 +30,31 @@ for (const { name, use } of VIEWPORTS) {
       await expect.poll(() => pages.evaluateAll((images) => images.filter((image) => !(image as HTMLImageElement).complete || (image as HTMLImageElement).naturalWidth === 0).length)).toBe(0);
       await expect(card.getByText(/^PDF · \d+ pages · [\d.]+ MB$/)).toBeVisible();
 
-      const download = card.getByRole("link", { name: /^Download the free pack/ });
+      const unlock = card.getByRole("link", { name: /^Get the free pack/ });
       // Exactly "<label>: <title>": a block-level hidden span makes Chromium insert a space before the colon.
       const title = (await card.getByRole("heading", { level: 3 }).innerText()).trim();
-      await expect(download).toHaveAccessibleName(`Download the free pack: ${title}`);
-      await expect(download).toHaveAttribute("href", ACTIVITY_PACK.fileUrl);
+      await expect(unlock).toHaveAccessibleName(`Get the free pack: ${title}`);
+      await expect(unlock).toHaveAttribute("href", "#lead-form");
+      // R140: the card holds no link to the file; only a signed route serves it.
+      await expect(card.locator('a[href$=".pdf"]')).toHaveCount(0);
       // The card sits inside the viewport, not off its edge.
       const box = (await card.boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(use.viewport.width);
 
-      const response = await page.request.get(ACTIVITY_PACK.fileUrl);
-      expect(response.status()).toBe(200);
-      expect(response.headers()["content-type"]).toContain("application/pdf");
-      const body = await response.body();
-      expect(body.length).toBe(ACTIVITY_PACK.bytes);
-      expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+      // The file is no longer public, and the signed route refuses anything without a valid token.
+      expect((await page.request.get(ACTIVITY_PACK.fileUrl)).status()).toBe(404);
+      expect((await page.request.get("/api/freebies/download")).status()).toBe(404);
+      expect((await page.request.get("/api/freebies/download?t=abc")).status()).toBe(404);
+      // Well-formed (passes the file-name and expiry shape check) but unsigned: the e2e dev server has
+      // no LEAD_IP_HASH_SECRET, so the route answers 503 "not open yet"; a malformed token is 404 above.
+      const wellFormed = `${Buffer.from(JSON.stringify({ f: ACTIVITY_PACK.fileUrl, e: 4102444800 })).toString("base64url")}.AAAA`;
+      // With a signing secret in the spec's environment the shape is valid and the signature is not (404); without one the route is unconfigured (503).
+      expect((await page.request.get(`/api/freebies/download?t=${wellFormed}`)).status()).toBe(process.env.LEAD_IP_HASH_SECRET ? 404 : 503);
 
       if (name === "desktop") {
-        const [file] = await Promise.all([page.waitForEvent("download"), download.click()]);
-        expect(file.suggestedFilename()).toBe("bibo-bay-activity-pack.pdf");
+        await unlock.click();
+        await expect(page.locator("#lead-form")).toBeInViewport();
       }
     });
 

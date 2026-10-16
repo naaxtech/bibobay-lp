@@ -15,6 +15,9 @@ import {
   type LeadFieldErrorCode,
   type LeadFieldErrors,
 } from "@/lib/leads/fields";
+import { DownloadGlyph } from "@/components/landing/DownloadGlyph";
+import { UI_COPY } from "@/components/landing/ui-copy";
+import { acceptDownload, type AcceptedDownload } from "./download-link";
 import { FORM_COPY, fieldErrorMessage } from "./form-copy";
 
 /** The CMS lead copy the form shows (spec §8: every sentence about BIBO comes from Sanity). */
@@ -94,6 +97,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
   const hydrated = useHydrated();
   const [errors, setErrors] = useState<LeadFieldErrors>({});
   const [outcome, setOutcome] = useState<Outcome>(null);
+  // R140: the pack's link, kept only from a confirmed (persisted) signup; cleared when a submit starts.
+  const [download, setDownload] = useState<AcceptedDownload | null>(null);
   const [pending, setPending] = useState(false);
   const [summaryFocus, setSummaryFocus] = useState(0);
   const [focusReturn, setFocusReturn] = useState<FocusReturn>(null);
@@ -132,6 +137,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
     const values = { email: text("email"), firstName: text("firstName"), ageBand: text("ageBand"), consent: data.get("consent") !== null };
 
     setOutcome(null);
+    setDownload(null);
     const found = checkLeadFields(values);
     if (Object.keys(found).length > 0) {
       showFieldErrors(found);
@@ -169,6 +175,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
       const answer: unknown = await response.json().catch(() => null);
       if (response.ok && isRecord(answer) && answer.ok === true && answer.persisted === true) {
         setOutcome({ tone: "success", text: copy.successMessage });
+        // This branch is the persisted guard: it requires answer.persisted === true.
+        setDownload(acceptDownload(answer.download));
         // Ruling R70: the outcome only; nothing the visitor typed.
         track("lead_submitted", { persisted: true, acknowledgementQueued: answer.acknowledgementQueued === true });
         form.reset();
@@ -206,8 +214,9 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
   };
   const listed = LEAD_FIELD_ORDER.filter((field) => errors[field]);
 
+  // The page renders one form, so the id is fixed on purpose (the freebie card anchors to it).
   return (
-    <form className="lead-form" aria-label={FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
+    <form id="lead-form" className="lead-form" aria-label={FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
       {listed.length > 0 ? (
         // role="group": a generic <div> may not be named (ARIA 1.2), so its title might never be
         // announced when it takes focus (review M5).
@@ -354,6 +363,27 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
           </p>
         </div>
       </div>
+
+      {/* After the status line and outside it, so the live region announces the outcome once; shown only for a stored signup. */}
+      {download ? (
+        <div className="lead-form__download-block">
+          <p className="lead-form__download-lead">{FORM_COPY.downloadReady}</p>
+          <a
+            className="btn btn-primary lead-form__download"
+            href={download.url}
+            {...(download.sameOrigin ? { download: "" } : {})}
+            aria-label={`${UI_COPY.downloadFreebie}: ${download.title}`}
+          >
+            <DownloadGlyph />
+            {UI_COPY.downloadFreebie}
+          </a>
+        </div>
+      ) : null}
+
+      {/* Always mounted so assistive technology hears the change (WCAG 4.1.3). No role: the form keeps exactly one role=status element; empty until a download is accepted. */}
+      <p className="lead-form__download-status sr-only" data-download-announcement aria-live="polite" aria-atomic="true">
+        {download ? `${FORM_COPY.downloadReady} ${UI_COPY.downloadFreebie}: ${download.title}` : ""}
+      </p>
 
       <noscript>
         <p className="lead-form__noscript">{FORM_COPY.noScript}</p>

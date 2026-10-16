@@ -52,7 +52,7 @@ const questions = [
   ["what", "What is BIBO Bay?", "BIBO Bay is a gentle underwater world of mindful content for curious little learners ages 2–6: songs, stories and playful adventures with Tula, Bob and Lumi."],
   ["episodes", "Where can we watch?", "On the Bibo Bay YouTube channel, @bibobay-tv. Every video on this page opens there."],
   ["ages", "Who is it for?", "Little learners ages 2–6, and the grown-ups watching with them."],
-  ["signup", "What happens when I join?", "Your request to join the founding-family list is recorded when the signup service accepts it. This does not guarantee an email or download."],
+  ["signup", "What happens when I join?", "Your request to join the founding-family list is recorded when the signup service accepts it. Once it is stored, the page shows the download button for the activity pack. A confirmation email is not guaranteed."],
 ] as const;
 const sectionIds = ["hero", "trust", "promise", "characters", "episodes", "offline", "pillars", "ecosystem", "testimonials", "lead", "faq", "finalCta"] as const;
 
@@ -63,7 +63,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     ...values.map(([id, title, description, prompts]) => ({ _id: collectionId("brandPillar", id), _type: "brandPillar", title, description, prompts: [...prompts] })),
     ...extensions.map(([id, name, tagline]) => ({ _id: collectionId("ecosystemEntry", id), _type: "ecosystemEntry", name, tagline, description: `A possible future space for ${tagline.toLowerCase()}.`, status: "idea" })),
     ...questions.map(([id, question, answer]) => ({ _id: collectionId("faqItem", id), _type: "faqItem", question, answer })),
-    // The one download: the activity pack this repository ships in public/freebies (R66).
+    // The one download: a PDF in content/freebies, served only by the signed route (R140).
     { _id: "leadMagnet-activity-pack", _type: "leadMagnet", title: "Bibo Bay Activity Pack", description: "Eight printable pages: colour the sea friends, count with Bob, match fruit with Tula, practise bubble breathing, a bedtime chart and a watch-together page.", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: true },
   ];
   const siteSettings: SeedDocument = {
@@ -94,7 +94,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     ecosystemIntro: intro("A wider world", "Ideas beyond the Bay.", "The wider BIBO ecosystem is a vision for future experiences, not a list of available products or services."),
     ecosystem: extensions.map(([id]) => ref("ecosystemEntry", id)),
     testimonialsIntro: intro("Family voices", "Experiences from families", "Verified experiences will appear here when available."), testimonials: [],
-    lead: { ...intro("Free activity pack", "Print, play and learn with the friends.", "Our free activity pack is yours to download right here, with no sign-up. Grown-ups can also join the list to hear about new adventures.", "leadSection"), buttonLabel: "Join the list", consentCopy: "I am an adult and agree to receive BIBO Bay updates.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again.", leadMagnet: { _type: "reference", _ref: "leadMagnet-activity-pack" } },
+    lead: { ...intro("Free activity pack", "Print, play and learn with the friends.", "Sign up with your email and the free activity pack is yours to download straight away. You'll also hear first about new adventures in the Bay.", "leadSection"), buttonLabel: "Get the free pack", consentCopy: "I am an adult and agree to receive BIBO Bay updates.", successMessage: "You joined the founding-family list.", errorMessage: "We could not save your request. Please try again.", leadMagnet: { _type: "reference", _ref: "leadMagnet-activity-pack" } },
     faqIntro: intro("Questions", "A little more about the Bay.", "What families ask about BIBO Bay."),
     faqs: questions.map(([id]) => ref("faqItem", id)),
     finalCta: { ...intro("Come say hello", "Dive into Bibo Bay.", "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", "finalCtaSection"), cta: subscribeOnYouTube() },

@@ -1808,6 +1808,12 @@
     flex: none;
   }
 
+  .freebie-card__gate {
+    margin-block-start: 0.625rem;
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+  }
+
   .freebie-card__meta {
     margin-block-start: 0.625rem;
     color: var(--bibo-color-navy-soft, #4a5878);

@@ -49,6 +49,8 @@ export const FORM_COPY = {
     /** Server answer for HTTP 400 with field errors; the form shows its own summary instead. */
     checkDetails: "Please check the highlighted fields and try again.",
   },
+  /** Lead-in to the download button; shown only after the server confirms the signup was stored (R140). */
+  downloadReady: "Your download is ready:",
   /** Shown only when JavaScript is off, where the form cannot submit. */
   noScript: "This form needs JavaScript. Turn it on in your browser to join the list.",
   /** Label of the hidden honeypot field; people never see it. */

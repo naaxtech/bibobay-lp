@@ -28,6 +28,13 @@ describe("classifyClick", () => {
     expect(classifyClick(el("#pack"))).toEqual({ event: "freebie_downloaded", properties: { file: "/freebies/bibo-bay-activity-pack.pdf", section: "lead", label: "Download the free pack: Bibo Bay Activity Pack" } });
   });
 
+  it("counts a click on the signed download link by its pathname only, never the token", () => {
+    mount(`<section data-section="lead"><a id="signed" href="/api/freebies/download?t=secret" download><svg></svg>Download the free pack</a></section>`);
+    const click = classifyClick(el("#signed"));
+    expect(click).toEqual({ event: "freebie_downloaded", properties: { file: "/api/freebies/download", section: "lead", label: "Download the free pack" } });
+    expect(JSON.stringify(click)).not.toContain("secret");
+  });
+
   it("records other links as calls to action with where they lead", () => {
     mount(`
       <section data-section="hero"><a id="anchor" href="#characters">Meet Tula, Bob &amp; Lumi</a></section>

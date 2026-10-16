@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import type { LegalSettings } from "@/lib/content/types";
-import { ackSendLimitPerHour, createLeadDependencies, leadStorageConfigured } from "@/lib/leads/dependencies";
+import { EMAIL_DOWNLOAD_TTL_SECONDS, IMMEDIATE_DOWNLOAD_TTL_SECONDS, verifyDownloadToken } from "@/lib/freebies/token";
+import { ackSendLimitPerHour, createLeadDependencies, immediateDownloadFrom, leadMagnetFrom, leadStorageConfigured } from "@/lib/leads/dependencies";
 
 vi.mock("server-only", () => ({}));
 
@@ -112,14 +113,85 @@ describe("global send cap setting (R40)", () => {
   });
 });
 
-describe("the activity pack in the acknowledgement email (R66)", () => {
-  it("links the pack by its full address once the site's public origin is known", async () => {
-    const deps = await createLeadDependencies(request(), { NEXT_PUBLIC_APP_URL: "https://bibobay.example" });
-    expect(deps.leadMagnet).toEqual({ title: "Bibo Bay Activity Pack", fileUrl: "https://bibobay.example/freebies/bibo-bay-activity-pack.pdf" });
+const PACK_URL = "/freebies/bibo-bay-activity-pack.pdf";
+const FAKE_SECRET = "fixture-only-not-a-real-secret-0123456789";
+const SIGNED_ENV = { LEAD_IP_HASH_SECRET: FAKE_SECRET, NEXT_PUBLIC_APP_URL: "https://bibobay.example" };
+const lead = (fileUrl: string) => ({ ...SAFE_FALLBACK_CONTENT.lead, leadMagnet: { ...SAFE_FALLBACK_CONTENT.lead.leadMagnet!, title: "Bibo Bay Activity Pack", available: true, fileUrl } });
+const tokenOf = (link: string) => new URL(link, "https://x.example").searchParams.get("t");
+const secondsLeft = (token: string | null) => {
+  const claims = JSON.parse(Buffer.from((token ?? "").split(".")[0] ?? "", "base64url").toString("utf8")) as { e: number };
+  return claims.e - Math.floor(Date.now() / 1000);
+};
+
+// R140 overrides R66: the pack is reached only through a signed link, signed at call time.
+describe("the activity pack in the acknowledgement email (R140)", () => {
+  it("links the signed download route on the site's public origin, valid for the email lifetime", () => {
+    const magnet = leadMagnetFrom(lead(PACK_URL), SAFE_FALLBACK_SETTINGS, SIGNED_ENV);
+    expect(magnet?.title).toBe("Bibo Bay Activity Pack");
+    expect(magnet?.fileUrl.startsWith("https://bibobay.example/api/freebies/download?t=")).toBe(true);
+    expect(magnet?.expiresInDays).toBe(30);
+    const token = tokenOf(magnet?.fileUrl ?? "");
+    expect(verifyDownloadToken(token, SIGNED_ENV)).toEqual({ ok: true, fileUrl: PACK_URL });
+    expect(secondsLeft(token)).toBeGreaterThan(EMAIL_DOWNLOAD_TTL_SECONDS - 60);
+    expect(secondsLeft(token)).toBeLessThanOrEqual(EMAIL_DOWNLOAD_TTL_SECONDS);
   });
 
-  it("leaves the pack out of the email while the origin is unknown, rather than send a broken link", async () => {
-    const deps = await createLeadDependencies(request(), {});
-    expect(deps.leadMagnet).toBeNull();
+  it("leaves the pack out of the email while the origin is unknown, rather than send a broken link", () => {
+    expect(leadMagnetFrom(lead(PACK_URL), SAFE_FALLBACK_SETTINGS, { LEAD_IP_HASH_SECRET: FAKE_SECRET })).toBeNull();
+  });
+
+  it("leaves the pack out while the signing secret is missing or short", () => {
+    expect(leadMagnetFrom(lead(PACK_URL), SAFE_FALLBACK_SETTINGS, { NEXT_PUBLIC_APP_URL: "https://bibobay.example" })).toBeNull();
+    expect(leadMagnetFrom(lead(PACK_URL), SAFE_FALLBACK_SETTINGS, { ...SIGNED_ENV, LEAD_IP_HASH_SECRET: "short" })).toBeNull();
+  });
+
+  it("passes an https CMS file through unchanged, without a token", () => {
+    const url = "https://cdn.sanity.io/files/abc/production/sheet.pdf";
+    expect(leadMagnetFrom(lead(url), SAFE_FALLBACK_SETTINGS, {})).toEqual({ title: "Bibo Bay Activity Pack", fileUrl: url });
+    expect(leadMagnetFrom(lead(url), SAFE_FALLBACK_SETTINGS, {})?.expiresInDays).toBeUndefined();
+  });
+
+  it("wires the signed link into the request dependencies", async () => {
+    const deps = await createLeadDependencies(request(), SIGNED_ENV);
+    expect(deps.leadMagnet?.fileUrl).toContain("https://bibobay.example/api/freebies/download?t=");
+  });
+});
+
+describe("the download the signup answer carries (R140)", () => {
+  it("is a same-origin signed path valid for the immediate lifetime", () => {
+    const download = immediateDownloadFrom(lead(PACK_URL), SIGNED_ENV);
+    expect(download?.title).toBe("Bibo Bay Activity Pack");
+    expect(download?.url.startsWith("/api/freebies/download?t=")).toBe(true);
+    const token = tokenOf(download?.url ?? "");
+    expect(verifyDownloadToken(token, SIGNED_ENV)).toEqual({ ok: true, fileUrl: PACK_URL });
+    expect(secondsLeft(token)).toBeGreaterThan(IMMEDIATE_DOWNLOAD_TTL_SECONDS - 60);
+    expect(secondsLeft(token)).toBeLessThanOrEqual(IMMEDIATE_DOWNLOAD_TTL_SECONDS);
+  });
+
+  it("needs no public origin, only the secret", () => {
+    expect(immediateDownloadFrom(lead(PACK_URL), { LEAD_IP_HASH_SECRET: FAKE_SECRET })).not.toBeNull();
+  });
+
+  it("is null without a signing secret", () => {
+    expect(immediateDownloadFrom(lead(PACK_URL), {})).toBeNull();
+  });
+
+  it("is null when no file is available", () => {
+    const unavailable = { ...SAFE_FALLBACK_CONTENT.lead, leadMagnet: { ...SAFE_FALLBACK_CONTENT.lead.leadMagnet!, title: "Pack", available: false, fileUrl: PACK_URL } };
+    expect(immediateDownloadFrom(unavailable, SIGNED_ENV)).toBeNull();
+  });
+
+  it("hands an https CMS file over as it is, with no token", () => {
+    const url = "https://cdn.sanity.io/files/abc/production/sheet.pdf";
+    expect(immediateDownloadFrom(lead(url), {})).toEqual({ title: "Bibo Bay Activity Pack", url });
+  });
+
+  it("refuses a file that is neither the repository pack nor https", () => {
+    expect(immediateDownloadFrom(lead("javascript:alert(1)"), SIGNED_ENV)).toBeNull();
+  });
+
+  it("is wired into the request dependencies", async () => {
+    expect((await createLeadDependencies(request(), SIGNED_ENV)).download?.url).toContain("/api/freebies/download?t=");
+    expect((await createLeadDependencies(request(), {})).download).toBeNull();
   });
 });

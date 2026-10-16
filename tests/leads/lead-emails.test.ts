@@ -38,6 +38,15 @@ describe("acknowledgement email", () => {
     const withFile = buildLeadAcknowledgement({ firstName: "Ana", leadMagnet: { title: "Bay colouring sheet", fileUrl: "https://cdn.sanity.io/files/abc/production/sheet.pdf" } });
     expect(withFile.text).toContain("Bay colouring sheet: https://cdn.sanity.io/files/abc/production/sheet.pdf");
     expect(withFile.html).toContain('href="https://cdn.sanity.io/files/abc/production/sheet.pdf"');
+    expect(withFile.text).toContain("Here is your free download:");
+    expect(withFile.html).toContain("Here is your free download:");
+    expect(withFile.text).not.toContain("30 days");
+    expect(withFile.html).not.toContain("30 days");
+    const signed = buildLeadAcknowledgement({ firstName: "Ana", leadMagnet: { title: "Pack", fileUrl: "https://bibobay.example/api/freebies/download?t=abc.def", expiresInDays: 30 } });
+    expect(signed.text).toContain("Here is your free download; the link works for 30 days:");
+    expect(signed.html).toContain("Here is your free download; the link works for 30 days:");
+    expect(withFile.text).not.toContain("As a thank-you");
+    expect(withFile.html).not.toContain("As a thank-you");
   });
 
   it("refuses a lead-magnet link that is not https", () => {

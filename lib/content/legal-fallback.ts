@@ -100,7 +100,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
     ),
     heading("Why we use your details"),
     paragraph(
-      "To send you updates about BIBO Bay, which is what you agree to when you join. Once email sending is set up, you receive one email confirming that you joined, and the BIBO Bay team may receive a short note with your email address, first name and age range so they know someone signed up.",
+      "To send you updates about BIBO Bay, which is what you agree to when you join, and to send you the download link for the free activity pack. Once email sending is set up, you receive one email confirming that you joined, and the BIBO Bay team may receive a short note with your email address, first name and age range so they know someone signed up.",
     ),
     ...whenSelling(commerce, () =>
       paragraph(

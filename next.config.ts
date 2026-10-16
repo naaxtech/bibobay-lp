@@ -2,7 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 import { sentryDsnFrom } from "./lib/observability/monitoring-env";
-import { ADMIN_HEADER_RULES, API_CONTENT_SECURITY_POLICY, PRIVATE_LINK_HEADER_RULE, securityEnvironment, staticSecurityHeaders } from "./lib/security/headers";
+import { ADMIN_HEADER_RULES, API_CONTENT_SECURITY_POLICY, FREEBIE_DOWNLOAD_HEADER_RULE, PRIVATE_LINK_HEADER_RULE, securityEnvironment, staticSecurityHeaders } from "./lib/security/headers";
 
 const nextConfig: NextConfig = {
   // src: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins · next 16.3.8 · 2026-10-05
@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
     // future optimised use to this one host.
     remotePatterns: [{ protocol: "https", hostname: "cdn.sanity.io", pathname: "/images/**" }],
   },
+  // src: node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md · next 16.3.8 · 2026-10-16
+  // Ruling R140: the activity pack lives in content/freebies (not public/) and is read at request time by the
+  // signed download route, so the file tracer must be told to ship it with that one function. Keys are route
+  // globs; values are globs from the project root.
+  outputFileTracingIncludes: { "/api/freebies/download": ["./content/freebies/*.pdf"] },
   // src: node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/headers.md · next 16.3.8 · 2026-10-13
   // Ruling R34. The hardening headers go on every response; the page CSP is per request (proxy.ts,
   // which needs a fresh nonce), and API responses get a fixed deny-all policy. Next evaluates this
@@ -37,6 +42,8 @@ const nextConfig: NextConfig = {
       PRIVATE_LINK_HEADER_RULE,
       // Task 8b (R99): the staff pages and API, private in the same way; after the API rule too.
       ...ADMIN_HEADER_RULES,
+      // R140: the signed download route, private like the order pages; after the site-wide rule.
+      FREEBIE_DOWNLOAD_HEADER_RULE,
     ];
   },
 };

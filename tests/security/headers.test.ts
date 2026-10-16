@@ -200,3 +200,19 @@ describe("proxy.ts", () => {
     expect(matcher!.missing).toEqual(expect.arrayContaining([{ type: "header", key: "next-router-prefetch" }, { type: "header", key: "purpose", value: "prefetch" }]));
   });
 });
+
+describe("freebie download response headers (ruling R140)", () => {
+  it("come after the site-wide rule and are private", async () => {
+    const { FREEBIE_DOWNLOAD_HEADER_RULE } = await import("@/lib/security/headers");
+    const rules = await nextConfig.headers!();
+    const index = rules.findIndex((rule) => rule.source === "/api/freebies/download");
+    expect(index).toBeGreaterThan(rules.findIndex((rule) => rule.source === "/:path*"));
+    expect(index).toBeGreaterThan(rules.findIndex((rule) => rule.source === "/api/:path*"));
+    expect(rules[index]!.headers).toEqual([
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
+    expect(FREEBIE_DOWNLOAD_HEADER_RULE.source).toBe("/api/freebies/download");
+  });
+});

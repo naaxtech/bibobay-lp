@@ -135,6 +135,8 @@ export interface LeadSubmissionDependencies {
   clientKey: string;
   staffEmail: string | null;
   leadMagnet: LeadMagnetLink | null;
+  /** The link the 200 answer carries; null while no download is configured. */
+  download: { url: string; title: string } | null;
   /** Reply-to for the acknowledgement only; the staff alert never has one (review M3). */
   replyTo: string | null;
   /** Structured, PII-free operational log. */
@@ -155,6 +157,8 @@ export interface LeadApiBody {
   acknowledgementQueued: boolean;
   message: string;
   fieldErrors?: LeadFieldErrors;
+  /** Present only on a persisted signup when a download is configured: a same-origin signed path or an https file. */
+  download?: { url: string; title: string };
 }
 
 export interface LeadSubmissionResult {
@@ -421,7 +425,10 @@ export async function submitLead(input: unknown, dependencies: LeadSubmissionDep
    *   }
    */
 
-  return { status: 200, body: { ok: true, persisted: true, acknowledgementQueued, message: copy.successMessage } };
+  return {
+    status: 200,
+    body: { ok: true, persisted: true, acknowledgementQueued, message: copy.successMessage, ...(dependencies.download ? { download: dependencies.download } : {}) },
+  };
 }
 
 /** Writes one outbox row, unclaimed (R88). Never throws: a failure means the row does not exist. */
