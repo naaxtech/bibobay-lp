@@ -1,0 +1,171 @@
+tests/content/fallback-lead-copy.test.ts
+  s_36fcf8940d4895::t_cf12401a52c85c 13-14
+  s_36fcf8940d4895::t_9f79bdf05adf47 1-9,12,19-20
+  s_36fcf8940d4895::t_e944d0f00574a6 10-11
+  s_36fcf8940d4895::t_7eca6b0f68b4a2 15-18
+tests/leads/lead-form-download.test.tsx
+  s_36fcf8940d4895::t_e944d0f00574a6 51-52,54-55,58-73
+  s_36fcf8940d4895::t_92acfe43570c26 50,53,56-57,87-89
+  s_36fcf8940d4895::t_c8e546bd491ada 1-49,74-86,90-131,141-142
+  s_36fcf8940d4895::t_31ab660899c63c 132-140
+tests/landing/section-renderer.test.tsx
+  s_36fcf8940d4895::t_e944d0f00574a6 78-86
+  s_36fcf8940d4895::t_9c1736b4dbb9a4 6,89-90
+  s_36fcf8940d4895::t_5d117e21edfe81 263,287
+  s_36fcf8940d4895::t_a6afa581b39103 262,265-270,272,279,283,288-291
+  s_36fcf8940d4895::t_7a876b0f17d898 273
+studio/scripts/seed-data.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 55,66,97
+components/forms/download-link.ts
+  s_36fcf8940d4895::t_67b976c4d583cd 1-13,15-18,21-32
+  s_36fcf8940d4895::t_4175bf1c947242 14,19-20
+lib/outbox/dependencies.ts
+  s_36fcf8940d4895::t_b316fc0e7f062a 20-22
+e2e/leads/lead-form.spec.ts
+  s_36fcf8940d4895::t_55ee30082cb3cb 25
+app/api/freebies/download/route.ts
+  s_36fcf8940d4895::t_13dac28743cd58 6,10-11,13-14,27-31,44-45
+  s_36fcf8940d4895::t_f3879bd41ae76c 46-47
+  s_36fcf8940d4895::t_373c3b8039ab6c 1-5,7-9,12,15-26,32-43,48-59
+app/api/leads/route.ts
+  s_36fcf8940d4895::t_7e2a7b342459e5 10-11
+lib/content/legal-fallback.ts
+  s_36fcf8940d4895::t_b316fc0e7f062a 103
+lib/leads/dependencies.ts
+  s_36fcf8940d4895::t_b7de432cba806c 11-12,17,39-40,100-105,108-109,111-133,142,162
+docs/observability.md
+  s_36fcf8940d4895::t_846664a555ee6e 16
+components/forms/lead-form.css
+  s_36fcf8940d4895::t_0fe3fc177c9681 218-246
+e2e/landing/freebie-youtube.spec.ts
+  s_36fcf8940d4895::t_93a348268400f4 7
+  s_36fcf8940d4895::t_b5c2616bf2f6ba 49-51
+  s_36fcf8940d4895::t_312e99435ce1ce 8,17,23,33,36-39,45-48,56-57
+  s_36fcf8940d4895::t_71b5da395feed9 52-53
+studio/schemaTypes/documents/collections.ts
+  s_36fcf8940d4895::t_aba1ddf74136c0 47
+tests/freebie/activity-pack.test.ts
+  s_36fcf8940d4895::t_0591ea8472a949 15-16
+  s_36fcf8940d4895::t_242a203c01d05e 114,122-125
+  s_36fcf8940d4895::t_1039a6435d762d 129-130,133
+  s_36fcf8940d4895::t_b7de432cba806c 131,134-137
+  s_36fcf8940d4895::t_6fc258e075e63d 2
+  s_36fcf8940d4895::t_eae4221ae98cbb 36
+  s_36fcf8940d4895::t_365eed5d4f3dd8 126
+tests/leads/lead-submit.test.ts
+  s_36fcf8940d4895::t_9d017277a677c1 146,769-796
+components/landing/ui-copy.ts
+  s_36fcf8940d4895::t_846664a555ee6e 84-86,88
+  s_36fcf8940d4895::t_9575b62c8adef8 87
+tests/leads/lead-emails.test.ts
+  s_36fcf8940d4895::t_1039a6435d762d 41-47
+  s_36fcf8940d4895::t_5dd0cf9a77c275 48-49
+docs/architecture.md
+  s_36fcf8940d4895::t_7e2a7b342459e5 145,152-153
+lib/security/headers.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 164-172
+  s_36fcf8940d4895::t_c758d4d1157036 163
+lib/security/secrets.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 11-16
+next.config.ts
+  s_36fcf8940d4895::t_13dac28743cd58 5
+  s_36fcf8940d4895::t_e944d0f00574a6 45-46
+  s_36fcf8940d4895::t_0067febaa6ed54 27-31
+tests/security/headers.test.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 203-218
+CHANGELOG.md
+  s_36fcf8940d4895::t_0acfd61048d877 15
+  s_36fcf8940d4895::t_7e2a7b342459e5 5-10,12-14,16,18-19
+  s_36fcf8940d4895::t_aba1ddf74136c0 11,17
+tests/leads/lead-copy.test.tsx
+  s_36fcf8940d4895::t_5983865e71f345 329-332
+lib/email/lead-emails.ts
+  s_36fcf8940d4895::t_13dac28743cd58 23-24,73,80,91
+components/landing/FreebieCard.tsx
+  s_36fcf8940d4895::t_e944d0f00574a6 14,46
+  s_36fcf8940d4895::t_846664a555ee6e 3,7-12,48,50
+lib/analytics/classify.ts
+  s_36fcf8940d4895::t_846664a555ee6e 1,53-54
+tests/leads/lead-route.test.ts
+  s_36fcf8940d4895::t_c2f4ce59821772 202,244,286,316
+  s_36fcf8940d4895::t_97fe9f06aa6476 63
+  s_36fcf8940d4895::t_7a49a301d36297 64
+e2e/analytics/analytics.spec.ts
+  s_36fcf8940d4895::t_eb4daf6abfaac8 80-101,106-109
+docs/deployment.md
+  s_36fcf8940d4895::t_aba1ddf74136c0 41
+lib/freebies/file.ts
+  s_36fcf8940d4895::t_cc4a3b0b3792c9 1-2,4-16,18
+  s_36fcf8940d4895::t_e944d0f00574a6 3,17
+lib/freebies/token.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 6,17-18,31-32
+  s_36fcf8940d4895::t_02d8d0348f8719 1-5,7-16,19-30,33-87
+e2e/freebies/download.spec.ts
+  s_36fcf8940d4895::t_b5c2616bf2f6ba 1-54
+tests/analytics/classify.test.ts
+  s_36fcf8940d4895::t_179e4e691c2b32 31-37
+scripts/freebie/build_activity_pack.py
+  s_36fcf8940d4895::t_3e93418914b25f 62-63
+  s_36fcf8940d4895::t_6cae84c03fdf5f 17-18,961,972-974
+components/forms/form-copy.ts
+  s_36fcf8940d4895::t_846664a555ee6e 52-53
+components/forms/LeadForm.tsx
+  s_36fcf8940d4895::t_6293a271273fa0 18-20
+  s_36fcf8940d4895::t_63fdc8e010f7d4 100-101
+  s_36fcf8940d4895::t_980d1a0eed5334 140
+  s_36fcf8940d4895::t_e944d0f00574a6 382,385-386
+  s_36fcf8940d4895::t_4fbf8d7884fe8d 367-381,387
+  s_36fcf8940d4895::t_92acfe43570c26 383-384
+  s_36fcf8940d4895::t_692defef2ed04b 219
+  s_36fcf8940d4895::t_d158b08c36aba0 178-179,217
+docs/cms-operations.md
+  s_36fcf8940d4895::t_aba1ddf74136c0 101-103,109,115-117
+  s_36fcf8940d4895::t_e8adf50ed0a601 124
+  s_36fcf8940d4895::t_c5e0f42a105e9b 107-108,110-114,119
+  s_36fcf8940d4895::t_2e22af93a3d064 118
+lib/content/fallback.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 96,102
+tests/leads/lead-dependencies.test.ts
+  s_36fcf8940d4895::t_7c721a44f53ec1 5-6,116-131,133-136,139-150,152-195
+  s_36fcf8940d4895::t_1039a6435d762d 132,151
+lib/content/freebie.ts
+  s_36fcf8940d4895::t_b7de432cba806c 4,8,36-38,40-41
+tests/freebies/download-route.test.ts
+  s_36fcf8940d4895::t_c8b584a147115a 12-13,24,81-84,91
+  s_36fcf8940d4895::t_5bb35b6e10f9bf 20
+  s_36fcf8940d4895::t_647ae595b303ba 1-11,14-19,21,26-80,92-104
+  s_36fcf8940d4895::t_1039a6435d762d 22-23,25,85-90
+tests/freebies/token.test.ts
+  s_36fcf8940d4895::t_f51a32e97a3907 1-78
+components/landing/LeadCapture.tsx
+  s_36fcf8940d4895::t_e944d0f00574a6 62
+components/landing/DownloadGlyph.tsx
+  s_36fcf8940d4895::t_d18a8bb22ef8dc 1-8
+lib/content/normalize.ts
+  s_36fcf8940d4895::t_e944d0f00574a6 13
+.github/workflows/ci.yml
+  s_36fcf8940d4895::t_b5c2616bf2f6ba 256-257,297-298
+  s_36fcf8940d4895::t_aba1ddf74136c0 273-274
+lib/leads/submit.ts
+  s_36fcf8940d4895::t_b316fc0e7f062a 138-139,160-161,428-431
+components/landing/landing.css
+  s_36fcf8940d4895::t_e318992804d541 1811-1816
+docs/superpowers/plans/2026-10-16-gated-activity-pack.md
+  s_36fcf8940d4895::t_d36a1c14b25dd9 75,100,118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "adda12662b261e2468b977224721dfcb4011ec57",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
