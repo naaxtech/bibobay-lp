@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { deriveSecretRules } from "./lib/bundle-secrets";
 import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
 import { bypassFetch, bypassSecretFrom, carriesBypass } from "./lib/protection-bypass";
-import { ALLOWED_PUBLIC_NAMES } from "./verify-env";
+import { ALLOWED_PUBLIC_NAMES, isAllowedPublicName } from "./verify-env";
 
 /*
  * npm run verify:deployment -- <url> [--browser] [--require-ready] [--production] [--expect-heading <text>] [--min-text <n>]
@@ -113,7 +113,7 @@ async function main(): Promise<number> {
   const { options } = parsed;
   // Scan for the values this machine (or CI job) holds, read the same way verify:bundle reads them.
   nextEnv.loadEnvConfig(process.cwd(), false);
-  const scanRules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, env: process.env });
+  const scanRules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, isAllowedPublicName, env: process.env });
   const results: CheckResult[] = [];
   const secret = bypassSecretFrom(process.env);
   try {

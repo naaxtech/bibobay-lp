@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { deriveSecretRules, scanBuildOutput, type Finding } from "./lib/bundle-secrets";
-import { ALLOWED_PUBLIC_NAMES } from "./verify-env";
+import { ALLOWED_PUBLIC_NAMES, isAllowedPublicName } from "./verify-env";
 
 /*
  * npm run verify:bundle [-- --next-dir <dir>] [-- --public-dir <dir>]
@@ -45,7 +45,7 @@ if (!options) {
 
 // Scan for the values this machine (or CI job) actually holds, as the build saw them.
 nextEnv.loadEnvConfig(process.cwd(), false);
-const rules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, env: process.env });
+const rules = deriveSecretRules({ envExample: readFileSync(resolve(".env.example"), "utf8"), allowedPublicNames: ALLOWED_PUBLIC_NAMES, isAllowedPublicName, env: process.env });
 if (rules.configErrors.length > 0) {
   console.error(rules.configErrors.join("\n"));
   process.exit(1);
@@ -59,7 +59,7 @@ try {
   process.exit(2);
 }
 
-const summary = `${result.scannedFiles} client files; ${rules.serverNames.length} server names, ${rules.allowedPublicNames.size} allowed public names, ${rules.secretValues.length} configured secret values, token shapes and server-code indicators`;
+const summary = `${result.scannedFiles} client files; ${rules.serverNames.length} server names, ${rules.allowedPublicNames.size} listed public names (plus the NEXT_PUBLIC_VERCEL_ namespace), ${rules.secretValues.length} configured secret values, token shapes and server-code indicators`;
 if (result.findings.length > 0) {
   print(result.findings);
   console.error(`Bundle secret scan FAILED: ${result.findings.length} finding(s) in ${summary}.`);

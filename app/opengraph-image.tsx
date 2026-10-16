@@ -52,7 +52,6 @@ export default async function OpenGraphImage() {
           color: color.navy,
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- next/og draws plain img elements only */}
         <img src={`data:image/svg+xml;base64,${logo.toString("base64")}`} width={logoWidth} height={logoHeight} alt="" />
         <div style={{ display: "flex", fontSize: 46, lineHeight: 1.2, textAlign: "center", maxWidth: 1000 }}>{drawableTitle(content.seo.title)}</div>
       </div>

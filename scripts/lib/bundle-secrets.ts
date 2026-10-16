@@ -52,6 +52,8 @@ export interface SecretRules {
   serverNames: string[];
   publicNames: string[];
   allowedPublicNames: ReadonlySet<string>;
+  /** Decides whether a public name is allowed; verify-env's isAllowedPublicName in production, the set's membership by default. */
+  isAllowedPublicName: (name: string) => boolean;
   secretValues: Array<{ name: string; value: string }>;
   /** Problems with the inputs themselves (e.g. .env.example lists a public name verify-env refuses). */
   configErrors: string[];
@@ -94,14 +96,14 @@ export function secretValuesFromEnv(env: Readonly<Record<string, string | undefi
   return values;
 }
 
-export function deriveSecretRules({ envExample, allowedPublicNames, env }: { envExample: string; allowedPublicNames: ReadonlySet<string>; env: Readonly<Record<string, string | undefined>> }): SecretRules {
+export function deriveSecretRules({ envExample, allowedPublicNames, isAllowedPublicName = (name) => allowedPublicNames.has(name), env }: { envExample: string; allowedPublicNames: ReadonlySet<string>; isAllowedPublicName?: (name: string) => boolean; env: Readonly<Record<string, string | undefined>> }): SecretRules {
   const serverNames = serverNamesFromEnvExample(envExample);
   const publicNames = publicNamesFromEnvExample(envExample);
   const configErrors = publicNames
-    .filter((name) => !allowedPublicNames.has(name))
+    .filter((name) => !isAllowedPublicName(name))
     .map((name) => `.env.example lists ${name}, which scripts/verify-env.ts does not allow`);
   if (serverNames.length === 0) configErrors.push(".env.example lists no server name; the scan would check nothing");
-  return { serverNames, publicNames, allowedPublicNames, secretValues: secretValuesFromEnv(env, serverNames), configErrors };
+  return { serverNames, publicNames, allowedPublicNames, isAllowedPublicName, secretValues: secretValuesFromEnv(env, serverNames), configErrors };
 }
 
 export interface TokenShape {
@@ -167,7 +169,7 @@ export function scanText(text: string, file: string, rules: SecretRules): Findin
   }
   const publicNames = new Set(Array.from(text.matchAll(/(?<![A-Za-z0-9_])NEXT_PUBLIC_[A-Z0-9_]+/g), (match) => match[0]));
   for (const name of [...publicNames].sort()) {
-    if (!rules.allowedPublicNames.has(name)) findings.push({ file, kind: "public-name", rule: name, detail: `public name not on the verify-env allow-list: ${name}` });
+    if (!rules.isAllowedPublicName(name)) findings.push({ file, kind: "public-name", rule: name, detail: `public name not on the verify-env allow-list: ${name}` });
   }
   for (const indicator of CODE_INDICATORS) {
     if (text.includes(indicator)) findings.push({ file, kind: "code-indicator", rule: indicator, detail: `server-code indicator "${indicator}"` });

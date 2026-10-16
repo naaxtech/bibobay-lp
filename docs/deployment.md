@@ -72,8 +72,8 @@ Not created yet (Task 11). Settings to use:
   restricted to non-commercial personal use, and this site keeps a mailing list and takes order
   requests, which is commercial use. Hobby is acceptable only for a private preview before anything
   commercial is reachable. Pro also lets the email cron run every 15 minutes (below).
-- The build runs `npm run verify:env -- production` first; it fails on a forbidden public name or a
-  short `LEAD_IP_HASH_SECRET` or `CRON_SECRET`.
+- The build runs `npm run verify:env -- production` first; it fails on a forbidden public name (Vercel's own
+  `NEXT_PUBLIC_VERCEL_*` names are allowed) or a short `LEAD_IP_HASH_SECRET` or `CRON_SECRET`.
 - Production branch: keep the feature branch until review; choose the production branch deliberately
   after approval.
 - Add the variables above per environment. Keep Preview and Production Supabase projects or at least

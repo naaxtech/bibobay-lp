@@ -36,26 +36,32 @@ const allowedPublicNames = new Set([
   // Task 10M-a: a Sentry DSN can only submit events. Its server names (SENTRY_AUTH_TOKEN,
   // SENTRY_ORG, SENTRY_PROJECT) are refused here under NEXT_PUBLIC_.
   "NEXT_PUBLIC_SENTRY_DSN",
-  // Vercel's own framework-prefixed System Environment Variables, set on every Next.js build.
-  // src: https://raw.githubusercontent.com/vercel/vercel/main/packages/build-utils/src/get-prefixed-env-vars.ts · read 2026-10-16
-  "NEXT_PUBLIC_VERCEL_URL",
-  "NEXT_PUBLIC_VERCEL_ENV",
-  "NEXT_PUBLIC_VERCEL_TARGET_ENV",
-  "NEXT_PUBLIC_VERCEL_REGION",
-  "NEXT_PUBLIC_VERCEL_BRANCH_URL",
-  "NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL",
-  "NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID",
-  "NEXT_PUBLIC_VERCEL_PROJECT_ID",
 ]);
 
-/** Vercel also adds every VERCEL_GIT_* variable with the framework prefix (same source). */
-const VERCEL_GIT_PUBLIC = /^NEXT_PUBLIC_VERCEL_GIT_[A-Z_]+$/;
+/**
+ * Vercel prefixes every System Environment Variable with the framework prefix (VERCEL_* becomes
+ * NEXT_PUBLIC_VERCEL_*) and adds names over time, so the whole namespace is allowed rather than a list:
+ * NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG appeared on 2026-10-16 and failed the first production build.
+ * Vercel's own prefixer (the file named below) produces only eight named variables plus VERCEL_GIT_*, never a
+ * credential-shaped name, and it does not produce that observability name: it reached the build by another Vercel
+ * path, which is why the whole namespace is allowed rather than the prefixer's list. Credential-shaped names
+ * inside the namespace stay refused on purpose, because any NEXT_PUBLIC_ value can reach the browser; a
+ * Vercel-injected one would need an explicit entry in the list above after its value is confirmed not secret.
+ * src: https://raw.githubusercontent.com/vercel/vercel/main/packages/build-utils/src/get-prefixed-env-vars.ts · read 2026-10-16
+ */
+const VERCEL_PUBLIC = /^NEXT_PUBLIC_VERCEL_[A-Z0-9_]+$/;
+
+/** The explicitly listed public names (the Vercel namespace is a rule, not a list); use isAllowedPublicName to decide. */
+export const ALLOWED_PUBLIC_NAMES: ReadonlySet<string> = allowedPublicNames;
 
 /**
- * The only names the browser may see. scripts/verify-bundle-secrets.ts reads this same set, so a
- * name added here is accepted by the client-bundle scan too, and any other NEXT_PUBLIC_ name fails it.
+ * The only names the browser may see: the explicit list or Vercel's own namespace, never a name shaped
+ * like a credential. scripts/verify-bundle-secrets.ts and verify-deployment.ts use this same predicate, so
+ * the env verifier and the client-bundle scan agree on every name.
  */
-export const ALLOWED_PUBLIC_NAMES: ReadonlySet<string> = allowedPublicNames;
+export function isAllowedPublicName(name: string): boolean {
+  return allowedPublicNames.has(name) || (VERCEL_PUBLIC.test(name) && !PRIVATE_NAME_PATTERN.test(name));
+}
 
 /** Server names whose values are credentials; their values must never reach a public name or the client bundle. */
 export const PRIVATE_NAME_PATTERN = /(?:_SECRET(?:_|$)|_TOKEN$|_PRIVATE_KEY$|_SERVICE_ROLE_KEY$|_API_KEY$)/i;
@@ -83,7 +89,7 @@ export function verifyEnvironment(
   );
   const forbiddenPublic = Object.keys(env)
     .filter((name) => name.startsWith("NEXT_PUBLIC_") && (
-      !(allowedPublicNames.has(name) || VERCEL_GIT_PUBLIC.test(name)) ||
+      !isAllowedPublicName(name) ||
       /^sb_secret_/i.test(env[name]?.trim() ?? "") ||
       (name === "NEXT_PUBLIC_POSTHOG_KEY" && /^phx_/i.test(env[name]?.trim() ?? "")) ||
       privateValues.has(env[name]?.trim())

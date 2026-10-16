@@ -19,4 +19,9 @@ export default defineConfig([
     "references/**",
     "studio/**",
   ]),
+  {
+    // These routes render ImageResponse JSX where <img> is the only element. The rule's own exemption for them was observed to differ by platform (the unused-directive warning fired on Linux and not on Windows), so an explicit override keeps lint identical everywhere.
+    files: ["app/**/opengraph-image.tsx", "app/**/twitter-image.tsx", "app/**/icon.tsx", "app/**/apple-icon.tsx"],
+    rules: { "@next/next/no-img-element": "off" },
+  },
 ]);

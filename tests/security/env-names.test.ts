@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { verifyEnvironment } from "@/scripts/verify-env";
+import { isAllowedPublicName, verifyEnvironment } from "@/scripts/verify-env";
 
 /*
  * Task 9 environment names. Every one is server-only: documented in .env.example without a public
@@ -49,9 +49,27 @@ describe("Vercel's own public variables", () => {
     expect(verifyEnvironment(env, "production").forbiddenPublic).toEqual([]);
   });
 
-  it("still refuses an invented NEXT_PUBLIC_VERCEL_ name and any secret value under these names", () => {
+  it("refuses a credential-shaped name in the Vercel namespace and any secret value under these names", () => {
     expect(verifyEnvironment({ NEXT_PUBLIC_VERCEL_TOKEN: "value" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_VERCEL_TOKEN"]);
     expect(verifyEnvironment({ SUPABASE_SERVICE_ROLE_KEY: "secret-value", NEXT_PUBLIC_VERCEL_URL: "secret-value" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_VERCEL_URL"]);
+  });
+});
+
+describe("the Vercel public namespace", () => {
+  it("accepts a Vercel name that is not enumerated, in the env verifier and the predicate", () => {
+    const name = "NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG";
+    expect(verifyEnvironment({ [name]: '{"a":1}' }, "production").forbiddenPublic).toEqual([]);
+    expect(isAllowedPublicName(name)).toBe(true);
+  });
+
+  it.each(["NEXT_PUBLIC_VERCEL_foo", "NEXT_PUBLIC_VERCELX_FOO", "NEXT_PUBLIC_VERCEL_", "NEXT_PUBLIC_EVIL"])("refuses %s", (name) => {
+    expect(verifyEnvironment({ [name]: "value" }, "production").forbiddenPublic).toEqual([name]);
+    expect(isAllowedPublicName(name)).toBe(false);
+  });
+
+  it("keeps refusing a credential-shaped name inside the namespace", () => {
+    expect(isAllowedPublicName("NEXT_PUBLIC_VERCEL_ACCESS_TOKEN")).toBe(false);
+    expect(isAllowedPublicName("NEXT_PUBLIC_VERCEL_BYPASS_SECRET")).toBe(false);
   });
 });
 

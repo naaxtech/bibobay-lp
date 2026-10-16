@@ -14,7 +14,7 @@ import {
   secretValuesFromEnv,
   serverNamesFromEnvExample,
 } from "@/scripts/lib/bundle-secrets";
-import { ALLOWED_PUBLIC_NAMES } from "@/scripts/verify-env";
+import { ALLOWED_PUBLIC_NAMES, isAllowedPublicName } from "@/scripts/verify-env";
 
 /*
  * The client-bundle secret scan (plan Task 10; spec §17.9: no service-role or secret value is exposed
@@ -26,7 +26,7 @@ import { ALLOWED_PUBLIC_NAMES } from "@/scripts/verify-env";
  */
 
 const ENV_EXAMPLE = readFileSync(resolve(".env.example"), "utf8");
-const rules = () => deriveSecretRules({ envExample: ENV_EXAMPLE, allowedPublicNames: ALLOWED_PUBLIC_NAMES, env: {} });
+const rules = () => deriveSecretRules({ envExample: ENV_EXAMPLE, allowedPublicNames: ALLOWED_PUBLIC_NAMES, isAllowedPublicName, env: {} });
 
 const base64url = (value: string) => Buffer.from(value).toString("base64url");
 const jwt = (payload: Record<string, unknown>) => [base64url(JSON.stringify({ alg: "HS256", typ: "JWT" })), base64url(JSON.stringify(payload)), "c2lnbmF0dXJlLWZpeHR1cmUtbm90LXJlYWwtMTIzNDU2"].join(".");
@@ -53,6 +53,11 @@ describe("secret names are derived, not hard-coded", () => {
     expect(publicNames.length).toBeGreaterThan(0);
     for (const name of publicNames) expect(ALLOWED_PUBLIC_NAMES.has(name), name).toBe(true);
     expect(rules().configErrors).toEqual([]);
+  });
+
+  it("accepts a Vercel-namespace name that is not enumerated, and still flags other public names", () => {
+    expect(scanText("NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG", "chunk.js", rules())).toEqual([]);
+    expect(scanText("NEXT_PUBLIC_EVIL", "chunk.js", rules()).map((finding) => finding.rule)).toEqual(["NEXT_PUBLIC_EVIL"]);
   });
 
   it("reports a configuration error when .env.example lists a public name verify-env would refuse", () => {
