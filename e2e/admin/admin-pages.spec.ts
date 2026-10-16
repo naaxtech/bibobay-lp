@@ -121,6 +121,67 @@ for (const { name, use } of VIEWPORTS) {
   });
 }
 
+/*
+ * The orders pages (Task 8c part 2). The server has no Supabase keys, so access is "unconfigured"
+ * and both pages show the notice (a signed-in render is proven in Vitest, ruling R106). Nothing
+ * here may call /api: the shared guard fails any request the test does not answer, and the context
+ * guard below covers /api/admin by name as well.
+ */
+const adminCalls = new WeakMap<object, string[]>();
+const ORDER_PAGES = ["/admin/orders", "/admin/orders?status=paid", "/admin/orders/BB-12AB-34CD"];
+
+for (const { name, use } of VIEWPORTS) {
+  test.describe(`the staff orders pages on ${name}`, () => {
+    test.use(use);
+
+    test.beforeEach(async ({ context }) => {
+      const reached: string[] = [];
+      await context.route("**/api/admin/**", async (route) => {
+        reached.push(route.request().url());
+        await route.abort("blockedbyclient");
+      });
+      adminCalls.set(context, reached);
+    });
+
+    test.afterEach(async ({ context }) => {
+      expect(adminCalls.get(context), "a staff page called the staff API on load").toEqual([]);
+    });
+
+    for (const path of ORDER_PAGES) {
+      test(`${path} shows the unconfigured notice with the admin headers, noindex and a Staff title`, async ({ page }) => {
+        const response = await page.goto(path);
+        expect(response?.status()).toBe(200);
+        const headers = response!.headers();
+        if (!process.env.PLAYWRIGHT_DEV_SERVER) expect(headers["cache-control"]).toContain("no-store");
+        expect(headers["x-robots-tag"]).toBe("noindex, nofollow");
+        expect(headers["referrer-policy"]).toBe("no-referrer");
+        await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+        await expect(page).toHaveTitle(/^Staff\b/);
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(PAGE_COPY.notices.unconfigured.title);
+        await expect(page.getByText(PAGE_COPY.notices.unconfigured.body)).toBeVisible();
+        await expect(page.getByRole("main")).toHaveCount(1);
+        await expect(page.getByRole("link", { name: PAGE_COPY.frame.skipToContent })).toHaveAttribute("href", "#main-content");
+        // No staff session: no sign-out button, and no order data or controls.
+        await expect(page.getByRole("button", { name: PAGE_COPY.signOut.label })).toHaveCount(0);
+        await expect(page.getByRole("table")).toHaveCount(0);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+      });
+    }
+
+    test("a malformed reference gets the same page as any other: nothing is looked up, nothing is revealed", async ({ page }) => {
+      const response = await page.goto("/admin/orders/not-a-reference");
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(PAGE_COPY.notices.unconfigured.title);
+    });
+
+    test("/admin goes to the orders", async ({ page }) => {
+      await page.goto("/admin");
+      await expect(page).toHaveURL(/\/admin\/orders$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(PAGE_COPY.notices.unconfigured.title);
+    });
+  });
+}
+
 test.describe("no public page leads to the staff pages", () => {
   for (const path of ["/", "/privacy", "/terms", "/thank-you"]) {
     test(`${path} links nowhere under /admin`, async ({ page }) => {

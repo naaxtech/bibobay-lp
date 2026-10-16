@@ -1,16 +1,17 @@
 # Manual checkout operations
 
-**Status: the customer side and the staff APIs are built; the staff pages are not built yet (Task 8c), so it is not usable yet.**
+**Status: the customer side, the staff APIs and the staff pages are built (Task 8c). The whole flow has not been tried end to end on a live preview yet (Task 12), so it is not ready to take real orders.**
 The commerce gate and order pad (Task 6), the order database, the order request API and the
 tracking API (Task 7a; see [database-security.md](database-security.md#orders-migrations-0002-to-0005)),
 the shop's catalogue and product pages, `/shop` and `/shop/[slug]` (Task 7b), and the order request
 and tracking pages, `/order`, `/track` and `/orders/[token]` (Task 7c), all exist. The email outbox
 worker and the order emails (buyer acknowledgement, staff order alert, and the quote email for when
 staff can send one) exist too (Task 8a). Staff sign-in, the staff access rules and the staff APIs
-for quotes, status changes and new tracking links exist (Task 8b; see [Staff access](#staff-access));
-the staff pages that use them do not (Task 8c; see the plan in `docs/superpowers/plans/`).
-`commerceEnabled` is `false` by default and must stay off: switching it on today lets customers send
-order requests that staff could only see and answer through raw API calls.
+for quotes, status changes and new tracking links exist (Task 8b; see [Staff access](#staff-access)),
+and so do the staff pages that use them: the sign-in page, the order list and the order page (Task 8c;
+see [Using the staff pages](#using-the-staff-pages)). Only a unit-test and keyless browser pass
+has covered the signed-in pages so far; a pass on a live preview with real staff accounts comes in
+Task 12. `commerceEnabled` is `false` by default and must stay off until that pass has been done.
 
 This page lists what the design specification requires, so operations staff know what is coming.
 It is not a procedure: the real steps will be written here once the workflow exists and has been
@@ -64,7 +65,8 @@ to touch this repository or any folder inside a git work tree, and nothing in th
 
 ## Staff access
 
-Built in Task 8b; the staff pages that use it come in Task 8c. Database details:
+Built in Task 8b; the staff pages that use it are described in
+[Using the staff pages](#using-the-staff-pages) (Task 8c). Database details:
 [database-security.md](database-security.md#staff-access-migration-0007).
 
 **Adding a staff member** (the owner, in the Supabase dashboard)
@@ -91,7 +93,7 @@ forgotten password is reset by the owner in Supabase). At most 10 attempts per n
 5 per email address in each 15 minutes. A wrong password and an account without staff access get
 the same answer. The session is kept in cookies that page scripts cannot read.
 
-**What staff can do** (the API; the pages in Task 8c will call it)
+**What staff can do** (the API; the staff pages call it)
 
 - Save a quote: currency (a three-letter ISO 4217 code, e.g. `AUD`), subtotal and freight in the currency's minor
   units (cents), and the payment link, which must be https on a host listed exactly in
@@ -105,6 +107,56 @@ the same answer. The session is kept in cookies that page scripts cannot read.
   changed it first nothing happens and the order must be reloaded.
 - Issue a new private tracking link: shown once to the staff member, the old link stops working.
 - Every one of these is recorded in the order's history with the staff member's user id.
+
+## Using the staff pages
+
+Built in Task 8c. They need JavaScript, and a staff account as described under
+[Staff access](#staff-access). The pages are private: they are never in the sitemap, no public
+page links to them, and search engines are told to stay away.
+
+1. **Sign in** at `/admin/login` with your email address and password. A bare `/admin` goes to the
+   orders. If you open an order link while signed out you land on the sign-in page; after signing in
+   you arrive on the order list, so open the order again from there.
+2. **Read an order**: `/admin/orders` lists the newest orders (reference, status, when it was
+   submitted and last changed, contact name, country, quote revision, and whether the mail service
+   accepted the quote email). The status links above the list narrow it to one status. Open a
+   reference to see the contact and delivery details, the notes, when consent was given, the
+   products, the current quote (the payment link is shown as plain text, not a link), every email
+   row (kind, status, attempts, last error code) and the order's history.
+3. **Save a quote**: on an order that is `new` or `confirmed`, choose the currency, type the subtotal
+   and freight in the currency's main unit (for example `1250.50`; yen take no decimals) and paste
+   the payment link. Saving stores a new revision and sends nothing to the customer.
+4. **Queue the quote email**: once the revision is saved, "Queue quote email" asks the server to queue
+   it. The button stays off while the form holds changes that are not saved. The email is attempted
+   after the answer; the order's email rows and its "Quote email" line show what happened later (reload
+   the page): "Accepted by the mail service" means the mail service took the email, not that it
+   arrived.
+5. **Advance the status**: only the next allowed step is offered (`new` → `confirmed` → `paid` →
+   `dispatched` → `closed`). Marking an order paid is a record that you have checked the payment
+   yourself; the website never takes or checks one.
+6. **Cancel**: "Cancel order" asks for confirmation first. A cancelled or closed order has no
+   status or quote controls.
+7. **New tracking link**: "Replace tracking link" makes a new private link, shows it once with a Copy
+   button and stops the old one working at once. Copy it before you leave the page: it cannot be
+   shown again. On a preview deployment the link points at the preview address.
+8. **Sign out** with the button in the header.
+
+What the messages mean (they come from the server as written; nothing was changed unless a message
+says it was saved):
+
+| Message starts | Meaning |
+|---|---|
+| "Quote saved." | The revision is stored. Nothing has gone to the customer. |
+| "Quote queued for email." | The email is queued for that revision. Its delivery shows on the order later. |
+| "This quote was already queued" | That revision was queued before; nothing more was queued. |
+| "Order status updated." | The status moved one step. |
+| "New tracking link created." | Copy the link now; the old one no longer works. |
+| "This order changed since you opened it." | A colleague changed the order first. The page reloads itself; check it and try again. |
+| "This order's current state does not allow that." | For example a quote on an order that is already paid. |
+| "Please check the highlighted fields" | One or more fields need fixing; the problems are written beside them. |
+| "No quote can be saved yet" | The site owner has not listed any payment provider; see [deployment.md](deployment.md). |
+| "Please sign in to continue." | The session ended; you are sent to the sign-in page. |
+| "Staff sign-in cannot be checked right now." | The sign-in service or the database did not answer. Nothing was changed. Try again in a few minutes. |
 
 ## What the specification requires
 
@@ -149,5 +201,5 @@ the same answer. The session is kept in cookies that page scripts cannot read.
 - QA orders on any shared environment are labelled `QA test … - delete me` and removed afterwards,
   and their removal is checked.
 
-Until Task 8c adds the staff pages and the whole flow is reviewed and tested end to end, there is
-nothing for operations staff to run.
+Until the whole flow has been tried end to end on a live preview (Task 12), do not take real orders
+with it.

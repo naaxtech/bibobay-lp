@@ -99,8 +99,8 @@ describe("email outbox worker docs (Task 8a)", () => {
   it("documents the worker as built in the README, and the staff side as still to come", () => {
     const readme = read("README.md").split(/\r?\n/);
     expect(readme.find((line) => line.includes("outbox worker")) ?? "", "README worker row").toMatch(/\| built \(Task 8a/);
-    // Task 8b built the staff sign-in and APIs; the staff pages are still to come (Task 8c).
-    expect(readme.find((line) => line.startsWith("| Staff order administration pages")) ?? "", "README staff pages row").toMatch(/not built yet \(Task 8c\)/);
+    // Task 8b built the staff sign-in and APIs; Task 8c built the staff pages over them.
+    expect(readme.find((line) => line.startsWith("| Staff order administration pages")) ?? "", "README staff pages row").toMatch(/\| built \(Task 8c/);
   });
 
   it("documents CRON_SECRET as used, its 32-character minimum, and the once-a-day schedule with how to raise it (R88)", () => {
@@ -148,7 +148,7 @@ describe("outbox docs after the Task 8a review", () => {
 });
 
 describe("staff access docs (Task 8b)", () => {
-  it("documents the staff sign-in and APIs as built and the staff pages as still to come", () => {
+  it("documents the staff sign-in and APIs as built, and the staff pages as built in the route table (Task 8c)", () => {
     const readme = read("README.md").split(/\r?\n/);
     expect(readme.find((line) => line.startsWith("| Staff sign-in and the staff order APIs")) ?? "", "README staff API row").toMatch(/\| built \(Task 8b/);
     const architecture = read("docs/architecture.md");
@@ -156,7 +156,9 @@ describe("staff access docs (Task 8b)", () => {
     for (const route of ["`/api/admin/session`", "`/api/admin/orders/[reference]/quote`", "`/api/admin/orders/[reference]/status`", "`/api/admin/orders/[reference]/tracking-link`"]) {
       expect(rows.find((line) => line.startsWith(`| ${route}`)) ?? "", route).toMatch(/^\| [^|]+ \| ƒ \|/);
     }
-    expect(rows.find((line) => line.startsWith("| `/admin/login`")) ?? "").toMatch(/not built yet \(Task 8c\)/);
+    expect(rows.find((line) => line.startsWith("| `/admin/login`")) ?? "").toMatch(/^\| [^|]+ \| ƒ \|/);
+    expect(rows.find((line) => line.startsWith("| `/admin` |")) ?? "").toMatch(/\/admin\/orders/);
+    expect(architecture).not.toMatch(/not built yet \(Task 8c\)/);
     for (const path of ["lib/admin/{dependencies,http,orders,session}.ts", "lib/orders/admin.ts", "lib/supabase/{admin,auth,leads,orders,server}.ts", "lib/supabase/staff-session.ts"]) {
       expect(architecture, path).toContain(path);
     }
@@ -192,7 +194,7 @@ describe("staff access docs (Task 8b)", () => {
     expect(operations).toMatch(/set active = false, disabled_at = now\(\)/);
     expect(operations).toMatch(/sign-ups/i);
     expect(operations).toMatch(/Task 8c/);
-    expect(operations).toMatch(/`commerceEnabled` is `false` by default and\s+must stay off/);
+    expect(operations).toMatch(/`commerceEnabled` is `false` by default and must stay off until that pass has been done/);
   });
 
   it("names every staff API warning in the observability notes", () => {

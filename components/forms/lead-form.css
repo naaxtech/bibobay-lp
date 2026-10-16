@@ -126,7 +126,7 @@
     outline-offset: var(--bibo-focus-offset);
   }
 
-  /* The status line takes focus after a stored signup (LeadForm, review M6); an outline never changes layout. */
+  /* Kept for any script focus; LeadForm no longer focuses its status line (Task 5 N4). */
   .lead-form__status:focus-visible {
     outline: var(--bibo-focus-width) solid var(--bibo-focus-color);
     outline-offset: var(--bibo-focus-offset);

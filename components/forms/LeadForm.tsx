@@ -169,7 +169,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
         // Ruling R70: the outcome only; nothing the visitor typed.
         track("lead_submitted", { persisted: true, acknowledgementQueued: answer.acknowledgementQueued === true });
         form.reset();
-        returnFocusTo = "status";
+        // Task 5 N4: focus returns to the button, never the live status line (a focused live region is read out as well as announced).
+        // returnFocusTo = "status";
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
@@ -342,8 +343,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
        */}
       <div className="lead-form__outcome" data-reserve-a={copy.successMessage} data-reserve-b={copy.errorMessage}>
         <div className="lead-form__outcome" data-reserve-a={FORM_COPY.outcome.rateLimited} data-reserve-b={FORM_COPY.sending}>
-          {/* tabIndex -1: focusable from script only, so a success can take focus (review M6). */}
-          <p ref={statusRef} role="status" aria-live="polite" aria-atomic="true" tabIndex={-1} className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
+          {/* Never focused (Task 5 N4): a focused live region is read out as well as announced. */}
+          <p ref={statusRef} role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
             {pending ? FORM_COPY.sending : (outcome?.text ?? "")}
           </p>
         </div>

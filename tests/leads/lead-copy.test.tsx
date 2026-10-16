@@ -285,13 +285,15 @@ describe("submission outcomes", () => {
     expect(document.activeElement).toBe(emailInput());
   });
 
-  it("moves focus to the outcome after a stored signup (M6)", async () => {
+  it("returns focus to the button, never to the live status line, after a stored signup (M6, Task 5 N4)", async () => {
+    // Focusing a role="status" element makes screen readers read it as well as announce the change.
     renderForm();
     fillValid();
     await submit();
     await waitFor(() => expect(status().textContent).toBe(CMS.successMessage));
-    await waitFor(() => expect(document.activeElement).toBe(status()));
-    expect(status().tabIndex).toBe(-1);
+    await waitFor(() => expect(document.activeElement).toBe(submitButton()));
+    expect(document.activeElement).not.toBe(status());
+    expect(status().hasAttribute("tabindex")).toBe(false);
   });
 
   it("keeps every outcome message out of the DOM text until it is the outcome", () => {

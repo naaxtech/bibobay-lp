@@ -26,6 +26,7 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 | `components/brand/` | The logo renderer and the drawn scenery: `ReefBackdrop` (sunbeams, bubbles and the sandy sea floor behind the hero and the closing scene) and `BayBackdrop` (the earlier paper horizon, kept for a slot with no art at all) |
 | `components/forms/` | The founding-family form (`LeadForm.tsx`) and its copy |
 | `components/shop/` | The shop (Task 7b): product card and picture, catalogue grouping, `ShopFrame`, `shop.css`; the order pad (`OrderPadProvider`, mounted by the `app/(commerce)` layout through `OrderPadMount` only while commerce is on, so no other page downloads it), `AddToOrder` and `OrderPadSummary` |
+| `components/admin/` | The staff pages' parts (Task 8c): `AdminFrame` (the plain frame `app/admin/layout.tsx` renders), `LoginForm`, `SignOutButton`, `OrdersTable`, `AdminNotice`, and the order controls (`OrderControls` with `QuoteForm`, `StatusControls`, `TrackingLinkControl`, `useOrderAction`), their copy (`page-copy.ts`; the API's own answers are `admin-copy.ts`) and `admin.css` |
 | `components/legal/`, `components/preview/` | `SiteFrame` (header, main, footer for every page but the landing page), privacy, terms and thank-you page shells; the draft-preview notice |
 | `components/motion/` | GSAP provider, reduced-motion hook, section reveals |
 | `lib/content/` | Content types, normalisation, repository fallback content, fallback legal text, and `lib/content/brand-art.ts`: the registry of repository brand art (each still's size, srcset, alt text and source video) |
@@ -63,17 +64,13 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/api/admin/orders/[reference]/quote` | ƒ | POST: active staff save a quote (`intent: "save"`, never notifies) or send one saved revision (`intent: "send"`, queued once, emailed after the answer) (Task 8b) |
 | `/api/admin/orders/[reference]/status` | ƒ | POST: active staff move an order one step, naming the status they saw (`{from, to}`); 409 if it moved on (Task 8b) |
 | `/api/admin/orders/[reference]/tracking-link` | ƒ | POST: active staff issue a new private tracking link, shown once; the old one stops working (Task 8b) |
+| `/admin` | ƒ | Redirects to `/admin/orders` (Task 8c) |
+| `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | ƒ | The staff pages (Task 8c): sign in, the order list with a `?status=` filter, and one order with its quote, status and tracking-link controls. Server components that read through the signed-in member's own Supabase client; a visitor who is signed out is sent to `/admin/login`; without Supabase they show a notice; `noindex`, titled "Staff"; a malformed or unknown reference is a 404 |
 | `/api/health` | ƒ | GET: liveness, `{status, version, time}` |
 | `/api/readiness` | ƒ | GET: configuration booleans; 200 when ready, 503 otherwise |
 | `/api/revalidate` | ƒ | POST: signed Sanity webhook that expires cache tags |
 | `/api/draft-mode/enable`, `/api/draft-mode/disable` | ƒ | Studio draft preview on and off |
 | `/robots.txt`, `/sitemap.xml`, `/manifest.webmanifest`, `/icon.svg`, `/opengraph-image` | ○ | Metadata files |
-
-Planned, not in the code:
-
-| Route | State |
-|---|---|
-| `/admin/login`, `/admin/orders`, `/admin/orders/[reference]` | not built yet (Task 8c): the staff pages over the Task 8b APIs |
 
 The robots rules keep crawlers out of the private and transactional paths (`/order`, `/orders/`,
 `/track`, `/admin`; `ROBOTS_DISALLOW` in `lib/seo/metadata.ts`), and the sitemap never lists them.
@@ -88,7 +85,11 @@ sitemap lists `/shop` and the listed product pages only while commerce is on.
   (reveals), `GsapProvider` and `Dialog`, plus the shop's `OrderPadProvider`, `AddToOrder`,
   `OrderPadSummary` and `OrderRequest` (with `OrderForm`), which do nothing unless the
   `app/(commerce)` layout mounted the pad (commerce on), and `TrackOrderForm` and `LocalTime` on the
-  tracking pages. The order status view (`components/orders/OrderStatusView.tsx`) renders on the
+  tracking pages. The staff pages' client components are `LoginForm`, `SignOutButton` and
+  `OrderControls` (with its `QuoteForm`, `StatusControls`, `TrackingLinkControl` and
+  `useOrderAction`): they call the staff APIs with same-origin JSON and may not import
+  `components/admin/admin-copy.ts`, because that file names a server setting (the build-time
+  bundle scan and `tests/admin/page-copy.test.ts` both enforce it). The order status view (`components/orders/OrderStatusView.tsx`) renders on the
   server for `/orders/[token]` and in the browser for `/track`.
 - Every module that reads a server setting or talks to Sanity with a token, Supabase or Resend
   imports `server-only`, so importing it from a client component is a build error:
@@ -96,7 +97,7 @@ sitemap lists `/shop` and the listed product pages only while commerce is on.
   `lib/orders/{catalogue,submit,track,dependencies}.ts`,
   `lib/email/client.ts`, `lib/supabase/{admin,auth,leads,orders,server}.ts`, `lib/security/rate-limit.ts`,
   `lib/ops/readiness.ts`, and the staff modules `lib/admin/{dependencies,http,orders,session}.ts` and
-  `lib/orders/admin.ts` (Task 8b). `lib/supabase/staff-session.ts` (the staff cookie rules) is not
+  `lib/orders/admin.ts` (Task 8b) and `lib/admin/access.ts` (the staff pages' access check, Task 8c). `lib/supabase/staff-session.ts` (the staff cookie rules) is not
   server-only because `proxy.ts` imports it; it holds nothing secret, only the public Supabase URL
   and publishable key. (`lib/sanity/env.ts` reads only the public project id, dataset and API
   version; `lib/sanity/draft-mode.ts` is used only by server routes and pages.)
@@ -189,6 +190,26 @@ staff browser  --same-origin JSON + session cookies-->  /api/admin/...  ->  lib/
 - Quote payment links must be https on a host listed exactly in `PAYMENT_HOST_ALLOWLIST`
   (`lib/security/payment-url.ts`). Copy: `components/admin/admin-copy.ts`; no answer says an email
   was delivered or a payment taken.
+
+## Staff pages (Task 8c)
+
+- `lib/admin/access.ts` (`staffPageAccess`) answers once per request with one of four outcomes:
+  `staff` (an Auth-verified user with an active `staff_users` row, plus a database client that
+  reads as that user under row level security), `signed_out` (no or refused session, or a signed-in
+  user who is not active staff), `unconfigured` (no Supabase settings) or `unavailable` (Auth or
+  the database did not answer in time). A page may only read cookies, so the session refresh stays
+  in `proxy.ts`.
+- `/admin/orders` and `/admin/orders/[reference]` send `signed_out` to `/admin/login` (no `next`
+  parameter: after signing in staff always land on the orders) and show a notice for the other two.
+  `/admin/login` always shows the form, because the sign-in API words every refusal itself.
+- Every action is a same-origin JSON `fetch` to the staff APIs above. After a 200 or a 409 the
+  page calls `router.refresh()`, so every figure, revision, status, email row and event on screen
+  comes from the server; a 401 loads the sign-in page. Quote money is typed in the currency's main
+  unit and converted to whole minor units with integer string arithmetic (`lib/orders/quote-money.ts`;
+  the currency list is fixed there).
+- Quotes can be saved and queued only while an order is `new` or `confirmed`; the status buttons
+  offer only the steps `nextOrderStatuses` allows and cancelling asks first; a new tracking link is
+  shown once, in the page's memory only.
 
 ## Security headers and why pages are dynamic
 

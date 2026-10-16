@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { ADMIN_COPY } from "@/components/admin/admin-copy";
 import { PAGE_COPY } from "@/components/admin/page-copy";
+import { ORDER_STATUSES, nextOrderStatuses } from "@/lib/orders/constants";
 
 /*
  * Truth rules for the staff pages' own copy (Task 8c; spec §3 ruling 3, §10), the same scan
@@ -36,7 +37,9 @@ describe("PAGE_COPY", () => {
   });
 
   it("writes every sentence as a sentence (a capital letter and a full stop); titles and labels are not sentences", () => {
-    const sentences = entries(PAGE_COPY).filter(([path]) => !/(?:^|\.)(?:title|pageTitle|heading|titleDefault|titleTemplate|siteTitle)$/.test(path));
+    // Titles, headings and table/field labels and values (the groups below) are names, not sentences.
+    const NAME = /(?:^|\.)(?:title|pageTitle|notFoundPageTitle|notFoundTitle|heading|titleDefault|titleTemplate|siteTitle)$|(?:^|\.)(?:columns|lineColumns|labels|values|kinds|statuses|actors|statusNames|advance|sections)\./;
+    const sentences = entries(PAGE_COPY).filter(([path]) => !NAME.test(path));
     expect(sentences.length).toBeGreaterThan(10);
     for (const [, text] of sentences.filter(([, entry]) => entry.split(/\s+/).length > 3)) {
       expect(text, text).toMatch(/^[A-Z].*[.!]$/);
@@ -88,6 +91,23 @@ describe("client bundle rule", () => {
     expect(f.failed).toBe(ADMIN_COPY.api.failed);
     expect(f.unavailable).toBe(ADMIN_COPY.api.unavailable);
     expect(PAGE_COPY.login.signedIn).toBe(ADMIN_COPY.session.signedIn);
+  });
+
+  it("keeps the order controls' fallback words equal to the API's", () => {
+    const f = PAGE_COPY.controls.fallback;
+    expect(f.forbidden).toBe(ADMIN_COPY.api.forbidden);
+    expect(f.signedOut).toBe(ADMIN_COPY.api.signedOut);
+    expect(f.notFound).toBe(ADMIN_COPY.api.notFound);
+    expect(f.checkDetails).toBe(ADMIN_COPY.api.checkDetails);
+    expect(f.stale).toBe(ADMIN_COPY.api.stale);
+    expect(f.failed).toBe(ADMIN_COPY.api.failed);
+    expect(f.unavailable).toBe(ADMIN_COPY.api.unavailable);
+  });
+
+  it("every status the staff pages name has a name, and every step a button label", () => {
+    expect(Object.keys(PAGE_COPY.statusNames).sort()).toEqual([...ORDER_STATUSES].sort());
+    const steps = new Set(ORDER_STATUSES.flatMap((status) => nextOrderStatuses(status)).filter((to) => to !== "cancelled"));
+    expect(Object.keys(PAGE_COPY.controls.status.advance).sort()).toEqual([...steps].sort());
   });
 
   it("no client file under components/admin or app/admin imports admin-copy.ts, directly or through a local import chain", () => {

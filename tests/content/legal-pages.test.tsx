@@ -218,6 +218,11 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
     expect(privacy).toMatch(/acknowledging your request, without prices/i);
   });
 
+  it("names exactly what the staff alert carries: the reference, name, email address and products, and no delivery details (R107)", () => {
+    // lib/email/order-emails.ts buildStaffOrderAlert: reference, contact name, email, the lines. No address, phone or notes.
+    expect(privacy).toMatch(/team is told that a request arrived, in a note that carries the order's reference, your name and email address and the products you asked for, but not your delivery address/i);
+  });
+
   it("describes the order list kept on the device, and the private link kept out of statistics and error reports", () => {
     expect(privacy).toMatch(/only which products you added and how many/i);
     expect(privacy).toMatch(/\/orders\/\[token\]/);

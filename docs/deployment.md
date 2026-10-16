@@ -114,7 +114,7 @@ unthrottled). Quotes need `PAYMENT_HOST_ALLOWLIST`; the quote email needs Resend
 - Create each staff member and their `staff_users` row as described in
   [manual-checkout-operations.md](manual-checkout-operations.md#staff-access).
 - `/admin` and `/api/admin` are private (`Cache-Control: private, no-store`, `noindex`, no referrer)
-  and disallowed in `robots.txt`. The staff pages themselves come in Task 8c.
+  and disallowed in `robots.txt`. The staff pages (`/admin/login`, `/admin/orders`) are built (Task 8c) and need those Supabase settings; without them they show a notice and nothing else.
 
 ## Sanity webhook and Studio origin
 

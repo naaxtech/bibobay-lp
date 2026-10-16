@@ -183,20 +183,27 @@ describe("documentation matches the code", () => {
     for (const name of names) expect(deployment, name).toContain(`\`${name}\``);
   });
 
-  it("states that the staff side of manual checkout is not built yet, and promises no procedure", () => {
+  it("documents the staff pages as built (Task 8c) but the whole flow as not yet tried live, so no real orders and commerce stays off", () => {
     const text = read("docs/manual-checkout-operations.md");
-    expect(text).toMatch(/not built yet/i);
     expect(text).toMatch(/Task 7c/);
-    expect(text).toMatch(/Task 8/);
-    // Task 7c built the customer side; nobody can manage orders until Task 8, so commerce stays off.
+    expect(text).toMatch(/Task 8c/);
+    expect(text).toMatch(/Task 12/);
+    expect(text).toMatch(/not ready to take real orders/i);
+    expect(text).toMatch(/do not take real orders/i);
+    // The staff pages exist, but nobody has tried the flow on a live preview, so commerce stays off.
     expect(text).toMatch(/must stay off/i);
   });
 
-  it("never documents an admin route as present", () => {
+  it("documents each admin page route as built, dynamic and noindex (Task 8c), and no admin route as not built", () => {
     const architecture = read("docs/architecture.md");
-    for (const line of architecture.split(/\r?\n/).filter((entry) => entry.startsWith("| `/admin"))) {
-      expect(line, line).toMatch(/not built yet/i);
+    const rows = architecture.split(/\r?\n/).filter((entry) => entry.startsWith("| `/admin"));
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    for (const line of rows) {
+      expect(line, line).not.toMatch(/not built yet/i);
+      expect(line, line).toContain("ƒ");
+      expect(line, line).toMatch(/Task 8c/);
     }
+    expect(rows.find((line) => line.startsWith("| `/admin/login`")) ?? "").toMatch(/noindex/);
   });
 
   it("documents the shop, order and tracking pages as built, behind their switches, and never indexed (Tasks 7b, 7c)", () => {

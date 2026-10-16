@@ -102,7 +102,7 @@ function privacyText(commerce: boolean): PortableContent {
     ),
     ...whenSelling(commerce, () =>
       paragraph(
-        "To handle your order request: to check availability, reply with a quote and a payment link, arrange delivery, and show you the order's progress where tracking is offered. Once email sending for orders is set up, you receive an email acknowledging your request, without prices, and the BIBO Bay team is told that a request arrived.",
+        "To handle your order request: to check availability, reply with a quote and a payment link, arrange delivery, and show you the order's progress where tracking is offered. Once email sending for orders is set up, you receive an email acknowledging your request, without prices, and the BIBO Bay team is told that a request arrived, in a note that carries the order's reference, your name and email address and the products you asked for, but not your delivery address.",
       ),
     ),
     paragraph("We do not sell your details or share them with advertisers."),

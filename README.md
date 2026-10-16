@@ -25,7 +25,7 @@ What exists today and what does not:
 | Shop catalogue and product pages (`/shop`, `/shop/[slug]`), no prices, 404 while commerce is off | built (Task 7b) |
 | Order and tracking pages (`/order`, `/track`, `/orders/[token]`), idempotent order requests, order consent and countries from the CMS | built (Task 7c) |
 | Staff sign-in and the staff order APIs (`/api/admin/session`, `/api/admin/orders/[reference]/{quote,status,tracking-link}`): staff access rules, quotes, status changes, new tracking links | built (Task 8b; needs Supabase Auth accounts, `staff_users` rows and `PAYMENT_HOST_ALLOWLIST`) |
-| Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`) | not built yet (Task 8c) |
+| Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`): sign in, the order list, an order with its quote, status and tracking-link controls | built (Task 8c; needs Supabase Auth accounts and `staff_users` rows; the signed-in pages are proven in unit tests, a live pass on a preview waits for Task 12) |
 | Email outbox worker (`/api/cron/email-outbox`, daily Vercel cron), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase and Resend) |
 | Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11) |
