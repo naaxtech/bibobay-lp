@@ -1,0 +1,46 @@
+lib/admin/http.ts
+  s_36fcf8940d4895::t_85df75f43047ae 6
+  s_36fcf8940d4895::t_c4efb70f6270e6 36-39,41-49
+  s_36fcf8940d4895::t_85bbc9b43ef828 12-17
+tests/admin/order-controls.test.ts
+  s_36fcf8940d4895::t_905c60a218961b 306,463
+  s_36fcf8940d4895::t_27efbc94ab53ff 244-245,247,253-255,257
+lib/supabase/auth.ts
+  s_36fcf8940d4895::t_53f4e6d9d2cbf6 200-202
+  s_36fcf8940d4895::t_2664a0edea5bfb 130-135
+  s_36fcf8940d4895::t_3724405157ed0e 155-158,160-163,165,167-168
+  s_36fcf8940d4895::t_abd4e74761bd45 7
+  s_36fcf8940d4895::t_094441c401837e 175
+  s_36fcf8940d4895::t_7e4ab5fc270b83 186
+lib/admin/dependencies.ts
+  s_36fcf8940d4895::t_bb858b5cf967f3 67
+docs/observability.md
+  s_36fcf8940d4895::t_eeeee430795a32 191-192
+proxy.ts
+  s_36fcf8940d4895::t_5d1ecdd1a63e5c 36
+  s_36fcf8940d4895::t_6da5dbf263c8a5 5
+lib/admin/session.ts
+  s_36fcf8940d4895::t_ddf4f28f24456d 147-148
+tests/admin/admin-headers.test.ts
+  s_36fcf8940d4895::t_905c60a218961b 178
+tests/admin/admin-origin-and-signout.test.ts
+  s_36fcf8940d4895::t_99ac4a5f6354ae 1-175
+lib/supabase/staff-session.ts
+  s_36fcf8940d4895::t_cc14055d13cb36 47-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d7dfb8532841d4e7869d89b75a8489097dff60c",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
