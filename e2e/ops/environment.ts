@@ -9,6 +9,7 @@
  * as a Vercel preview does after Task 11: the same routes then answer from the live checks (401 for a
  * signed-out staff request, 400 for a bad sign-in body, a redirect to sign-in for the staff pages,
  * readiness 200). The specs that assume keyless answers branch on this one flag and cite the route code
- * for each configured expectation. Email may or may not be configured; nothing here depends on it.
+ * for each configured expectation. Readiness also needs a lead removal channel (a contact address,
+ * lib/ops/readiness.ts `leadRemovalChannel`), so a configured server has one; email itself is optional.
  */
 export const CONFIGURED = process.env.E2E_CONFIGURED === "1";

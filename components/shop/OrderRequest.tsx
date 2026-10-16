@@ -39,6 +39,10 @@ export function OrderRequest({ products, consentCopy, countries, trackingEnabled
   const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
   const ids = useMemo(() => products.map((product) => product.id), [products]);
   const keepListed = pad?.keepListed;
+  const padHasListed = Boolean(pad?.lines?.some((line) => ids.includes(line.productId)));
+  /** True once this visit has shown a product on the pad: the pad then emptying is a removal, not an arrival. */
+  const [hadProducts, setHadProducts] = useState(false);
+  if (padHasListed && !hadProducts) setHadProducts(true); // adjusting state while rendering (react.dev "You Might Not Need an Effect")
 
   useEffect(() => {
     if (keepListed && ids.length > 0) keepListed(new Set(ids));
@@ -47,17 +51,25 @@ export function OrderRequest({ products, consentCopy, countries, trackingEnabled
   if (!pad) return null;
   if (receipt) return <OrderReceived receipt={receipt} trackingEnabled={trackingEnabled} />;
   if (products.length === 0) return <OrderEmpty text={UI_COPY.shop.empty} />;
-  if (pad.lines && !pad.lines.some((line) => ids.includes(line.productId))) return <OrderEmpty text={ORDER_COPY.page.empty} />;
+  const padEmpty = Boolean(pad.lines) && !padHasListed;
+  if (padEmpty && !hadProducts) return <OrderEmpty text={ORDER_COPY.page.empty} />;
 
+  /*
+   * Final fix wave C-I2: a visitor who removes the last product stays in this tree, so the pad's
+   * heading (the focus target) and its status line ("<product> removed") remain mounted. The form
+   * gives way to the empty state's text and the way back to the shop.
+   */
   return (
     <div className="order-layout">
       <div className="order-layout__aside">
         <OrderPadSummary listed={products} reviewLink={false} />
-        {aside}
+        {padEmpty ? <OrderEmpty text={ORDER_COPY.page.empty} /> : aside}
       </div>
-      <div className="order-layout__form">
-        <OrderForm consentCopy={consentCopy} countries={countries} listedIds={ids} onReceived={setReceipt} />
-      </div>
+      {padEmpty ? null : (
+        <div className="order-layout__form">
+          <OrderForm consentCopy={consentCopy} countries={countries} listedIds={ids} onReceived={setReceipt} />
+        </div>
+      )}
     </div>
   );
 }

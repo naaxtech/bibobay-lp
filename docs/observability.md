@@ -150,9 +150,14 @@ project); otherwise nothing loads and nothing is sent.
 
 `logLeadEvent` keeps its structured log line and also sends these as warning messages, tagged with
 the event, delivery kind and error code only (never an address or a lead id):
-`delivery_send_capped` (the hourly send cap was hit: emails wait in the outbox),
-`delivery_send_cap_unavailable`, `delivery_enqueue_failed`, `lead_store_failed`,
-`lead_rate_limit_unavailable`, `lead_storage_unconfigured` and `lead_config_invalid`. An unexpected
+`delivery_send_capped` (the hourly cap of one send bucket was hit: emails of that kind wait in the
+outbox; the buckets are `send:lead_acknowledgement`, `send:lead_staff_alert`,
+`send:order_acknowledgement`, `send:order_staff_alert` and `send:quote`, each capped at
+`LEAD_ACK_SEND_LIMIT_PER_HOUR`), `delivery_send_cap_unavailable`, `delivery_enqueue_failed`,
+`lead_store_failed`, `lead_rate_limit_unavailable`, `lead_storage_unconfigured`,
+`lead_config_invalid` and `lead_removal_channel_unconfigured` (a signup was refused with the
+"signups are closed" answer because neither email sending nor a contact address exists for a person to withdraw consent;
+configure email sending or set the contact address in the Studio; `/api/readiness` shows `leadRemovalChannel: false` until then). An unexpected
 failure of `/api/leads` is reported as `lead_route_failed` and answered with the generic error copy.
 
 Set a Sentry alert on `delivery_send_capped` and `lead_store_failed`.

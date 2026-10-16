@@ -92,10 +92,15 @@ signup removal channel, that is email sending or a Studio contact address, must 
   the Studio for this run: the shop specs assert the commerce-off answers, and the order flow itself
   is the manual Task 12 pass.
 - **`VERCEL_AUTOMATION_BYPASS_SECRET`**: Vercel protects new previews, and the verifier and Playwright
-  send the project's "Protection Bypass for Automation" secret as the `x-vercel-protection-bypass`
-  header on every request to the named origin (`scripts/lib/protection-bypass.ts`,
-  `playwright.config.ts`). Set it in the shell or the CI secret store only; nothing prints it, and
-  Playwright keeps no trace while it is set, because a trace records request headers.
+  use the project's "Protection Bypass for Automation" secret, and neither sends it to any other host.
+  The verifier sends it as the `x-vercel-protection-bypass` header on requests to the named origin only
+  (`scripts/lib/protection-bypass.ts`). Playwright spends it once, in a global setup
+  (`e2e/support/vercel-bypass.setup.ts`) that requests the preview's root with
+  `x-vercel-protection-bypass=<secret>&x-vercel-set-bypass-cookie=true`, keeps the cookies the preview
+  sets for its own host as a storage state file in the OS temp folder (never in the repository), and
+  loads that cookie in the browser; the browser sends no bypass header, so YouTube, Sanity and PostHog
+  never see the secret. Set it in the shell or the CI secret store only; nothing prints it, and
+  Playwright keeps no trace while it is set, because a trace records cookies.
 
 ## 4. Acceptance criteria (specification section 17)
 

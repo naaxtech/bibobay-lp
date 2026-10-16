@@ -68,12 +68,11 @@ describe("wiring", () => {
     expect(script).not.toMatch(/console\.\w+\([^)]*secret/i);
   });
 
-  it("Playwright sends the header as an extra HTTP header only when the secret is set, and keeps no trace then", () => {
+  it("Playwright no longer sends the header as an extra HTTP header: the cookie setup replaces it (residual fixer item 4)", () => {
     const config = source("playwright.config.ts");
     expect(config).toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
-    expect(config).toMatch(/extraHTTPHeaders:\s*bypass/);
-    expect(config).toContain("x-vercel-protection-bypass");
-    // A trace records request headers, so a run that carries the secret must not write one.
-    expect(config).toMatch(/trace:\s*bypass \? "off"/);
+    expect(config).not.toContain("extraHTTPHeaders");
+    // Storage state may hold the cookie, so a run that carries the secret must not write a trace.
+    expect(config).toMatch(/trace:\s*bypassSecret \? "off"/);
   });
 });

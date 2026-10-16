@@ -125,12 +125,15 @@ test.describe("the staff APIs refuse a request that is not from this site's own 
   });
 
   // Keyless: the unconfigured 503 comes before the body is read (lib/admin/session.ts), so every body gets it.
-  // Configured: the body is read next (lib/admin/http.ts `readAdminJson`): over 16 KiB is 413, anything that
-  // is not a credentials object is 400.
-  test(`an oversized or malformed JSON body from this site ${CONFIGURED ? "is a 400 or 413" : "gets the unconfigured 503, before the body is read"}, never a crash`, async ({ request }) => {
+  // Configured: the sign-in route reads the body next (lib/admin/session.ts `handleSignIn`) and answers 400
+  // for every body it cannot use, oversized included: it ignores `readAdminJson`'s 413 (lib/admin/http.ts).
+  // Only the order routes pass the 413 through (lib/admin/orders.ts `body`), and a signed-out e2e request
+  // never gets that far there (503 keyless, 401 configured, before the body is read), so this spec does not
+  // assert the order routes' 413.
+  test(`an oversized or malformed JSON body from this site ${CONFIGURED ? "is a 400" : "gets the unconfigured 503, before the body is read"}, never a crash`, async ({ request }) => {
     for (const data of ["{not json", `{"email":"${"a".repeat(40_000)}"}`, "null", "[]"]) {
       const response = await request.post(SESSION, { headers: sameOrigin, data });
-      expect(response.status(), `body ${data.slice(0, 12)}`).toBe(CONFIGURED ? (data.length > 16 * 1024 ? 413 : 400) : 503);
+      expect(response.status(), `body ${data.slice(0, 12)}`).toBe(CONFIGURED ? 400 : 503);
       expectAdminHeaders(response, `body ${data.slice(0, 12)}`);
     }
   });

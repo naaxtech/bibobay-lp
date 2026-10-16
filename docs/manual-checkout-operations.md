@@ -99,7 +99,7 @@ the same answer. The session is kept in cookies that page scripts cannot read.
 - Save a quote: currency (a three-letter ISO 4217 code, e.g. `AUD`), subtotal and freight in the currency's minor
   units (cents), and the payment link, which must be https on a host listed exactly in
   `PAYMENT_HOST_ALLOWLIST`. Only while the order is `new` or `confirmed`. Saving never emails
-  anyone; each save is a new revision of the quote.
+  anyone; each save is a new revision of the quote and clears the "quote email accepted" mark, which is set again only when the mail service accepts the email for the current revision.
 - Send a saved quote: queues the quote email for that revision once. Sending the same revision again
   queues nothing; a newer save makes an older queued email obsolete (it is skipped, never sent with
   the wrong figures). Sending does not change the order's status: staff move it themselves.

@@ -335,4 +335,41 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
     expect(deploymentText).toContain("`leadRemovalChannel`");
     expect(deploymentText).toMatch(/readiness is 503 without it/);
   });
+
+  it("names every per-kind bucket in the observability doc, with the removal-channel warning event (residual fixer, item 5)", () => {
+    const observability = read("docs/observability.md");
+    for (const budget of [...Object.values(SEND_BUDGETS.leads), ...Object.values(SEND_BUDGETS.orders)]) {
+      expect(observability, budget).toContain(`\`${sendBudgetKey(budget)}\``);
+    }
+    expect(observability).toContain("`LEAD_ACK_SEND_LIMIT_PER_HOUR`");
+    expect(observability).not.toMatch(/global send budget/i);
+    expect(read("docs/database-security.md")).not.toMatch(/global send budget/i);
+    expect(read("lib/leads/submit.ts")).toContain('event: "lead_removal_channel_unconfigured"');
+    expect(observability).toContain("`lead_removal_channel_unconfigured`");
+  });
+
+  it("says saving a quote clears quote_sent_at and that it is set only for the current revision (C-I1)", () => {
+    const database = read("docs/database-security.md");
+    expect(database).toMatch(/clears `quote_sent_at` in one statement/);
+    expect(database).toMatch(/only if the accepted email is for the order's current revision/);
+    expect(read("supabase/migrations/0007_staff_access.sql")).toMatch(/quote_sent_at\s*=\s*null/);
+    expect(read("supabase/migrations/0006_order_events_and_email_outbox.sql")).toContain("only if the quote's revision is the order's current revision");
+    expect(read("docs/manual-checkout-operations.md")).toMatch(/clears the "quote email accepted" mark/);
+  });
+
+  it("describes the bypass as a host-scoped cookie, not a header on every request (residual fixer, item 4)", () => {
+    for (const file of ["docs/qa-checklist.md", "docs/qa-report-2026-10-02.md"]) {
+      expect(read(file), file).toContain("cookie");
+      expect(read(file), file).not.toMatch(/Playwright send it as `x-vercel-protection-bypass`|verifier and Playwright send it/);
+    }
+    expect(read("docs/qa-checklist.md")).toContain("e2e/support/vercel-bypass.setup.ts");
+    expect(read("docs/qa-checklist.md")).toContain("x-vercel-set-bypass-cookie=true");
+    expect(read("e2e/support/vercel-bypass.ts")).toContain("x-vercel-set-bypass-cookie");
+  });
+
+  it("keeps the sign-in oversized-body expectation at what the route answers: 400 (O-I3)", () => {
+    expect(read("lib/admin/session.ts")).toMatch(/adminJson\(400, \{ ok: false, message: ADMIN_COPY\.session\.checkDetails \}\)/);
+    expect(read("e2e/admin/admin-security.spec.ts")).toMatch(/CONFIGURED \? 400 : 503/);
+    expect(read("e2e/ops/health.spec.ts")).toContain("expect(body.leadRemovalChannel).toBe(CONFIGURED)");
+  });
 });

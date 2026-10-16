@@ -5,11 +5,11 @@ import { CONFIGURED } from "./environment";
 /*
  * Task 12 (local pass), spec §15/§16: the two operational probes answer the way a monitor expects.
  * Liveness (`/api/health`) is always 200 with { status, version, time } and no configuration;
- * readiness (`/api/readiness`) is 200 when Sanity, lead storage and revalidation are configured and
+ * readiness (`/api/readiness`) is 200 when Sanity, lead storage, revalidation and a lead removal channel are configured and
  * 503 otherwise, with booleans only. On the keyless e2e server nothing is configured, so readiness
- * is 503 there. With E2E_CONFIGURED=1 (a server with Supabase, Sanity and the revalidation secret, such
- * as the preview) it must be 200 with those three booleans true (app/api/readiness/route.ts: status is
- * `checks.ready ? 200 : 503`; lib/ops/readiness.ts: ready = sanity && supabase && revalidation).
+ * is 503 there. With E2E_CONFIGURED=1 (a server with Supabase, Sanity, the revalidation secret and a removal channel, such
+ * as the preview) it must be 200 with those four booleans true (app/api/readiness/route.ts: status is
+ * `checks.ready ? 200 : 503`; lib/ops/readiness.ts: ready = sanity && supabase && revalidation && leadRemovalChannel).
  * Both are never cached, answer HEAD, and refuse POST.
  */
 
@@ -62,6 +62,7 @@ test.describe("GET /api/readiness", () => {
     expect(body.sanity).toBe(CONFIGURED);
     expect(body.supabase).toBe(CONFIGURED);
     expect(body.revalidation).toBe(CONFIGURED);
+    expect(body.leadRemovalChannel).toBe(CONFIGURED);
   });
 
   test("answers HEAD with the same status and refuses POST", async ({ request }) => {

@@ -70,8 +70,9 @@ function serverFieldErrors(body: unknown): LeadFieldErrors {
  * (a named group, so its title is announced) that takes focus on a failed submit and links to each
  * field, one polite live region for the result, and a submit button that is disabled and
  * `aria-busy` while saving. Disabling the focused button drops focus to <body> in Chromium, so once
- * the request completes focus returns to the button after a failure, or moves to the outcome after
- * a success, unless the person has moved it elsewhere meanwhile. The status line keeps its height
+ * the request completes focus returns to the submit button after every outcome except field errors
+ * (a success included), unless the person has moved it elsewhere meanwhile; the live status line
+ * announces the outcome once and is never focused. The status line keeps its height
  * and the button keeps its width between states, so nothing jumps. Before hydration the button
  * stays disabled, so a native submit can never post the form somewhere unintended.
  */
