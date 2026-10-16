@@ -130,7 +130,7 @@ export function LoginForm() {
           autoCapitalize="none"
           spellCheck={false}
           required
-          disabled={done}
+          disabled={pending || done}
           aria-invalid={fieldError("email") ? true : undefined}
           aria-describedby={describedBy("email")}
           className="lead-form__input"
@@ -153,7 +153,7 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          disabled={done}
+          disabled={pending || done}
           aria-invalid={fieldError("password") ? true : undefined}
           aria-describedby={describedBy("password")}
           className="lead-form__input"

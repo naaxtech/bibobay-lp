@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 
 import { apiMessage, isAdminSuccess, sendAdminRequest, type AdminAnswer } from "./admin-request";
 import { goTo } from "./navigate";
@@ -56,7 +56,9 @@ function fallbackFor(status: number): string {
 
 export function useOrderAction(reference: string) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  // The refresh runs in a transition: the controls stay off until the server's new page has landed.
+  const [refreshing, startRefresh] = useTransition();
   const [message, setMessage] = useState<{ text: string; tone: Tone } | null>(null);
   const busyRef = useRef(false);
 
@@ -64,7 +66,7 @@ export function useOrderAction(reference: string) {
     async (endpoint, body) => {
       if (busyRef.current) return null;
       busyRef.current = true;
-      setBusy(true);
+      setRequesting(true);
       setMessage({ text: PAGE_COPY.controls.working, tone: "pending" });
       const answer = await sendAdminRequest("POST", `/api/admin/orders/${encodeURIComponent(reference)}/${endpoint}`, body);
       busyRef.current = false;
@@ -78,8 +80,8 @@ export function useOrderAction(reference: string) {
         goTo("/admin/login");
         return { ok, answer };
       }
-      setBusy(false);
-      if (ok || answer.status === 409) router.refresh();
+      setRequesting(false);
+      if (ok || answer.status === 409) startRefresh(() => router.refresh());
       return { ok, answer };
     },
     [reference, router],
@@ -88,6 +90,8 @@ export function useOrderAction(reference: string) {
   /** Shows a message of the component's own (copying the link), in the same live region. */
   const announce = useCallback((text: string, tone: Tone) => setMessage({ text, tone }), []);
   const clear = useCallback(() => setMessage(null), []);
+
+  const busy = requesting || refreshing;
 
   return { busy, message, perform, announce, clear };
 }

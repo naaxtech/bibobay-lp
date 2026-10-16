@@ -7,6 +7,8 @@ import { SignOutButton } from "./SignOutButton";
 export interface AdminFrameProps {
   /** True while an active staff session exists: the site name then links to the orders and sign-out shows. */
   signedIn: boolean;
+  /** True when a staff session cookie is on the request, whether or not it could be checked: sign-out then shows too. */
+  canSignOut?: boolean;
   children: ReactNode;
 }
 
@@ -16,7 +18,7 @@ export interface AdminFrameProps {
  * motion layer. Rendered by app/admin/layout.tsx, so every staff page has it and no page renders it
  * itself. A server component: only the sign-out button is a client component.
  */
-export function AdminFrame({ signedIn, children }: AdminFrameProps) {
+export function AdminFrame({ signedIn, canSignOut = false, children }: AdminFrameProps) {
   const name = (
     <>
       <span className="admin-header__site">{PAGE_COPY.frame.siteTitle}</span>
@@ -37,7 +39,7 @@ export function AdminFrame({ signedIn, children }: AdminFrameProps) {
           ) : (
             <p className="admin-header__name">{name}</p>
           )}
-          {signedIn ? <SignOutButton /> : null}
+          {signedIn || canSignOut ? <SignOutButton /> : null}
         </div>
       </header>
       <main id="main-content" className="admin-main">

@@ -15,6 +15,8 @@ vi.mock("server-only", () => ({}));
 type Access = { kind: "staff"; identity: { userId: string; displayName: string | null }; db: unknown } | { kind: "signed_out" } | { kind: "unconfigured" } | { kind: "unavailable" };
 let access: Access = { kind: "signed_out" };
 vi.mock("@/lib/admin/access", () => ({ staffPageAccess: async () => access }));
+let cookieNames: string[] = [];
+vi.mock("next/headers", () => ({ cookies: async () => ({ getAll: () => cookieNames.map((name) => ({ name, value: "x" })) }) }));
 
 /*
  * Task 8c, ruling R101: the staff frame is plain: the site's name, a "Staff" label, a skip link, one
@@ -32,6 +34,7 @@ beforeEach(() => {
   requests.length = 0;
   release = undefined;
   access = { kind: "signed_out" };
+  cookieNames = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init: RequestInit) => {
@@ -151,6 +154,16 @@ describe("AdminFrame", () => {
     expect(screen.getByRole("button", { name: PAGE_COPY.signOut.label })).toBeTruthy();
   });
 
+  it("can show sign-out without being signed in (a session cookie exists but could not be checked)", () => {
+    render(
+      <AdminFrame signedIn={false} canSignOut>
+        <h1>Page</h1>
+      </AdminFrame>,
+    );
+    expect(screen.getByRole("button", { name: PAGE_COPY.signOut.label })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: new RegExp(PAGE_COPY.frame.siteTitle) })).toBeNull();
+  });
+
   it("links the site name to the orders only when signed in, and never to the public site", () => {
     frame(false);
     expect(screen.queryByRole("link", { name: new RegExp(PAGE_COPY.frame.siteTitle) })).toBeNull();
@@ -194,5 +207,33 @@ describe("app/admin/layout", () => {
     access = { kind: "staff", identity: { userId: "u", displayName: "Jo" }, db: {} };
     render(await AdminLayout({ children: <p>Body</p> }));
     expect(screen.getByRole("button", { name: PAGE_COPY.signOut.label })).toBeTruthy();
+  });
+
+  /*
+   * Final fix wave 8c-M4: R111's sign-out clears the cookies even when Auth is down, so the button
+   * shows whenever a staff session cookie is on the request, not only when the staff check passed.
+   */
+  it("shows sign-out, but not the orders link, when a staff session cookie is present and the check could not be made", async () => {
+    const { default: AdminLayout } = await import("@/app/admin/layout");
+    for (const kind of ["unavailable", "signed_out", "unconfigured"] as const) {
+      access = { kind };
+      cookieNames = ["sb-abcdefgh-auth-token"];
+      render(await AdminLayout({ children: <p>Body</p> }));
+      expect(screen.getByRole("button", { name: PAGE_COPY.signOut.label }), kind).toBeTruthy();
+      expect(screen.queryByRole("link", { name: new RegExp(PAGE_COPY.frame.siteTitle) }), kind).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("recognises the chunked session cookie and ignores other cookies", async () => {
+    const { default: AdminLayout } = await import("@/app/admin/layout");
+    access = { kind: "unavailable" };
+    cookieNames = ["sb-abcdefgh-auth-token.0", "sb-abcdefgh-auth-token.1"];
+    render(await AdminLayout({ children: <p>Body</p> }));
+    expect(screen.getByRole("button", { name: PAGE_COPY.signOut.label })).toBeTruthy();
+    cleanup();
+    cookieNames = ["bibobay-preview", "sb-abcdefgh-auth-token-code-verifier", "other"];
+    render(await AdminLayout({ children: <p>Body</p> }));
+    expect(screen.queryByRole("button", { name: PAGE_COPY.signOut.label })).toBeNull();
   });
 });

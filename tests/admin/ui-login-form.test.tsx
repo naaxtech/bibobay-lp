@@ -162,6 +162,21 @@ describe("the sign-in form", () => {
     expect(status().textContent).toBe(ADMIN_COPY.session.refused);
   });
 
+  it("disables both inputs as well as the button while the request is in flight, and enables them after (R102)", async () => {
+    answers = ["never"];
+    render(<LoginForm />);
+    await submit();
+    expect(email().disabled).toBe(true);
+    expect(password().disabled).toBe(true);
+    expect(button().disabled).toBe(true);
+    await act(async () => {
+      release?.();
+    });
+    await waitFor(() => expect(email().disabled).toBe(false));
+    expect(password().disabled).toBe(false);
+    expect(button().disabled).toBe(false);
+  });
+
   it("clears the password and puts focus back on it after a refusal, never on the live region", async () => {
     answers = [{ status: 401, body: { ok: false, message: ADMIN_COPY.session.refused } }];
     render(<LoginForm />);

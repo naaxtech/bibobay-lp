@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Suspense, use, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ADMIN_COPY } from "@/components/admin/admin-copy";
@@ -582,5 +583,58 @@ describe("truth", () => {
     }
     expect(seen.every(Boolean)).toBe(true);
     for (const text of seen) expect(text).not.toMatch(claim);
+  });
+});
+
+/*
+ * Final fix wave 8c-M2: the controls stay disabled until the refresh has landed. router.refresh()
+ * runs inside startTransition, so the transition stays pending while the server's new page renders;
+ * the harness stands in for that render with a child that suspends on a promise the refresh starts.
+ */
+describe("until the refresh has landed", () => {
+  it("keeps every control disabled while the transition is pending, then enables them", async () => {
+    let settleRefresh: () => void = () => {};
+    const landed = new Promise<void>((resolve) => (settleRefresh = resolve));
+    const resolved = Promise.resolve();
+    let startRefresh: () => void = () => {};
+
+    function ServerRender({ pending }: { pending: boolean }) {
+      use(pending ? landed : resolved);
+      return null;
+    }
+    function Harness() {
+      const [pending, setPending] = useState(false);
+      startRefresh = () => setPending(true);
+      return (
+        <>
+          <OrderControls reference={REFERENCE} status="new" quote={QUOTED} />
+          <Suspense fallback={null}>
+            <ServerRender pending={pending} />
+          </Suspense>
+        </>
+      );
+    }
+
+    refresh.mockImplementation(() => startRefresh());
+    try {
+      answers = [{ status: 200, body: { ok: true, status: "confirmed", message: ADMIN_COPY.status.changed } }];
+      render(<Harness />);
+      await click(advanceButton("confirmed"));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(status().textContent).toBe(ADMIN_COPY.status.changed);
+      for (const control of [saveButton(), sendButton(), advanceButton("confirmed"), cancelButton(), trackingButton(), subtotal()]) {
+        expect((control as HTMLButtonElement | HTMLInputElement).disabled, control.outerHTML.slice(0, 60)).toBe(true);
+      }
+      fireEvent.click(advanceButton("confirmed"));
+      expect(requests).toHaveLength(1);
+
+      await act(async () => {
+        settleRefresh();
+      });
+      await waitFor(() => expect(advanceButton("confirmed").disabled).toBe(false));
+      expect(saveButton().disabled).toBe(false);
+    } finally {
+      refresh.mockReset();
+    }
   });
 });
