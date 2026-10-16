@@ -1,0 +1,118 @@
+tests/outbox/worker.test.ts
+  s_36fcf8940d4895::t_b01b78ebb0608c 137-138,183
+  s_36fcf8940d4895::t_74c2d32d73bf37 48-50,52-53,61-62,79,81,88-123,142,150,152
+tests/leads/lead-submit.test.ts
+  s_36fcf8940d4895::t_4696f957043dcb 495,510,515,520,522-526,542,545,548-550,552-570,576,582,635
+  s_36fcf8940d4895::t_99accd8c10d19b 10,148-149,231-269,735
+lib/sanity/fetch.ts
+  s_36fcf8940d4895::t_b72bcc5fc1d8d4 10-14,21,31-46
+  s_36fcf8940d4895::t_b038f1fc241e73 47
+tests/outbox/order-send-now.test.ts
+  s_36fcf8940d4895::t_884e5017606e8a 18,85-88,90-121,124-137,139-142,161-162,170-171,178
+supabase/migrations/0007_staff_access.sql
+  s_36fcf8940d4895::t_7e88424210a363 28-32,223-225,232
+tests/orders/order-fields.test.ts
+  s_36fcf8940d4895::t_49a09e938b44d9 74-80
+  s_36fcf8940d4895::t_b777ff3eea0d36 41-45
+tests/outbox/supabase-outbox-adapter.test.ts
+  s_36fcf8940d4895::t_e85775439413a7 147-169
+lib/orders/schema.ts
+  s_36fcf8940d4895::t_ae21cd3157c572 19,129-130
+tests/outbox/cron-route.test.ts
+  s_36fcf8940d4895::t_4696f957043dcb 52-55,58-60,130,132-139,143-144,151,156,158-170
+tests/orders/order-submit.test.ts
+  s_36fcf8940d4895::t_b72bcc5fc1d8d4 32-33
+tests/orders/order-schema.test.ts
+  s_36fcf8940d4895::t_b777ff3eea0d36 155-174
+tests/outbox/attempt.test.ts
+  s_36fcf8940d4895::t_74c2d32d73bf37 70-71,169,172-174,176,179-180,183-201
+lib/orders/dependencies.ts
+  s_36fcf8940d4895::t_da8a3a6cb72071 93
+supabase/tests/0006_catalogue.sql
+  s_36fcf8940d4895::t_1d9d48a23d365b 92-93
+  s_36fcf8940d4895::t_2d1288e8083557 1-91,94-141
+tests/ops/health-readiness.test.ts
+  s_36fcf8940d4895::t_99accd8c10d19b 8-9,25-27,31,59-63,66-70,75,79,83,95,103,108-132
+tests/commerce/gate-freshness.test.ts
+  s_36fcf8940d4895::t_3deed232c103dc 1-73
+app/api/orders/track/route.ts
+  s_36fcf8940d4895::t_b72bcc5fc1d8d4 7,47-48
+lib/email/order-email-copy.ts
+  s_36fcf8940d4895::t_ae21cd3157c572 14-15
+tests/orders/tracking.test.ts
+  s_36fcf8940d4895::t_b72bcc5fc1d8d4 27-28
+lib/outbox/send.ts
+  s_36fcf8940d4895::t_214417b6332975 7,10-14,30-36,38-39,42
+tests/leads/lead-route.test.ts
+  s_36fcf8940d4895::t_9e149af96e9c5e 164-170
+  s_36fcf8940d4895::t_4696f957043dcb 258,266,294,303,307,310
+  s_36fcf8940d4895::t_99accd8c10d19b 7,38-50,87,163,171-187,189
+tests/outbox/order-emails.test.ts
+  s_36fcf8940d4895::t_3e0da339d455ac 77
+  s_36fcf8940d4895::t_e1c7d00a42fac0 67-68,70-76
+app/api/readiness/route.ts
+  s_36fcf8940d4895::t_70801a81dac039 26
+  s_36fcf8940d4895::t_d19f3ef31b8d70 1,3,6,9-10,12-13,16,22-25,27,29-32,35-36
+app/api/orders/route.ts
+  s_36fcf8940d4895::t_b72bcc5fc1d8d4 7,50-51
+tests/email/order-greeting.test.ts
+  s_36fcf8940d4895::t_ccc22d3cb7efb8 1-60
+lib/email/order-emails.ts
+  s_36fcf8940d4895::t_ae21cd3157c572 1,32-42,89,202
+lib/leads/dependencies.ts
+  s_36fcf8940d4895::t_214417b6332975 65-69,83,92-96
+  s_36fcf8940d4895::t_d19f3ef31b8d70 18,132-133
+lib/outbox/log.ts
+  s_36fcf8940d4895::t_214417b6332975 15-16,25-29
+app/admin/orders/[reference]/page.tsx
+  s_36fcf8940d4895::t_92e8967edd359a 174-176
+lib/ops/readiness.ts
+  s_36fcf8940d4895::t_d19f3ef31b8d70 3,6,16-19,25,27-32,41-44,48,50
+components/admin/OrdersTable.tsx
+  s_36fcf8940d4895::t_92e8967edd359a 12-14,54-62
+lib/leads/submit.ts
+  s_36fcf8940d4895::t_4f71bd54824707 110-111
+  s_36fcf8940d4895::t_214417b6332975 7,18,25-31,78-83,85,112,143,206-208,211-215,217-218,221,324,375-376
+  s_36fcf8940d4895::t_d19f3ef31b8d70 11,17,90-96,105-106,121-125,318-323
+  s_36fcf8940d4895::t_9ce06458b1bebc 325
+.env.example
+  s_36fcf8940d4895::t_58a920be9aaabc 34
+lib/outbox/constants.ts
+  s_36fcf8940d4895::t_214417b6332975 18-50
+lib/outbox/attempt.ts
+  s_36fcf8940d4895::t_fedc03bb90c0b6 204
+  s_36fcf8940d4895::t_214417b6332975 3,11-13,34,46-49,62-66,84,152,182-186,195-203,205
+app/api/leads/route.ts
+  s_36fcf8940d4895::t_d19f3ef31b8d70 13-15
+supabase/migrations/0006_order_events_and_email_outbox.sql
+  s_36fcf8940d4895::t_7e88424210a363 39-41,536-538,592,597
+  s_36fcf8940d4895::t_da8a3a6cb72071 30
+lib/outbox/worker.ts
+  s_36fcf8940d4895::t_214417b6332975 9-16,19-21,25,36-44
+lib/orders/fields.ts
+  s_36fcf8940d4895::t_ae21cd3157c572 13,59-69,130-132,145
+supabase/tests/0005_staff_access.sql
+  s_36fcf8940d4895::t_ad333bf5cba9d1 176-178,209,211,223-226,233-237,263-265,518-521
+  s_36fcf8940d4895::t_95bf8a3e601478 447-488
+  s_36fcf8940d4895::t_a886a265847cd6 16-18,25
+tests/admin/ui-admin-pages.test.tsx
+  s_36fcf8940d4895::t_d71ee7558d33c4 193-200,358-373
+tests/orders/migration-database.test.ts
+  s_36fcf8940d4895::t_cd9ed8685964c4 7,10-11,37-38,108-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "98bba09b12287f8602da29648d30825e2af235e6",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
