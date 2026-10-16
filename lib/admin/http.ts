@@ -3,14 +3,18 @@ import "server-only";
 import { isJsonRequest, readBodyWithLimit } from "@/lib/leads/http";
 import { reportEvent } from "@/lib/observability/report";
 import type { OrderStatus } from "@/lib/orders/constants";
+import { requestHostAndProtocol } from "@/lib/supabase/staff-session";
 
 /**
  * Request and response rules shared by every staff API route (Task 8b, ruling R99).
  *
  * The routes authenticate with cookies, so a page on another site could make a browser send them.
- * Every state-changing request must therefore come from this site's own pages: its `Origin` equals
- * the request's own origin, or, without an Origin, the browser says `Sec-Fetch-Site: same-origin`.
- * A `Sec-Fetch-Site` that says anything else wins over the Origin. And it must be JSON, which a
+ * Every state-changing request must therefore come from this site's own pages (ruling R110): a
+ * `Sec-Fetch-Site` header decides alone (same-origin passes, anything else is refused); without
+ * one, the `Origin` host must equal the request's own host (`x-forwarded-host`, else `host`) and,
+ * when `x-forwarded-proto` is sent, its scheme; no Origin either is refused. `request.url` is never
+ * read: behind `next start -H 127.0.0.1` or a proxy it is not the address the browser used. And it
+ * must be JSON, which a
  * cross-site form cannot send without a CORS preflight this site never approves. Anything else is
  * 403 with no detail.
  *
@@ -29,18 +33,21 @@ export function adminJson(status: number, body: Record<string, unknown>, extra: 
 
 export function isSameOriginRequest(request: Request): boolean {
   const fetchSite = request.headers.get("sec-fetch-site")?.trim().toLowerCase();
-  if (fetchSite && fetchSite !== "same-origin") return false;
+  // R110: Fetch Metadata decides alone when present (page scripts cannot forge it).
+  if (fetchSite) return fetchSite === "same-origin";
+  // Older browsers: the Origin must be this request's own host, as the browser addressed it. Never
+  // `request.url`, which on a self-hosted server is the server's configured host, not the browser's.
   const origin = request.headers.get("origin")?.trim();
-  if (origin) {
-    let own: string;
-    try {
-      own = new URL(request.url).origin;
-    } catch {
-      return false;
-    }
-    return origin === own;
+  if (!origin) return false;
+  const { host, protocol } = requestHostAndProtocol(request.headers);
+  if (!host) return false;
+  try {
+    const parsed = new URL(origin);
+    if (parsed.host.toLowerCase() !== host) return false;
+    return protocol === null || parsed.protocol === `${protocol}:`;
+  } catch {
+    return false;
   }
-  return fetchSite === "same-origin";
 }
 
 /** R99: same-origin AND JSON. */

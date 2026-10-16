@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { isAuthApiError, isAuthSessionMissingError, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { StaffDatabase, StaffSelect } from "@/lib/orders/admin";
-import { createStaffAuthClient, isLocalHostname, staffAuthEnvironment, withinStaffAuthTimeout, type StaffCookieJar } from "./staff-session";
+import { cookiesMayBeInsecureFor, createStaffAuthClient, expireStaffSessionCookies, staffAuthEnvironment, withinStaffAuthTimeout, type StaffCookieJar } from "./staff-session";
 
 /**
  * Staff authorization (Task 8b; spec §5 "Staff routes", §11; rulings R94, R95).
@@ -127,7 +127,12 @@ export interface StaffSignIn {
   signOut(): Promise<boolean>;
 }
 
-export function staffSignInFrom(client: SupabaseClient, session: StaffSession = staffSessionFrom(client)): StaffSignIn {
+export function staffSignInFrom(
+  client: SupabaseClient,
+  session: StaffSession = staffSessionFrom(client),
+  /** Expires this device's session cookies directly; used when Auth does not confirm a sign-out (R111). */
+  expireCookies: () => void = () => {},
+): StaffSignIn {
   return {
     async signIn(email, password) {
       let error: unknown;
@@ -147,22 +152,27 @@ export function staffSignInFrom(client: SupabaseClient, session: StaffSession = 
     access: () => requireStaffUser(session),
     async signOut() {
       try {
-        // `local`: this device only. The session's refresh token is revoked by Auth; even when Auth
-        // cannot be reached, the library still removes the session, so the cookies are cleared.
+        // `local`: this device only. Auth revokes the session's refresh token and the library removes
+        // the cookies. When Auth does not confirm (it hangs past the bound, or errors), the cookies
+        // are expired here directly: this device is signed out either way, while the server-side
+        // session may live on until it expires.
         const answer = await withinStaffAuthTimeout(client.auth.signOut({ scope: "local" }));
-        if (answer.timedOut) return false;
-        const { error } = answer.value;
-        return !error || isAuthSessionMissingError(error);
+        if (!answer.timedOut) {
+          const { error } = answer.value;
+          if (!error || isAuthSessionMissingError(error)) return true;
+        }
       } catch {
-        return false;
+        // Treated as unconfirmed, like a timeout.
       }
+      expireCookies();
+      return false;
     },
   };
 }
 
 /** Whether this request's cookies may go without Secure: only on the local dev server. */
 export function cookiesMayBeInsecure(request: Request): boolean {
-  return isLocalHostname(new URL(request.url).hostname);
+  return cookiesMayBeInsecureFor(request.headers);
 }
 
 /**
@@ -173,7 +183,7 @@ export function cookiesMayBeInsecure(request: Request): boolean {
 export async function staffClientForRequest(
   request: Request,
   env: Record<string, string | undefined> = process.env,
-): Promise<{ client: SupabaseClient; session: StaffSession } | null> {
+): Promise<{ client: SupabaseClient; session: StaffSession; expireCookies: () => void } | null> {
   const config = staffAuthEnvironment(env);
   if (!config) return null;
   const store = await cookies();
@@ -187,6 +197,7 @@ export async function staffClientForRequest(
       }
     },
   };
-  const client = createStaffAuthClient(config, jar, { secure: !cookiesMayBeInsecure(request) });
-  return { client, session: staffSessionFrom(client) };
+  const secure = !cookiesMayBeInsecure(request);
+  const client = createStaffAuthClient(config, jar, { secure });
+  return { client, session: staffSessionFrom(client), expireCookies: () => expireStaffSessionCookies(jar, secure) };
 }

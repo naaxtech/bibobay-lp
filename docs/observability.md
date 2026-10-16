@@ -188,8 +188,8 @@ warnings, tagged with the event and code only:
 - `admin_auth_unavailable`: Supabase Auth or the `staff_users` read did not answer, or not within
   5 seconds (answered 503; nothing changed).
 - `staff_sign_in_unavailable`: Auth or the sign-in rate limiter did not answer during a sign-in.
-- `staff_sign_out_unavailable`: the session cookies were cleared but Auth did not confirm it
-  revoked the session.
+- `staff_sign_out_unavailable`: this device's session cookies were cleared, but Auth did not confirm it
+  revoked the session, so the server-side session may live on until it expires.
 - `admin_action_failed`: an unexpected failure of a staff route (also reported as an error with
   area `admin`); answered 500 with the generic copy.
 

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { monitoringConnectSources } from "./lib/observability/monitoring-env";
 import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironment } from "./lib/security/headers";
-import { STAFF_SESSION_COOKIE, createStaffAuthClient, isLocalHostname, isStaffPath, staffAuthEnvironment, withinStaffAuthTimeout } from "./lib/supabase/staff-session";
+import { STAFF_SESSION_COOKIE, cookiesMayBeInsecureFor, createStaffAuthClient, isStaffPath, staffAuthEnvironment, withinStaffAuthTimeout } from "./lib/supabase/staff-session";
 
 type CookieWrite = { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] };
 
@@ -33,7 +33,7 @@ async function refreshStaffSession(request: NextRequest): Promise<CookieWrite[]>
         else request.cookies.set(name, value);
       },
     },
-    { secure: !isLocalHostname(request.nextUrl.hostname) },
+    { secure: !cookiesMayBeInsecureFor(request.headers) },
   );
   try {
     // Bounded: auth-js retries a failed refresh for up to 30 s. Past the bound, nothing is refreshed.

@@ -144,7 +144,8 @@ export async function handleSignOut(request: Request, deps: Pick<SessionDependen
       return adminJson(503, { ok: false, message: ADMIN_COPY.api.unconfigured });
     }
     const revoked = await deps.auth.signOut();
-    // The cookies are cleared either way; an unconfirmed revoke is worth a warning.
+    // This device's cookies are gone either way (signOut expires them itself when Auth does not
+    // confirm); an unconfirmed revoke leaves the server-side session alive until it expires: a warning.
     deps.log(revoked ? { event: "staff_signed_out" } : { event: "staff_sign_out_unavailable" });
     return adminJson(200, { ok: true, message: ADMIN_COPY.session.signedOut });
   } catch (error) {

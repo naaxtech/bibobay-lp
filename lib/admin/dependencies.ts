@@ -64,7 +64,7 @@ export async function createSessionDependencies(request: Request, env: Env = pro
   const admin = getSupabaseAdminEnvironment(env);
   const secret = hashSecretFrom(env);
   return {
-    auth: staff ? staffSignInFrom(staff.client, staff.session) : null,
+    auth: staff ? staffSignInFrom(staff.client, staff.session, staff.expireCookies) : null,
     rateLimiter: admin && secret ? createSupabaseRateLimiter(createSupabaseAdminClient(admin)) : null,
     clientKey: secret ? clientKeyFromHeaders(request.headers, secret) : "",
     emailKey: (email) => (secret ? createHmac("sha256", secret).update(`staff-login-email:${email}`).digest("hex") : ""),

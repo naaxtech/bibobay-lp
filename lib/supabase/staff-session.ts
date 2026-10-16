@@ -44,6 +44,43 @@ const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 /** The local dev server's hosts: the only ones where the cookies go without Secure (plain http). */
 export const isLocalHostname = (hostname: string) => LOCAL_HOSTNAMES.has(hostname.toLowerCase());
 
+/** The first value of a (possibly comma-separated, proxy-appended) header, trimmed and lower-cased, or null. */
+function firstHeaderValue(headers: Headers, name: string): string | null {
+  const value = headers.get(name)?.split(",")[0]?.trim().toLowerCase();
+  return value ? value : null;
+}
+
+/**
+ * The host (with port) and protocol the browser used, from the request's own headers and never from
+ * `request.url`: on `next start -H 127.0.0.1` the url says `localhost` whatever the browser typed
+ * (ruling R110). Host: the first `x-forwarded-host`, else `host`. Protocol: the first
+ * `x-forwarded-proto`, else null (a plain `next start` sends none and speaks http).
+ */
+export function requestHostAndProtocol(headers: Headers): { host: string | null; protocol: string | null } {
+  return { host: firstHeaderValue(headers, "x-forwarded-host") ?? firstHeaderValue(headers, "host"), protocol: firstHeaderValue(headers, "x-forwarded-proto") };
+}
+
+/**
+ * Whether this request's cookies may go without Secure (R110): only when the browser's host is a
+ * local hostname and the protocol is not https. An unreadable or missing host is not local.
+ */
+export function cookiesMayBeInsecureFor(headers: Headers): boolean {
+  const { host, protocol } = requestHostAndProtocol(headers);
+  if (!host || protocol === "https") return false;
+  try {
+    return isLocalHostname(new URL(`http://${host}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Expires every staff session cookie in the jar, with the enforced options (R111). */
+export function expireStaffSessionCookies(jar: StaffCookieJar, secure: boolean): void {
+  for (const { name } of jar.getAll()) {
+    if (STAFF_SESSION_COOKIE.test(name)) jar.set(name, "", { ...staffCookieOptions(secure), maxAge: 0 });
+  }
+}
+
 export function staffCookieOptions(secure: boolean) {
   return { httpOnly: true, secure, sameSite: "lax" as const, path: "/" };
 }

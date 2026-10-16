@@ -241,20 +241,20 @@ describe("staff reads under row level security", () => {
 // The routes' rules (R99), on the handlers the route files call
 // ---------------------------------------------------------------------------
 
-describe("same-origin JSON only (R99)", () => {
-  it("accepts the site's own origin, or Sec-Fetch-Site same-origin without an Origin", () => {
+describe("same-origin JSON only (R99, R110)", () => {
+  it("accepts Sec-Fetch-Site same-origin, or without it an Origin equal to the request's own host", () => {
     expect(isSameOriginRequest(adminRequest("/api/admin/x", {}))).toBe(true);
-    expect(isSameOriginRequest(adminRequest("/api/admin/x", {}, { "sec-fetch-site": "" }))).toBe(true);
+    expect(isSameOriginRequest(adminRequest("/api/admin/x", {}, { "sec-fetch-site": "", host: "bibobay.example" }))).toBe(true);
     const fetchSiteOnly = new Request(`${ORIGIN}/api/admin/x`, { method: "POST", headers: { "sec-fetch-site": "same-origin" } });
     expect(isSameOriginRequest(fetchSiteOnly)).toBe(true);
   });
 
   it.each([
-    ["another origin", { origin: "https://evil.example" }],
-    ["another scheme", { origin: "http://bibobay.example" }],
-    ["another port", { origin: "https://bibobay.example:8443" }],
+    ["another origin", { origin: "https://evil.example", "sec-fetch-site": "", host: "bibobay.example" }],
+    ["another scheme", { origin: "http://bibobay.example", "sec-fetch-site": "", host: "bibobay.example", "x-forwarded-proto": "https" }],
+    ["another port", { origin: "https://bibobay.example:8443", "sec-fetch-site": "", host: "bibobay.example" }],
     ["a subdomain", { origin: "https://shop.bibobay.example", "sec-fetch-site": "same-site" }],
-    ["an opaque origin", { origin: "null" }],
+    ["an opaque origin", { origin: "null", "sec-fetch-site": "", host: "bibobay.example" }],
     ["a cross-site fetch with a forged origin", { "sec-fetch-site": "cross-site" }],
     ["a same-site fetch", { "sec-fetch-site": "same-site" }],
     ["a navigation typed in the address bar", { "sec-fetch-site": "none" }],
@@ -303,7 +303,7 @@ describe("POST /api/admin/orders/[reference]/status", () => {
       body: { ok: false, message: ADMIN_COPY.api.signedOut },
     });
     const notStaff = await answer(await handleStatusRequest(request(), order.reference, dependencies({ access: async () => ({ ok: false, reason: "not_staff" }) }).deps));
-    const crossSite = await answer(await handleStatusRequest(adminRequest("/x", { from: "new", to: "confirmed" }, { origin: "https://evil.example" }), order.reference, dependencies().deps));
+    const crossSite = await answer(await handleStatusRequest(adminRequest("/x", { from: "new", to: "confirmed" }, { origin: "https://evil.example", "sec-fetch-site": "cross-site" }), order.reference, dependencies().deps));
     expect(notStaff.status).toBe(403);
     expect(notStaff.body).toEqual(crossSite.body);
     expect((await orderRow(order.orderId)).status).toBe("new");
@@ -460,7 +460,7 @@ describe("POST /api/admin/orders/[reference]/tracking-link", () => {
 
   it("follows the same rules: cross-site 403, signed out 401, not staff 403, unknown 404", async () => {
     const order = await seedOrder(db);
-    expect((await handleTrackingLinkRequest(adminRequest("/x", {}, { origin: "https://evil.example" }), order.reference, dependencies().deps)).status).toBe(403);
+    expect((await handleTrackingLinkRequest(adminRequest("/x", {}, { origin: "https://evil.example", "sec-fetch-site": "cross-site" }), order.reference, dependencies().deps)).status).toBe(403);
     expect((await handleTrackingLinkRequest(adminRequest("/x", {}), order.reference, dependencies({ access: async () => ({ ok: false, reason: "signed_out" }) }).deps)).status).toBe(401);
     expect((await handleTrackingLinkRequest(adminRequest("/x", {}), order.reference, dependencies({ access: async () => staffAccess(STAFF_FIXTURE.visitor) }).deps)).status).toBe(403);
     expect((await handleTrackingLinkRequest(adminRequest("/x", {}), "BB-0000-0000", dependencies().deps)).status).toBe(404);

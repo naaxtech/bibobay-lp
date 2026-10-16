@@ -175,7 +175,7 @@ describe("proxy.ts and the staff session (Task 8b)", () => {
 
   it("drops Secure only on the local dev server", async () => {
     configure();
-    const response = await proxy(new NextRequest("http://127.0.0.1:3000/admin/orders", { headers: { cookie: sessionCookie({ expired: true }) } }));
+    const response = await proxy(new NextRequest("http://127.0.0.1:3000/admin/orders", { headers: { host: "127.0.0.1:3000", cookie: sessionCookie({ expired: true }) } }));
     const setCookie = response.headers.getSetCookie().join("\n");
     expect(setCookie).toMatch(/HttpOnly/i);
     expect(setCookie).not.toMatch(/Secure/i);
