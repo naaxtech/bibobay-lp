@@ -1,0 +1,87 @@
+studio/scripts/seed-data.ts
+  s_36fcf8940d4895::t_f4cf9a0a1377c5 97
+components/landing/useRovingTabs.ts
+  s_36fcf8940d4895::t_d0f58ba6fc8047 63-73
+components/legal/legal-copy.ts
+  s_36fcf8940d4895::t_caddc78991e4d1 36-37
+components/landing/Navbar.tsx
+  s_36fcf8940d4895::t_2c625bc2b9ceb3 4,20-35,44-63,106,120,124
+app/thank-you/page.tsx
+  s_36fcf8940d4895::t_caddc78991e4d1 6-7,24-25,29
+lib/leads/removal-channel.ts
+  s_36fcf8940d4895::t_59b5b4885e3d97 1-20
+studio/sanity.config.ts
+  s_36fcf8940d4895::t_38f617be4c87f3 12,18-20,32-35
+components/landing/landing.css
+  s_36fcf8940d4895::t_513252e2188490 1198
+  s_36fcf8940d4895::t_b2f14a1fb5d06c 1199
+tests/landing/inactive-panel-images.test.tsx
+  s_36fcf8940d4895::t_9ce366a4c6b78e 1-51
+components/landing/Episodes.tsx
+  s_36fcf8940d4895::t_57741bbaf72c85 14,31,35
+studio/README.md
+  s_36fcf8940d4895::t_04b835ef37899b 6
+tests/content/legal-pages.test.tsx
+  s_36fcf8940d4895::t_ee5dfa54dd4e4f 99-102,161,167
+components/landing/Characters.tsx
+  s_36fcf8940d4895::t_57741bbaf72c85 11,20,26
+tests/privacy/removal-channel-wording.test.tsx
+  s_36fcf8940d4895::t_f2bdae8367350c 1-132
+lib/content/fallback.ts
+  s_36fcf8940d4895::t_caddc78991e4d1 96
+lib/content/legal-fallback.ts
+  s_36fcf8940d4895::t_9e9e0e0853bf6f 2-3,37,86,135,139,158,178,181-204,206-209
+components/ui/Dialog.tsx
+  s_36fcf8940d4895::t_2c625bc2b9ceb3 41-46,57,118-119,121
+lib/content/removal-copy.ts
+  s_36fcf8940d4895::t_caddc78991e4d1 1-19
+tests/content/studio-preview-config.test.ts
+  s_36fcf8940d4895::t_aa24043de41687 1-31
+e2e/leads/lead-form.spec.ts
+  s_36fcf8940d4895::t_7bed35f4e5a7f1 173-186
+tests/leads/lead-copy.test.tsx
+  s_36fcf8940d4895::t_61f4dbd618f61e 200,203-204,206,210-217,274,291,351-362
+  s_36fcf8940d4895::t_5d1adc0b6798e5 363,365-371
+  s_36fcf8940d4895::t_4a855326d78c17 364
+app/page.tsx
+  s_36fcf8940d4895::t_caddc78991e4d1 6-7,32,34
+components/forms/LeadForm.tsx
+  s_36fcf8940d4895::t_70d306e9f7a43a 64-67
+  s_36fcf8940d4895::t_caddc78991e4d1 175-177
+e2e/landing/interactions.spec.ts
+  s_36fcf8940d4895::t_1c9b2585134e17 191-214
+components/analytics/AnalyticsProvider.tsx
+  s_36fcf8940d4895::t_a644e6755207e0 9,17-18,26,49
+lib/analytics/events.ts
+  s_36fcf8940d4895::t_4aa96bb9016a17 28-48,150,156
+lib/observability/admin-paths.ts
+  s_36fcf8940d4895::t_88ea3f884781f1 1-29
+lib/observability/sentry-config.ts
+  s_36fcf8940d4895::t_c37ba71b9e2167 5,18-19,38-39,41
+tests/analytics/client.test.tsx
+  s_36fcf8940d4895::t_551e57bf75c0e5 178-194
+tests/analytics/events.test.ts
+  s_36fcf8940d4895::t_7dcf293d9fb435 31-52
+tests/landing/accessibility-contracts.test.tsx
+  s_36fcf8940d4895::t_12d967d8711dc4 2,388-408
+tests/landing/section-renderer.test.tsx
+  s_36fcf8940d4895::t_bdc17f9e3ec111 3,354-356
+tests/observability/admin-order-paths.test.ts
+  s_36fcf8940d4895::t_ce2ac69a15d28c 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cc82b29de509e7c725736c74314592306c9c5d9e",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
