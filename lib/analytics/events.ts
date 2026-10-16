@@ -25,6 +25,27 @@ export type AnalyticsEvent = keyof typeof ANALYTICS_EVENTS;
 export type AnalyticsValue = string | number | boolean;
 export type AnalyticsProperties = Record<string, AnalyticsValue>;
 
+/**
+ * Pages that are never counted (8c-M1): the staff pages (their paths carry order references) and the
+ * editors' Studio. `cleanCapture` applies it to every event, so client-side navigations are covered
+ * too; the provider uses it to not start at all on a hard load of one of these pages.
+ */
+export function isExcludedPagePath(pathname: string): boolean {
+  return /^\/(?:admin|studio)(?:[/;?#]|$)/i.test(pathname);
+}
+
+/** True when the event's address (`$current_url`) or path (`$pathname`) is an excluded page. */
+function onExcludedPage(properties: Record<string, unknown>): boolean {
+  const { $current_url: url, $pathname: path } = properties;
+  if (typeof path === "string" && isExcludedPagePath(path)) return true;
+  if (typeof url !== "string") return false;
+  try {
+    return isExcludedPagePath(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** PostHog's own events that are kept: page views and page leaves (time on page, scroll depth). */
 const SDK_EVENTS = new Set(["$pageview", "$pageleave"]);
 
@@ -126,12 +147,13 @@ export interface CaptureLike {
 
 /**
  * PostHog `before_send`: drops anything that is not a page view, page leave or allow-listed
- * action; keeps the SDK's device, page and source fields with the address cut down; removes person
+ * action, and anything on a staff or Studio page; keeps the SDK's device, page and source fields with the address cut down; removes person
  * properties, initial-visit copies, ad-click identifiers and any value holding an email address.
  */
 export function cleanCapture<T extends CaptureLike>(capture: T): T | null {
   const action = isEventName(capture.event);
   if (!action && !SDK_EVENTS.has(capture.event)) return null;
+  if (onExcludedPage(capture.properties ?? {})) return null;
   const allowed = action ? new Set<string>(ANALYTICS_EVENTS[capture.event as AnalyticsEvent]) : new Set<string>();
   const properties: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(capture.properties ?? {})) {

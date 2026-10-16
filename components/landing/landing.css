@@ -1195,6 +1195,8 @@
 
   .watch-layout {
     display: grid;
+    /* One column that may shrink to the container: with an automatic column the sideways-scrolling playlist set the width (QA-1, 2 px of page overflow at 320 px). */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "tabs" "progress" "books";
     gap: 1.25rem;
   }

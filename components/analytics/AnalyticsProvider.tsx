@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { classifyClick } from "@/lib/analytics/classify";
 import { analyticsActive, startAnalytics, track } from "@/lib/analytics/client";
 import type { AnalyticsConfig } from "@/lib/analytics/config";
+import { isExcludedPagePath } from "@/lib/analytics/events";
 
 /**
  * Starts visit statistics on every public page (ruling R70) and counts what visitors do: one
@@ -13,7 +14,8 @@ import type { AnalyticsConfig } from "@/lib/analytics/config";
  * calls to action, tabs, questions, the menu), including links opened with the middle button, and
  * each section is counted once per page view when it crosses the middle of the screen. Page views,
  * page leaves and where the visit came from are PostHog's own events. Renders nothing; does
- * nothing without a configuration or in the editors' Studio.
+ * nothing without a configuration, and counts nothing on the staff pages or in the editors' Studio
+ * (8c-M1: the capture filter `cleanCapture` drops them, so client-side navigations are covered too).
  */
 export function AnalyticsProvider({ config }: { config: AnalyticsConfig | null }) {
   const key = config?.key;
@@ -21,7 +23,7 @@ export function AnalyticsProvider({ config }: { config: AnalyticsConfig | null }
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!key || !apiHost || window.location.pathname.startsWith("/studio")) return;
+    if (!key || !apiHost || isExcludedPagePath(window.location.pathname)) return;
     void startAnalytics({ key, apiHost });
 
     const count = (target: EventTarget | null) => {
@@ -44,7 +46,7 @@ export function AnalyticsProvider({ config }: { config: AnalyticsConfig | null }
 
   // Review M4: re-observed on every page, including pages reached by client-side navigation.
   useEffect(() => {
-    if (!key || !apiHost || typeof IntersectionObserver === "undefined" || window.location.pathname.startsWith("/studio")) return;
+    if (!key || !apiHost || typeof IntersectionObserver === "undefined" || isExcludedPagePath(window.location.pathname)) return;
     const counted = new Set<string>();
     const observer = new IntersectionObserver(
       (entries) => {

@@ -8,7 +8,7 @@ import { PaperMood, moodAccent } from "./PaperMood";
 import { PaperEdge, SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
 import { UI_COPY } from "./ui-copy";
-import { useRovingTabs } from "./useRovingTabs";
+import { useEverChosen, useRovingTabs } from "./useRovingTabs";
 
 type PanelProps = ReturnType<ReturnType<typeof useRovingTabs>["panelProps"]>;
 
@@ -17,12 +17,13 @@ const accentStyle = (accent: string) => ({ "--friend-accent": accent }) as CSSPr
 function FriendStage({ friend, index, art, panelProps }: { friend: Character; index: number; art?: StageArt; panelProps: PanelProps }) {
   const accent = moodAccent(friend.accentColor, index);
   const status = friend.status === "concept" ? UI_COPY.characterStatus.concept : null;
+  const showArt = useEverChosen(!panelProps.inert);
   const kind = [friend.species, friend.role].filter(Boolean).join(" · ");
   const personality = friend.personality && friend.personality !== friend.description ? friend.personality : null;
   return (
     <div {...panelProps} className="friend-stage" style={accentStyle(accent)}>
       <div className="friend-stage__art">
-        {art ? (
+        {art && showArt ? (
           <ArtImage art={art} sizes="(min-width: 64rem) 30rem, (min-width: 48rem) 45vw, 100vw" />
         ) : (
           <PaperMood variant={index} accent={accent} />

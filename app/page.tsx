@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { LeadForm } from "@/components/forms/LeadForm";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { PreviewNotice } from "@/components/preview/PreviewNotice";
+import { consentWithRemoval } from "@/lib/content/removal-copy";
+import { removalChannelFrom } from "@/lib/leads/removal-channel";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
 import { getLandingPage, getSiteSettings } from "@/lib/sanity/fetch";
 import { sanityImageUrl } from "@/lib/sanity/image";
@@ -27,9 +29,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const { preview, content, settings } = await load();
   const { buttonLabel, consentCopy, successMessage, errorMessage } = content.lead;
-  // The form always renders. Without Supabase the route answers 503 and the form shows the CMS
+  // The consent sentence names the removal channel that exists (Ruling R125). The form always renders. Without Supabase the route answers 503 and the form shows the CMS
   // error message; success appears only once the server reports the signup stored.
-  const leadForm = <LeadForm copy={{ buttonLabel, consentCopy, successMessage, errorMessage }} />;
+  const leadForm = <LeadForm copy={{ buttonLabel, consentCopy: consentWithRemoval(consentCopy, removalChannelFrom(settings)), successMessage, errorMessage }} />;
   return (
     <>
       {preview ? <PreviewNotice /> : null}

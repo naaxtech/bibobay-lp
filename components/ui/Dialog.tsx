@@ -38,6 +38,12 @@ export interface DialogProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   /** Receives focus on close; defaults to whatever was focused when the dialog opened. */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * When `.current` is true as the dialog closes, focus is not returned to the opener (the owner
+   * moves it somewhere better, such as the section a menu link points at). Escape and Close leave
+   * it false, so they keep the restore. The dialog resets it to false once it has been honoured.
+   */
+  skipFocusReturnRef?: RefObject<boolean>;
   className?: string;
   children: ReactNode;
 }
@@ -48,7 +54,7 @@ export interface DialogProps {
  * locked and everything behind it is inert while it is open.
  * src: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ · WAI-ARIA APG (living document) · 2026-10-05
  */
-export function Dialog({ open, onClose, title, hideTitle = false, initialFocusRef, returnFocusRef, className, children }: DialogProps) {
+export function Dialog({ open, onClose, title, hideTitle = false, initialFocusRef, returnFocusRef, skipFocusReturnRef, className, children }: DialogProps) {
   const isBrowser = useIsBrowser();
   const titleId = useId();
   const layerRef = useRef<HTMLDivElement>(null);
@@ -109,9 +115,10 @@ export function Dialog({ open, onClose, title, hideTitle = false, initialFocusRe
       if (previousGutter) root.style.setProperty("scrollbar-gutter", previousGutter);
       else root.style.removeProperty("scrollbar-gutter");
       // Inert is lifted first: an inert element cannot take focus.
-      if (returnTo?.isConnected) returnTo.focus();
+      if (skipFocusReturnRef?.current) skipFocusReturnRef.current = false;
+      else if (returnTo?.isConnected) returnTo.focus();
     };
-  }, [open, isBrowser, initialFocusRef, returnFocusRef]);
+  }, [open, isBrowser, initialFocusRef, returnFocusRef, skipFocusReturnRef]);
 
   if (!open || !isBrowser) return null;
   return createPortal(

@@ -197,13 +197,22 @@ describe("submission outcomes", () => {
     await waitFor(() => expect(status().textContent).toBe(CMS.errorMessage));
   });
 
-  it("shows the CMS error message when storage is unavailable (503)", async () => {
+  it("shows the API's own message on a 503, never success (P-I1: signups are not open yet)", async () => {
     renderForm();
     fillValid();
-    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: SAFE_FALLBACK_CONTENT.lead.errorMessage } });
+    const closed = "Signups are not open yet. Please check back soon.";
+    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: closed } });
+    await submit();
+    await waitFor(() => expect(status().textContent).toBe(closed));
+    expect(status().textContent).not.toContain(CMS.successMessage);
+  });
+
+  it("shows the CMS error message on a 503 that carries no message", async () => {
+    renderForm();
+    fillValid();
+    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false } });
     await submit();
     await waitFor(() => expect(status().textContent).toBe(CMS.errorMessage));
-    expect(status().textContent).not.toContain(CMS.successMessage);
   });
 
   it("shows the CMS error message when the network fails", async () => {
@@ -262,7 +271,7 @@ describe("submission outcomes", () => {
     renderForm();
     fillValid();
     submitButton().focus();
-    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: "x" } });
+    answers.push({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: CMS.errorMessage } });
     // Chromium drops focus to <body> when the focused button is disabled; jsdom does not, so do it here.
     submitButton().blur();
     await submit();
@@ -279,7 +288,7 @@ describe("submission outcomes", () => {
     expect(submitButton().disabled).toBe(true);
     emailInput().focus();
     await act(async () => {
-      release(new Response(JSON.stringify({ ok: false, persisted: false, acknowledgementQueued: false, message: "x" }), { status: 503 }));
+      release(new Response(JSON.stringify({ ok: false, persisted: false, acknowledgementQueued: false, message: CMS.errorMessage }), { status: 503 }));
     });
     await waitFor(() => expect(status().textContent).toBe(CMS.errorMessage));
     expect(document.activeElement).toBe(emailInput());
@@ -338,5 +347,26 @@ describe("landing page integration", () => {
     expect(within(signup).getByRole("button", { name: SAFE_FALLBACK_CONTENT.lead.buttonLabel })).toBeTruthy();
     expect(within(signup).getByRole("checkbox", { name: SAFE_FALLBACK_CONTENT.lead.consentCopy })).toBeTruthy();
     expect(within(signup).getByRole("status").textContent).toBe("");
+  });
+
+  it("appends the removal channel that exists to the consent sentence, and none when there is none (P-I1)", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESEND_FROM", "");
+    const { unmount } = render(await Home());
+    expect(screen.getByRole("checkbox", { name: SAFE_FALLBACK_CONTENT.lead.consentCopy })).toBeTruthy();
+    unmount();
+    vi.stubEnv("RESEND_API_KEY", "re_fixture");
+    vi.stubEnv("RESEND_FROM", "BIBO Bay <hello@example.com>");
+    render(await Home());
+    expect(screen.getByRole("checkbox", { name: `${SAFE_FALLBACK_CONTENT.lead.consentCopy} I can ask to be removed by replying to the acknowledgement email.` })).toBeTruthy();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("lead form source hygiene (P-M2, workspace law 1)", () => {
+  it("keeps no commented-out code in the form", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("components/forms/LeadForm.tsx", "utf8");
+    expect(source).not.toMatch(/^\s*\/\/\s*returnFocusTo\s*=/m);
   });
 });

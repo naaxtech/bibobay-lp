@@ -223,10 +223,6 @@ test.describe("reflow at 320 CSS px (WCAG 2.2 AA 1.4.10; spec §13 and the §16 
   }
 
   test("the landing page needs no sideways scroll", async ({ page }) => {
-    // QA-1: at 320 px the story selector (#episodes .story-tabs) is 322.3 px wide, so the whole page scrolls
-    // sideways by 2 px. It is fine at 330 px and above. Kept failing until the selector is fixed; remove
-    // the annotation then (the controller routes the fix, ruling R121).
-    test.fail(true, "QA-1: .story-tabs overflows the viewport by 2 px at 320 px wide");
     await openLanding(page);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     for (let y = 0; y < height; y += 700) {
@@ -234,28 +230,5 @@ test.describe("reflow at 320 CSS px (WCAG 2.2 AA 1.4.10; spec §13 and the §16 
       await page.waitForTimeout(30);
     }
     expect(await overflowOf(page), "sideways overflow in CSS px").toBeLessThanOrEqual(0);
-  });
-
-  test("QA-1 diagnosis: the only element past the right edge outside a scroll container is the story selector", async ({ page }) => {
-    await openLanding(page);
-    const offenders = await page.evaluate(() => {
-      const width = document.documentElement.clientWidth;
-      const found: string[] = [];
-      for (const element of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
-        const box = element.getBoundingClientRect();
-        if (box.width === 0 || box.right <= width + 0.5) continue;
-        let clipped = false;
-        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-          if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowX)) {
-            clipped = true;
-            break;
-          }
-        }
-        if (!clipped) found.push(`${element.tagName.toLowerCase()}.${String(element.className).split(" ")[0]} in #${element.closest("section")?.id}`);
-      }
-      return found;
-    });
-    // When QA-1 is fixed this list is empty and this test fails: delete it with the annotation above.
-    expect(offenders).toEqual(["div.story-tabs in #episodes"]);
   });
 });

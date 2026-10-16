@@ -170,6 +170,20 @@ for (const { name, use } of VIEWPORTS) {
       await expectFocusKept(page);
     });
 
+    test("a 503 that says signups are not open yet shows the API's message, never success (P-I1)", async ({ page }) => {
+      // The route's 503 while no removal channel exists (Ruling R125), served here (ruling R39).
+      const closed = "Signups are not open yet. Please check back soon.";
+      await page.route("**/api/leads", (route) => answer(route, 503, { ok: false, persisted: false, acknowledgementQueued: false, message: closed }));
+      await openForm(page);
+      await emailField(page).fill("parent@example.com");
+      await consentBox(page).check();
+      await submitButton(page).click();
+
+      await expect(statusLine(page)).toHaveText(closed);
+      await expect(leadForm(page)).not.toContainText(SUCCESS);
+      await expect(emailField(page)).toHaveValue("parent@example.com");
+    });
+
     test("shows success only when the server reports the signup stored", async ({ page }) => {
       let reply: Record<string, unknown> = { ok: true, persisted: false, acknowledgementQueued: false, message: SUCCESS };
       const bodies: unknown[] = [];

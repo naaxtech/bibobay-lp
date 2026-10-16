@@ -28,6 +28,28 @@ describe("the event allow-list", () => {
   });
 });
 
+describe("staff and editor pages are never counted (8c-M1)", () => {
+  const pageview = (url: string, extra: Record<string, unknown> = {}) => capture("$pageview", { $current_url: url, ...extra });
+
+  it("drops page views, page leaves and actions whose address is under /admin or /studio", () => {
+    for (const path of ["/admin", "/admin/", "/admin/login", "/admin/orders", "/admin/orders/BB-1A2B-3C4D", "/studio", "/studio/desk/page;abc", "/ADMIN/orders"]) {
+      expect(cleanCapture(pageview(`https://bibobay.example${path}`)), path).toBeNull();
+      expect(cleanCapture(capture("$pageleave", { $current_url: `https://bibobay.example${path}` })), path).toBeNull();
+      expect(cleanCapture(capture("cta_clicked", { $current_url: `https://bibobay.example${path}`, section: "hero" })), path).toBeNull();
+    }
+  });
+
+  it("also drops an event that only carries $pathname", () => {
+    expect(cleanCapture(capture("$pageview", { $pathname: "/admin/orders/BB-1A2B-3C4D" }))).toBeNull();
+  });
+
+  it("still counts the public pages, including paths that only start with the same letters", () => {
+    for (const path of ["/", "/privacy", "/administration", "/studios", "/orders/abc", "/api/admin-not-a-page"]) {
+      expect(cleanCapture(pageview(`https://bibobay.example${path}`)), path).not.toBeNull();
+    }
+  });
+});
+
 describe("cleanCapture (before_send)", () => {
   it("drops every event that is not a page view, a page leave or an allow-listed action", () => {
     for (const event of ["$autocapture", "$rageclick", "$exception", "$identify", "$snapshot", "$web_vitals", "$opt_in", "survey shown", "made_up"]) {

@@ -2,6 +2,7 @@ import type { Breadcrumb, ErrorEvent, Event } from "@sentry/nextjs";
 
 import { decodeLeniently } from "../privacy/decode";
 import { maskPrivatePaths } from "../privacy/private-links";
+import { maskAdminOrderPaths } from "./admin-paths";
 
 /** The parts of these SDK types this file relies on (the package's index does not re-export them). */
 export type TransactionEvent = Event & { type: "transaction" };
@@ -14,7 +15,8 @@ export interface Integration {
  * no default personal data, no session replay, and every event, transaction and breadcrumb passes
  * through the scrubber, which keeps a request's method, its URL without the query and the user
  * agent, and nothing else from it; drops the user and every extra value; and masks anything shaped
- * like an email address, and the token of a private order link (Task 7b: `/orders/[token]`). Types
+ * like an email address, the token of a private order link (Task 7b: `/orders/[token]`) and the
+ * reference in a staff order path (8c-M1: `/admin/orders/[reference]`, lib/observability/admin-paths.ts). Types
  * only from the SDK: this file never loads Sentry itself.
  */
 
@@ -33,10 +35,10 @@ const maskEmails = (value: string) => (value.includes("@") ? value.replace(EMAIL
 const stripQueries = (value: string) => (value.includes("?") ? value.replace(QUERY_IN_TEXT, "$1") : value);
 /**
  * Free text: cut to MAX_TEXT, percent-decoded (leniently, so `parent%40example.com` in a URL path is
- * seen as the address it is; re-review 3), queries removed, email addresses and private order
- * tokens masked.
+ * seen as the address it is; re-review 3), queries removed, email addresses, private order
+ * tokens and staff order references masked.
  */
-const maskText = (value: string) => maskPrivatePaths(maskEmails(stripQueries(decodeLeniently(cap(value)))));
+const maskText = (value: string) => maskAdminOrderPaths(maskPrivatePaths(maskEmails(stripQueries(decodeLeniently(cap(value))))));
 
 /** A URL or path without its query string and fragment; other strings unchanged. */
 function withoutQuery(value: string): string {

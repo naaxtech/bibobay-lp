@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -383,6 +383,27 @@ describe("mobile navigation menu", () => {
     fireEvent.click(within(dialog).getByRole("link", { name: "Watch" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(menuButton().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("moves focus to the target section's heading, not the Menu button, when an in-page link closes the menu (P-I2, WCAG 2.4.3)", async () => {
+    renderPage();
+    const { button, dialog } = openMenu();
+    fireEvent.click(within(dialog).getByRole("link", { name: "Watch" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const heading = document.getElementById("episodes-heading")!;
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(document.activeElement).not.toBe(button);
+    expect(heading.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("moves focus to the heading for the call to action's anchor too, and keeps the restore for a link that leaves the page", async () => {
+    renderPage();
+    const first = openMenu();
+    fireEvent.click(within(first.dialog).getByRole("link", { name: "Free activity pack" }));
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById("lead-heading")));
+    const second = openMenu();
+    fireEvent.click(within(second.dialog).getByRole("link", { name: /Subscribe on YouTube/ }));
+    expect(document.activeElement).toBe(second.button);
   });
 
   it("closes from its Close button and on Escape, returning focus to Menu", () => {

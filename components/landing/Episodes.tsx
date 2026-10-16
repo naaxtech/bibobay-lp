@@ -11,7 +11,7 @@ import { PaperMood, moodAccent } from "./PaperMood";
 import { SectionShell, Tape } from "./SectionShell";
 import type { StageArt } from "./sections";
 import { UI_COPY } from "./ui-copy";
-import { useRovingTabs } from "./useRovingTabs";
+import { useEverChosen, useRovingTabs } from "./useRovingTabs";
 
 type PanelProps = ReturnType<ReturnType<typeof useRovingTabs>["panelProps"]>;
 
@@ -28,10 +28,11 @@ function Storybook({ story, index, art, conceptLabel, panelProps, describedBy }:
   describedBy?: string;
 }) {
   const isConcept = story.status === "concept";
+  const showArt = useEverChosen(!panelProps.inert);
   const watchHref = !isConcept && story.mediaUrl ? story.mediaUrl : null;
   const cover = (
     <>
-      {art ? (
+      {art && showArt ? (
         <ArtImage art={art} sizes="(min-width: 80rem) 50rem, (min-width: 64rem) 62vw, 100vw" />
       ) : (
         <PaperMood variant={index + COVER_OFFSET} accent={moodAccent(undefined, index + COVER_OFFSET)} />

@@ -175,6 +175,23 @@ describe("AnalyticsProvider", () => {
     expect(sdk.calls.init).toHaveLength(0);
   });
 
+  it("leaves the staff pages alone on a hard load, and drops a page view of them after a client-side navigation (8c-M1)", async () => {
+    window.history.pushState({}, "", "/admin/orders/BB-1A2B-3C4D");
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    cleanup();
+
+    window.history.pushState({}, "", "/");
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    const beforeSend = sdk.calls.init[0]![1].before_send as (capture: unknown) => unknown;
+    const pageview = (path: string) => ({ uuid: "u", event: "$pageview", properties: { $current_url: `https://bibobay.example${path}` } });
+    expect(beforeSend(pageview("/"))).not.toBeNull();
+    expect(beforeSend(pageview("/admin/orders/BB-1A2B-3C4D"))).toBeNull();
+    expect(beforeSend(pageview("/studio/desk"))).toBeNull();
+  });
+
   it("leaves the editors' Studio alone", async () => {
     window.history.pushState({}, "", "/studio/desk");
     render(<AnalyticsProvider config={CONFIG} />);

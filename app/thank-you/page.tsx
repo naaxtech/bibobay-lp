@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { CtaLink } from "@/components/landing/CtaLink";
 import { SimplePageShell } from "@/components/legal/SimplePageShell";
 import { THANK_YOU_COPY } from "@/components/legal/legal-copy";
+import { removalPhrase } from "@/lib/content/removal-copy";
+import { removalChannelFrom } from "@/lib/leads/removal-channel";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
 import { getSiteSettings } from "@/lib/sanity/fetch";
 import { seoEnvironment, thankYouMetadata } from "@/lib/seo/metadata";
@@ -19,10 +21,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ThankYouPage() {
   const preview = await isDraftMode();
   const settings = await getSiteSettings({ preview });
+  const phrase = removalPhrase(removalChannelFrom(settings));
+  const paragraphs = phrase ? [...THANK_YOU_COPY.paragraphs, THANK_YOU_COPY.removal(phrase)] : THANK_YOU_COPY.paragraphs;
   return (
     <SimplePageShell settings={settings} title={THANK_YOU_COPY.title} preview={preview}>
       <div className="prose-paper simple-page__prose">
-        {THANK_YOU_COPY.paragraphs.map((text) => (
+        {paragraphs.map((text) => (
           <p key={text}>{text}</p>
         ))}
       </div>

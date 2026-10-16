@@ -1,4 +1,6 @@
 import { isCommerceEnabled } from "../commerce/gate";
+import { removalChannelFrom, type RemovalChannel } from "../leads/removal-channel";
+import { removalPhrase } from "./removal-copy";
 import type { PortableContent, SiteSettings } from "./types";
 
 /*
@@ -32,7 +34,7 @@ const paragraph = (text: string): PortableContent[number] => ({ _type: "block", 
 /** Blocks that appear only while commerce is on. */
 const whenSelling = (commerce: boolean, ...blocks: Array<() => PortableContent[number]>): PortableContent => (commerce ? blocks.map((block) => block()) : []);
 
-function privacyText(commerce: boolean): PortableContent {
+function privacyText(commerce: boolean, channel: RemovalChannel): PortableContent {
   return [
     paragraph(
       "BIBO Bay is a story world in development. This page explains what happens to the details you share through this website, in plain words.",
@@ -81,7 +83,7 @@ function privacyText(commerce: boolean): PortableContent {
           "Your IP address is not stored with your signup. To stop the form being flooded, the website keeps a rate-limit count of signup attempts, in 10-minute windows, against a one-way, keyed code made from your network address. That count is not linked to your signup and is used only to enforce the limit.",
         ),
     paragraph(
-      "This website does not use advertising or analytics cookies. The only cookie it sets is a preview cookie used by the people who edit the website.",
+      "This website does not use advertising or analytics cookies. It sets two kinds of cookie, neither for visitors: a preview cookie used by the people who edit the website, and session cookies set only when BIBO Bay staff sign in to manage orders. The staff session cookies are httpOnly, so page scripts cannot read them, and they are removed when staff sign out.",
     ),
     heading("Visit statistics"),
     paragraph(
@@ -130,13 +132,11 @@ function privacyText(commerce: boolean): PortableContent {
       paragraph("Order requests are kept too, with their products, their history and their email delivery records; nothing deletes them automatically, and no period for keeping them has been set."),
     ),
     heading("How to ask for removal or a copy"),
-    paragraph(
-      "Reply to any BIBO Bay email and tell us what you would like: to be removed from the list, or to see the details we hold about you.",
-    ),
+    paragraph(removalRequest(channel)),
   ];
 }
 
-function termsText(commerce: boolean): PortableContent {
+function termsText(commerce: boolean, channel: RemovalChannel): PortableContent {
   return [
     paragraph(
       "BIBO Bay is a story world in development. These terms cover using this website while it is being built.",
@@ -155,7 +155,7 @@ function termsText(commerce: boolean): PortableContent {
       : [paragraph("Nothing is for sale on this website at the moment.")]),
     heading("The founding-family list"),
     paragraph(
-      "Joining the list means BIBO Bay may email you updates about the story world. Only adults may join, and only with their own email address. You can ask to be removed at any time by replying to any BIBO Bay email.",
+      `Joining the list means BIBO Bay may email you updates about the story world. Only adults may join, and only with their own email address.${termsRemoval(channel)}`,
     ),
     heading("Using the website"),
     paragraph(
@@ -175,12 +175,36 @@ function termsText(commerce: boolean): PortableContent {
 type LegalFallback = { privacy: PortableContent; terms: PortableContent };
 
 /** The text while commerce is off (the default): nothing is sold on this website. */
-export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false), terms: termsText(false) });
+export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false, null), terms: termsText(false, null) });
 
 /** The text while commerce is on: what an order request stores, and how payment works. */
-export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true), terms: termsText(true) });
+export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true, null), terms: termsText(true, null) });
 
-/** The fallback text for the site's commerce switch; only a literal `true` counts as on. */
-export function legalFallbackFor(settings: Partial<Pick<SiteSettings, "commerceEnabled">>): LegalFallback {
-  return isCommerceEnabled(settings) ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
+/**
+ * The fallback text for the site's commerce switch and removal channel (Ruling R125). Only a
+ * literal `true` counts as commerce on. With no removal channel (no email sending, no contact
+ * address) the text is the frozen no-channel text and promises nothing; otherwise the removal
+ * sentences name the channel that exists. `env` is injectable for tests.
+ */
+export function legalFallbackFor(
+  settings: Partial<Pick<SiteSettings, "commerceEnabled" | "contactEmail">>,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): LegalFallback {
+  const commerce = isCommerceEnabled(settings);
+  const channel = removalChannelFrom(settings, env);
+  if (channel === null) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
+  return { privacy: privacyText(commerce, channel), terms: termsText(commerce, channel) };
+}
+
+/** The privacy page's removal paragraph; with no channel it says signups are not open, and promises nothing. */
+function removalRequest(channel: RemovalChannel): string {
+  if (channel === null) return "Joining the list is not open yet, so there is nothing to remove. When it opens, this page will say how to ask for removal or for a copy of your details.";
+  const how = channel.kind === "email" ? "Reply to the acknowledgement email you receive when you join" : `Write to ${channel.email}`;
+  return `${how} and tell us what you would like: to be removed from the list, or to see the details we hold about you.`;
+}
+
+/** The terms' removal sentence (with its leading space), or nothing when no channel exists. */
+function termsRemoval(channel: RemovalChannel): string {
+  const phrase = removalPhrase(channel);
+  return phrase ? ` You can ask to be removed at any time ${phrase}.` : "";
 }

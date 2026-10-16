@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { BayBackdrop } from "@/components/brand/BayBackdrop";
 import { BiboLogo } from "@/components/brand/BiboLogo";
@@ -17,6 +17,22 @@ export interface NavbarProps {
   primaryCta?: Cta;
 }
 
+/** The id a same-page link ("#lead" or "/#lead") points at, or null for any other link. */
+function inPageTarget(cta: Cta): string | null {
+  if (cta.external) return null;
+  const match = /^\/?#(.+)$/.exec(cta.href);
+  return match?.[1] ?? null;
+}
+
+/** Moves focus to the heading inside the section with this id (the section itself when it has none). */
+function focusSectionHeading(id: string) {
+  const section = document.getElementById(id);
+  if (!section) return;
+  const heading = section.matches("h1, h2, h3, h4, h5, h6") ? section : (section.querySelector<HTMLElement>("h1, h2, h3") ?? section);
+  if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+  heading.focus({ preventScroll: true });
+}
+
 /**
  * Sticky site header: the canonical logo, editorial anchor links and one founding-family call to
  * action. Below the large breakpoint the links move into a full-screen menu dialog.
@@ -25,6 +41,26 @@ export function Navbar({ links, primaryCta }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeMenu = () => setMenuOpen(false);
+  // P-I2 (WCAG 2.4.3): choosing an in-page link must not send focus back to the Menu button, because
+  // the next Tab would then jump to the top of the page. Focus goes to the target section's heading.
+  const skipFocusReturnRef = useRef(false);
+  const pendingTargetRef = useRef<string | null>(null);
+  const chooseLink = (cta: Cta) => {
+    const target = inPageTarget(cta);
+    if (target) {
+      skipFocusReturnRef.current = true;
+      pendingTargetRef.current = target;
+    }
+    closeMenu();
+  };
+  useEffect(() => {
+    const target = pendingTargetRef.current;
+    if (menuOpen || !target) return;
+    pendingTargetRef.current = null;
+    // After the browser's own jump to the anchor has run, so it cannot take focus back.
+    const timer = window.setTimeout(() => focusSectionHeading(target), 0);
+    return () => window.clearTimeout(timer);
+  }, [menuOpen]);
   // With every destination hidden in the CMS there is nothing to open: no empty landmark, no dead button.
   const hasMenu = links.length > 0 || primaryCta !== undefined;
 
@@ -67,7 +103,7 @@ export function Navbar({ links, primaryCta }: NavbarProps) {
         </div>
       </div>
 
-      <Dialog open={hasMenu && menuOpen} onClose={closeMenu} title={UI_COPY.menu} hideTitle returnFocusRef={menuButtonRef} className="mobile-menu">
+      <Dialog open={hasMenu && menuOpen} onClose={closeMenu} title={UI_COPY.menu} hideTitle returnFocusRef={menuButtonRef} skipFocusReturnRef={skipFocusReturnRef} className="mobile-menu">
         <div className="mobile-menu__bar landing-container">
           <BiboLogo decorative className="w-[7.75rem]" />
           <button type="button" className="menu-button" onClick={closeMenu}>
@@ -81,11 +117,11 @@ export function Navbar({ links, primaryCta }: NavbarProps) {
           <ul className="mobile-menu__links">
             {links.map((link) => (
               <li key={`${link.href}-${link.label}`}>
-                <CtaLink cta={link} className="mobile-menu__link" onClick={closeMenu} />
+                <CtaLink cta={link} className="mobile-menu__link" onClick={() => chooseLink(link)} />
               </li>
             ))}
           </ul>
-          {primaryCta ? <CtaLink cta={primaryCta} variant="primary" className="mobile-menu__cta" onClick={closeMenu} /> : null}
+          {primaryCta ? <CtaLink cta={primaryCta} variant="primary" className="mobile-menu__cta" onClick={() => chooseLink(primaryCta)} /> : null}
         </div>
         <div className="mobile-menu__bay">
           <BayBackdrop className="absolute inset-0" />

@@ -96,9 +96,10 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/cookie/i);
   });
 
-  it("explains removal by reply and does not promise an unsubscribe link that does not exist", () => {
-    expect(privacy).toMatch(/reply to any BIBO Bay email/i);
-    expect(privacy).not.toMatch(/unsubscribe link/i);
+  it("does not promise an unsubscribe link, nor a reply channel nobody has configured (P-I1; wording per channel is in tests/privacy)", () => {
+    expect(privacy).not.toMatch(/unsubscribe/i);
+    expect(privacy).not.toMatch(/reply to any BIBO Bay email/i);
+    expect(privacy).toMatch(/How to ask for removal or a copy/);
   });
 
   it("describes retention as the database implements it, without inventing a period", () => {
@@ -157,13 +158,13 @@ describe("repository fallback legal text (ruling R30)", () => {
  * stores (migrations 0002 to 0005), why, and how payment works, without a retention period.
  */
 describe("repository fallback legal text while commerce is on (Task 7b)", () => {
-  const on = legalFallbackFor({ commerceEnabled: true });
+  const on = legalFallbackFor({ commerceEnabled: true }, {});
   const privacy = textOf(on.privacy);
   const terms = textOf(on.terms);
   const migration = ["0002_orders.sql", "0003_order_tracking.sql", "0005_shared_rate_limits_and_token_rotation.sql"].map((file) => readFileSync(resolve("supabase/migrations", file), "utf8")).join("\n");
 
   it("is exactly today's text while commerce is off, or anything but a literal true", () => {
-    for (const settings of [{ commerceEnabled: false }, { commerceEnabled: "true" as unknown as boolean }, SAFE_FALLBACK_SETTINGS]) expect(legalFallbackFor(settings)).toBe(LEGAL_FALLBACK);
+    for (const settings of [{ commerceEnabled: false }, { commerceEnabled: "true" as unknown as boolean }, SAFE_FALLBACK_SETTINGS]) expect(legalFallbackFor(settings, {})).toBe(LEGAL_FALLBACK);
     expect(textOf(LEGAL_FALLBACK.privacy)).toMatch(/Nothing is sold on this website\./);
     expect(textOf(LEGAL_FALLBACK.terms)).toMatch(/Nothing is for sale on this website at the moment\./);
   });

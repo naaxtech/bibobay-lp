@@ -188,6 +188,30 @@ for (const { name, use } of VIEWPORTS) {
       });
     }
 
+    if (name === "mobile") {
+      test("choosing an in-page menu link puts focus in the target section, not on the Menu button (P-I2)", async ({ page }) => {
+        const problems = collectProblems(page);
+        await openLanding(page);
+        const menuButton = page.getByRole("button", { name: "Menu" });
+        const dialog = page.getByRole("dialog", { name: "Menu" });
+        // The menu needs hydration; a first tap on a cold dev server can land before React does.
+        await expect(async () => {
+          await menuButton.click();
+          await expect(dialog).toBeVisible({ timeout: 1_000 });
+        }).toPass();
+        await dialog.getByRole("link", { name: "Watch" }).click();
+        await expect(dialog).toBeHidden();
+
+        const inTargetSection = () => page.evaluate(() => document.getElementById("episodes")?.contains(document.activeElement) ?? false);
+        await expect.poll(inTargetSection).toBe(true);
+        await expect(menuButton).not.toBeFocused();
+        // The next Tab moves on from the section, not back to the hero.
+        await page.keyboard.press("Tab");
+        expect(await inTargetSection()).toBe(true);
+        expect(problems).toEqual([]);
+      });
+    }
+
     test.describe("with reduced motion", () => {
       test.use({ reducedMotion: "reduce" });
 

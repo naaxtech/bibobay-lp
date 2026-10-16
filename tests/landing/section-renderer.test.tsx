@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -351,7 +351,9 @@ describe("content stays visible and server-rendered", () => {
     expect(ollie.getAttribute("src")).toContain("https://cdn.sanity.io/images/abcdefgh/production/ollie-1200x1000.png");
     const coral = within(section("episodes")).getByRole("img", { name: "Letter stones on a coral reef" });
     expect(coral.getAttribute("src")).toContain("https://cdn.sanity.io/images/abcdefgh/production/coral-1600x900.jpg");
-    // The other friends keep their channel portraits, served by this site.
+    // The other friends keep their channel portraits, served by this site. A stage renders its art
+    // once it has been chosen (inactive panels load nothing), so visit every friend first.
+    for (const tab of within(section("characters")).getAllByRole("tab")) fireEvent.click(tab);
     const portraits = Array.from(section("characters").querySelectorAll(".friend-stage__art img"), (image) => decodeURIComponent(image.getAttribute("src") ?? ""));
     expect(portraits).toHaveLength(3);
     expect(portraits.filter((src) => src.includes("/brand/art/friend-"))).toHaveLength(2);

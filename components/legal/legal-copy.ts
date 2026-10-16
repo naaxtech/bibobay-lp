@@ -32,8 +32,9 @@ export const THANK_YOU_COPY = {
     "The founding-family list is how BIBO Bay shares news with adults while the story world is being developed.",
     "The form on the home page tells you straight away whether your details were saved. If it showed a confirmation, there is nothing more to do.",
     "If you are not sure it worked, or you have not signed up yet, you can use the form again. Signing up twice with the same email address changes nothing.",
-    "You can ask to be removed at any time by replying to any BIBO Bay email.",
   ],
+  /** Added only when a removal channel exists (Ruling R125); with none, nothing is promised. */
+  removal: (phrase: string) => `You can ask to be removed at any time ${phrase}.`,
   backToForm: "Go to the founding-family form",
   backHome: "Back to the home page",
 } as const;

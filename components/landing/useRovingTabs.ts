@@ -60,3 +60,14 @@ export function useRovingTabs(count: number) {
     },
   };
 }
+
+/**
+ * True from the first render in which `chosen` is true, and from then on. Every tab panel stays laid
+ * out (see `panelProps`), so a lazy image in an unchosen panel still loads once its section nears;
+ * panels render their big art only once they have been chosen, and keep it after.
+ */
+export function useEverChosen(chosen: boolean): boolean {
+  const [seen, setSeen] = useState(chosen);
+  if (chosen && !seen) setSeen(true);
+  return chosen || seen;
+}

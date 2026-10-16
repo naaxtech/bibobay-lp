@@ -61,8 +61,10 @@ function serverFieldErrors(body: unknown): LeadFieldErrors {
  * an optional broad age range and the required consent tick; nothing else about a child.
  *
  * Truthful outcomes: the CMS success message appears only when the server answers
- * `persisted: true`; every other answer (503 unconfigured, 500, network failure) shows the CMS error
- * message. Nothing here says an email was sent.
+ * `persisted: true`. A 503 shows the server's own message (signups can be closed on purpose, Ruling
+ * R125); a rate limit (429) is explained in plain words; every other answer (500, a 503 without a
+ * message, network failure) shows the CMS error message. Nothing here says an email was sent.
+ * After any outcome except field errors, focus returns to the submit button, never the status line.
  *
  * Accessibility: labels above fields, hints and errors tied by `aria-describedby`, an error summary
  * (a named group, so its title is announced) that takes focus on a failed submit and links to each
@@ -170,7 +172,9 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
         track("lead_submitted", { persisted: true, acknowledgementQueued: answer.acknowledgementQueued === true });
         form.reset();
         // Task 5 N4: focus returns to the button, never the live status line (a focused live region is read out as well as announced).
-        // returnFocusTo = "status";
+      } else if (response.status === 503 && isRecord(answer) && typeof answer.message === "string" && answer.message.trim() !== "") {
+        // Signups can be closed on purpose (no removal channel yet, Ruling R125): say what the server says.
+        setOutcome({ tone: "error", text: answer.message });
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
