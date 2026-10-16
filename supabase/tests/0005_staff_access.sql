@@ -13,14 +13,16 @@
 -- active staff); quotes (R96: saving bumps the revision and never notifies, sending queues one
 -- outbox row per revision and a repeat is a no-op, neither changes the status); one-way optimistic
 -- status changes (R98) and the audit trail (actor staff, the staff member's user id); and a staff
--- rotation of the private tracking link.
+-- rotation of the private tracking link. Fix wave: quote_sent_at belongs to the current revision
+-- only (C-I1), and every identity is tried against every staff-readable table, the lead tables and
+-- the rate-limit buckets (T-M7). supabase/tests/0006_catalogue.sql sweeps the whole schema (T-I4).
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(174);
+select plan(206);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: three signed-in people and two orders
@@ -171,6 +173,9 @@ reset role;
 set local role service_role;
 select throws_ok($$ select id from public.orders $$, '42501', null, 'service_role cannot read orders directly');
 select throws_ok($$ select user_id from public.staff_users $$, '42501', null, 'service_role cannot read staff_users');
+select throws_ok($$ select title from public.order_items $$, '42501', null, 'service_role cannot read order lines directly (T-M7)');
+select throws_ok($$ select event_type from public.order_events $$, '42501', null, 'nor the audit trail');
+select throws_ok($$ select status from public.order_email_outbox $$, '42501', null, 'nor the order outbox: only through its functions');
 select throws_ok($$ select * from public.staff_save_order_quote((select reference from order_a), 0, 'AUD', 100, 0, 'https://pay.example.com/x') $$, '42501', null, 'service_role cannot save a quote');
 select throws_ok($$ select * from public.staff_queue_order_quote((select reference from order_a), 1) $$, '42501', null, 'service_role cannot queue a quote');
 select throws_ok($$ select * from public.staff_advance_order_status((select reference from order_a), 'new', 'confirmed') $$, '42501', null, 'service_role cannot change a status');
@@ -201,7 +206,9 @@ select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000a2
 set local role authenticated;
 select is(public.is_active_staff(), false, 'inactive staff are not staff');
 select is_empty($$ select id from public.orders $$, 'and read no order');
+select is_empty($$ select title from public.order_items $$, 'no order line (T-M7)');
 select is_empty($$ select event_type from public.order_events $$, 'no audit event');
+select is_empty($$ select status from public.order_email_outbox $$, 'no outbox row (T-M7)');
 select results_eq($$ select user_id::text, active from public.staff_users $$, $$ values ('00000000-0000-4000-8000-0000000000a2'::text, false) $$, 'they see only their own staff row, marked inactive');
 select throws_ok($$ select * from public.staff_save_order_quote((select reference from order_a), 0, 'AUD', 100, 0, 'https://pay.example.com/x') $$, '42501', 'staff only', 'inactive staff cannot save a quote');
 select throws_ok($$ select * from public.staff_queue_order_quote((select reference from order_a), 1) $$, '42501', 'staff only', 'or queue one');
@@ -213,12 +220,21 @@ select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select is(public.is_active_staff(), false, 'a request with no user is not staff');
 select is_empty($$ select id from public.orders $$, 'and reads no order');
+select is_empty($$ select title from public.order_items $$, 'no order line (T-M7)');
+select is_empty($$ select event_type from public.order_events $$, 'no audit event (T-M7)');
+select is_empty($$ select status from public.order_email_outbox $$, 'no outbox row (T-M7)');
+select is_empty($$ select user_id from public.staff_users $$, 'and no staff row (T-M7)');
 reset role;
 
 -- The newer PostgREST form: the whole claim set as JSON.
 select set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000a1", "role": "authenticated"}', true);
 set local role authenticated;
 select is(public.is_active_staff(), true, 'the staff check reads the user from the JWT claims as PostgREST sets them');
+select is((select count(*)::integer from public.orders where id in ((select order_id from order_a), (select order_id from order_b))), 2, 'and the policies read it the same way: both orders (T-M7)');
+select is((select count(*)::integer from public.order_items where order_id in ((select order_id from order_a), (select order_id from order_b))), 2, 'their lines (T-M7)');
+select is((select count(*)::integer from public.order_events where order_id in ((select order_id from order_a), (select order_id from order_b))), 2, 'their audit trail (T-M7)');
+select is((select count(*)::integer from public.order_email_outbox where order_id in ((select order_id from order_a), (select order_id from order_b))), 4, 'their emails (T-M7)');
+select results_eq($$ select user_id::text from public.staff_users $$, $$ values ('00000000-0000-4000-8000-0000000000a1'::text) $$, 'and their own staff row only (T-M7)');
 reset role;
 select set_config('request.jwt.claims', '', true);
 
@@ -244,6 +260,9 @@ select throws_ok($$ update public.orders set status = 'confirmed' $$, '42501', n
 select throws_ok($$ delete from public.order_events $$, '42501', null, 'nor delete the audit trail');
 select throws_ok(format($$ insert into public.order_email_outbox (order_id, kind, quote_revision) values (%L, 'quote', 1) $$, (select order_id from order_a)), '42501', null, 'nor queue an email directly');
 select throws_ok($$ update public.staff_users set active = true $$, '42501', null, 'nor change a staff row');
+select throws_ok($$ select email from public.lead_submissions $$, '42501', null, 'staff never read the signups: no staff policy or grant on the lead tables (T-M7)');
+select throws_ok($$ select status from public.lead_delivery_events $$, '42501', null, 'nor the signup outbox (T-M7)');
+select throws_ok($$ select bucket_key from public.rate_limit_buckets $$, '42501', null, 'nor the rate-limit buckets (T-M7)');
 
 -- ---------------------------------------------------------------------------
 -- Quotes (R96)
@@ -426,6 +445,48 @@ reset role;
 select is((select count(*)::integer from public.order_email_outbox where order_id = (select order_id from order_c) and kind = 'quote'), 1, 'still one quote email');
 
 -- ---------------------------------------------------------------------------
+-- The quote-sent time belongs to the current revision only (fix wave C-I1)
+-- ---------------------------------------------------------------------------
+
+-- order_c's revision 1 was accepted above. Staff now save revision 2, and while its email is being
+-- sent, revision 3: the staff pages read quote_sent_at as "the current quote's email was accepted".
+set local role authenticated;
+select is((select quote_revision from public.staff_save_order_quote((select reference from order_c), 1, 'NZD', 950, 0, 'https://pay.example.com/c2')), 2, 'order_c is quoted again after its first quote was accepted');
+reset role;
+select results_eq(
+  $$ select quote_revision, quote_sent_at is null from public.orders where id = (select order_id from order_c) $$,
+  $$ values (2, true) $$,
+  'saving a new revision clears the sent time in the same update: the new figures have not been emailed'
+);
+set local role authenticated;
+select is((select already_queued from public.staff_queue_order_quote((select reference from order_c), 2)), false, 'revision 2 is queued');
+reset role;
+set local role service_role;
+create temp table oclaim_c2 on commit drop as select public.claim_order_emails(10, (select order_id from order_c), array['quote']) as result;
+reset role;
+select is((select (result -> 'claimed' -> 0 -> 'quote' ->> 'revision')::integer from oclaim_c2), 2, 'and claimed for sending');
+set local role authenticated;
+select is((select quote_revision from public.staff_save_order_quote((select reference from order_c), 2, 'NZD', 975, 0, 'https://pay.example.com/c3')), 3, 'revision 3 is saved while the revision 2 email is in flight');
+reset role;
+set local role service_role;
+select is(public.record_order_email_attempt((select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_c2), 'sent', 're_quote_c2'), true, 'the provider then accepts the revision 2 email');
+reset role;
+select is((select status from public.order_email_outbox where order_id = (select order_id from order_c) and kind = 'quote' and quote_revision = 2), 'sent', 'which is recorded as sent on its own row');
+select results_eq(
+  $$ select quote_revision, quote_sent_at is null from public.orders where id = (select order_id from order_c) $$,
+  $$ values (3, true) $$,
+  'but a superseded revision''s acceptance never marks the current quote as sent'
+);
+set local role authenticated;
+select is((select already_queued from public.staff_queue_order_quote((select reference from order_c), 3)), false, 'revision 3 is queued');
+reset role;
+set local role service_role;
+create temp table oclaim_c3 on commit drop as select public.claim_order_emails(10, (select order_id from order_c), array['quote']) as result;
+select is(public.record_order_email_attempt((select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_c3), 'sent', 're_quote_c3'), true, 'and the provider accepts the revision 3 email');
+reset role;
+select is((select quote_sent_at from public.orders where id = (select order_id from order_c)), now(), 'the current revision''s acceptance sets the sent time');
+
+-- ---------------------------------------------------------------------------
 -- Tracking link rotation by staff
 -- ---------------------------------------------------------------------------
 
@@ -454,6 +515,10 @@ update public.staff_users set active = false, disabled_at = now() where user_id 
 set local role authenticated;
 select is(public.is_active_staff(), false, 'a deactivated staff member is no longer staff');
 select is_empty($$ select id from public.orders $$, 'reads nothing');
+select is_empty($$ select title from public.order_items $$, 'no order line (T-M7)');
+select is_empty($$ select event_type from public.order_events $$, 'no audit event (T-M7)');
+select is_empty($$ select status from public.order_email_outbox $$, 'no outbox row (T-M7)');
+select results_eq($$ select user_id::text, active from public.staff_users $$, $$ values ('00000000-0000-4000-8000-0000000000a1'::text, false) $$, 'only their own staff row, now inactive (T-M7)');
 select throws_ok($$ select * from public.staff_rotate_order_tracking_token((select reference from order_b)) $$, '42501', 'staff only', 'and can do nothing');
 reset role;
 

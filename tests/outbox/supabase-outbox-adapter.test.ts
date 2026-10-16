@@ -144,6 +144,29 @@ describe("the order outbox adapter against the real migrations", () => {
     const { rows } = await db.query<{ sent: boolean }>("select quote_sent_at is not null as sent from public.orders where id = $1", [stored.orderId]);
     expect(rows).toEqual([{ sent: true }]);
   });
+
+  it("never marks the current quote sent when the accepted email was for an older revision (fix wave C-I1)", async () => {
+    const orders = createSupabaseOrderRepository(client);
+    const outbox = createSupabaseOrderEmailOutbox(client);
+    const stored = await orders.submitOrder({ ...ORDER, submissionKey: "7a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d" });
+    await db.query(
+      "update public.orders set currency = 'PHP', subtotal_minor = 250000, freight_minor = 15000, payment_url = 'https://pay.example.com/c/1', quote_revision = 1 where id = $1",
+      [stored.orderId],
+    );
+    await db.query("insert into public.order_email_outbox (order_id, kind, quote_revision) values ($1, 'quote', 1)", [stored.orderId]);
+    const batch = await outbox.claimEmails({ ownerId: stored.orderId, kinds: ["quote"], limit: 1 });
+    expect(batch.claimed[0]!.quote?.revision).toBe(1);
+
+    // Revision 2 is saved while the revision 1 email is in flight (staff_save_order_quote's effect).
+    await db.query("update public.orders set subtotal_minor = 260000, quote_revision = 2, quote_sent_at = null where id = $1", [stored.orderId]);
+    expect(await outbox.recordEmailAttempt(batch.claimed[0]!.id, { status: "sent", providerMessageId: "re_quote_old" })).toBe(true);
+
+    const { rows } = await db.query<{ sent: boolean; status: string }>(
+      "select o.quote_sent_at is not null as sent, e.status from public.orders as o join public.order_email_outbox as e on e.order_id = o.id and e.kind = 'quote' where o.id = $1",
+      [stored.orderId],
+    );
+    expect(rows).toEqual([{ sent: false, status: "sent" }]);
+  });
 });
 
 describe("the outbox adapters refuse answers they do not expect", () => {

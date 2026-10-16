@@ -10,7 +10,7 @@
  * Spec §3 ruling 2: adult contact and delivery details only. Nothing here may grow a child's name,
  * birthday, photo, voice, health, school or location. Spec §10: no prices and no payment details.
  */
-import { EMAIL_PATTERN, type LeadFieldErrorCode } from "@/lib/leads/fields";
+import { EMAIL_PATTERN, isSafeFirstName, type LeadFieldErrorCode } from "@/lib/leads/fields";
 
 export { EMAIL_PATTERN, HONEYPOT_FIELD, isHoneypotFilled, normalizeEmail } from "@/lib/leads/fields";
 export { ORDER_PAD_MAX_LINES, ORDER_PAD_MAX_QUANTITY } from "./constants";
@@ -55,6 +55,17 @@ export const SINGLE_LINE_CONTROL = /[\u0000-\u001f\u007f]/;
 /** Control characters other than tab, line feed and carriage return: refused in the notes. */
 // Control characters are exactly what this rejects.
 export const MULTI_LINE_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+
+/**
+ * Fix wave D-M3: the contact name opens the buyer's emails ("Hi <name>,"), sent from BIBO Bay's
+ * verified sender to whatever address was typed, so it follows the signup first-name rule
+ * (lib/leads/fields.ts): no markup (`<`, `>`), no link (`://`, `www.`), no control characters. The
+ * schema (./schema.ts), the form's own check below and the email builders
+ * (lib/email/order-emails.ts, as a second guard) all use this one test.
+ */
+export function isSafeContactName(value: string): boolean {
+  return isSafeFirstName(value);
+}
 
 export type OrderFieldErrorCode = LeadFieldErrorCode;
 export type OrderField =
@@ -116,6 +127,9 @@ const requiredLine = (limit: number): Check => (value) => {
 /** An optional one-line field: blank means not given. */
 const optionalLine = (limit: number): Check => (value) => (value.trim() ? requiredLine(limit)(value) : undefined);
 
+/** The contact name: a required line, then the first-name rule (D-M3), in the server's order. */
+const contactNameCheck: Check = (value) => requiredLine(ORDER_LIMITS.contactName)(value) ?? (isSafeContactName(value.trim()) ? undefined : "invalid");
+
 /**
  * The browser's check of the order form, giving the same first problem per field as the server's
  * schema (./schema.ts): tests/orders/order-fields.test.ts compares the two case by case. `countries`
@@ -128,7 +142,7 @@ export function checkOrderFields(values: OrderFieldValues, countries: readonly s
   const notes = values.notes.trim();
   const country = values.country.trim().toUpperCase();
   const found: OrderFieldErrors = {
-    contactName: requiredLine(ORDER_LIMITS.contactName)(values.contactName),
+    contactName: contactNameCheck(values.contactName),
     email: !email ? "required" : email.length > ORDER_LIMITS.email ? "too_long" : EMAIL_PATTERN.test(email) ? undefined : "invalid",
     phone: !phone ? undefined : phone.length > ORDER_LIMITS.phone ? "too_long" : phone.length < PHONE_MIN_LENGTH || !PHONE_PATTERN.test(phone) ? "invalid" : undefined,
     addressLine1: requiredLine(ORDER_LIMITS.addressLine)(values.addressLine1),

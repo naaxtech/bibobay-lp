@@ -15,6 +15,39 @@ export type LeadDeliveryKind = (typeof LEAD_DELIVERY_KINDS)[number];
 export const ORDER_EMAIL_KINDS = ["acknowledgement", "staff_alert", "quote"] as const;
 export type OrderEmailKind = (typeof ORDER_EMAIL_KINDS)[number];
 
+/** The two outboxes, as an attempt channel names itself (lib/outbox/attempt.ts). */
+export type OutboxName = "leads" | "orders";
+
+/**
+ * Fix wave D-I1: one hourly send budget per message kind, so no kind can starve another. Each is
+ * its own bucket in the shared rate limiter (`consume_rate_limit`), keyed `send:<budget>`, and each
+ * is capped at `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60, lib/leads/dependencies.ts):
+ *
+ *   send:lead_acknowledgement   the signup acknowledgement (public form)
+ *   send:lead_staff_alert       the signup staff alert (public form)
+ *   send:order_acknowledgement  the order acknowledgement (public form)
+ *   send:order_staff_alert      the order staff alert (public form)
+ *   send:quote                  the quote email (queued only by active, audited staff)
+ *
+ * Both send paths and the cron worker spend the bucket of the row's own kind, so a flood of signups
+ * from fresh addresses spends the two signup buckets and nothing else: order emails and staff
+ * quotes keep their own hour. Replaces the single shared `ack-send:global` bucket of ruling R40.
+ */
+export const SEND_BUDGETS = {
+  leads: { acknowledgement: "lead_acknowledgement", staff_alert: "lead_staff_alert" },
+  orders: { acknowledgement: "order_acknowledgement", staff_alert: "order_staff_alert", quote: "quote" },
+} as const satisfies { leads: Record<LeadDeliveryKind, string>; orders: Record<OrderEmailKind, string> };
+export type SendBudget = (typeof SEND_BUDGETS.leads)[LeadDeliveryKind] | (typeof SEND_BUDGETS.orders)[OrderEmailKind];
+
+/** The budget a row of this kind spends in this outbox; null for a kind the outbox does not have. */
+export function sendBudgetFor(outbox: OutboxName, kind: string): SendBudget | null {
+  const budgets: Readonly<Record<string, SendBudget>> = SEND_BUDGETS[outbox];
+  return Object.hasOwn(budgets, kind) ? budgets[kind]! : null;
+}
+
+/** The shared limiter's bucket for one budget. */
+export const sendBudgetKey = (budget: SendBudget): `send:${SendBudget}` => `send:${budget}`;
+
 export const OUTBOX_LIMITS = {
   /** Most rows one claim may take. */
   maxClaim: 50,

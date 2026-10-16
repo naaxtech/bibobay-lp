@@ -4,7 +4,7 @@ import { isJsonRequest, readBodyWithLimit } from "@/lib/leads/http";
 import { reportError } from "@/lib/observability/report";
 import { createTrackingDependencies } from "@/lib/orders/dependencies";
 import { trackOrder, type TrackingResult } from "@/lib/orders/track";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 
 /**
  * POST /api/orders/track: find an order by `{ token }` or `{ reference, email }` (spec §10 step 11;
@@ -44,7 +44,8 @@ export async function POST(request: Request) {
 }
 
 async function handle(request: Request) {
-  const settings = await getSiteSettings();
+  // Fix wave D-M2 (Ruling R127): the gate's read expires after 300 s even if the webhook never fires.
+  const settings = await getGateSettings();
   try {
     assertCommerceEnabled(settings);
   } catch (error) {

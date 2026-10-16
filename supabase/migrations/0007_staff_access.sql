@@ -25,9 +25,11 @@
 --     actor_user_id = auth.uid():
 --       staff_save_order_quote       currency (ISO 4217 letters), subtotal and freight (whole minor
 --                                    units, 0..100,000,000) and the payment link; bumps
---                                    quote_revision; only while the order is `new` or `confirmed`;
---                                    names the revision the staff member saw (optimistic); never
---                                    notifies anyone (R96). Event `quote_saved`.
+--                                    quote_revision and clears quote_sent_at in the same update (the
+--                                    new figures have not been emailed; fix wave C-I1); only while
+--                                    the order is `new` or `confirmed`; names the revision the staff
+--                                    member saw (optimistic); never notifies anyone (R96). Event
+--                                    `quote_saved`.
 --       staff_queue_order_quote      sends one saved revision: queues it as a `quote` row in the
 --                                    order outbox (migration 0006's idempotency key
 --                                    <order id>:quote:<revision>), so sending the same revision
@@ -218,12 +220,16 @@ begin
   end if;
 
   v_revision := v_order.quote_revision + 1;
+  -- Fix wave C-I1: quote_sent_at means "the CURRENT revision's email was accepted by the mail
+  -- service", so a new revision starts unsent in the same update that raises the revision. Migration
+  -- 0006's record function sets it again only for an email of the revision current at that moment.
   update public.orders as o set
     currency       = p_currency,
     subtotal_minor = p_subtotal_minor,
     freight_minor  = p_freight_minor,
     payment_url    = p_payment_url,
     quote_revision = v_revision,
+    quote_sent_at  = null,
     updated_at     = now()
   where o.id = v_order.id;
 

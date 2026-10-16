@@ -4,7 +4,7 @@ import { isJsonRequest, readBodyWithLimit } from "@/lib/leads/http";
 import { reportError } from "@/lib/observability/report";
 import { createOrderDependencies } from "@/lib/orders/dependencies";
 import { submitOrder, type OrderApiBody } from "@/lib/orders/submit";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 
 /**
  * POST /api/orders: an order request (spec §10 steps 4-7; Task 7a).
@@ -47,7 +47,8 @@ export async function POST(request: Request) {
 }
 
 async function handle(request: Request) {
-  const settings = await getSiteSettings();
+  // Fix wave D-M2 (Ruling R127): the gate's read expires after 300 s even if the webhook never fires.
+  const settings = await getGateSettings();
   try {
     assertCommerceEnabled(settings);
   } catch (error) {

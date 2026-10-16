@@ -7,7 +7,7 @@ import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
 import type { DeliveryKind, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
 import * as leadSubmitModule from "@/lib/leads/submit";
-import { ACK_SEND_LIMIT, LEAD_RATE_LIMIT, submitLead, type LeadSubmissionDependencies } from "@/lib/leads/submit";
+import { ACK_SEND_LIMIT, LEAD_RATE_LIMIT, LEAD_SIGNUPS_CLOSED_MESSAGE, submitLead, type LeadSubmissionDependencies } from "@/lib/leads/submit";
 import type { ClaimedLeadDelivery, OutboxOutcome } from "@/lib/outbox/types";
 import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
 
@@ -145,6 +145,8 @@ function dependencies(overrides: Partial<LeadSubmissionDependencies> = {}): Lead
     leadMagnet: null,
     replyTo: null,
     log: () => {},
+    // P-I1 (Ruling R125): a way to ask for removal exists; tests of the closed state pass null.
+    removalChannel: { kind: "contact", email: "hello@bibobay.example" },
     ...overrides,
   };
 }
@@ -223,6 +225,45 @@ describe("unconfigured storage", () => {
     expect(result.status).toBe(503);
     expect(result.body).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: COPY.errorMessage });
     expect(sent).toEqual([]);
+  });
+});
+
+describe("a real way to ask for removal (P-I1, Ruling R125)", () => {
+  it("answers 503 with the honest closed message, and stores, limits and sends nothing, while no removal channel exists", async () => {
+    const repo = fakeRepository();
+    const consume = vi.fn(allowAll.consume);
+    const { mailer, sent } = fakeMailer();
+    const log = vi.fn();
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: { consume }, mailer, removalChannel: null, log }));
+    expect(result.status).toBe(503);
+    expect(result.body).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: LEAD_SIGNUPS_CLOSED_MESSAGE });
+    expect(repo.calls).toEqual([]);
+    expect(consume).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+    expect(log).toHaveBeenCalledWith({ event: "lead_removal_channel_unconfigured" });
+  });
+
+  it("says plainly that signups are not open and nothing was saved, and promises nothing", () => {
+    expect(LEAD_SIGNUPS_CLOSED_MESSAGE).toMatch(/not open/i);
+    expect(LEAD_SIGNUPS_CLOSED_MESSAGE).toMatch(/nothing was saved/i);
+    expect(LEAD_SIGNUPS_CLOSED_MESSAGE).not.toMatch(DELIVERY_CLAIM);
+    expect(LEAD_SIGNUPS_CLOSED_MESSAGE).not.toMatch(/unsubscribe|remove|reply/i);
+  });
+
+  it.each([
+    ["the acknowledgement email (email sending configured)", { kind: "email" as const }],
+    ["a contact address", { kind: "contact" as const, email: "hello@bibobay.example" }],
+  ])("stores the signup when the removal channel is %s", async (_label, removalChannel) => {
+    const repo = fakeRepository();
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, removalChannel }));
+    expect(result.status).toBe(200);
+    expect(result.body.persisted).toBe(true);
+    expect(repo.leads.size).toBe(1);
+  });
+
+  it("still validates first, and still says storage is unavailable first when it is", async () => {
+    expect((await submitLead({ consent: true }, dependencies({ removalChannel: null }))).status).toBe(400);
+    expect((await submitLead(VALID, dependencies({ repository: null, removalChannel: null }))).body.message).toBe(COPY.errorMessage);
   });
 });
 
@@ -451,7 +492,7 @@ describe("duplicate normalised email (ruling R38)", () => {
   });
 });
 
-describe("global immediate-send cap (ruling R40)", () => {
+describe("immediate-send budgets, one per message kind (ruling R40, fix wave D-I1)", () => {
   /** A limiter that allows the lead rule but records every key it is asked about. */
   function recordingLimiter(decide: (key: string) => boolean | Error = () => true) {
     const keys: Array<[string, { maxHits: number; windowSeconds: number }]> = [];
@@ -466,20 +507,23 @@ describe("global immediate-send cap (ruling R40)", () => {
     return { limiter, keys };
   }
 
-  it("asks the shared limiter for one global send under ack-send:global, 60 per hour by default", async () => {
+  it("asks the shared limiter for one send under the acknowledgement's own bucket, send:lead_acknowledgement, 60 per hour by default", async () => {
     const { limiter, keys } = recordingLimiter();
     await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: fakeMailer().mailer }));
     expect(keys).toEqual([
       [`${LEAD_RATE_LIMIT.scope}:client-hash`, { maxHits: LEAD_RATE_LIMIT.maxHits, windowSeconds: LEAD_RATE_LIMIT.windowSeconds }],
-      [ACK_SEND_LIMIT.key, { maxHits: 60, windowSeconds: 3600 }],
+      ["send:lead_acknowledgement", { maxHits: 60, windowSeconds: 3600 }],
     ]);
     expect(ACK_SEND_LIMIT.defaultPerHour).toBe(60);
   });
 
-  it("uses the configured hourly cap", async () => {
+  it("uses the configured hourly cap, per kind: the staff alert has its own bucket, send:lead_staff_alert", async () => {
     const { limiter, keys } = recordingLimiter();
-    await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: fakeMailer().mailer, sendLimitPerHour: 7 }));
-    expect(keys[1]).toEqual([ACK_SEND_LIMIT.key, { maxHits: 7, windowSeconds: 3600 }]);
+    await submitLead(VALID, dependencies({ rateLimiter: limiter, mailer: fakeMailer().mailer, staffEmail: "team@bibobay.example", sendLimitPerHour: 7 }));
+    expect(keys.slice(1).sort(([a], [b]) => a.localeCompare(b))).toEqual([
+      ["send:lead_acknowledgement", { maxHits: 7, windowSeconds: 3600 }],
+      ["send:lead_staff_alert", { maxHits: 7, windowSeconds: 3600 }],
+    ]);
   });
 
   it("stores the lead and leaves the acknowledgement pending once the cap is spent, with the same answer", async () => {
@@ -495,28 +539,47 @@ describe("global immediate-send cap (ruling R40)", () => {
     expect(sent.map((message) => message.to)).toEqual([["first@example.com"]]);
     const secondLead = repo.leads.get("second@example.com")?.id;
     expect([...repo.events.values()].find((event) => event.leadId === secondLead)).toMatchObject({ kind: "acknowledgement", status: "pending", attempts: 0 });
-    expect(log).toHaveBeenCalledWith({ event: "delivery_send_capped", kind: "acknowledgement" });
+    expect(log).toHaveBeenCalledWith({ event: "delivery_send_capped", kind: "acknowledgement", budget: "lead_acknowledgement" });
   });
 
-  it("counts staff alerts against the same cap, leaving them pending beyond it", async () => {
+  it("counts staff alerts against their own cap, not the acknowledgements' (D-I1), leaving them pending beyond it", async () => {
     const repo = fakeRepository();
     const { mailer, sent } = fakeMailer();
-    await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: createMemoryRateLimiter(), mailer, staffEmail: "team@bibobay.example", sendLimitPerHour: 1 }));
-    expect(sent.map((message) => message.to)).toEqual([["parent@example.com"]]);
+    const deps = dependencies({ repository: repo.repository, rateLimiter: createMemoryRateLimiter(), mailer, staffEmail: "team@bibobay.example", sendLimitPerHour: 1 });
+    await submitLead(VALID, deps);
+    expect(sent.map((message) => message.to).sort()).toEqual([["parent@example.com"], ["team@bibobay.example"]]);
     expect(repo.event("acknowledgement")).toMatchObject({ status: "sent" });
-    expect(repo.event("staff_alert")).toMatchObject({ status: "pending", attempts: 0 });
+    expect(repo.event("staff_alert")).toMatchObject({ status: "sent" });
+
+    await submitLead({ ...VALID, email: "second@example.com" }, deps);
+    const second = repo.leads.get("second@example.com")?.id;
+    expect([...repo.events.values()].filter((event) => event.leadId === second).map((event) => [event.kind, event.status, event.attempts])).toEqual([
+      ["acknowledgement", "pending", 0],
+      ["staff_alert", "pending", 0],
+    ]);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("a spent acknowledgement budget never holds up the staff alert (D-I1)", async () => {
+    const repo = fakeRepository();
+    const { mailer, sent } = fakeMailer();
+    const { limiter } = recordingLimiter((key) => key !== "send:lead_acknowledgement");
+    await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: limiter, mailer, staffEmail: "team@bibobay.example" }));
+    expect(sent.map((message) => message.to)).toEqual([["team@bibobay.example"]]);
+    expect(repo.event("acknowledgement")).toMatchObject({ status: "pending", attempts: 0 });
+    expect(repo.event("staff_alert")).toMatchObject({ status: "sent" });
   });
 
   it("leaves the email pending, and still reports the stored signup, when the send budget cannot be checked", async () => {
     const repo = fakeRepository();
     const { mailer, sent } = fakeMailer();
-    const { limiter } = recordingLimiter((key) => (key === ACK_SEND_LIMIT.key ? new Error("connection refused") : true));
+    const { limiter } = recordingLimiter((key) => (key === "send:lead_acknowledgement" ? new Error("connection refused") : true));
     const log = vi.fn();
     const result = await submitLead(VALID, dependencies({ repository: repo.repository, rateLimiter: limiter, mailer, log }));
     expect(result.body).toEqual({ ok: true, persisted: true, acknowledgementQueued: true, message: COPY.successMessage });
     expect(sent).toEqual([]);
     expect(repo.event("acknowledgement")).toMatchObject({ status: "pending" });
-    expect(log).toHaveBeenCalledWith({ event: "delivery_send_cap_unavailable", kind: "acknowledgement", code: "unknown" });
+    expect(log).toHaveBeenCalledWith({ event: "delivery_send_cap_unavailable", kind: "acknowledgement", budget: "lead_acknowledgement", code: "unknown" });
   });
 
   it("spends no send budget while email is not configured", async () => {
@@ -569,7 +632,7 @@ describe("sending without holding up the answer (M4)", () => {
     expect(deferred).toHaveLength(1);
     consume.mockClear();
     await deferred[0]!();
-    expect(consume.mock.calls.map(([key]) => key)).toEqual([ACK_SEND_LIMIT.key, ACK_SEND_LIMIT.key]);
+    expect(consume.mock.calls.map(([key]) => key).sort()).toEqual(["send:lead_acknowledgement", "send:lead_staff_alert"]);
   });
 
   it("sends nothing after the answer for a row the outbox worker claimed first (no double send)", async () => {
@@ -669,6 +732,7 @@ describe("truthful messages", () => {
     ["invalid", () => submitLead({}, dependencies())],
     ["honeypot", () => submitLead({ ...VALID, website: "x" }, dependencies())],
     ["unconfigured", () => submitLead(VALID, dependencies({ repository: null }))],
+    ["no removal channel", () => submitLead(VALID, dependencies({ removalChannel: null }))],
     ["rate limited", () => submitLead(VALID, dependencies({ rateLimiter: { async consume() { return { allowed: false, remaining: 0, retryAfterSeconds: 60 }; } } }))],
   ];
 

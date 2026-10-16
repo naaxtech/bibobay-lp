@@ -45,10 +45,12 @@ describe("the acknowledgement's tracking line (R89)", () => {
   });
 });
 
-const lead = (id: string): ClaimedLeadDelivery => ({ id, kind: "acknowledgement", attempt: 1, email: "parent@example.com", firstName: null, ageBand: null, source: "landing" });
-const order = (id: string): ClaimedOrderEmail => ({ id, kind: "acknowledgement", attempt: 1, reference: "BB-1A2B-3C4D", contactName: "Sam Rivers", email: "buyer@example.com", lines: [{ title: "Tula plush", variant: null, pack: null, quantity: 1 }], quote: null });
+const lead = (id: string, kind: ClaimedLeadDelivery["kind"] = "acknowledgement"): ClaimedLeadDelivery => ({ id, kind, attempt: 1, email: "parent@example.com", firstName: null, ageBand: null, source: "landing" });
+const QUOTE = { currency: "AUD", subtotalMinor: 1000, freightMinor: 0, paymentUrl: "https://pay.example.com/q", revision: 1 };
+const order = (id: string, kind: ClaimedOrderEmail["kind"] = "acknowledgement"): ClaimedOrderEmail => ({ id, kind, attempt: 1, reference: "BB-1A2B-3C4D", contactName: "Sam Rivers", email: "buyer@example.com", lines: [{ title: "Tula plush", variant: null, pack: null, quantity: 1 }], quote: kind === "quote" ? QUOTE : null });
 
-function queue<T>(rows: T[]) {
+/** An outbox that hands out its due rows in order, one claim at a time, only of the kinds asked for. */
+function queue<T extends { kind: string }>(rows: T[]) {
   const claims: Array<ClaimOptions<string>> = [];
   const records: Array<[string, OutboxOutcome]> = [];
   return {
@@ -56,7 +58,8 @@ function queue<T>(rows: T[]) {
     records,
     take: async (options: ClaimOptions<string>) => {
       claims.push(options);
-      const row = rows.shift();
+      const index = rows.findIndex((row) => options.kinds.includes(row.kind));
+      const row = index >= 0 ? rows.splice(index, 1)[0] : undefined;
       return { claimed: row ? [row] : [], skipped: 0, expired: 0 };
     },
     record: async (id: string, outcome: OutboxOutcome) => (records.push([id, outcome]), true),
@@ -73,19 +76,51 @@ const SETTINGS = {
 };
 
 describe("runOutboxWorker", () => {
-  it("drains the order outbox, then the signup outbox, one row per claim, and answers counts only", async () => {
+  it("drains the order outbox, quotes first, then the signup outbox, one kind and one row per claim, and answers counts only", async () => {
     const leads = queue([lead("l1"), lead("l2")]);
-    const orders = queue([order("o1")]);
+    const orders = queue([order("o1"), order("q1", "quote")]);
     const sendOrder: string[] = [];
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
       context: context({ deliver: async (message) => (sendOrder.push(message.idempotencyKey ?? ""), { status: "sent", providerMessageId: "re_1" }) }),
     });
-    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 0 });
-    expect(sendOrder).toEqual(["order-email/o1", "lead-delivery/l1", "lead-delivery/l2"]);
-    expect(orders.claims[0]).toEqual({ kinds: ["acknowledgement", "quote"], limit: 1 });
-    expect(leads.claims[0]).toEqual({ kinds: ["acknowledgement", "staff_alert"], limit: 1 });
+    expect(result).toEqual({ sent: 4, failed: 0, skipped: 0, deferred: 0 });
+    expect(sendOrder).toEqual(["order-email/q1", "order-email/o1", "lead-delivery/l1", "lead-delivery/l2"]);
+    // Fix wave D-I1: each kind is drained under its own budget; quotes (staff are waiting on them) first.
+    expect(orders.claims).toEqual([
+      { kinds: ["quote"], limit: 1 },
+      { kinds: ["quote"], limit: 1 },
+      { kinds: ["acknowledgement"], limit: 1 },
+      { kinds: ["acknowledgement"], limit: 1 },
+    ]);
+    expect(leads.claims.map((options) => options.kinds)).toEqual([["acknowledgement"], ["acknowledgement"], ["acknowledgement"], ["staff_alert"]]);
+  });
+
+  it("asks the budget of each row's own kind and outbox (D-I1)", async () => {
+    const leads = queue([lead("l1"), lead("s1", "staff_alert")]);
+    const orders = queue([order("o1"), order("q1", "quote")]);
+    const asked: string[] = [];
+    await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      context: context({ reserve: async (kind, outbox) => (asked.push(`${outbox}:${kind}`), true) }),
+    });
+    expect(asked).toEqual(["orders:quote", "orders:acknowledgement", "leads:acknowledgement", "leads:staff_alert"]);
+  });
+
+  it("a spent budget closes only its own kind: a full signup bucket never holds up a quote or an order email (D-I1)", async () => {
+    const leads = queue([lead("l1"), lead("l2"), lead("s1", "staff_alert")]);
+    const orders = queue([order("o1"), order("q1", "quote")]);
+    const result = await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      context: context({ reserve: async (kind, outbox) => !(outbox === "leads" && kind === "acknowledgement") }),
+    });
+    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 1 });
+    expect(orders.records.map(([id, outcome]) => [id, outcome.status])).toEqual([["q1", "sent"], ["o1", "sent"]]);
+    // The capped signup acknowledgement is handed back once; the next signup row is never claimed; the staff alert still goes.
+    expect(leads.records.map(([id, outcome]) => [id, outcome.status])).toEqual([["l1", "deferred"], ["s1", "sent"]]);
   });
 
   it("stops claiming once the run's time is up (bounded run time)", async () => {
@@ -99,11 +134,12 @@ describe("runOutboxWorker", () => {
       now: () => clock,
     });
     expect(result.sent).toBe(1);
-    expect(orders.claims).toHaveLength(1);
+    // The quote claim found nothing; the first acknowledgement used up the run.
+    expect(orders.claims.map((options) => options.kinds)).toEqual([["quote"], ["acknowledgement"]]);
     expect(leads.claims).toHaveLength(0);
   });
 
-  it("stops at the send budget: the capped row is handed back and nothing else is claimed", async () => {
+  it("with every budget spent, hands back one row per kind and claims nothing more of that kind", async () => {
     const leads = queue([lead("l1")]);
     const orders = queue([order("o1"), order("o2")]);
     const result = await runOutboxWorker({
@@ -111,9 +147,9 @@ describe("runOutboxWorker", () => {
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
       context: context({ reserve: async () => false }),
     });
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 1 });
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 2 });
     expect(orders.records).toEqual([["o1", { status: "deferred" }]]);
-    expect(leads.claims).toHaveLength(0);
+    expect(leads.records).toEqual([["l1", { status: "deferred" }]]);
   });
 
   it("handles at most WORKER_LIMITS.maxRowsPerChannel rows of one outbox per run", async () => {
@@ -144,6 +180,6 @@ describe("the run's clock (Task 8a review M6)", () => {
       startedAt: clock - 34_000,
     });
     expect(result.sent).toBe(2);
-    expect(orders.claims).toHaveLength(2);
+    expect(orders.claims.map((options) => options.kinds)).toEqual([["quote"], ["acknowledgement"], ["acknowledgement"]]);
   });
 });

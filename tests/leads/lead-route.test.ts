@@ -4,6 +4,7 @@ import { POST } from "@/app/api/leads/route";
 import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { clientKeyFromHeaders } from "@/lib/leads/http";
+import { LEAD_SIGNUPS_CLOSED_MESSAGE } from "@/lib/leads/submit";
 
 vi.mock("server-only", () => ({}));
 
@@ -33,6 +34,19 @@ vi.mock("next/server", async (importOriginal) => ({
     afterTasks.push(task);
   },
 }));
+
+/** P-I1: the CMS contact address the removal channel may name; Sanity itself stays unconfigured. */
+const { siteContact } = vi.hoisted(() => ({ siteContact: { email: undefined as string | undefined } }));
+vi.mock("@/lib/sanity/fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sanity/fetch")>();
+  return {
+    ...actual,
+    getSiteSettings: async (...args: Parameters<typeof actual.getSiteSettings>) => {
+      const settings = await actual.getSiteSettings(...args);
+      return siteContact.email ? { ...settings, contactEmail: siteContact.email } : settings;
+    },
+  };
+});
 
 /** The Resend SDK, so no test can reach the real API. */
 const { resendSend } = vi.hoisted(() => ({ resendSend: vi.fn() }));
@@ -70,6 +84,7 @@ function post(body: unknown, headers: Record<string, string> = {}) {
 const VALID = { email: "Parent@Example.com", consent: true, firstName: "Ana", ageBand: "6-8", website: "", source: "landing" };
 
 beforeEach(() => {
+  siteContact.email = undefined;
   rpcCalls.length = 0;
   afterTasks.length = 0;
   resendSend.mockReset();
@@ -145,8 +160,33 @@ describe("POST /api/leads request handling", () => {
   });
 });
 
-describe("POST /api/leads with Supabase configured (mocked)", () => {
+describe("POST /api/leads with Supabase configured and no removal channel (P-I1, Ruling R125)", () => {
+  // The database would accept the signup: only the missing removal channel refuses it.
   beforeEach(() => {
+    rpcAnswers.consume_rate_limit = () => ({ data: [{ allowed: true, remaining: 4, retry_after_seconds: 0 }], error: null });
+    rpcAnswers.submit_lead = () => ({ data: [{ lead_id: LEAD_ID, created: true }], error: null });
+    rpcAnswers.enqueue_lead_delivery = () => ({ data: [{ event_id: EVENT_ID, status: "pending", created: true }], error: null });
+  });
+
+  it("answers 503 with the honest closed message and touches nothing while neither email sending nor a contact address exists", async () => {
+    configureSupabase();
+    const response = await post(VALID);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: LEAD_SIGNUPS_CLOSED_MESSAGE });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("ignores a contact address that is not an address", async () => {
+    configureSupabase();
+    siteContact.email = "not an address";
+    expect((await post(VALID)).status).toBe(503);
+  });
+});
+
+describe("POST /api/leads with Supabase configured (mocked), removal by writing to the contact address", () => {
+  beforeEach(() => {
+    siteContact.email = "hello@bibobay.example";
     configureSupabase();
     rpcAnswers.consume_rate_limit = () => ({ data: [{ allowed: true, remaining: 4, retry_after_seconds: 0 }], error: null });
     rpcAnswers.submit_lead = () => ({ data: [{ lead_id: LEAD_ID, created: true }], error: null });
@@ -215,7 +255,7 @@ describe("POST /api/leads with Supabase configured (mocked)", () => {
 });
 
 describe("POST /api/leads with Supabase and Resend configured (both mocked)", () => {
-  /** The global send bucket answers `sendAllowed`; every other bucket allows. */
+  /** The acknowledgement's send bucket answers `sendAllowed`; every other bucket allows. */
   let sendAllowed = true;
 
   beforeEach(() => {
@@ -223,7 +263,7 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
     configureResend();
     sendAllowed = true;
     rpcAnswers.consume_rate_limit = (args) => ({
-      data: [args.bucket_key === "ack-send:global" && !sendAllowed
+      data: [args.bucket_key === "send:lead_acknowledgement" && !sendAllowed
         ? { allowed: false, remaining: 0, retry_after_seconds: 900 }
         : { allowed: true, remaining: 4, retry_after_seconds: 0 }],
       error: null,
@@ -251,7 +291,7 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
     await afterTasks[0]!();
     expect(rpcCalls.slice(3).map(([fn]) => fn)).toEqual(["claim_lead_deliveries", "consume_rate_limit", "record_lead_delivery_attempt"]);
     expect(rpcCalls[3]?.[1]).toEqual({ p_limit: 1, p_lead_id: LEAD_ID, p_kinds: ["acknowledgement"] });
-    expect(rpcCalls[4]?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 60, window_seconds: 3600 });
+    expect(rpcCalls[4]?.[1]).toEqual({ bucket_key: "send:lead_acknowledgement", max_hits: 60, window_seconds: 3600 });
     expect(resendSend).toHaveBeenCalledTimes(1);
     const [payload, options] = resendSend.mock.calls[0]!;
     expect(payload).toMatchObject({ from: "BIBO Bay <hello@bibobay.example>", to: ["parent@example.com"] });
@@ -260,14 +300,14 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
     expect(rpcCalls.at(-1)).toEqual(["record_lead_delivery_attempt", { p_event_id: EVENT_ID, p_status: "sent", p_provider_message_id: "re_fixture", p_error_code: null }]);
   });
 
-  it("reads the global send cap from LEAD_ACK_SEND_LIMIT_PER_HOUR", async () => {
+  it("reads each kind's send cap from LEAD_ACK_SEND_LIMIT_PER_HOUR (D-I1: one bucket per kind)", async () => {
     vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "5");
     await post(VALID);
     await afterTasks[0]!();
-    expect(rpcCalls.find(([fn, args]) => fn === "consume_rate_limit" && args.bucket_key === "ack-send:global")?.[1]).toEqual({ bucket_key: "ack-send:global", max_hits: 5, window_seconds: 3600 });
+    expect(rpcCalls.find(([fn, args]) => fn === "consume_rate_limit" && args.bucket_key === "send:lead_acknowledgement")?.[1]).toEqual({ bucket_key: "send:lead_acknowledgement", max_hits: 5, window_seconds: 3600 });
   });
 
-  it("past the global send cap: stores the lead, answers the same, sends nothing and hands the claim back for the worker", async () => {
+  it("past the acknowledgement's send cap: stores the lead, answers the same, sends nothing and hands the claim back for the worker", async () => {
     sendAllowed = false;
     const response = await post(VALID);
     expect(response.status).toBe(200);

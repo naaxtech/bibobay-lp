@@ -9,8 +9,9 @@ const COPY = PAGE_COPY.orders;
 /**
  * The staff order list (Task 8c, ruling R100), newest first as the read returns it: reference (a
  * link to the order), status, when it was submitted and last changed, the contact's name, country,
- * the quote's revision and whether the mail service has accepted the quote email (`quoteSentAt` is
- * set only when it did; nothing here says it was delivered). A server component; the times are
+ * the quote's revision and whether the mail service has accepted that revision's quote email
+ * (`quoteSentAt` is set only for the current revision, fix wave C-I1, and the cell names it; nothing
+ * here says it was delivered). A server component; the times are
  * LocalTime, UTC in the server HTML and the viewer's zone once hydrated. The table scrolls inside
  * its own focusable region on a narrow screen, so the page itself never scrolls sideways.
  */
@@ -50,7 +51,15 @@ export function OrdersTable({ orders }: { orders: readonly AdminOrderSummary[] }
               <td>{order.contactName}</td>
               <td>{order.country}</td>
               <td>{order.quoteRevision < 1 ? COPY.values.noQuote : `${COPY.values.revision} ${order.quoteRevision}`}</td>
-              <td>{order.quoteSentAt ? <>{COPY.values.accepted} <LocalTime iso={order.quoteSentAt} /></> : COPY.values.notYet}</td>
+              <td>
+                {order.quoteSentAt ? (
+                  <>
+                    {`${COPY.values.accepted} (${COPY.values.revision.toLowerCase()} ${order.quoteRevision})`} <LocalTime iso={order.quoteSentAt} />
+                  </>
+                ) : (
+                  COPY.values.notYet
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -1,3 +1,4 @@
+import { ORDER_LIMITS, isSafeContactName } from "@/lib/orders/fields";
 import { ORDER_EMAIL_COPY } from "./order-email-copy";
 import { EMAIL_LINK, EMAIL_MUTED, escapeHtml, paragraph, safeHttpsUrl, shell, type RenderedEmail } from "./lead-emails";
 
@@ -27,6 +28,17 @@ export interface OrderEmailQuote {
 }
 
 const COPY = ORDER_EMAIL_COPY;
+
+/**
+ * Fix wave D-M3, second guard: the buyer's greeting names them only when the name passes the order
+ * schema's own rule (lib/orders/fields.ts `isSafeContactName`, within the length cap), so a row
+ * stored before that rule, or by any other path, can never put a link or markup at the top of an
+ * email sent from BIBO Bay's address. Otherwise the greeting has no name.
+ */
+function greetingFor(contactName: string): string {
+  const name = contactName.trim();
+  return name && name.length <= ORDER_LIMITS.contactName && isSafeContactName(name) ? COPY.greeting(name) : COPY.greetingWithoutName;
+}
 
 function lineText(line: OrderEmailLine): string {
   const details = [line.variant, line.pack].filter((value): value is string => typeof value === "string" && value.trim() !== "");
@@ -74,7 +86,7 @@ export function buildOrderAcknowledgement({
   tracking: { url: string | null } | null;
 }): RenderedEmail {
   const copy = COPY.acknowledgement;
-  const greeting = COPY.greeting(contactName.trim());
+  const greeting = greetingFor(contactName);
   const trackUrl = tracking?.url ? safeHttpsUrl(tracking.url) : null;
   const trackText = tracking ? (trackUrl ? copy.trackAt(trackUrl) : copy.trackOnSite) : null;
   const referenceLine = `${COPY.referenceLabel}: ${reference}`;
@@ -187,7 +199,7 @@ export function buildQuoteEmail({
   ];
   if (!paymentUrl || amounts.some(([, value]) => value === null)) return null;
   const rows = amounts as Array<[string, string]>;
-  const greeting = COPY.greeting(contactName.trim());
+  const greeting = greetingFor(contactName);
   const width = Math.max(...rows.map(([label]) => label.length));
 
   const text = [

@@ -152,6 +152,26 @@ describe("bounded text fields", () => {
   });
 });
 
+describe("the contact name (fix wave D-M3: the signup first-name rule)", () => {
+  it.each([
+    ["a link", "Your parcel is held, pay at https://evil.example"],
+    ["a scheme-less link", "Sam pay at evil.example://x"],
+    ["a www address", "Sam see www.evil.example"],
+    ["markup", "Sam <b>Rivers</b>"],
+    ["a lone angle bracket", "Sam > Rivers"],
+  ])("refuses %s: the name opens buyer emails (\"Hi <name>,\")", (_case, contactName) => {
+    expect(errorsOf({ ...VALID, contactName })).toEqual({ contactName: "invalid" });
+  });
+
+  it.each(["Ana-María O'Neil", "Dr. Sam Rivers Jr.", "李小龍", "Jo (Tide)", "Wwwendy Rivers"])("accepts a real name: %s", (contactName) => {
+    expect(validateOrderSubmission({ ...VALID, contactName }).ok).toBe(true);
+  });
+
+  it("still reports a name that is too long as too long first", () => {
+    expect(errorsOf({ ...VALID, contactName: `https://evil.example/${"n".repeat(120)}` })).toEqual({ contactName: "too_long" });
+  });
+});
+
 describe("order lines: product ids and quantities only", () => {
   it("needs at least one line", () => {
     expect(errorsOf({ ...VALID, lines: [] })).toEqual({ lines: "required" });

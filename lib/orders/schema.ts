@@ -16,6 +16,7 @@ import {
   POSTAL_CODE_PATTERN,
   SINGLE_LINE_CONTROL,
   TRACKING_TOKEN_PATTERN,
+  isSafeContactName,
   normalizeEmail,
   type OrderField,
   type OrderFieldErrorCode,
@@ -125,7 +126,8 @@ const lines = z
   .refine((entries) => new Set(entries.map((entry) => entry.productId)).size === entries.length, { error: "invalid" });
 
 export const orderSubmissionSchema = z.strictObject({
-  contactName: requiredLine(ORDER_LIMITS.contactName),
+  // Fix wave D-M3: the name opens the buyer's emails, so the signup first-name rule applies.
+  contactName: requiredLine(ORDER_LIMITS.contactName).refine(isSafeContactName, { error: "invalid" }),
   email,
   phone,
   addressLine1: requiredLine(ORDER_LIMITS.addressLine),

@@ -11,6 +11,8 @@
 export const ORDER_EMAIL_COPY = {
   brand: "BIBO Bay",
   greeting: (name: string) => `Hi ${name},`,
+  /** Fix wave D-M3: the greeting when the contact name cannot be shown (blank, too long, or carrying a link or markup). */
+  greetingWithoutName: "Hello,",
   /** "2 × Tula plush (Large, Single)": quantity, title, then the variant and pack when present. */
   line: (quantity: number, title: string, details: readonly string[]) => `${quantity} × ${title}${details.length > 0 ? ` (${details.join(", ")})` : ""}`,
   referenceLabel: "Order reference",

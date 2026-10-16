@@ -1,6 +1,6 @@
 import type { EmailMessage, EmailSendResult } from "@/lib/email/client";
 import { RpcError } from "@/lib/supabase/rpc";
-import { OUTBOX_FINAL_FAILURE_CODES, OUTBOX_LIMITS } from "./constants";
+import { OUTBOX_FINAL_FAILURE_CODES, OUTBOX_LIMITS, type OutboxName, type SendBudget } from "./constants";
 import type { ClaimBatch, ClaimOptions, OutboxOutcome } from "./types";
 
 /**
@@ -8,8 +8,9 @@ import type { ClaimBatch, ClaimOptions, OutboxOutcome } from "./types";
  *
  *   claim one due row (the outbox's claim function, migration 0006)
  *   → build its message (null: nothing can be sent; recorded as failed `message_invalid`)
- *   → spend one unit of the global send budget (`ack-send:global`); spent or unavailable: the
- *     claim is handed back (`deferred`), so the row stays due and no attempt is counted
+ *   → spend one unit of the send budget of the row's own kind in its outbox (`send:<budget>`, fix
+ *     wave D-I1; lib/outbox/constants.ts SEND_BUDGETS); spent or unavailable: the claim is handed
+ *     back (`deferred`), so the row stays due and no attempt is counted
  *   → send, bounded by a timeout, under the row's idempotency key
  *   → record the outcome.
  *
@@ -30,7 +31,7 @@ export interface ClaimedItem<K extends string> {
 }
 
 export interface OutboxChannel<K extends string, T extends ClaimedItem<K>> {
-  readonly name: "leads" | "orders";
+  readonly name: OutboxName;
   claim(options: ClaimOptions<K>): Promise<ClaimBatch<T>>;
   record(id: string, outcome: OutboxOutcome): Promise<boolean>;
   /** The message for one claimed row, recipient included, or null when it cannot be built: nothing is sent. */
@@ -42,8 +43,10 @@ export interface OutboxChannel<K extends string, T extends ClaimedItem<K>> {
 /** Event names and codes only: never an address, a name, a reference or a row id. */
 export type OutboxLogEvent<K extends string = string> =
   | { event: "delivery_claim_failed"; code: string }
-  | { event: "delivery_send_capped"; kind: K }
-  | { event: "delivery_send_cap_unavailable"; kind: K; code: string }
+  /** Fix wave D-I1: `budget` names the spent bucket (`send:<budget>`); the kind alone is ambiguous across outboxes. */
+  | { event: "delivery_send_capped"; kind: K; budget: SendBudget }
+  /** `budget` is absent only for a kind with no budget in that outbox (code `unknown_budget`). */
+  | { event: "delivery_send_cap_unavailable"; kind: K; budget?: SendBudget; code: string }
   | { event: "delivery_attempted"; kind: K; status: "sent" | "failed"; code?: string }
   | { event: "delivery_record_failed"; kind: K; code: string }
   | { event: "delivery_message_invalid"; kind: K }
@@ -56,8 +59,11 @@ export type OutboxLogEvent<K extends string = string> =
   | { event: "delivery_expired"; count: number; kind?: K; code?: string };
 
 export interface AttemptContext<K extends string = string> {
-  /** Spends one unit of the shared hourly send budget; false when it is spent or cannot be checked. */
-  reserve(kind: K): Promise<boolean>;
+  /**
+   * Spends one unit of the hourly send budget of this kind in this outbox (fix wave D-I1); false
+   * when it is spent or cannot be checked.
+   */
+  reserve(kind: K, outbox: OutboxName): Promise<boolean>;
   /** Sends one message, bounded by a timeout. Never throws. */
   deliver(message: EmailMessage): Promise<EmailSendResult>;
   log(event: OutboxLogEvent<K>): void;
@@ -75,7 +81,7 @@ export type AttemptOutcome =
   | "progress"
   /** Nothing was due. */
   | "none"
-  /** The send budget is spent (or unavailable); the claimed row was handed back. */
+  /** The send budget of the claimed row's kind is spent (or unavailable); the row was handed back. */
   | "capped"
   /** The claim itself failed. */
   | "claim_failed";
@@ -143,7 +149,7 @@ export async function attemptNext<K extends string, T extends ClaimedItem<K>>(
     return { outcome: "progress", tally };
   }
 
-  if (!(await context.reserve(item.kind))) {
+  if (!(await context.reserve(item.kind, channel.name))) {
     await record(channel, item, { status: "deferred" }, context);
     tally.deferred += 1;
     return { outcome: "capped", tally };
@@ -173,9 +179,11 @@ export async function attemptNow<K extends string, T extends ClaimedItem<K>>(
 }
 
 /**
- * The cron worker's loop over one outbox: one row at a time, until nothing is due, the send
- * budget is spent, a claim fails, the run's time is up (`deadline`, checked before every claim) or
- * `maxRows` rows were handled.
+ * The cron worker's loop over one outbox. Fix wave D-I1: kind by kind, in the order given, because
+ * each kind spends its own send budget: one row of that kind per claim until none of it is due or
+ * its budget is spent, then the next kind. The whole outbox stops when a claim fails, the run's
+ * time is up (`deadline`, checked before every claim) or `maxRows` rows were handled across all
+ * its kinds (a claim that finds nothing due is not a row).
  */
 export async function drainChannel<K extends string, T extends ClaimedItem<K>>(
   channel: OutboxChannel<K, T>,
@@ -184,10 +192,17 @@ export async function drainChannel<K extends string, T extends ClaimedItem<K>>(
   { deadline, maxRows, now = Date.now }: { deadline: number; maxRows: number; now?: () => number },
 ): Promise<OutboxTally> {
   let total = emptyTally();
-  for (let rows = 0; rows < maxRows && now() < deadline; rows += 1) {
-    const step = await attemptNext(channel, { kinds }, context);
-    total = addTally(total, step.tally);
-    if (step.outcome !== "progress") break;
+  let rows = 0;
+  for (const kind of kinds) {
+    while (rows < maxRows && now() < deadline) {
+      const step = await attemptNext(channel, { kinds: [kind] }, context);
+      total = addTally(total, step.tally);
+      if (step.outcome === "claim_failed") return total;
+      if (step.outcome === "none") break;
+      rows += 1;
+      // A spent budget closes this kind for the rest of the run; the other kinds keep theirs.
+      if (step.outcome === "capped") break;
+    }
   }
   return total;
 }

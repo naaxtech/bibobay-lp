@@ -90,7 +90,7 @@ export async function createOrderDependencies(
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
     log: logOrderEvent,
     // Task 8a (R88): the two queued emails are attempted after the answer through the outbox's
-    // claim, spending the shared send budget; without storage or email they wait for the worker.
+    // claim, each spending its own kind's send budget (fix wave D-I1); without storage or email they wait for the worker.
     sendQueuedEmails:
       client && email
         ? createOrderEmailSender(

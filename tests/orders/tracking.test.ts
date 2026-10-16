@@ -24,7 +24,8 @@ const cms = vi.hoisted(() => {
     getOrderableProducts: vi.fn(async () => []),
   });
 });
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings: cms.getSiteSettings, getLegalSettings: cms.getLegalSettings, getOrderableProducts: cms.getOrderableProducts }));
+// Fix wave D-M2: the routes' gates read getGateSettings (the same settings, with a 300 s backstop).
+vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings: cms.getSiteSettings, getGateSettings: cms.getSiteSettings, getLegalSettings: cms.getLegalSettings, getOrderableProducts: cms.getOrderableProducts }));
 
 const supabase = vi.hoisted(() => {
   const calls: Array<[string, Record<string, unknown>]> = [];

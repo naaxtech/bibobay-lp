@@ -190,6 +190,14 @@ describe("/admin/orders", () => {
     expect(rows[2]!.querySelectorAll("time")).toHaveLength(3);
   });
 
+  it("names the revision whose quote email the mail service accepted (fix wave C-I1)", async () => {
+    listOrders.mockResolvedValue([summary({ reference: "BB-BBBB-0002", status: "confirmed", ...QUOTED, quoteRevision: 3 })]);
+    render(await ordersPage());
+    const row = within(screen.getByRole("table", { name: PAGE_COPY.orders.tableCaption })).getAllByRole("row")[1]!;
+    const accepted = within(row).getByText(`${PAGE_COPY.orders.values.accepted} (${PAGE_COPY.orders.values.revision.toLowerCase()} 3)`, { exact: false });
+    expect(accepted.querySelector("time")).not.toBeNull();
+  });
+
   it("has one h1, the lead, and a status filter that works as plain links", async () => {
     render(await ordersPage());
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -345,6 +353,22 @@ describe("/admin/orders/[reference]", () => {
     const quote = within(screen.getByRole("region", { name: PAGE_COPY.detail.sections.quote }));
     expect(quote.getByText(PAGE_COPY.detail.quote.values.notAccepted)).toBeTruthy();
     expect(quote.queryByText(PAGE_COPY.detail.quote.values.accepted)).toBeNull();
+  });
+
+  it("labels the quote email with the revision it belongs to, accepted or not (fix wave C-I1)", async () => {
+    const label = (revision: number) => `${PAGE_COPY.detail.quote.emailAccepted} (${PAGE_COPY.detail.quote.revision.toLowerCase()} ${revision})`;
+    getOrder.mockResolvedValue(detail({ ...QUOTED, quoteRevision: 2 }));
+    const { unmount } = render(await detailPage(REFERENCE));
+    let quote = within(screen.getByRole("region", { name: PAGE_COPY.detail.sections.quote }));
+    const accepted = quote.getByText(label(2));
+    expect(accepted.tagName).toBe("DT");
+    expect(accepted.nextElementSibling?.textContent).toContain(PAGE_COPY.detail.quote.values.accepted);
+    unmount();
+
+    getOrder.mockResolvedValue(detail({ ...QUOTED, quoteRevision: 3, quoteSentAt: null }));
+    render(await detailPage(REFERENCE));
+    quote = within(screen.getByRole("region", { name: PAGE_COPY.detail.sections.quote }));
+    expect(quote.getByText(label(3)).nextElementSibling?.textContent).toBe(PAGE_COPY.detail.quote.values.notAccepted);
   });
 
   it("lists the email rows: kind, revision, status, attempts, times and the last error code", async () => {

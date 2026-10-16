@@ -12,7 +12,8 @@ const WARNING_EVENT = /_(failed|unavailable|unconfigured|invalid)$/;
  *
  * Ruling R52: warnings, the send-cap hit and parked rows (`delivery_expired`: an unconfirmed send
  * outside the idempotency window, out of attempts, or refused as `invalid_idempotent_request`,
- * waiting for a human) also go to Sentry as warning messages tagged with the event, kind and code only.
+ * waiting for a human) also go to Sentry as warning messages tagged with the event, kind and code
+ * only, plus (fix wave D-I1) the send budget a cap event concerns (`budget`, e.g. `quote`).
  */
 export function outboxLogger<K extends string>(channel: "leads" | "orders" | "worker") {
   return (entry: OutboxLogEvent<K>): void => {
@@ -21,7 +22,11 @@ export function outboxLogger<K extends string>(channel: "leads" | "orders" | "wo
     if (warning) console.warn(line);
     else console.info(line);
     if (warning || entry.event === "delivery_send_capped") {
-      reportEvent(entry.event, { ...("kind" in entry ? { kind: entry.kind } : {}), ...("code" in entry && entry.code ? { code: entry.code } : {}) });
+      reportEvent(entry.event, {
+        ...("kind" in entry ? { kind: entry.kind } : {}),
+        ...("budget" in entry && entry.budget ? { budget: entry.budget } : {}),
+        ...("code" in entry && entry.code ? { code: entry.code } : {}),
+      });
     }
   };
 }

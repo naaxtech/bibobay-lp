@@ -15,6 +15,7 @@ import { reportEvent } from "@/lib/observability/report";
 import { SERVER_SECRET_MIN_LENGTH } from "@/lib/security/secrets";
 import { seoEnvironment } from "@/lib/seo/metadata";
 import { clientKeyFromHeaders } from "./http";
+import { removalChannelFrom } from "./removal-channel";
 import { ACK_SEND_LIMIT, type LeadLogEvent, type LeadSubmissionDependencies } from "./submit";
 
 /**
@@ -61,9 +62,11 @@ function consentVersionFrom(cmsVersion: string, log: (event: LeadLogEvent) => vo
 }
 
 /**
- * Ruling R40: the hourly cap on emails sent straight from the form, shared by acknowledgements,
- * staff alerts and (Task 8) the outbox worker. `LEAD_ACK_SEND_LIMIT_PER_HOUR` must be a whole
- * number from 1 to 10000 (the bounds `consume_rate_limit` accepts); anything else means the default.
+ * Ruling R40, fix wave D-I1: the hourly cap of EACH send budget (`send:<budget>`, one per message
+ * kind: signup acknowledgement, signup staff alert, order acknowledgement, order staff alert and
+ * staff quote; lib/outbox/constants.ts SEND_BUDGETS), spent by the immediate sends and the outbox
+ * worker alike. `LEAD_ACK_SEND_LIMIT_PER_HOUR` keeps its name; it must be a whole number from 1 to
+ * 10000 (the bounds `consume_rate_limit` accepts); anything else means the default (60).
  */
 export function ackSendLimitPerHour(env: Record<string, string | undefined> = process.env): number {
   const raw = env.LEAD_ACK_SEND_LIMIT_PER_HOUR?.trim() ?? "";
@@ -77,7 +80,7 @@ const WARNING_EVENT = /_(failed|unavailable|unconfigured|invalid)$/;
 /**
  * Structured operational log: event names and codes only, never an address, name or email.
  * Warnings and the send-cap hit also go to Sentry as warning messages (ruling R52), tagged with the
- * event, kind and code only.
+ * event, kind and code only, plus the send budget of a cap event (fix wave D-I1).
  */
 export function logLeadEvent(entry: LeadLogEvent): void {
   const line = JSON.stringify({ scope: "leads", ...entry });
@@ -86,7 +89,11 @@ export function logLeadEvent(entry: LeadLogEvent): void {
   if (warning) console.warn(line);
   else console.info(line);
   if (warning || entry.event === "delivery_send_capped") {
-    reportEvent(entry.event, { ...("kind" in entry ? { kind: entry.kind } : {}), ...("code" in entry ? { code: entry.code } : {}) });
+    reportEvent(entry.event, {
+      ...("kind" in entry ? { kind: entry.kind } : {}),
+      ...("budget" in entry && entry.budget ? { budget: entry.budget } : {}),
+      ...("code" in entry ? { code: entry.code } : {}),
+    });
   }
 }
 
@@ -122,6 +129,8 @@ export async function createLeadDependencies(request: Request, env: Record<strin
 
   return {
     repository: storage ? createSupabaseLeadRepository(storage) : null,
+    // P-I1 (Ruling R125): email sending (reply to the acknowledgement) or the CMS contact address.
+    removalChannel: removalChannelFrom(settings, env),
     rateLimiter: storage ? createSupabaseRateLimiter(storage) : null,
     mailer: email?.sender ?? null,
     copy,

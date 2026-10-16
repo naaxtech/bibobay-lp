@@ -67,7 +67,8 @@ describe("attemptNext", () => {
     const { ctx, sent, reserve } = context();
     const step = await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
     expect(claims).toEqual([{ kinds: ["acknowledgement"], limit: 1 }]);
-    expect(reserve).toHaveBeenCalledWith("acknowledgement");
+    // Fix wave D-I1: the budget is the row's own kind in this outbox.
+    expect(reserve).toHaveBeenCalledWith("acknowledgement", "leads");
     expect(sent).toEqual([{ to: ["acknowledgement@example.com"], subject: "Hello", html: "<p>Hello</p>", text: "Hello", idempotencyKey: "test/a" }]);
     expect(records).toEqual([["a", { status: "sent", providerMessageId: "re_1" }]]);
     expect(step).toEqual({ outcome: "progress", tally: { sent: 1, failed: 0, skipped: 0, deferred: 0 } });
@@ -165,22 +166,39 @@ describe("attemptNow (the send right after the answer)", () => {
 });
 
 describe("drainChannel (the worker)", () => {
-  it("claims one row at a time until nothing is due", async () => {
+  it("claims one row of one kind at a time, kind by kind in the order given, until nothing of that kind is due (D-I1)", async () => {
     const rows = [row("a"), row("b"), row("c", "staff_alert", "lead-2")];
     const { channel, claims } = fakeChannel(rows);
-    const { ctx } = context();
-    expect(await drainChannel(channel, ["acknowledgement", "staff_alert"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 50 })).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 0 });
-    expect(claims).toHaveLength(4);
+    const { ctx, reserve } = context();
+    expect(await drainChannel(channel, ["staff_alert", "acknowledgement"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 50 })).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 0 });
+    expect(claims.map((options) => options.kinds)).toEqual([["staff_alert"], ["staff_alert"], ["acknowledgement"], ["acknowledgement"], ["acknowledgement"]]);
     expect(claims.every((options) => options.ownerId === undefined && options.limit === 1)).toBe(true);
+    expect(reserve.mock.calls).toEqual([["staff_alert", "leads"], ["acknowledgement", "leads"], ["acknowledgement", "leads"]]);
   });
 
-  it("stops at the first spent budget, leaving the rest due", async () => {
-    const rows = [row("a"), row("b"), row("c")];
+  it("stops a kind at its first spent budget, leaving its other rows due, and moves on to the next kind", async () => {
+    const rows = [row("a"), row("b"), row("c"), row("d", "staff_alert")];
     const { channel } = fakeChannel(rows);
     let allowed = 1;
-    const { ctx } = context({ reserve: async () => allowed-- > 0 });
-    expect(await drainChannel(channel, ["acknowledgement"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 50 })).toEqual({ sent: 1, failed: 0, skipped: 0, deferred: 1 });
-    expect(rows.map((entry) => entry.status)).toEqual(["sent", "pending", "pending"]);
+    const { ctx } = context({ reserve: async (kind) => kind === "staff_alert" || allowed-- > 0 });
+    expect(await drainChannel(channel, ["acknowledgement", "staff_alert"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 50 })).toEqual({ sent: 2, failed: 0, skipped: 0, deferred: 1 });
+    expect(rows.map((entry) => entry.status)).toEqual(["sent", "pending", "pending", "sent"]);
+  });
+
+  it("counts its row limit across every kind of the outbox", async () => {
+    const rows = [row("a"), row("b"), row("c", "staff_alert")];
+    const { channel } = fakeChannel(rows);
+    const { ctx } = context();
+    expect(await drainChannel(channel, ["acknowledgement", "staff_alert"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 2 })).toEqual({ sent: 2, failed: 0, skipped: 0, deferred: 0 });
+    expect(rows.map((entry) => entry.status)).toEqual(["sent", "sent", "pending"]);
+  });
+
+  it("stops the whole outbox when a claim fails", async () => {
+    const rows = [row("a", "staff_alert")];
+    const { channel, claims } = fakeChannel(rows, { claim: async (options) => { claims.push(options); throw new RpcError("claim_lead_deliveries", "PGRST301"); } });
+    const { ctx } = context();
+    expect(await drainChannel(channel, ["acknowledgement", "staff_alert"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 50 })).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 0 });
+    expect(claims).toHaveLength(1);
   });
 
   it("stops claiming once its time is up or its row limit is reached", async () => {

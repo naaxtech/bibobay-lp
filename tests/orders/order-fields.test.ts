@@ -38,6 +38,11 @@ const CASES: Array<[string, Partial<OrderFieldValues>]> = [
   ["a long name", { contactName: "n".repeat(121) }],
   ["a long name with a control character", { contactName: `${"n".repeat(121)}\u0007` }],
   ["a name with a line break", { contactName: "Sam\nRivers" }],
+  ["a name with a link (D-M3)", { contactName: "Pay at https://evil.example" }],
+  ["a name with a www address (D-M3)", { contactName: "See WWW.evil.example" }],
+  ["a name with markup (D-M3)", { contactName: "Sam <b>Rivers</b>" }],
+  ["a long name with a link (D-M3)", { contactName: `https://evil.example/${"n".repeat(120)}` }],
+  ["a name with an apostrophe and a hyphen", { contactName: "Ana-María O'Neil" }],
   ["a short phone number", { phone: "12345" }],
   ["a phone number in words", { phone: "call me maybe" }],
   ["a long phone number", { phone: "1".repeat(33) }],
@@ -64,6 +69,13 @@ describe("the order form's own check", () => {
   it("refuses a country the form does not offer, like the server with a CMS list (R85)", () => {
     expect(checkOrderFields({ ...BASE, country: "PH" }, ["AU", "NZ"])).toEqual({ country: "invalid" });
     expect(checkOrderFields({ ...BASE, country: "NZ" }, ["AU", "NZ"])).toEqual({});
+  });
+
+  it("refuses a contact name with a link, www. or markup, like the signup first name (fix wave D-M3)", () => {
+    for (const contactName of ["Pay at https://evil.example", "See www.evil.example", "Sam <b>Rivers</b>"]) {
+      expect(checkOrderFields({ ...BASE, contactName }, ISO_COUNTRY_CODES)).toEqual({ contactName: "invalid" });
+    }
+    expect(checkOrderFields({ ...BASE, contactName: "Ana-María O'Neil" }, ISO_COUNTRY_CODES)).toEqual({});
   });
 
   it("lists problems in the form's order", () => {

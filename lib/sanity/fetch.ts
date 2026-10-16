@@ -7,14 +7,18 @@ import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, ORDER_
 
 export interface ContentOptions { preview?: boolean }
 
-async function query<T>(groq: string, params: Record<string, string>, tags: string[], options: ContentOptions): Promise<T | null> {
+/**
+ * `revalidate` (published reads only): `false` caches until the tag is revalidated (the default);
+ * a number of seconds also expires the entry on its own after that long.
+ */
+async function query<T>(groq: string, params: Record<string, string>, tags: string[], options: ContentOptions, revalidate: number | false = false): Promise<T | null> {
   const client = getSanityClient(options);
   if (!client) return null;
   try {
     // No CDN for either variant; tags require fresh origin data after invalidation.
     return await client.fetch<T>(groq, params, options.preview
       ? { cache: "no-store", perspective: "drafts" }
-      : { next: { tags, revalidate: false }, perspective: "published" });
+      : { next: { tags, revalidate }, perspective: "published" });
   } catch {
     // Bad config, permissions, or network outage must not take down the public page.
     return null;
@@ -23,6 +27,23 @@ async function query<T>(groq: string, params: Record<string, string>, tags: stri
 
 export async function getSiteSettings(options: ContentOptions = {}) {
   return normalizeSiteSettings(await query<unknown>(SITE_SETTINGS_QUERY, {}, ["siteSettings"], options)) ?? SAFE_FALLBACK_SETTINGS;
+}
+
+/**
+ * Fix wave D-M2, Ruling R127: the longest a server gate may act on a cached commerce switch.
+ * src: node_modules/next/dist/docs/01-app/03-api-reference/04-functions/fetch.md (options.next.revalidate) · next 16.3.8 · 2026-10-16
+ */
+export const GATE_SETTINGS_REVALIDATE_SECONDS = 300;
+
+/**
+ * The site settings for a server gate (`isCommerceEnabled` / `isTrackingEnabled` on the order and
+ * tracking API routes): the same document as `getSiteSettings`, tagged `siteSettings` as well, but
+ * cached for at most GATE_SETTINGS_REVALIDATE_SECONDS. If the revalidation webhook breaks (say,
+ * SANITY_REVALIDATE_SECRET rotated on one side only), switching commerce off in Studio still stops
+ * orders within five minutes instead of never. The landing page keeps `getSiteSettings`, tag-only.
+ */
+export async function getGateSettings(options: ContentOptions = {}) {
+  return normalizeSiteSettings(await query<unknown>(SITE_SETTINGS_QUERY, {}, ["siteSettings"], options, GATE_SETTINGS_REVALIDATE_SECONDS)) ?? SAFE_FALLBACK_SETTINGS;
 }
 export async function getLandingPage(options: ContentOptions = {}) {
   const settings = await getSiteSettings(options);

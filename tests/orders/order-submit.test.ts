@@ -29,7 +29,8 @@ const cms = vi.hoisted(() => {
     getOrderableProducts: vi.fn(async (ids: readonly string[]) => (void ids, state.products)),
   });
 });
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings: cms.getSiteSettings, getLegalSettings: cms.getLegalSettings, getOrderableProducts: cms.getOrderableProducts }));
+// Fix wave D-M2: the routes' gates read getGateSettings (the same settings, with a 300 s backstop).
+vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings: cms.getSiteSettings, getGateSettings: cms.getSiteSettings, getLegalSettings: cms.getLegalSettings, getOrderableProducts: cms.getOrderableProducts }));
 
 /** Every RPC the route makes, through the mocked Supabase client. */
 const supabase = vi.hoisted(() => {

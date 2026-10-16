@@ -64,10 +64,17 @@ describe("buyer acknowledgement", () => {
   });
 
   it("escapes what the buyer typed", () => {
-    const email = buildOrderAcknowledgement({ reference: REFERENCE, contactName: "<b>Sam</b>", lines: [{ title: "<img src=x>", variant: null, pack: null, quantity: 1 }], tracking: null });
-    expect(email.html).not.toContain("<b>Sam</b>");
-    expect(email.html).toContain("&lt;b&gt;Sam&lt;/b&gt;");
+    const email = buildOrderAcknowledgement({ reference: REFERENCE, contactName: "Sam & Jo", lines: [{ title: "<img src=x>", variant: null, pack: null, quantity: 1 }], tracking: null });
+    expect(email.html).toContain("Hi Sam &amp; Jo,");
     expect(email.html).not.toContain("<img src=x>");
+    expect(email.html).toContain("&lt;img src=x&gt;");
+  });
+
+  it("leaves out a name with markup altogether (fix wave D-M3; tests/email/order-greeting.test.ts)", () => {
+    const email = buildOrderAcknowledgement({ reference: REFERENCE, contactName: "<b>Sam</b>", lines: LINES, tracking: null });
+    expect(email.html).not.toContain("<b>Sam</b>");
+    expect(email.html).not.toContain("&lt;b&gt;Sam");
+    expect(email.text.split("\n")[0]).toBe(ORDER_EMAIL_COPY.greetingWithoutName);
   });
 });
 

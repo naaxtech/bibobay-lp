@@ -171,7 +171,9 @@ export default async function OrderPage({ params }: { params: Promise<{ referenc
               [copy.quote.paymentLink, <span key="url" className="admin-url">{order.paymentUrl ?? copy.values.notGiven}</span>],
               [copy.quote.revision, order.quoteRevision],
               [
-                copy.quote.emailAccepted,
+                // Fix wave C-I1: the sent state names its revision. quoteSentAt is set only when the
+                // mail service accepted THIS revision's email (migrations 0006/0007 clear it on save).
+                `${copy.quote.emailAccepted} (${copy.quote.revision.toLowerCase()} ${order.quoteRevision})`,
                 order.quoteSentAt ? (
                   <>
                     {copy.quote.values.accepted} <LocalTime iso={order.quoteSentAt} />

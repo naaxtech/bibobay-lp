@@ -49,14 +49,15 @@ const get = (authorization?: string) =>
 function oneDueRowEach() {
   let orderRows = [{ id: ORDER_EMAIL_ID, kind: "acknowledgement", attempt: 2, reference: "BB-1A2B-3C4D", contactName: "Sam Rivers", email: "buyer@example.com", lines: [{ title: "Tula plush", variant: null, pack: null, quantity: 1 }], quote: null }];
   let leadRows = [{ id: LEAD_EVENT_ID, kind: "acknowledgement", attempt: 3, email: "parent@example.com", firstName: "Ana", ageBand: "6-8", source: "landing" }];
-  rpcAnswers.claim_order_emails = () => {
-    const claimed = orderRows;
-    orderRows = [];
+  // Each claim hands out the due rows of the kinds it names (fix wave D-I1: the worker claims kind by kind).
+  rpcAnswers.claim_order_emails = (args) => {
+    const claimed = orderRows.filter((row) => (args.p_kinds as string[]).includes(row.kind));
+    orderRows = orderRows.filter((row) => !claimed.includes(row));
     return { data: { claimed, skipped: 0, expired: 0 }, error: null };
   };
-  rpcAnswers.claim_lead_deliveries = () => {
-    const claimed = leadRows;
-    leadRows = [];
+  rpcAnswers.claim_lead_deliveries = (args) => {
+    const claimed = leadRows.filter((row) => (args.p_kinds as string[]).includes(row.kind));
+    leadRows = leadRows.filter((row) => !claimed.includes(row));
     return { data: { claimed, skipped: claimed.length > 0 ? 1 : 0, expired: 0 }, error: null };
   };
 }
@@ -126,27 +127,47 @@ describe("GET /api/cron/email-outbox", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({ sent: 2, failed: 0, skipped: 1, deferred: 0 });
 
+    // Fix wave D-I1: one kind per claim, quotes first; no staff alert without a staff address.
     const claims = rpcCalls.filter(([fn]) => fn.startsWith("claim_"));
-    expect(claims[0]).toEqual(["claim_order_emails", { p_limit: 1, p_order_id: null, p_kinds: ["acknowledgement", "quote"] }]);
+    expect(claims.map(([fn, args]) => [fn, (args.p_kinds as string[]).join()])).toEqual([
+      ["claim_order_emails", "quote"],
+      ["claim_order_emails", "acknowledgement"],
+      ["claim_order_emails", "acknowledgement"],
+      ["claim_lead_deliveries", "acknowledgement"],
+      ["claim_lead_deliveries", "acknowledgement"],
+    ]);
+    expect(claims[0]).toEqual(["claim_order_emails", { p_limit: 1, p_order_id: null, p_kinds: ["quote"] }]);
     expect(claims.find(([fn]) => fn === "claim_lead_deliveries")?.[1]).toEqual({ p_limit: 1, p_lead_id: null, p_kinds: ["acknowledgement"] });
     // R91: the provider idempotency key is the row id, so a retried send cannot be delivered twice.
     expect(resendSend.mock.calls.map(([, options]) => options.idempotencyKey)).toEqual([`order-email/${ORDER_EMAIL_ID}`, `lead-delivery/${LEAD_EVENT_ID}`]);
-    // R40: every send spends one unit of the shared hourly budget.
-    expect(rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => args.bucket_key)).toEqual(["ack-send:global", "ack-send:global"]);
+    // R40 + D-I1: every send spends one unit of its own kind's hourly budget.
+    expect(rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => args.bucket_key)).toEqual(["send:order_acknowledgement", "send:lead_acknowledgement"]);
     expect(rpcCalls.filter(([fn]) => fn.startsWith("record_")).map(([fn, args]) => [fn, args.p_status])).toEqual([
       ["record_order_email_attempt", "sent"],
       ["record_lead_delivery_attempt", "sent"],
     ]);
   });
 
-  it("sends nothing past the global send budget and hands the row back", async () => {
+  it("sends nothing past each kind's send budget and hands each capped row back (D-I1)", async () => {
     configure();
     oneDueRowEach();
     rpcAnswers.consume_rate_limit = () => ({ data: [{ allowed: false, remaining: 0, retry_after_seconds: 600 }], error: null });
     const response = await get(`Bearer ${SECRET}`);
-    expect(await response.json()).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 1 });
+    expect(await response.json()).toEqual({ sent: 0, failed: 0, skipped: 1, deferred: 2 });
     expect(resendSend).not.toHaveBeenCalled();
-    expect(rpcCalls.at(-1)).toEqual(["record_order_email_attempt", { p_email_id: ORDER_EMAIL_ID, p_status: "deferred", p_provider_message_id: null, p_error_code: null }]);
+    expect(rpcCalls.filter(([fn]) => fn.startsWith("record_"))).toEqual([
+      ["record_order_email_attempt", { p_email_id: ORDER_EMAIL_ID, p_status: "deferred", p_provider_message_id: null, p_error_code: null }],
+      ["record_lead_delivery_attempt", { p_event_id: LEAD_EVENT_ID, p_status: "deferred", p_provider_message_id: null, p_error_code: null }],
+    ]);
+  });
+
+  it("a spent signup budget never holds up the order emails or a quote (D-I1)", async () => {
+    configure();
+    oneDueRowEach();
+    rpcAnswers.consume_rate_limit = (args) => ({ data: [args.bucket_key === "send:lead_acknowledgement" ? { allowed: false, remaining: 0, retry_after_seconds: 600 } : { allowed: true, remaining: 9, retry_after_seconds: 0 }], error: null });
+    const response = await get(`Bearer ${SECRET}`);
+    expect(await response.json()).toEqual({ sent: 1, failed: 0, skipped: 1, deferred: 1 });
+    expect(resendSend.mock.calls.map(([, options]) => options.idempotencyKey)).toEqual([`order-email/${ORDER_EMAIL_ID}`]);
   });
 
   it("answers a generic 500 when the run itself breaks, and never echoes the cause", async () => {

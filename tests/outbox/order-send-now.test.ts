@@ -15,7 +15,7 @@ import { budgetedSends } from "@/lib/outbox/send";
 import type { ClaimOptions, ClaimedOrderEmail, OrderEmailOutbox, OutboxOutcome } from "@/lib/outbox/types";
 import { ACK_SEND_LIMIT } from "@/lib/leads/submit";
 import type { OrderEmailKind } from "@/lib/outbox/constants";
-import type { RateLimiter } from "@/lib/security/rate-limit";
+import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
 
 /*
  * The send right after an order is stored (Task 8a, R88): both queued emails are claimed by order
@@ -82,21 +82,64 @@ describe("createOrderEmailSender", () => {
   });
 });
 
-describe("budgetedSends", () => {
-  it("spends one unit of ack-send:global per message, at the configured hourly cap", async () => {
+describe("budgetedSends (fix wave D-I1: one budget per message kind)", () => {
+  const SENT = { send: async () => ({ status: "sent" as const, providerMessageId: "re_1" }) };
+
+  it("spends one unit of the row's own bucket, send:<kind>, at the configured hourly cap", async () => {
     const consume = vi.fn<RateLimiter["consume"]>(async () => ({ allowed: true, remaining: 1, retryAfterSeconds: 0 }));
-    const context = budgetedSends({ rateLimiter: { consume }, sendLimitPerHour: 7, mailer: { send: async () => ({ status: "sent", providerMessageId: "re_1" }) }, log: () => {} });
-    expect(await context.reserve("acknowledgement")).toBe(true);
-    expect(consume).toHaveBeenCalledWith(ACK_SEND_LIMIT.key, { maxHits: 7, windowSeconds: ACK_SEND_LIMIT.windowSeconds });
+    const context = budgetedSends<string>({ rateLimiter: { consume }, sendLimitPerHour: 7, mailer: SENT, log: () => {} });
+    for (const [kind, outbox] of [["acknowledgement", "orders"], ["staff_alert", "orders"], ["quote", "orders"], ["acknowledgement", "leads"], ["staff_alert", "leads"]] as const) {
+      expect(await context.reserve(kind, outbox)).toBe(true);
+    }
+    const rule = { maxHits: 7, windowSeconds: ACK_SEND_LIMIT.windowSeconds };
+    expect(consume.mock.calls).toEqual([
+      ["send:order_acknowledgement", rule],
+      ["send:order_staff_alert", rule],
+      ["send:quote", rule],
+      ["send:lead_acknowledgement", rule],
+      ["send:lead_staff_alert", rule],
+    ]);
+    expect(ACK_SEND_LIMIT.windowSeconds).toBe(3600);
   });
 
-  it("reports a spent or unreachable budget as no, with an event", async () => {
+  it("a full signup bucket never holds up a quote, an order email or a staff alert", async () => {
+    const context = budgetedSends<string>({ rateLimiter: createMemoryRateLimiter(), sendLimitPerHour: 2, mailer: SENT, log: () => {} });
+    expect(await context.reserve("acknowledgement", "leads")).toBe(true);
+    expect(await context.reserve("acknowledgement", "leads")).toBe(true);
+    expect(await context.reserve("acknowledgement", "leads")).toBe(false);
+    expect(await context.reserve("quote", "orders")).toBe(true);
+    expect(await context.reserve("acknowledgement", "orders")).toBe(true);
+    expect(await context.reserve("staff_alert", "orders")).toBe(true);
+    expect(await context.reserve("staff_alert", "leads")).toBe(true);
+  });
+
+  it("caps each kind on its own: a spent quote bucket leaves the order acknowledgement open", async () => {
+    const context = budgetedSends<string>({ rateLimiter: createMemoryRateLimiter(), sendLimitPerHour: 1, mailer: SENT, log: () => {} });
+    expect(await context.reserve("quote", "orders")).toBe(true);
+    expect(await context.reserve("quote", "orders")).toBe(false);
+    expect(await context.reserve("acknowledgement", "orders")).toBe(true);
+    expect(await context.reserve("acknowledgement", "orders")).toBe(false);
+  });
+
+  it("reports a spent or unreachable budget as no, with an event naming the kind and its budget", async () => {
     const events: unknown[] = [];
-    const capped = budgetedSends({ rateLimiter: { consume: async () => ({ allowed: false, remaining: 0, retryAfterSeconds: 60 }) }, sendLimitPerHour: 1, mailer: { send: async () => ({ status: "sent", providerMessageId: "re_1" }) }, log: (event) => events.push(event) });
-    expect(await capped.reserve("quote")).toBe(false);
-    const down = budgetedSends({ rateLimiter: { consume: async () => { throw new Error("db down"); } }, sendLimitPerHour: 1, mailer: { send: async () => ({ status: "sent", providerMessageId: "re_1" }) }, log: (event) => events.push(event) });
-    expect(await down.reserve("quote")).toBe(false);
-    expect(events).toEqual([{ event: "delivery_send_capped", kind: "quote" }, { event: "delivery_send_cap_unavailable", kind: "quote", code: "unknown" }]);
+    const capped = budgetedSends<string>({ rateLimiter: { consume: async () => ({ allowed: false, remaining: 0, retryAfterSeconds: 60 }) }, sendLimitPerHour: 1, mailer: SENT, log: (event) => events.push(event) });
+    expect(await capped.reserve("quote", "orders")).toBe(false);
+    const down = budgetedSends<string>({ rateLimiter: { consume: async () => { throw new Error("db down"); } }, sendLimitPerHour: 1, mailer: SENT, log: (event) => events.push(event) });
+    expect(await down.reserve("acknowledgement", "leads")).toBe(false);
+    expect(events).toEqual([
+      { event: "delivery_send_capped", kind: "quote", budget: "quote" },
+      { event: "delivery_send_cap_unavailable", kind: "acknowledgement", budget: "lead_acknowledgement", code: "unknown" },
+    ]);
+  });
+
+  it("refuses, without asking the limiter, a kind that has no budget in that outbox", async () => {
+    const consume = vi.fn<RateLimiter["consume"]>(async () => ({ allowed: true, remaining: 1, retryAfterSeconds: 0 }));
+    const events: unknown[] = [];
+    const context = budgetedSends<string>({ rateLimiter: { consume }, sendLimitPerHour: 1, mailer: SENT, log: (event) => events.push(event) });
+    expect(await context.reserve("quote", "leads")).toBe(false);
+    expect(consume).not.toHaveBeenCalled();
+    expect(events).toEqual([{ event: "delivery_send_cap_unavailable", kind: "quote", code: "unknown_budget" }]);
   });
 
   it("bounds every send by its timeout", async () => {
@@ -115,8 +158,8 @@ describe("outboxLogger (ruling R52)", () => {
 
   it("writes one JSON line per event, naming the outbox, and reports warnings, the send cap and parked rows to Sentry", () => {
     const log = outboxLogger("orders");
-    log({ event: "delivery_send_capped", kind: "acknowledgement" });
-    log({ event: "delivery_send_cap_unavailable", kind: "quote", code: "PGRST301" });
+    log({ event: "delivery_send_capped", kind: "acknowledgement", budget: "order_acknowledgement" });
+    log({ event: "delivery_send_cap_unavailable", kind: "quote", budget: "quote", code: "PGRST301" });
     log({ event: "delivery_claim_failed", code: "PGRST301" });
     log({ event: "delivery_message_invalid", kind: "quote" });
     log({ event: "delivery_expired", count: 2 });
@@ -124,13 +167,14 @@ describe("outboxLogger (ruling R52)", () => {
     log({ event: "delivery_skipped", count: 1 });
     log({ event: "delivery_expired", count: 1, kind: "quote", code: "invalid_idempotent_request" });
     expect(reported.events).toEqual([
-      ["delivery_send_capped", { kind: "acknowledgement" }],
-      ["delivery_send_cap_unavailable", { kind: "quote", code: "PGRST301" }],
+      ["delivery_send_capped", { kind: "acknowledgement", budget: "order_acknowledgement" }],
+      ["delivery_send_cap_unavailable", { kind: "quote", budget: "quote", code: "PGRST301" }],
       ["delivery_claim_failed", { code: "PGRST301" }],
       ["delivery_message_invalid", { kind: "quote" }],
       ["delivery_expired", {}],
       ["delivery_expired", { kind: "quote", code: "invalid_idempotent_request" }],
     ]);
     expect(console.info).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "orders", event: "delivery_attempted", kind: "acknowledgement", status: "sent" }));
+    expect(console.info).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "orders", event: "delivery_send_capped", kind: "acknowledgement", budget: "order_acknowledgement" }));
   });
 });

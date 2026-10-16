@@ -4,9 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { applyMigrations, createSupabaseStandIn, migrationFiles, pgtapFiles, readPgtap, runTap, summariseTap } from "@/tests/support/supabase-db";
 
 /*
- * Applies every migration (0001-0006) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
+ * Applies every migration (0001-0007) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
  * and runs every pgTAP file against the result, so each file proves its policy holds alongside all
  * the others. This is the same set Task 11 runs against the real project with `supabase test db`.
+ * 0006_catalogue.sql (fix wave T-I4) sweeps the whole public schema, so a grant or a table a later
+ * migration adds is caught even before a per-object check names it.
  */
 let db: PGlite;
 
@@ -32,8 +34,8 @@ describe("every migration in Postgres", () => {
     ]);
   });
 
-  it("has a pgTAP file for the leads, the orders, the tracking grants, the email outbox and staff access", () => {
-    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql", "0005_staff_access.sql"]);
+  it("has a pgTAP file for the leads, the orders, the tracking grants, the email outbox, staff access and the whole-schema sweep", () => {
+    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql", "0005_staff_access.sql", "0006_catalogue.sql"]);
   });
 
   it.each(pgtapFiles())("passes every pgTAP assertion in supabase/tests/%s", async (file) => {
@@ -100,6 +102,13 @@ describe("every migration in Postgres", () => {
 
   it("keeps the staff access rules after a second application of every migration", async () => {
     const { planned, passed, failures } = summariseTap(await runTap(db, readPgtap("0005_staff_access.sql")));
+    expect(failures).toEqual([]);
+    expect(passed).toBe(planned);
+  }, 120_000);
+
+  it("keeps the whole-schema sweep green after a second application of every migration (fix wave T-I4)", async () => {
+    const { planned, passed, failures } = summariseTap(await runTap(db, readPgtap("0006_catalogue.sql")));
+    expect(planned).toBe(14);
     expect(failures).toEqual([]);
     expect(passed).toBe(planned);
   }, 120_000);

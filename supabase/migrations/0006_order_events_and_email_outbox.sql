@@ -27,7 +27,7 @@
 --     (`lead_withdrawn`) and never returns it, so no caller can email a withdrawn adult even with a
 --     bug (R92). enqueue_lead_delivery no longer claims any kind for a withdrawn lead either.
 --   * Recording: `sent` or `failed` (with exponential backoff, capped at six hours), or `deferred`:
---     the claim is handed back without an attempt (the global send budget was spent), returning the
+--     the claim is handed back without an attempt (the send budget was spent; one per kind since fix wave D-I1), returning the
 --     row to its earlier status and attempt count, still due.
 --   * Order emails gain the `quote` kind (queued by Task 8b), an explicit unique `idempotency_key`
 --     (R90): `<order id>:<kind>` for the acknowledgement and staff alert, `<order id>:quote:<revision>`
@@ -36,7 +36,9 @@
 --     `orders.quote_revision` counts the order's quotes; a queued quote whose revision is no longer
 --     the order's current one, whose order was cancelled, or whose quote is incomplete is
 --     `skipped`, never sent with figures it was not queued for. When the provider accepts a quote,
---     the statement that records it also sets `orders.quote_sent_at` (R90).
+--     the statement that records it also sets `orders.quote_sent_at` (R90), but only while that
+--     quote's revision is still the order's current one (fix wave C-I1): an older revision accepted
+--     after a newer save never marks the newer figures as emailed.
 --
 -- Security model (the same as 0001-0005): the new functions are `security definer` with
 -- `set search_path = ''`, executable by service_role only; the failure-code helper is executable by
@@ -531,7 +533,9 @@ grant execute on function public.claim_order_emails(integer, uuid, text[]) to se
 -- ---------------------------------------------------------------------------
 -- record_order_email_attempt: the order outbox's record_lead_delivery_attempt, with the same
 -- statuses and rules. When the provider accepted a quote, the same statement sets the order's
--- quote_sent_at (R90). Returns false when the row was not `sending`.
+-- quote_sent_at (R90), only if the quote's revision is the order's current revision (fix wave
+-- C-I1; migration 0007's save clears it with every new revision). Returns false when the row was
+-- not `sending`.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.record_order_email_attempt(
@@ -585,11 +589,12 @@ begin
                             end,
       updated_at          = now()
     where outbox.id = p_email_id and outbox.status = 'sending'
-    returning outbox.order_id, outbox.kind, outbox.status
+    returning outbox.order_id, outbox.kind, outbox.status, outbox.quote_revision
   ), quoted as (
     update public.orders as o set quote_sent_at = now(), updated_at = now()
       from recorded
      where o.id = recorded.order_id and recorded.kind = 'quote' and recorded.status = 'sent'
+       and o.quote_revision = recorded.quote_revision
     returning o.id
   )
   select exists (select 1 from recorded) into v_found;
