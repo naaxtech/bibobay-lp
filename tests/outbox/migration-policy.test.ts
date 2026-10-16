@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { LEAD_DELIVERY_KINDS, ORDER_EMAIL_KINDS, OUTBOX_LIMITS, OUTBOX_STATUSES } from "@/lib/outbox/constants";
+import { LEAD_DELIVERY_KINDS, ORDER_EMAIL_KINDS, OUTBOX_FINAL_FAILURE_CODES, OUTBOX_LIMITS, OUTBOX_STATUSES, PROVIDER_REFUSAL_CODES } from "@/lib/outbox/constants";
 
 /*
  * Static policy gate for migration 0006 (the email outbox worker; Task 8a), like the 0001-0005
@@ -104,7 +104,8 @@ describe("migration 0006: the values the worker relies on", () => {
       expect(body, name).toContain("skip locked");
     }
     for (const name of ["record_lead_delivery_attempt", "record_order_email_attempt"]) {
-      expect(FUNCTIONS.find((fn) => fn.name === name)!.body, name).toContain(`attempts >= ${OUTBOX_LIMITS.maxAttempts} or p_error_code = 'invalid_idempotent_request'`);
+      expect(OUTBOX_FINAL_FAILURE_CODES).toEqual(["invalid_idempotent_request"]);
+      expect(FUNCTIONS.find((fn) => fn.name === name)!.body, name).toContain(`attempts >= ${OUTBOX_LIMITS.maxAttempts} or p_error_code = '${OUTBOX_FINAL_FAILURE_CODES[0]}'`);
     }
     // The provider keeps an idempotency key for 24 hours; the window must close before that.
     expect(OUTBOX_LIMITS.idempotencyWindowHours).toBeLessThan(24);
@@ -118,5 +119,22 @@ describe("migration 0006: the values the worker relies on", () => {
   it("returns no address, phone, notes, SKU, product id or token hash from the order claim", () => {
     const claimOrders = FUNCTIONS.find((fn) => fn.name === "claim_order_emails")!;
     expect(claimOrders.body).not.toMatch(/\b(address_line1|address_line2|city|region|postal_code|country|notes|phone|tracking_token_hash|sanity_id|sku)\b/);
+  });
+});
+
+describe("migration 0006: which failures are answers (Task 8a review M3)", () => {
+  it("treats exactly the known refusals as answered, and every other code as unconfirmed", () => {
+    const body = FUNCTIONS.find((fn) => fn.name === "outbox_failure_unconfirmed")!.body;
+    const listed = body.match(/not in \(([^)]*)\)/)?.[1]?.match(/'([a-z_]+)'/g)?.map((code) => code.slice(1, -1));
+    expect(listed).toEqual([...PROVIDER_REFUSAL_CODES]);
+    expect(body).toContain("coalesce(p_error_code not in (");
+  });
+
+  it("lists only refusals Resend 6.32.1 can return, plus our own message_invalid", async () => {
+    const types = readFileSync(resolve("node_modules/resend/dist/index.d.mts"), "utf8");
+    const known = types.match(/type RESEND_ERROR_CODE_KEY = ([^;]+);/)?.[1]?.match(/'([a-z_]+)'/g)?.map((code) => code.slice(1, -1)) ?? [];
+    for (const code of PROVIDER_REFUSAL_CODES) if (code !== "message_invalid") expect(known, code).toContain(code);
+    // Resend's server-side and in-progress errors stay unconfirmed: they may have been accepted.
+    for (const code of ["application_error", "internal_server_error", "concurrent_idempotent_requests", "invalid_idempotent_request"]) expect(PROVIDER_REFUSAL_CODES as readonly string[]).not.toContain(code);
   });
 });

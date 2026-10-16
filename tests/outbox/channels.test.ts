@@ -34,13 +34,14 @@ describe("the lead channel", () => {
     expect(message?.text).toMatch(/Submitted address \(unverified\)\s+parent@example\.com/);
   });
 
-  it("says a retried staff alert shows the details on file, not a fresh submission", () => {
+  // Task 8a review M2: the provider refuses a reused idempotency key with another body
+  // (invalid_idempotent_request), so a retry of a send that did go out must build the same message.
+  it("builds the same staff alert whichever path sends it, so a retry reuses its idempotency key safely", () => {
     const now = leadDeliveryChannel(noLeadOutbox, { ...settings, fromOutbox: false }).build(LEAD_ALERT);
     const retried = leadDeliveryChannel(noLeadOutbox, { ...settings, fromOutbox: true }).build(LEAD_ALERT);
+    expect(retried).toEqual(now);
     expect(now?.text).toMatch(/^A new signup joined/);
-    expect(retried?.text).not.toMatch(/A new signup joined|this submission contained/);
-    expect(retried?.text).toMatch(/on file/);
-    expect(retried?.text).toMatch(/Submitted address \(unverified\)\s+parent@example\.com/);
+    expect(now?.text).toMatch(/Submitted address \(unverified\)\s+parent@example\.com/);
   });
 
   it("builds no staff alert without a staff address, and claims no staff alerts then", () => {

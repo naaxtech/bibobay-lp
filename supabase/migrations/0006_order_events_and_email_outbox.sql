@@ -71,6 +71,10 @@ alter table public.lead_delivery_events drop constraint if exists lead_delivery_
 alter table public.lead_delivery_events add constraint lead_delivery_events_status_values
   check (status in ('pending', 'sending', 'sent', 'failed', 'skipped'));
 alter table public.lead_delivery_events add column if not exists unconfirmed_since timestamptz;
+-- When the current holder claimed the row (review M5): set by a claim, cleared when the outcome is
+-- recorded or the claim handed back. A stuck send is found by it; last_attempt_at is only ever the
+-- time of a real attempt.
+alter table public.lead_delivery_events add column if not exists claimed_at timestamptz;
 
 alter table public.lead_submissions drop constraint if exists lead_submissions_acknowledgement_status_values;
 alter table public.lead_submissions add constraint lead_submissions_acknowledgement_status_values
@@ -94,6 +98,7 @@ alter table public.order_email_outbox drop constraint if exists order_email_outb
 alter table public.order_email_outbox add constraint order_email_outbox_quote_revision_shape
   check ((kind = 'quote') = (quote_revision is not null) and (quote_revision is null or quote_revision >= 1));
 alter table public.order_email_outbox add column if not exists unconfirmed_since timestamptz;
+alter table public.order_email_outbox add column if not exists claimed_at timestamptz;
 alter table public.order_email_outbox add column if not exists idempotency_key text
   generated always as (order_id::text || ':' || kind || coalesce(':' || quote_revision::text, '')) stored;
 alter table public.order_email_outbox alter column idempotency_key set not null;
@@ -105,9 +110,11 @@ alter table public.order_email_outbox drop constraint if exists order_email_outb
 
 -- ---------------------------------------------------------------------------
 -- Internal: which failure codes leave a send unconfirmed (it may have reached the provider).
--- Our own codes (lib/email/client.ts, lib/leads/submit.ts) for a request that may have gone out,
--- an unrecognised provider error, and the provider's server-side and in-progress errors. Every other
--- provider code is an answer: nothing was accepted. Executable by its owner only.
+-- Review M3: only a known refusal is an answer (the provider's refusals in Resend 6.32.1, and our own
+-- `message_invalid`: nothing was sent); every other code, ours (timeouts, exceptions), the
+-- provider's server-side and in-progress errors, and any code not known yet, is unconfirmed.
+-- lib/outbox/constants.ts PROVIDER_REFUSAL_CODES holds the same list (pinned by a test).
+-- Executable by its owner only.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.outbox_failure_unconfirmed(p_error_code text)
@@ -116,9 +123,11 @@ language sql
 immutable
 set search_path = ''
 as $fn$
-  select coalesce(p_error_code in (
-    'send_timeout', 'send_aborted', 'send_exception', 'missing_message_id', 'provider_error',
-    'application_error', 'internal_server_error', 'concurrent_idempotent_requests'
+  select coalesce(p_error_code not in (
+    'invalid_idempotency_key', 'validation_error', 'missing_api_key', 'restricted_api_key', 'invalid_api_key',
+    'not_found', 'method_not_allowed', 'invalid_attachment', 'invalid_from_address', 'invalid_access',
+    'invalid_parameter', 'invalid_region', 'missing_required_field', 'monthly_quota_exceeded',
+    'daily_quota_exceeded', 'rate_limit_exceeded', 'security_error', 'message_invalid'
   ), true);
 $fn$;
 
@@ -130,6 +139,12 @@ update public.lead_delivery_events as event
    set unconfirmed_since = event.last_attempt_at
  where event.status = 'failed' and event.unconfirmed_since is null and event.last_attempt_at is not null
    and public.outbox_failure_unconfirmed(event.last_error_code);
+update public.lead_delivery_events as event
+   set claimed_at = event.last_attempt_at
+ where event.status = 'sending' and event.claimed_at is null;
+update public.order_email_outbox as outbox
+   set claimed_at = outbox.last_attempt_at
+ where outbox.status = 'sending' and outbox.claimed_at is null;
 update public.order_email_outbox as outbox
    set unconfirmed_since = outbox.last_attempt_at
  where outbox.status = 'failed' and outbox.unconfirmed_since is null and outbox.last_attempt_at is not null
@@ -171,7 +186,7 @@ begin
     v_claim := false;
   end if;
 
-  insert into public.lead_delivery_events as event (lead_id, kind, status, attempts, last_attempt_at)
+  insert into public.lead_delivery_events as event (lead_id, kind, status, attempts, claimed_at)
   values (
     p_lead_id,
     p_kind,
@@ -235,7 +250,7 @@ begin
   end if;
 
   for r in
-    select event.id, event.lead_id, event.kind, event.status, event.attempts, event.last_attempt_at, event.unconfirmed_since,
+    select event.id, event.lead_id, event.kind, event.status, event.attempts, coalesce(event.claimed_at, event.last_attempt_at) as claimed_at, event.unconfirmed_since,
            lead.consent_state, lead.email, lead.first_name, lead.age_band, lead.source
       from public.lead_delivery_events as event
       join public.lead_submissions as lead on lead.id = event.lead_id
@@ -243,7 +258,7 @@ begin
        and (p_kinds is null or event.kind = any (p_kinds))
        and (
          (event.status in ('pending', 'failed') and event.next_attempt_at <= now())
-         or (event.status = 'sending' and event.last_attempt_at <= now() - interval '15 minutes')
+         or (event.status = 'sending' and coalesce(event.claimed_at, event.last_attempt_at) <= now() - interval '15 minutes')
        )
      order by event.next_attempt_at, event.created_at, event.id
      limit p_limit
@@ -257,15 +272,16 @@ begin
        where event.id = r.id;
       v_skipped := v_skipped + 1;
     elsif r.attempts >= 8
-       or (r.status = 'sending' and coalesce(r.unconfirmed_since, r.last_attempt_at) <= now() - interval '23 hours')
+       or (r.status = 'sending' and coalesce(r.unconfirmed_since, r.claimed_at) <= now() - interval '23 hours')
        or (r.status = 'failed' and r.unconfirmed_since is not null and r.unconfirmed_since <= now() - interval '23 hours') then
       -- R91: outside the provider's idempotency window a send may repeat one already delivered.
       v_status := 'failed';
       update public.lead_delivery_events as event
          set status = 'failed',
              last_error_code = case when r.status = 'sending' or r.unconfirmed_since is not null then 'stale_unconfirmed' else event.last_error_code end,
-             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.last_attempt_at) else event.unconfirmed_since end,
+             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else event.unconfirmed_since end,
              next_attempt_at = 'infinity',
+             claimed_at = null,
              updated_at = now()
        where event.id = r.id;
       v_expired := v_expired + 1;
@@ -274,9 +290,9 @@ begin
       update public.lead_delivery_events as event
          set status = 'sending',
              attempts = event.attempts + 1,
-             last_attempt_at = now(),
+             claimed_at = now(),
              -- A stuck send may have gone out: unconfirmed from when it was claimed.
-             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.last_attempt_at) else event.unconfirmed_since end,
+             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else event.unconfirmed_since end,
              updated_at = now()
        where event.id = r.id;
       v_claimed := v_claimed || pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
@@ -349,10 +365,11 @@ begin
     attempts            = case when p_status = 'deferred' then greatest(event.attempts - 1, 0) else event.attempts end,
     provider_message_id = case when p_status = 'sent' then p_provider_message_id else event.provider_message_id end,
     last_error_code     = case p_status when 'sent' then null when 'failed' then p_error_code else event.last_error_code end,
-    last_attempt_at     = case when p_status = 'deferred' then event.last_attempt_at else now() end,
+    last_attempt_at     = case when p_status = 'deferred' then event.last_attempt_at else coalesce(event.claimed_at, now()) end,
+    claimed_at          = null,
     unconfirmed_since   = case
                             when p_status = 'failed' and public.outbox_failure_unconfirmed(p_error_code)
-                              then coalesce(event.unconfirmed_since, event.last_attempt_at)
+                              then coalesce(event.unconfirmed_since, event.claimed_at, now())
                             else event.unconfirmed_since
                           end,
     next_attempt_at     = case
@@ -417,7 +434,7 @@ begin
   end if;
 
   for r in
-    select outbox.id, outbox.order_id, outbox.kind, outbox.status, outbox.attempts, outbox.last_attempt_at, outbox.unconfirmed_since,
+    select outbox.id, outbox.order_id, outbox.kind, outbox.status, outbox.attempts, coalesce(outbox.claimed_at, outbox.last_attempt_at) as claimed_at, outbox.unconfirmed_since,
            outbox.quote_revision, o.reference, o.contact_name, o.email, o.status as order_status, o.currency, o.subtotal_minor,
            o.freight_minor, o.payment_url, o.quote_revision as order_quote_revision
       from public.order_email_outbox as outbox
@@ -426,16 +443,18 @@ begin
        and (p_kinds is null or outbox.kind = any (p_kinds))
        and (
          (outbox.status in ('pending', 'failed') and outbox.next_attempt_at <= now())
-         or (outbox.status = 'sending' and outbox.last_attempt_at <= now() - interval '15 minutes')
+         or (outbox.status = 'sending' and coalesce(outbox.claimed_at, outbox.last_attempt_at) <= now() - interval '15 minutes')
        )
      order by outbox.next_attempt_at, outbox.created_at, outbox.id
      limit p_limit
      for update of outbox skip locked
   loop
-    -- A quote goes out only with the figures it was queued for, and never for a cancelled order.
+    -- A quote goes out only with the figures it was queued for, and only while the order is new or confirmed.
     v_skip := case
       when r.kind <> 'quote' then null
       when r.order_status = 'cancelled' then 'order_cancelled'
+      -- Review M7: a quote is for an order still being quoted; once paid it would only confuse.
+      when r.order_status in ('paid', 'dispatched', 'closed') then 'order_past_quote'
       when r.quote_revision is distinct from r.order_quote_revision then 'quote_superseded'
       when r.currency is null or r.subtotal_minor is null or r.freight_minor is null or r.payment_url is null then 'quote_incomplete'
     end;
@@ -446,13 +465,14 @@ begin
        where outbox.id = r.id;
       v_skipped := v_skipped + 1;
     elsif r.attempts >= 8
-       or (r.status = 'sending' and coalesce(r.unconfirmed_since, r.last_attempt_at) <= now() - interval '23 hours')
+       or (r.status = 'sending' and coalesce(r.unconfirmed_since, r.claimed_at) <= now() - interval '23 hours')
        or (r.status = 'failed' and r.unconfirmed_since is not null and r.unconfirmed_since <= now() - interval '23 hours') then
       update public.order_email_outbox as outbox
          set status = 'failed',
              last_error_code = case when r.status = 'sending' or r.unconfirmed_since is not null then 'stale_unconfirmed' else outbox.last_error_code end,
-             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.last_attempt_at) else outbox.unconfirmed_since end,
+             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else outbox.unconfirmed_since end,
              next_attempt_at = 'infinity',
+             claimed_at = null,
              updated_at = now()
        where outbox.id = r.id;
       v_expired := v_expired + 1;
@@ -460,8 +480,8 @@ begin
       update public.order_email_outbox as outbox
          set status = 'sending',
              attempts = outbox.attempts + 1,
-             last_attempt_at = now(),
-             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.last_attempt_at) else outbox.unconfirmed_since end,
+             claimed_at = now(),
+             unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else outbox.unconfirmed_since end,
              updated_at = now()
        where outbox.id = r.id;
       v_claimed := v_claimed || pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
@@ -537,10 +557,11 @@ begin
       attempts            = case when p_status = 'deferred' then greatest(outbox.attempts - 1, 0) else outbox.attempts end,
       provider_message_id = case when p_status = 'sent' then p_provider_message_id else outbox.provider_message_id end,
       last_error_code     = case p_status when 'sent' then null when 'failed' then p_error_code else outbox.last_error_code end,
-      last_attempt_at     = case when p_status = 'deferred' then outbox.last_attempt_at else now() end,
+      last_attempt_at     = case when p_status = 'deferred' then outbox.last_attempt_at else coalesce(outbox.claimed_at, now()) end,
+      claimed_at          = null,
       unconfirmed_since   = case
                               when p_status = 'failed' and public.outbox_failure_unconfirmed(p_error_code)
-                                then coalesce(outbox.unconfirmed_since, outbox.last_attempt_at)
+                                then coalesce(outbox.unconfirmed_since, outbox.claimed_at, now())
                               else outbox.unconfirmed_since
                             end,
       next_attempt_at     = case

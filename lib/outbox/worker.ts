@@ -20,10 +20,12 @@ export interface OutboxWorkerInput {
   /** Budget, bounded send and log, shared by both outboxes (lib/outbox/send.ts). */
   context: AttemptContext<LeadDeliveryKind | OrderEmailKind>;
   now?: () => number;
+  /** When the request started (review M6): the run's time counts from there, setup included. */
+  startedAt?: number;
 }
 
-export async function runOutboxWorker({ leads, orders, context, now = Date.now }: OutboxWorkerInput): Promise<OutboxTally> {
-  const deadline = now() + WORKER_LIMITS.runMs;
+export async function runOutboxWorker({ leads, orders, context, now = Date.now, startedAt }: OutboxWorkerInput): Promise<OutboxTally> {
+  const deadline = (startedAt ?? now()) + WORKER_LIMITS.runMs;
   const limits = { deadline, maxRows: WORKER_LIMITS.maxRowsPerChannel, now };
 
   const orderTally = await drainChannel(orderEmailChannel(orders.outbox, orders.settings), orderKindsFor(orders.settings.staffEmail), context, limits);

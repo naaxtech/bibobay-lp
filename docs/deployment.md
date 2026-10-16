@@ -80,20 +80,24 @@ failure, the hourly send cap, or Resend not yet configured.
 
 - `vercel.json` schedules `/api/cron/email-outbox` at `0 6 * * *` (once a day, 06:00 UTC). A Vercel
   **Hobby** plan accepts at most one run a day, so a failed email can wait up to a day for its
-  retry. On **Pro**, raise the schedule in `vercel.json` (for example `*/15 * * * *`); the worker
+  retry, and Vercel may start a Hobby run anywhere in its hour. A send whose outcome is unknown (a
+  timeout, a provider server error) is retried only within 23 hours of that attempt, so on Hobby it
+  gets at most one retry, and one made in the hour after a run is parked for a human before any
+  retry (reported as `delivery_expired`; nothing is claimed as sent). On **Pro**, raise the schedule in `vercel.json` (for example `*/15 * * * *`); the worker
   needs no other change, since every run claims only rows that are due.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
   `{ sent, failed, skipped, deferred }`.
-- One run stops claiming after 45 seconds or 100 rows per outbox, and every send spends one unit of
+- One run stops claiming 40 seconds after the request started, or after 100 rows per outbox, and every send spends one unit of
   the same hourly budget as the forms (`LEAD_ACK_SEND_LIMIT_PER_HOUR`). Rows the budget did not
   cover stay due for the next run.
 - To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.
-- A row the worker gave up on (8 attempts, or an unconfirmed send older than 23 hours, ruling R91)
-  stays `failed` with `next_attempt_at` set to infinity, and is reported as `delivery_expired`
+- A row the worker gave up on (8 attempts, a provider answer that the message's key was used for
+  another message, or an unconfirmed send older than 23 hours, ruling R91) stays `failed` with
+  `next_attempt_at` set to infinity, and is reported as `delivery_expired`
   ([observability.md](observability.md)). See [database-security.md](database-security.md#outbox-states).
 
 ## Sanity webhook and Studio origin

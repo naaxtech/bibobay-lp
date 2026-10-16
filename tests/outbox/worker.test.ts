@@ -125,6 +125,25 @@ describe("runOutboxWorker", () => {
       context: context(),
     });
     expect(result.sent).toBe(WORKER_LIMITS.maxRowsPerChannel + 1);
-    expect(WORKER_LIMITS).toEqual({ runMs: 45_000, maxRowsPerChannel: 100 });
+    // Review M6: 40 s from the request leaves a last send (at most its timeout) inside maxDuration 60.
+    expect(WORKER_LIMITS).toEqual({ runMs: 40_000, maxRowsPerChannel: 100 });
+  });
+});
+
+describe("the run's clock (Task 8a review M6)", () => {
+  it("starts when the request started, not after the worker was set up", async () => {
+    const leads = queue([lead("l1")]);
+    const orders = queue([order("o1"), order("o2"), order("o3")]);
+    let clock = 100_000;
+    const result = await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      context: context({ deliver: async () => ((clock += 4_000), { status: "sent", providerMessageId: "re_1" }) }),
+      now: () => clock,
+      // The setup (CMS reads, clients) took 34 s of the run's 40.
+      startedAt: clock - 34_000,
+    });
+    expect(result.sent).toBe(2);
+    expect(orders.claims).toHaveLength(2);
   });
 });

@@ -19,7 +19,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(139);
+select plan(146);
 
 -- ---------------------------------------------------------------------------
 -- Functions and grants
@@ -82,6 +82,8 @@ select col_not_null('public', 'orders', 'quote_revision', 'the quote revision is
 select col_default_is('public', 'orders', 'quote_revision', '0', 'and starts at 0');
 select has_column('public', 'lead_delivery_events', 'unconfirmed_since', 'lead deliveries record when a send became unconfirmed');
 select has_column('public', 'order_email_outbox', 'unconfirmed_since', 'order emails record when a send became unconfirmed');
+select has_column('public', 'lead_delivery_events', 'claimed_at', 'lead deliveries record when the current holder claimed them (review M5)');
+select has_column('public', 'order_email_outbox', 'claimed_at', 'order emails record when the current holder claimed them (review M5)');
 
 -- ---------------------------------------------------------------------------
 -- Lead deliveries
@@ -203,12 +205,12 @@ create temp table claim_c1 on commit drop as select public.claim_lead_deliveries
 select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_c1), (select event_id from queued_c), 'a claim can name one lead and kind (the immediate send after the answer, R88)');
 
 reset role;
-update public.lead_delivery_events set last_attempt_at = now() - interval '14 minutes' where id = (select event_id from queued_c);
+update public.lead_delivery_events set claimed_at = now() - interval '14 minutes' where id = (select event_id from queued_c);
 set local role service_role;
 select is(jsonb_array_length(public.claim_lead_deliveries(10, (select lead_id from lead_c)) -> 'claimed'), 0, 'a row sending for under 15 minutes is left alone');
 
 reset role;
-update public.lead_delivery_events set last_attempt_at = now() - interval '16 minutes' where id = (select event_id from queued_c);
+update public.lead_delivery_events set claimed_at = now() - interval '16 minutes' where id = (select event_id from queued_c);
 set local role service_role;
 create temp table claim_c2 on commit drop as select public.claim_lead_deliveries(10, (select lead_id from lead_c)) as result;
 select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_c2), (select event_id from queued_c), 'a row stuck in sending for over 15 minutes is claimed again, under the same id (R91)');
@@ -217,7 +219,7 @@ select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_c
 reset role;
 select is((select unconfirmed_since from public.lead_delivery_events where id = (select event_id from queued_c)), now() - interval '16 minutes', 'the stuck attempt counts as unconfirmed from when it was claimed');
 update public.lead_delivery_events
-   set last_attempt_at = now() - interval '16 minutes', unconfirmed_since = now() - interval '23 hours 1 minute'
+   set claimed_at = now() - interval '16 minutes', unconfirmed_since = now() - interval '23 hours 1 minute'
  where id = (select event_id from queued_c);
 set local role service_role;
 create temp table claim_c3 on commit drop as select public.claim_lead_deliveries(10, (select lead_id from lead_c)) as result;
@@ -234,7 +236,7 @@ set local role service_role;
 create temp table lead_d on commit drop as select * from public.submit_lead('parent-d@example.com', true, 'consent-v1');
 create temp table queued_d on commit drop as select * from public.enqueue_lead_delivery((select lead_id from lead_d), 'acknowledgement', true);
 reset role;
-update public.lead_delivery_events set last_attempt_at = now() - interval '25 hours' where id = (select event_id from queued_d);
+update public.lead_delivery_events set claimed_at = now() - interval '25 hours' where id = (select event_id from queued_d);
 set local role service_role;
 select is((public.claim_lead_deliveries(10, (select lead_id from lead_d)) ->> 'expired')::integer, 1, 'a sending row claimed over 23 hours ago is parked, never re-sent');
 
@@ -276,9 +278,9 @@ select is(public.record_lead_delivery_attempt((select event_id from queued_g), '
 select is(public.record_lead_delivery_attempt((select event_id from queued_g), 'deferred'), false, 'only a claimed row can be handed back');
 reset role;
 select results_eq(
-  $$ select e.status, e.attempts, e.next_attempt_at <= now() from public.lead_delivery_events as e where e.id = (select event_id from queued_g) $$,
-  $$ values ('pending'::text, 0, true) $$,
-  'a deferred row is pending again, uncounted, and still due'
+  $$ select e.status, e.attempts, e.next_attempt_at <= now(), e.last_attempt_at is null, e.claimed_at is null from public.lead_delivery_events as e where e.id = (select event_id from queued_g) $$,
+  $$ values ('pending'::text, 0, true, true, true) $$,
+  'a deferred row is pending again, uncounted, still due, and shows no attempt time (review M5)'
 );
 select is((select acknowledgement_status from public.lead_submissions where email = 'parent-g@example.com'), 'pending', 'and the lead mirrors it');
 set local role service_role;
@@ -294,6 +296,22 @@ select results_eq(
   $$ select e.status, e.attempts, e.last_error_code from public.lead_delivery_events as e where e.id = (select event_id from queued_g) $$,
   $$ values ('failed'::text, 1, 'rate_limit_exceeded'::text) $$,
   'a deferred retry returns to failed with its earlier attempt count and reason'
+);
+
+-- Review M3: an error the code does not know may have reached the provider, so it is unconfirmed;
+-- only a known refusal counts as an answer.
+set local role service_role;
+create temp table lead_m3 on commit drop as select * from public.submit_lead('parent-m3@example.com', true, 'consent-v1');
+create temp table queued_m3 on commit drop as select * from public.enqueue_lead_delivery((select lead_id from lead_m3), 'acknowledgement');
+create temp table queued_m3b on commit drop as select * from public.enqueue_lead_delivery((select lead_id from lead_m3), 'staff_alert');
+select is(jsonb_array_length(public.claim_lead_deliveries(2, (select lead_id from lead_m3)) -> 'claimed'), 2, 'both rows are claimed');
+select is(public.record_lead_delivery_attempt((select event_id from queued_m3), 'failed', null, 'brand_new_provider_error'), true, 'an unknown error is recorded');
+select is(public.record_lead_delivery_attempt((select event_id from queued_m3b), 'failed', null, 'validation_error'), true, 'a known refusal is recorded');
+reset role;
+select results_eq(
+  $$ select e.kind, e.unconfirmed_since is not null from public.lead_delivery_events as e where e.lead_id = (select lead_id from lead_m3) order by e.kind $$,
+  $$ values ('acknowledgement'::text, true), ('staff_alert'::text, false) $$,
+  'an unknown error leaves the send unconfirmed; a known refusal does not'
 );
 
 -- Arguments
@@ -452,18 +470,32 @@ update public.orders
    set currency = 'AUD', subtotal_minor = 900, freight_minor = 0, payment_url = 'https://pay.example.com/checkout/c', quote_revision = 1, status = 'cancelled'
  where id = (select order_id from order_c);
 insert into public.order_email_outbox (order_id, kind, quote_revision) values ((select order_id from order_c), 'quote', 1);
+set local role service_role;
+create temp table order_p on commit drop as
+  select * from public.submit_order(
+    p_contact_name => 'Pat Reef', p_email => 'paid@example.com', p_address_line1 => '2 Coral Way',
+    p_city => 'Bayview', p_country => 'AU', p_consent => true, p_consent_version => 'consent-v1',
+    p_lines => '[{"sanity_id": "product-lumi", "title": "Lumi puzzle", "quantity": 1}]'::jsonb,
+    p_submission_key => gen_random_uuid()
+  );
+reset role;
+update public.orders
+   set currency = 'AUD', subtotal_minor = 900, freight_minor = 0, payment_url = 'https://pay.example.com/checkout/p', quote_revision = 1, status = 'paid'
+ where id = (select order_id from order_p);
+insert into public.order_email_outbox (order_id, kind, quote_revision) values ((select order_id from order_p), 'quote', 1);
 
 set local role service_role;
 select is((public.claim_order_emails(10, (select order_id from order_a), array['quote']) ->> 'skipped')::integer, 1, 'a quote revision older than the order''s current quote is skipped');
 select is((public.claim_order_emails(10, (select order_id from order_b), array['quote']) ->> 'skipped')::integer, 1, 'a quote without a full quote on the order is skipped');
 select is((public.claim_order_emails(10, (select order_id from order_c), array['quote']) ->> 'skipped')::integer, 1, 'a quote for a cancelled order is skipped');
+select is((public.claim_order_emails(10, (select order_id from order_p), array['quote']) ->> 'skipped')::integer, 1, 'a quote for an order already paid (or later) is skipped (review M7)');
 reset role;
 select results_eq(
   $$ select o.reference = (select reference from order_a), x.status, x.last_error_code
        from public.order_email_outbox as x join public.orders as o on o.id = x.order_id
       where x.kind = 'quote' and x.status = 'skipped' and x.last_error_code is not null
       order by x.last_error_code $$,
-  $$ values (false, 'skipped'::text, 'order_cancelled'::text), (false, 'skipped', 'quote_incomplete'), (true, 'skipped', 'quote_superseded') $$,
+  $$ values (false, 'skipped'::text, 'order_cancelled'::text), (false, 'skipped', 'order_past_quote'), (false, 'skipped', 'quote_incomplete'), (true, 'skipped', 'quote_superseded') $$,
   'each skipped quote says why'
 );
 
@@ -471,7 +503,7 @@ select results_eq(
 set local role service_role;
 create temp table oclaim_b on commit drop as select public.claim_order_emails(10, (select order_id from order_b), array['acknowledgement']) as result;
 reset role;
-update public.order_email_outbox set last_attempt_at = now() - interval '16 minutes' where id = (select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_b);
+update public.order_email_outbox set claimed_at = now() - interval '16 minutes' where id = (select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_b);
 set local role service_role;
 select is(
   (public.claim_order_emails(10, (select order_id from order_b), array['acknowledgement']) -> 'claimed' -> 0 ->> 'attempt')::integer,
@@ -480,7 +512,7 @@ select is(
 );
 reset role;
 update public.order_email_outbox
-   set last_attempt_at = now() - interval '16 minutes', unconfirmed_since = now() - interval '23 hours 1 minute'
+   set claimed_at = now() - interval '16 minutes', unconfirmed_since = now() - interval '23 hours 1 minute'
  where id = (select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_b);
 set local role service_role;
 select is((public.claim_order_emails(10, (select order_id from order_b), array['acknowledgement']) ->> 'expired')::integer, 1, 'and parked once it is past 23 hours');

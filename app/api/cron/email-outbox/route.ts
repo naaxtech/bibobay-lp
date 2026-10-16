@@ -24,6 +24,8 @@ const NO_STORE = { "cache-control": "no-store" } as const;
 const refuse = (status: number) => Response.json({ ok: false }, { status, headers: NO_STORE });
 
 export async function GET(request: Request) {
+  // Review M6: the run's 40 seconds count from here, so the CMS reads and client setup are inside it.
+  const startedAt = Date.now();
   const secret = cronSecretFrom();
   if (!secret) return refuse(503);
   if (!isCronAuthorized(request.headers.get("authorization"), secret)) return refuse(401);
@@ -31,7 +33,7 @@ export async function GET(request: Request) {
   try {
     const worker = await createOutboxWorker();
     if (!worker) return refuse(503);
-    const tally = await worker.run();
+    const tally = await worker.run(startedAt);
     logWorkerRun(tally);
     return Response.json(tally, { status: 200, headers: NO_STORE });
   } catch (error) {

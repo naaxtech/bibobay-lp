@@ -14,19 +14,19 @@ import { RpcError } from "@/lib/supabase/rpc";
 type Kind = "acknowledgement" | "staff_alert";
 interface Row { id: string; kind: Kind; status: "pending" | "sending" | "sent" | "failed" | "skipped"; attempts: number; owner: string }
 
-function fakeChannel(rows: Row[], overrides: Partial<OutboxChannel<Kind, { id: string; kind: Kind }>> = {}) {
+function fakeChannel(rows: Row[], overrides: Partial<OutboxChannel<Kind, { id: string; kind: Kind; attempt: number }>> = {}) {
   const records: Array<[string, OutboxOutcome]> = [];
   const claims: Array<ClaimOptions<Kind>> = [];
-  const channel: OutboxChannel<Kind, { id: string; kind: Kind }> = {
+  const channel: OutboxChannel<Kind, { id: string; kind: Kind; attempt: number }> = {
     name: "leads",
-    async claim(options): Promise<ClaimBatch<{ id: string; kind: Kind }>> {
+    async claim(options): Promise<ClaimBatch<{ id: string; kind: Kind; attempt: number }>> {
       claims.push(options);
       const due = rows.filter((row) => (!options.ownerId || row.owner === options.ownerId) && options.kinds.includes(row.kind) && (row.status === "pending" || row.status === "failed")).slice(0, options.limit);
       for (const row of due) {
         row.status = "sending";
         row.attempts += 1;
       }
-      return { claimed: due.map(({ id, kind }) => ({ id, kind })), skipped: 0, expired: 0 };
+      return { claimed: due.map(({ id, kind, attempts }) => ({ id, kind, attempt: attempts })), skipped: 0, expired: 0 };
     },
     async record(id, outcome) {
       records.push([id, outcome]);
@@ -192,5 +192,37 @@ describe("drainChannel (the worker)", () => {
     expect(await drainChannel(channel, ["acknowledgement"], ctx, { deadline: 25, maxRows: 50, now })).toEqual({ sent: 2, failed: 0, skipped: 0, deferred: 0 });
     const more = fakeChannel([row("x"), row("y")]);
     expect(await drainChannel(more.channel, ["acknowledgement"], ctx, { deadline: Number.POSITIVE_INFINITY, maxRows: 1 })).toEqual({ sent: 1, failed: 0, skipped: 0, deferred: 0 });
+  });
+});
+
+describe("a failure that parks the row for a human (Task 8a review I1)", () => {
+  const failWith = (errorCode: string) => context({ deliver: async (): Promise<EmailSendResult> => ({ status: "failed", errorCode }) });
+
+  it("reports delivery_expired with the kind and code when the last attempt fails", async () => {
+    const { channel } = fakeChannel([{ ...row("a"), attempts: 7 }]);
+    const { ctx, events } = failWith("rate_limit_exceeded");
+    await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
+    expect(events).toContainEqual({ event: "delivery_expired", count: 1, kind: "acknowledgement", code: "rate_limit_exceeded" });
+  });
+
+  it("reports an idempotency conflict at any attempt: the provider will never take this message", async () => {
+    const { channel } = fakeChannel([row("a", "staff_alert")]);
+    const { ctx, events } = failWith("invalid_idempotent_request");
+    await attemptNext(channel, { kinds: ["staff_alert"] }, ctx);
+    expect(events).toContainEqual({ event: "delivery_expired", count: 1, kind: "staff_alert", code: "invalid_idempotent_request" });
+  });
+
+  it("reports a message that cannot be built on its last attempt", async () => {
+    const { channel } = fakeChannel([{ ...row("a"), attempts: 7 }], { build: () => null });
+    const { ctx, events } = context();
+    await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
+    expect(events).toContainEqual({ event: "delivery_expired", count: 1, kind: "acknowledgement", code: "message_invalid" });
+  });
+
+  it("does not report a failure that will be retried", async () => {
+    const { channel } = fakeChannel([{ ...row("a"), attempts: 2 }]);
+    const { ctx, events } = failWith("rate_limit_exceeded");
+    await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
+    expect(events.filter((event) => event.event === "delivery_expired")).toEqual([]);
   });
 });

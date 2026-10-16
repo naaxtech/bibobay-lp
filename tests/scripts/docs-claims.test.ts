@@ -127,3 +127,18 @@ describe("email outbox worker docs (Task 8a)", () => {
     for (const event of ["delivery_claim_failed", "delivery_message_invalid", "delivery_expired", "outbox_worker_failed", "worker_run"]) expect(observability, event).toContain(`\`${event}\``);
   });
 });
+
+describe("outbox docs after the Task 8a review", () => {
+  it("says a withdrawn lead's rows are written pending and skipped by the claim (M1), never answered skipped", () => {
+    const notes = read("docs/database-security.md");
+    expect(notes).not.toMatch(/answers `skipped`|written as anything but `skipped`/);
+    expect(notes).toMatch(/written `pending`/);
+  });
+
+  it("documents that a final failure is reported with its kind and code (I1), and the run's 40 seconds (M6)", () => {
+    expect(read("docs/observability.md")).toMatch(/final failure[\s\S]{0,120}kind and code/);
+    expect(read("docs/deployment.md")).toMatch(/40 seconds after the request started/);
+    expect(read("docs/deployment.md")).not.toMatch(/45 seconds/);
+  });
+});
+

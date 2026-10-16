@@ -122,12 +122,14 @@ describe("outboxLogger (ruling R52)", () => {
     log({ event: "delivery_expired", count: 2 });
     log({ event: "delivery_attempted", kind: "acknowledgement", status: "sent" });
     log({ event: "delivery_skipped", count: 1 });
+    log({ event: "delivery_expired", count: 1, kind: "quote", code: "invalid_idempotent_request" });
     expect(reported.events).toEqual([
       ["delivery_send_capped", { kind: "acknowledgement" }],
       ["delivery_send_cap_unavailable", { kind: "quote", code: "PGRST301" }],
       ["delivery_claim_failed", { code: "PGRST301" }],
       ["delivery_message_invalid", { kind: "quote" }],
       ["delivery_expired", {}],
+      ["delivery_expired", { kind: "quote", code: "invalid_idempotent_request" }],
     ]);
     expect(console.info).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "orders", event: "delivery_attempted", kind: "acknowledgement", status: "sent" }));
   });

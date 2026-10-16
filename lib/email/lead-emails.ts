@@ -102,8 +102,10 @@ export interface StaffLeadSummary {
   /** False when the address was already listed; ruling R38 means nothing on that record changed. */
   created: boolean;
   /**
-   * Task 8a: a retry by the outbox worker. The alert is built from the record on file, which may
-   * differ from what a later submission contained, so it says so instead of the two intros above.
+   * Task 8a: a retry by the outbox worker. Unused since Task 8a review M2 (no caller passes it): a
+   * retry must send the same body as the first attempt, or the provider refuses the reused
+   * idempotency key. Kept, as the owner never deletes code; use it only for a message that is never
+   * a retry of an earlier send under the same key.
    */
   fromOutbox?: boolean;
 }

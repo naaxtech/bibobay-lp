@@ -164,8 +164,9 @@ also sent to Sentry as warnings, tagged with the event, kind and code only:
   `failed` with `message_invalid`.
 - `delivery_record_failed`: the outcome could not be recorded; the row stays `sending` and is
   re-sent after 15 minutes under the same idempotency key.
-- `delivery_expired`: rows parked for a human (8 attempts, or an unconfirmed send older than 23
-  hours, `stale_unconfirmed`).
+- `delivery_expired`: rows parked for a human: a final failure (the eighth attempt, or
+  `invalid_idempotent_request`), tagged with its kind and code, or unconfirmed sends older than 23
+  hours (`stale_unconfirmed`, as a count).
 
 Routine lines, not reported: `delivery_attempted` (with `status` and a failure code),
 `delivery_skipped` (a withdrawn lead or a superseded quote, as a count) and `worker_run` (one line

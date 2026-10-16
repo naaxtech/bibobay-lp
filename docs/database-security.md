@@ -34,7 +34,7 @@ and staff access are not built yet (Task 8b).
 | Function | Does | Executable by |
 |---|---|---|
 | `submit_lead(email, consent, consent_version, first_name, age_band, source, locale, utm)` → `(lead_id, created)` | Re-validates every argument in SQL, normalises the email, requires consent, inserts a new row. On an existing address it changes nothing about the person (see below). Errors never repeat submitted values. | `service_role` only |
-| `enqueue_lead_delivery(lead_id, kind, claim)` → `(event_id, status, created)` | Writes the outbox row once per lead and kind. With `claim`, a new row starts as `sending` (attempt 1) for an immediate send. Since `0006` no kind is ever claimed, or written as anything but `skipped`, for a withdrawn adult; the website no longer claims here at all (it claims through `claim_lead_deliveries`). | `service_role` only |
+| `enqueue_lead_delivery(lead_id, kind, claim)` → `(event_id, status, created)` | Writes the outbox row once per lead and kind. With `claim`, a new row starts as `sending` (attempt 1) for an immediate send. Since `0006` no kind is ever claimed here for a withdrawn adult: their rows are written `pending`, exactly like anyone else's (so the answer and the work before it cannot tell the two apart), and `claim_lead_deliveries` marks them `skipped` before any send. The website no longer claims here at all (it claims through `claim_lead_deliveries`). | `service_role` only |
 | `claim_lead_deliveries(limit, lead_id, kinds)` → JSON (`0006`) | The one claim both send paths use: see [Email outbox](#email-outbox-migration-0006). | `service_role` only |
 | `record_lead_delivery_attempt(event_id, status, provider_message_id, error_code)` → `boolean` | Records the result of a claimed (`sending`) row: `sent` with the provider id, `failed` with a short code and exponential backoff capped at 6 hours, or (`0006`) `deferred`, which hands the claim back uncounted. | `service_role` only |
 | `consume_rate_limit(bucket_key, max_hits, window_seconds)` → `(allowed, remaining, retry_after_seconds)` | Counts one hit atomically (one upsert). Arguments are bounded (1 to 10000 hits, 1 s to 1 day). | `service_role` only |
@@ -155,12 +155,23 @@ Claim rules:
 - **At most 8 attempts.** The eighth failure, and a provider answer that the idempotency key was
   already used for another message (`invalid_idempotent_request`), are final: `failed` with
   `next_attempt_at` = infinity. Infinity is the terminal marker; no status value was added for it.
+  The website reports each such row as `delivery_expired` with its kind and code.
+- **Which failures are answers** (`outbox_failure_unconfirmed`): only a known provider refusal
+  (Resend's validation, key, quota and rate-limit errors) and the site's own `message_invalid` mean
+  nothing was accepted. Every other code, including timeouts, server errors and any code not known
+  yet, leaves the send unconfirmed, so it is retried only inside the 23-hour window.
+- **Claim time** (`claimed_at`): set by a claim and cleared when the outcome is recorded or the
+  claim handed back. A stuck send is found by it. `last_attempt_at` is only ever the time of a real
+  attempt (the claim's), so a claim handed back unspent (the send budget) shows no attempt.
 - **Withdrawn leads** (R92): every delivery kind of a withdrawn lead is marked `skipped`
   (`lead_withdrawn`) by the claim and never returned, so no caller can email a withdrawn adult even
-  with a bug. A later `enqueue_lead_delivery` for that lead answers `skipped`, not created.
+  with a bug. `enqueue_lead_delivery` still writes their rows `pending` (and answers `created`
+  for a new kind), like anyone else's, so nothing before the answer differs; the claim skips them.
 - **Quotes** (queued by Task 8b): `orders.quote_revision` (default 0) counts the order's quotes. A
-  quote email whose revision is no longer the order's current one, whose order was cancelled, or
-  whose quote figures are incomplete is `skipped`, never sent with figures it was not queued for.
+  quote email whose revision is no longer the order's current one, whose order was cancelled or is
+  already paid, dispatched or closed (`order_past_quote`), or whose quote figures are incomplete is
+  `skipped`, never sent with figures it was not queued for. Task 8b must raise `quote_revision` in
+  the same statement that changes the currency, subtotal, freight or payment URL.
 - **Idempotency key** (R90): `order_email_outbox.idempotency_key` is a stored generated column,
   `<order id>:<kind>` for the acknowledgement and staff alert and `<order id>:quote:<revision>` for
   a quote, and unique. It replaces the old unique `(order_id, kind)` rule, which still holds for

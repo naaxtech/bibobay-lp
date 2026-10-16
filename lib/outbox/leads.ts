@@ -16,8 +16,12 @@ export interface LeadChannelSettings {
   /** Reply-to for the acknowledgement only; the staff alert never has one (review M3). */
   replyTo: string | null;
   leadMagnet: LeadMagnetLink | null;
-  /** True for the worker: a retried staff alert says it shows the details on file. */
-  fromOutbox: boolean;
+  /**
+   * Ignored since Task 8a review M2, kept for the callers that still pass it: every attempt of a row
+   * must build the same message, because the provider refuses a reused idempotency key with another
+   * body (`invalid_idempotent_request`), which would record a delivered alert as a final failure.
+   */
+  fromOutbox?: boolean;
 }
 
 /** The kinds this channel may claim: never a staff alert without a staff address to send it to. */
@@ -48,9 +52,9 @@ export function leadDeliveryChannel(outbox: LeadDeliveryOutbox, settings: LeadCh
           firstName: item.firstName,
           ageBand: item.ageBand,
           source: item.source,
-          // Only a new signup's alert is sent straight away (R40); the worker says the details are on file.
+          // Only a new signup's alert is ever queued for sending (R40), and every attempt of a row
+          // builds the same body (review M2): the claim hands out the signup on file either way.
           created: true,
-          fromOutbox: settings.fromOutbox,
         }),
       };
     },

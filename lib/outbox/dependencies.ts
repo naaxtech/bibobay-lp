@@ -21,7 +21,7 @@ import { runOutboxWorker } from "./worker";
  * The emails it builds are the ones the request paths build (same lead magnet, R66; same tracking
  * line, R89; same staff address and reply-to).
  */
-export async function createOutboxWorker(env: Record<string, string | undefined> = process.env): Promise<{ run(): Promise<OutboxTally> } | null> {
+export async function createOutboxWorker(env: Record<string, string | undefined> = process.env): Promise<{ run(startedAt?: number): Promise<OutboxTally> } | null> {
   const admin = getSupabaseAdminEnvironment(env);
   const email = createEmailSenderFromEnv(env);
   if (!admin || !email) return null;
@@ -37,11 +37,12 @@ export async function createOutboxWorker(env: Record<string, string | undefined>
   });
 
   return {
-    run: () =>
+    run: (startedAt?: number) =>
       runOutboxWorker({
+        startedAt,
         leads: {
           outbox: createSupabaseLeadRepository(client),
-          settings: { staffEmail, replyTo: email.replyTo, leadMagnet: leadMagnetFrom(content.lead, settings, env), fromOutbox: true },
+          settings: { staffEmail, replyTo: email.replyTo, leadMagnet: leadMagnetFrom(content.lead, settings, env) },
         },
         orders: {
           outbox: createSupabaseOrderEmailOutbox(client),

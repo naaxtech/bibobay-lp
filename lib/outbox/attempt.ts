@@ -1,5 +1,6 @@
 import type { EmailMessage, EmailSendResult } from "@/lib/email/client";
 import { RpcError } from "@/lib/supabase/rpc";
+import { OUTBOX_FINAL_FAILURE_CODES, OUTBOX_LIMITS } from "./constants";
 import type { ClaimBatch, ClaimOptions, OutboxOutcome } from "./types";
 
 /**
@@ -21,7 +22,14 @@ import type { ClaimBatch, ClaimOptions, OutboxOutcome } from "./types";
  * send budget and the bounded send are passed in (`AttemptContext`).
  */
 
-export interface OutboxChannel<K extends string, T extends { id: string; kind: K }> {
+/** A claimed row: its id, its kind and which attempt this claim is (attempts are counted at claim). */
+export interface ClaimedItem<K extends string> {
+  id: string;
+  kind: K;
+  attempt: number;
+}
+
+export interface OutboxChannel<K extends string, T extends ClaimedItem<K>> {
   readonly name: "leads" | "orders";
   claim(options: ClaimOptions<K>): Promise<ClaimBatch<T>>;
   record(id: string, outcome: OutboxOutcome): Promise<boolean>;
@@ -40,7 +48,12 @@ export type OutboxLogEvent<K extends string = string> =
   | { event: "delivery_record_failed"; kind: K; code: string }
   | { event: "delivery_message_invalid"; kind: K }
   | { event: "delivery_skipped"; count: number }
-  | { event: "delivery_expired"; count: number };
+  /**
+   * Rows parked for a human: `count` at claim (unconfirmed past the idempotency window), or one row
+   * whose failure was final, with its kind and code (review I1: the last attempt, or a code that is
+   * final at any attempt).
+   */
+  | { event: "delivery_expired"; count: number; kind?: K; code?: string };
 
 export interface AttemptContext<K extends string = string> {
   /** Spends one unit of the shared hourly send budget; false when it is spent or cannot be checked. */
@@ -75,16 +88,30 @@ export function addTally(total: OutboxTally, part: OutboxTally): OutboxTally {
 
 const codeOf = (error: unknown) => (error instanceof RpcError ? error.code : "unknown");
 
-async function record<K extends string, T extends { id: string; kind: K }>(channel: OutboxChannel<K, T>, item: T, outcome: OutboxOutcome, context: AttemptContext<K>) {
+/**
+ * Whether the record functions of migration 0006 park this failure (next_attempt_at 'infinity'):
+ * on the last attempt, or with a code that is final at any attempt. Same rule as the SQL, pinned
+ * to it by tests/outbox/migration-policy.test.ts.
+ */
+export function failureParksRow(attempt: number, errorCode: string): boolean {
+  return attempt >= OUTBOX_LIMITS.maxAttempts || (OUTBOX_FINAL_FAILURE_CODES as readonly string[]).includes(errorCode);
+}
+
+async function record<K extends string, T extends ClaimedItem<K>>(channel: OutboxChannel<K, T>, item: T, outcome: OutboxOutcome, context: AttemptContext<K>) {
   try {
     await channel.record(item.id, outcome);
   } catch (error) {
     // The row stays `sending`; a later claim (after 15 minutes) re-sends it under the same key.
     context.log({ event: "delivery_record_failed", kind: item.kind, code: codeOf(error) });
+    return;
+  }
+  // Review I1: a final failure leaves the row for a human, so it is reported, not just logged.
+  if (outcome.status === "failed" && failureParksRow(item.attempt, outcome.errorCode)) {
+    context.log({ event: "delivery_expired", count: 1, kind: item.kind, code: outcome.errorCode });
   }
 }
 
-export async function attemptNext<K extends string, T extends { id: string; kind: K }>(
+export async function attemptNext<K extends string, T extends ClaimedItem<K>>(
   channel: OutboxChannel<K, T>,
   scope: { ownerId?: string; kinds: readonly K[] },
   context: AttemptContext<K>,
@@ -133,7 +160,7 @@ export async function attemptNext<K extends string, T extends { id: string; kind
  * order) is claimed on its own, in parallel, so one slow send never holds up the other (review M4).
  * A row another caller already holds is simply not claimed.
  */
-export async function attemptNow<K extends string, T extends { id: string; kind: K }>(
+export async function attemptNow<K extends string, T extends ClaimedItem<K>>(
   channel: OutboxChannel<K, T>,
   ownerId: string,
   kinds: readonly K[],
@@ -148,7 +175,7 @@ export async function attemptNow<K extends string, T extends { id: string; kind:
  * budget is spent, a claim fails, the run's time is up (`deadline`, checked before every claim) or
  * `maxRows` rows were handled.
  */
-export async function drainChannel<K extends string, T extends { id: string; kind: K }>(
+export async function drainChannel<K extends string, T extends ClaimedItem<K>>(
   channel: OutboxChannel<K, T>,
   kinds: readonly K[],
   context: AttemptContext<K>,
