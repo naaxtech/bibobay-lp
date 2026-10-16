@@ -1,0 +1,349 @@
+/*
+ * The shop (Task 7b): the catalogue and product pages, and the "Add to order" control. Built on the
+ * landing primitives (site header, paper ground, .btn, .text-link, .paper-stamp, .prose-paper) and
+ * the --bibo-* tokens. One radius family as on the landing page: pill buttons, paper prints with the
+ * sticker radius, soft notes. Nothing starts hidden or transparent; the only movement is the
+ * buttons' press and a print lifting under the pointer, both zero-length under reduced motion.
+ */
+
+@layer components {
+  .shop-page {
+    min-block-size: calc(100dvh - var(--site-header-height));
+    background-color: var(--ground);
+    color: var(--ink);
+    padding-block: clamp(1.75rem, 1rem + 4vw, 4rem) var(--bibo-space-section);
+  }
+
+  /* The order review in the header: a smaller paper key that fits beside the logo on a phone. */
+  .shop-review {
+    min-block-size: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  /* ---------- Catalogue ---------- */
+
+  .shop-intro {
+    max-inline-size: 46rem;
+  }
+
+  .shop-intro__title {
+    margin: 0;
+  }
+
+  .shop-intro__lead {
+    margin-block-start: 1rem;
+    max-inline-size: 60ch;
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-lead);
+    line-height: var(--bibo-leading-lead);
+  }
+
+  .shop-group {
+    margin-block-start: clamp(3rem, 2rem + 4vw, 5rem);
+  }
+
+  .shop-group__description {
+    margin-block-start: 0.5rem;
+    max-inline-size: 60ch;
+    color: var(--ink-soft);
+  }
+
+  /* One column on a phone, two from 40rem, three from 64rem; the grid never squeezes a print. */
+  .shop-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2.5rem, 2rem + 2vw, 3.5rem) clamp(1.5rem, 1rem + 2vw, 2.75rem);
+    margin-block-start: clamp(1.75rem, 1.25rem + 2vw, 2.75rem);
+  }
+
+  @media (min-width: 40rem) {
+    .shop-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .shop-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    /*
+     * Editorial rows for categories: the name and description in a narrow column beside the
+     * products, so a category with one or two products does not leave most of its row empty.
+     */
+    .shop-group {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+      grid-template-rows: auto 1fr;
+      column-gap: clamp(2rem, 1rem + 3vw, 4rem);
+      align-items: start;
+    }
+
+    .shop-group > .shop-group__title,
+    .shop-group > .shop-group__description {
+      grid-column: 1;
+    }
+
+    .shop-group > .shop-grid {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-block-start: 0;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .shop-group > .shop-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .product-card {
+    display: flex;
+    block-size: 100%;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .product-card__picture {
+    display: block;
+    border-radius: var(--bibo-radius-sticker);
+  }
+
+  /* Prints pinned to the board a little askew, alternately, like everything on the landing page. */
+  .shop-grid > li:nth-child(odd) .product-print {
+    rotate: -1deg;
+  }
+
+  .shop-grid > li:nth-child(even) .product-print {
+    rotate: 1deg;
+  }
+
+  .product-card__picture .product-print {
+    transition-property: translate, box-shadow;
+    transition-duration: var(--bibo-duration-base);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .product-card:hover .product-print {
+    translate: 0 -3px;
+    box-shadow: var(--bibo-shadow-lifted);
+  }
+
+  .product-card__name {
+    margin-block-start: 0.75rem;
+  }
+
+  .product-card__link {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .product-card__link:hover {
+    text-decoration-color: var(--bibo-color-teal);
+  }
+
+  .product-card__description {
+    max-inline-size: 48ch;
+    color: var(--ink-soft);
+  }
+
+  /* The empty shop: one calm sand note with the way home. */
+  .shop-empty {
+    display: grid;
+    justify-items: start;
+    gap: 1.25rem;
+    max-inline-size: 40rem;
+    margin-block-start: 2.5rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.25rem);
+    border-radius: var(--bibo-radius-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-sand) 70%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+    font-size: var(--bibo-text-lead);
+  }
+
+  /* ---------- Product pictures ---------- */
+
+  .product-print {
+    position: relative;
+    overflow: hidden;
+    inline-size: 100%;
+    aspect-ratio: 1;
+    border: clamp(0.4rem, 0.3rem + 0.4vw, 0.625rem) solid var(--bibo-color-paper);
+    border-radius: var(--bibo-radius-sticker);
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 16%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  /* No picture yet: a blank print with the product's initial, never a stand-in photograph. */
+  .product-print--empty {
+    display: grid;
+    place-items: center;
+    background-image: radial-gradient(120% 90% at 30% 15%, color-mix(in srgb, var(--bibo-color-lagoon) 26%, var(--bibo-color-paper)), color-mix(in srgb, var(--bibo-color-sand) 80%, var(--bibo-color-paper)));
+  }
+
+  .product-print__initial {
+    color: var(--bibo-color-teal-ink);
+    font-family: var(--bibo-font-display);
+    font-size: clamp(3rem, 2.25rem + 4vw, 5.5rem);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .product-print--hero {
+    box-shadow: var(--bibo-shadow-lifted);
+    rotate: -1deg;
+  }
+
+  .product-print--thumb {
+    inline-size: clamp(5rem, 4rem + 4vw, 7rem);
+    border-width: 0.3rem;
+    border-radius: var(--bibo-radius-paper);
+  }
+
+  /* ---------- Product page ---------- */
+
+  .product-page__back {
+    margin-block-end: clamp(1.25rem, 1rem + 1vw, 2rem);
+  }
+
+  /* Pictures first on a phone; side by side from 64rem, the details column the narrower. */
+  .product-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2rem, 1rem + 4vw, 4.5rem);
+  }
+
+  @media (min-width: 64rem) {
+    .product-page {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      align-items: start;
+    }
+  }
+
+  .product-page__gallery {
+    max-inline-size: 38rem;
+  }
+
+  .product-page__thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.875rem;
+    margin-block-start: 1.5rem;
+  }
+
+  .product-page__category {
+    color: var(--bibo-color-teal-ink);
+    font-family: var(--bibo-font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  .product-page__title {
+    margin: 0.25rem 0 0;
+  }
+
+  .product-page__lead {
+    margin-block-start: 1rem;
+    max-inline-size: 52ch;
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-lead);
+    line-height: var(--bibo-leading-lead);
+  }
+
+  .product-page__order {
+    margin-block-start: 1.75rem;
+  }
+
+  .product-sold-out {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    max-inline-size: 46ch;
+  }
+
+  /* The editor's notice for this product: a taped yellow slip, like the legal pages' status note. */
+  .product-notice {
+    margin-block-start: 2rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 18%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  .product-notice__title {
+    font-size: 1.25rem;
+    line-height: var(--bibo-leading-h3);
+  }
+
+  .product-notice__body {
+    margin-block-start: 0.5rem;
+  }
+
+  .product-notice__link {
+    display: inline-block;
+    margin-block-start: 0.75rem;
+  }
+
+  /* The codes an order records: a short two-column list, no rule under every row. */
+  .product-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.5rem 1.5rem;
+    margin-block-start: 2rem;
+  }
+
+  .product-facts > div {
+    display: contents;
+  }
+
+  .product-facts dt {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  .product-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .product-details {
+    max-inline-size: 46rem;
+    margin-block-start: clamp(3rem, 2rem + 4vw, 5rem);
+  }
+
+  .product-details__prose {
+    margin-block-start: 1.25rem;
+    max-inline-size: 65ch;
+  }
+
+  .product-details__prose h3 {
+    margin-block-start: 2rem;
+  }
+
+  /* ---------- Add to order (components/shop/AddToOrder.tsx) ---------- */
+
+  .add-to-order {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-block-start: auto;
+    padding-block-start: 0.5rem;
+  }
+
+  /* The polite announcement under the button keeps its line, so nothing jumps when it speaks. */
+  .add-to-order__status {
+    min-block-size: calc(var(--bibo-leading-small) * 1em);
+    color: var(--bibo-color-teal-ink);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+  }
+}

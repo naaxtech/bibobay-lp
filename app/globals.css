@@ -1,0 +1,254 @@
+@import "tailwindcss";
+/* Landing sections, header and footer; built on the tokens below. */
+@import "../components/landing/landing.css";
+/* The founding-family form; after the landing styles so it can build on .btn and .text-link. */
+@import "../components/forms/lead-form.css";
+/* Privacy, terms and the founding-family explainer, plus the draft preview notice (Task 9). */
+@import "../components/legal/simple-page.css";
+/* The shop's catalogue and product pages and the order pad's controls (Task 7b). */
+@import "../components/shop/shop.css";
+/* The order page, the tracking page and the order status view (Task 7c); after the shop and form. */
+@import "../components/orders/order.css";
+/* The staff frame, the sign-in page and the sign-out button (Task 8c); after the form styles it builds on. */
+@import "../components/admin/admin.css";
+
+/*
+ * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and
+ * tests/brand/tokens.test.ts fails if a name or value drifts between the two.
+ */
+:root {
+  color-scheme: light;
+  --bibo-color-cream: #fffbf8;
+  --bibo-color-paper: #ffffff;
+  --bibo-color-sand: #fbe9d4;
+  --bibo-color-line: #ecd8bf;
+  --bibo-color-navy: #283b63;
+  --bibo-color-navy-soft: #4a5878;
+  --bibo-color-teal: #349da1;
+  --bibo-color-yellow: #fdbb1f;
+  --bibo-color-amber: #fcac21;
+  --bibo-color-orange: #f06b32;
+  --bibo-color-purple: #9467aa;
+  --bibo-color-teal-ink: #0c6b68;
+  --bibo-color-orange-ink: #a93b0c;
+  --bibo-color-purple-ink: #5b4189;
+  --bibo-color-ocean-deep: #0b5cb8;
+  --bibo-color-ocean: #0a8ef8;
+  --bibo-color-lagoon: #3bb8fb;
+  --bibo-color-sand-warm: #f5c08f;
+  --bibo-color-coral: #f63882;
+  --bibo-color-lilac: #c08ae2;
+  --bibo-color-kelp: #6fbf4a;
+  --bibo-color-seagrass: #5e9f6e;
+  --bibo-font-display: var(--font-fredoka, "Fredoka"), ui-rounded, "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --bibo-font-body: var(--font-plus-jakarta, "Plus Jakarta Sans"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bibo-text-display: clamp(2.75rem, 1.85rem + 4.4vw, 5.5rem);
+  --bibo-text-h1: clamp(2.25rem, 1.65rem + 2.9vw, 4rem);
+  --bibo-text-h2: clamp(1.75rem, 1.4rem + 1.7vw, 2.75rem);
+  --bibo-text-h3: clamp(1.375rem, 1.2rem + 0.85vw, 1.875rem);
+  --bibo-text-lead: clamp(1.125rem, 1.05rem + 0.35vw, 1.375rem);
+  --bibo-text-body: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --bibo-text-small: 0.875rem;
+  --bibo-leading-display: 1.02;
+  --bibo-leading-h1: 1.05;
+  --bibo-leading-h2: 1.1;
+  --bibo-leading-h3: 1.2;
+  --bibo-leading-lead: 1.5;
+  --bibo-leading-body: 1.6;
+  --bibo-leading-small: 1.45;
+  --bibo-radius-soft: 0.75rem;
+  --bibo-radius-paper: 1.25rem;
+  --bibo-radius-sticker: 2rem;
+  --bibo-radius-pill: 999px;
+  --bibo-shadow-paper: 0.125rem 0.1875rem 0 rgb(40 59 99 / 0.06), 0.25rem 0.5rem 1.25rem rgb(40 59 99 / 0.12);
+  --bibo-shadow-felt: inset 0 0.0625rem 0 rgb(255 255 255 / 0.65), 0.125rem 0.375rem 1.5rem rgb(40 59 99 / 0.1);
+  --bibo-shadow-lifted: 0.1875rem 0.375rem 0 rgb(40 59 99 / 0.07), 0.5rem 1rem 2rem rgb(40 59 99 / 0.16);
+  --bibo-space-tight: clamp(0.5rem, 0.42rem + 0.4vw, 0.75rem);
+  --bibo-space-block: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+  --bibo-space-gutter: clamp(1rem, 0.4rem + 3vw, 3rem);
+  --bibo-space-section: clamp(4rem, 2.6rem + 7vw, 8.5rem);
+  --bibo-duration-press: 120ms;
+  --bibo-duration-quick: 180ms;
+  --bibo-duration-base: 320ms;
+  --bibo-duration-gentle: 560ms;
+  --bibo-duration-drift: 18000ms;
+  --bibo-ease-paper: cubic-bezier(0.22, 1, 0.36, 1);
+  --bibo-ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+  --bibo-ease-drift: cubic-bezier(0.45, 0, 0.55, 1);
+  --bibo-focus-color: #283b63;
+  --bibo-focus-color-on-dark: #fdbb1f;
+  --bibo-focus-width: 3px;
+  --bibo-focus-offset: 3px;
+}
+
+/* Reduced motion: every token duration collapses to zero. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bibo-duration-press: 0ms;
+    --bibo-duration-quick: 0ms;
+    --bibo-duration-base: 0ms;
+    --bibo-duration-gentle: 0ms;
+    --bibo-duration-drift: 0ms;
+  }
+}
+
+/* Tailwind utilities draw only from the brand palette (bg-bibo-cream, text-bibo-navy, ...). */
+@theme {
+  --color-*: initial;
+}
+
+/* src: https://tailwindcss.com/docs/theme#referencing-other-variables · tailwindcss 4.3.3 · 2026-10-04 */
+@theme inline {
+  --color-bibo-cream: var(--bibo-color-cream);
+  --color-bibo-paper: var(--bibo-color-paper);
+  --color-bibo-sand: var(--bibo-color-sand);
+  --color-bibo-line: var(--bibo-color-line);
+  --color-bibo-navy: var(--bibo-color-navy);
+  --color-bibo-navy-soft: var(--bibo-color-navy-soft);
+  --color-bibo-teal: var(--bibo-color-teal);
+  --color-bibo-yellow: var(--bibo-color-yellow);
+  --color-bibo-amber: var(--bibo-color-amber);
+  --color-bibo-orange: var(--bibo-color-orange);
+  --color-bibo-purple: var(--bibo-color-purple);
+  --color-bibo-teal-ink: var(--bibo-color-teal-ink);
+  --color-bibo-orange-ink: var(--bibo-color-orange-ink);
+  --color-bibo-purple-ink: var(--bibo-color-purple-ink);
+  --color-bibo-ocean-deep: var(--bibo-color-ocean-deep);
+  --color-bibo-ocean: var(--bibo-color-ocean);
+  --color-bibo-lagoon: var(--bibo-color-lagoon);
+  --color-bibo-sand-warm: var(--bibo-color-sand-warm);
+  --color-bibo-coral: var(--bibo-color-coral);
+  --color-bibo-lilac: var(--bibo-color-lilac);
+  --color-bibo-kelp: var(--bibo-color-kelp);
+  --color-bibo-seagrass: var(--bibo-color-seagrass);
+  --font-sans: var(--bibo-font-body);
+  --font-body: var(--bibo-font-body);
+  --font-display: var(--bibo-font-display);
+  --text-display: var(--bibo-text-display);
+  --text-display--line-height: var(--bibo-leading-display);
+  --text-h1: var(--bibo-text-h1);
+  --text-h1--line-height: var(--bibo-leading-h1);
+  --text-h2: var(--bibo-text-h2);
+  --text-h2--line-height: var(--bibo-leading-h2);
+  --text-h3: var(--bibo-text-h3);
+  --text-h3--line-height: var(--bibo-leading-h3);
+  --text-lead: var(--bibo-text-lead);
+  --text-lead--line-height: var(--bibo-leading-lead);
+  --text-body: var(--bibo-text-body);
+  --text-body--line-height: var(--bibo-leading-body);
+  --text-small: var(--bibo-text-small);
+  --text-small--line-height: var(--bibo-leading-small);
+  --radius-soft: var(--bibo-radius-soft);
+  --radius-paper: var(--bibo-radius-paper);
+  --radius-sticker: var(--bibo-radius-sticker);
+  --radius-pill: var(--bibo-radius-pill);
+  --shadow-paper: var(--bibo-shadow-paper);
+  --shadow-felt: var(--bibo-shadow-felt);
+  --shadow-lifted: var(--bibo-shadow-lifted);
+  --spacing-tight: var(--bibo-space-tight);
+  --spacing-block: var(--bibo-space-block);
+  --spacing-gutter: var(--bibo-space-gutter);
+  --spacing-section: var(--bibo-space-section);
+  --ease-paper: var(--bibo-ease-paper);
+  --ease-press: var(--bibo-ease-press);
+  --ease-drift: var(--bibo-ease-drift);
+}
+
+@layer base {
+  html {
+    background-color: var(--bibo-color-cream);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-body);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-size: var(--bibo-text-body);
+    line-height: var(--bibo-leading-body);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--bibo-font-display);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--bibo-text-h1);
+    line-height: var(--bibo-leading-h1);
+  }
+
+  h2 {
+    font-size: var(--bibo-text-h2);
+    line-height: var(--bibo-leading-h2);
+  }
+
+  h3 {
+    font-size: var(--bibo-text-h3);
+    line-height: var(--bibo-leading-h3);
+  }
+
+  :focus-visible {
+    outline: var(--bibo-focus-width) solid var(--bibo-focus-color);
+    outline-offset: var(--bibo-focus-offset);
+  }
+
+  /* Navy bands (footer, dark panels) switch the ring to sun yellow to keep 3:1 contrast. */
+  [data-surface="navy"] {
+    --bibo-focus-color: var(--bibo-focus-color-on-dark);
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 45%, transparent);
+    color: var(--bibo-color-navy);
+  }
+}
+
+@layer components {
+  .bibo-logo {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4em;
+    inline-size: 9rem;
+    max-inline-size: 100%;
+  }
+
+  .bibo-logo__image {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+  }
+
+  .bibo-logo__tagline {
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-body);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .bay-backdrop {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+  }
+}
+
+/* Reduced motion: neutralise animation and transition time everywhere, whatever set it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

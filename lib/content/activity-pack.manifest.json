@@ -1,0 +1,180 @@
+{
+  "file": "/freebies/bibo-bay-activity-pack.pdf",
+  "bytes": 439969,
+  "sha256": "b371be2d4a36567c23640c7b40f8e2353da892b99f1b056ebd639fc715ef006f",
+  "pages": [
+    "Cover",
+    "Meet the friends of Bibo Bay",
+    "Colour the sea friends",
+    "Count with Bob",
+    "Bubble breathing",
+    "Fruit match with Tula",
+    "Bedtime in the Bay",
+    "Watch together on YouTube"
+  ],
+  "links": [
+    "https://www.youtube.com/@bibobay-tv",
+    "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1",
+    "https://www.youtube.com/watch?v=1pp8G-bKeik",
+    "https://www.youtube.com/watch?v=3birY6XZ3_c",
+    "https://www.youtube.com/watch?v=6URNMNeC_3Y",
+    "https://www.youtube.com/watch?v=CvQeoCVk_mc",
+    "https://www.youtube.com/watch?v=RNfHUxM-Bso",
+    "https://www.youtube.com/watch?v=V4HEDvQD7vg",
+    "https://www.youtube.com/watch?v=yrpyvb5dVbA"
+  ],
+  "qr": [
+    {
+      "page": 1,
+      "url": "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1"
+    },
+    {
+      "page": 3,
+      "url": "https://www.youtube.com/watch?v=3birY6XZ3_c"
+    },
+    {
+      "page": 4,
+      "url": "https://www.youtube.com/watch?v=CvQeoCVk_mc"
+    },
+    {
+      "page": 5,
+      "url": "https://www.youtube.com/watch?v=6URNMNeC_3Y"
+    },
+    {
+      "page": 6,
+      "url": "https://www.youtube.com/watch?v=RNfHUxM-Bso"
+    },
+    {
+      "page": 7,
+      "url": "https://www.youtube.com/watch?v=V4HEDvQD7vg"
+    },
+    {
+      "page": 7,
+      "url": "https://www.youtube.com/watch?v=1pp8G-bKeik"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=3birY6XZ3_c"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=1pp8G-bKeik"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=6URNMNeC_3Y"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=RNfHUxM-Bso"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=CvQeoCVk_mc"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=yrpyvb5dVbA"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/watch?v=V4HEDvQD7vg"
+    },
+    {
+      "page": 8,
+      "url": "https://www.youtube.com/channel/UCFruHuRQ2eOrq9NOyx0K1GA?sub_confirmation=1"
+    }
+  ],
+  "videos": [
+    {
+      "id": "friends-in-the-bay",
+      "title": "Dance with the Sea Friends",
+      "url": "https://www.youtube.com/watch?v=3birY6XZ3_c"
+    },
+    {
+      "id": "twinkle-under-the-sea",
+      "title": "Twinkle Twinkle Little Star Under the Sea",
+      "url": "https://www.youtube.com/watch?v=1pp8G-bKeik"
+    },
+    {
+      "id": "bubble-breathing",
+      "title": "Bubble Breathing Song",
+      "url": "https://www.youtube.com/watch?v=6URNMNeC_3Y"
+    },
+    {
+      "id": "tula-fruit-adventure",
+      "title": "Tula the Turtle’s Fruit Adventure",
+      "url": "https://www.youtube.com/watch?v=RNfHUxM-Bso"
+    },
+    {
+      "id": "count-to-ten",
+      "title": "Can Your Toddler Count to 10?",
+      "url": "https://www.youtube.com/watch?v=CvQeoCVk_mc"
+    },
+    {
+      "id": "baby-animals",
+      "title": "Baby Animals & Fun Learning",
+      "url": "https://www.youtube.com/watch?v=yrpyvb5dVbA"
+    },
+    {
+      "id": "bedtime-lullaby",
+      "title": "Kids Sleep Song: A Calm Lullaby",
+      "url": "https://www.youtube.com/watch?v=V4HEDvQD7vg"
+    }
+  ],
+  "characters": [
+    "Tula the Turtle",
+    "Bob the Fish",
+    "Lumi"
+  ],
+  "previews": [
+    {
+      "page": "cover",
+      "alt": "Cover of the Bibo Bay activity pack: Tula, Bob and Lumi under the sea",
+      "variants": [
+        {
+          "src": "/freebies/activity-pack-cover-480.webp",
+          "width": 480,
+          "height": 679
+        },
+        {
+          "src": "/freebies/activity-pack-cover-960.webp",
+          "width": 960,
+          "height": 1358
+        }
+      ]
+    },
+    {
+      "page": "colour",
+      "alt": "Activity pack page: colour a turtle, a clownfish and an octopus",
+      "variants": [
+        {
+          "src": "/freebies/activity-pack-colour-480.webp",
+          "width": 480,
+          "height": 679
+        },
+        {
+          "src": "/freebies/activity-pack-colour-960.webp",
+          "width": 960,
+          "height": 1358
+        }
+      ]
+    },
+    {
+      "page": "count",
+      "alt": "Activity pack page: count with Bob and trace the numbers 1 to 10",
+      "variants": [
+        {
+          "src": "/freebies/activity-pack-count-480.webp",
+          "width": 480,
+          "height": 679
+        },
+        {
+          "src": "/freebies/activity-pack-count-960.webp",
+          "width": 960,
+          "height": 1358
+        }
+      ]
+    }
+  ]
+}

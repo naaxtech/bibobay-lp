@@ -1,0 +1,478 @@
+/*
+ * The staff pages (Task 8c): the plain frame (components/admin/AdminFrame.tsx), the sign-in page
+ * and the sign-out button. Imported by app/globals.css after the order styles, so it builds on
+ * .landing-container, .skip-link, .btn and the .lead-form field styles, and on the --bibo-*
+ * tokens. Plain on purpose: paper ground, navy ink, nothing decorative, no motion beyond the
+ * shared button press (zero-length under reduced motion). Targets are at least 3rem tall.
+ */
+
+@layer components {
+  .admin-shell {
+    min-block-size: 100dvh;
+    background-color: var(--ground);
+    color: var(--ink);
+    --admin-error: var(--bibo-color-orange-ink);
+    --admin-success: var(--bibo-color-teal-ink);
+  }
+
+  .admin-header {
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 1px 0 var(--bibo-color-line);
+  }
+
+  .admin-header__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    min-block-size: 4rem;
+    padding-block: 0.5rem;
+  }
+
+  .admin-header__name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-block-size: 3rem;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--bibo-font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  a.admin-header__name:hover .admin-header__site {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  /* The label that tells staff this is not the public site: navy on sand, 11:1. */
+  .admin-header__label {
+    padding: 0.125rem 0.75rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-sand);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-body);
+    font-size: var(--bibo-text-small);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .admin-main {
+    padding-block: clamp(1.5rem, 1rem + 3vw, 3rem) clamp(3rem, 2rem + 5vw, 6rem);
+  }
+
+  .admin-main:focus {
+    outline: none;
+  }
+
+  /* A plain secondary button: navy outline on paper. */
+  .admin-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: 3rem;
+    padding: 0.5rem 1.25rem;
+    border: 2px solid var(--bibo-color-navy);
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.15;
+    cursor: pointer;
+  }
+
+  .admin-button:hover {
+    background-color: var(--bibo-color-sand);
+  }
+
+  .admin-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .admin-button[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  .admin-signout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .admin-signout__status {
+    margin: 0;
+    max-inline-size: 28rem;
+    color: var(--admin-error);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+  }
+
+  .admin-signout__status:empty {
+    display: none;
+  }
+
+  /* ---------- Sign-in page ---------- */
+
+  .admin-login {
+    display: grid;
+    gap: 1rem;
+    max-inline-size: 30rem;
+    margin-inline: auto;
+  }
+
+  .admin-login__title {
+    margin: 0;
+    font-size: var(--bibo-text-h2);
+    line-height: var(--bibo-leading-h2);
+  }
+
+  .admin-login__lead {
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: var(--bibo-leading-body);
+  }
+
+  /* The sign-in form's live region keeps its height: no jump when a message appears. */
+  .admin-form .admin-status {
+    min-block-size: 2.9em;
+    margin: 0;
+  }
+
+  /* ---------- Orders list and order page (Task 8c part 2) ---------- */
+
+  .admin-page {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .admin-page-title {
+    margin: 0;
+    font-size: var(--bibo-text-h2);
+    line-height: var(--bibo-leading-h2);
+    overflow-wrap: anywhere;
+  }
+
+  .admin-lead,
+  .admin-hint {
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: var(--bibo-leading-body);
+  }
+
+  .admin-hint {
+    font-size: var(--bibo-text-small);
+    line-height: var(--bibo-leading-small);
+  }
+
+  .admin-back {
+    margin: 0;
+  }
+
+  .admin-notice {
+    display: grid;
+    gap: 1rem;
+    max-inline-size: 36rem;
+    margin-inline: auto;
+  }
+
+  .admin-notice__body {
+    margin: 0;
+    line-height: var(--bibo-leading-body);
+  }
+
+  .admin-empty {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+    padding: 1.5rem;
+    border: 2px dashed var(--bibo-color-line);
+    border-radius: var(--bibo-radius-soft);
+  }
+
+  .admin-empty p {
+    margin: 0;
+  }
+
+  /* The status filter: plain links, each at least 3rem tall; the current one is filled. */
+  .admin-filter__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .admin-filter__link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 3rem;
+    padding: 0.25rem 1rem;
+    border: 2px solid var(--bibo-color-navy);
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .admin-filter__link:hover {
+    background-color: var(--bibo-color-sand);
+  }
+
+  .admin-filter__link[aria-current="page"] {
+    background-color: var(--bibo-color-navy);
+    color: var(--bibo-color-paper);
+  }
+
+  /* Wide tables scroll inside their own focusable box, never the page. */
+  .admin-table-wrap {
+    max-inline-size: 100%;
+    overflow-x: auto;
+    border-radius: var(--bibo-radius-soft);
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 1px var(--bibo-color-line);
+  }
+
+  .admin-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--bibo-text-small);
+    line-height: var(--bibo-leading-small);
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 0.75rem 1rem;
+    border-block-end: 1px solid var(--bibo-color-line);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  .admin-table thead th {
+    background-color: var(--bibo-color-sand);
+    color: var(--bibo-color-navy);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .admin-table tbody th {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .admin-table .text-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+  }
+
+  .admin-badge {
+    display: inline-block;
+    padding: 0.125rem 0.75rem;
+    border: 2px solid var(--bibo-color-navy);
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    font-weight: 700;
+  }
+
+  .admin-badge[data-status="cancelled"] {
+    border-color: var(--admin-error);
+    color: var(--admin-error);
+  }
+
+  .admin-badge[data-status="closed"] {
+    border-color: var(--admin-success);
+    color: var(--admin-success);
+  }
+
+  .admin-section {
+    display: grid;
+    gap: 0.75rem;
+    padding: clamp(1rem, 0.75rem + 1.2vw, 1.5rem);
+    border-radius: var(--bibo-radius-soft);
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 1px var(--bibo-color-line);
+  }
+
+  .admin-section-title {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: var(--bibo-leading-h3);
+  }
+
+  .admin-section p {
+    margin: 0;
+  }
+
+  .admin-facts {
+    display: grid;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+  }
+
+  @media (min-width: 40rem) {
+    .admin-facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .admin-facts__row {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .admin-facts dt {
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  .admin-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-line {
+    display: block;
+  }
+
+  .admin-notes {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--bibo-text-small);
+  }
+
+  .admin-events {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .admin-events__item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    padding-block-end: 0.5rem;
+    border-block-end: 1px solid var(--bibo-color-line);
+  }
+
+  .admin-events__what {
+    font-weight: 600;
+  }
+
+  /* ---------- Order controls ---------- */
+
+  .order-controls {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .admin-quote,
+  .admin-status-controls,
+  .admin-tracking {
+    display: grid;
+    gap: 0.75rem;
+    max-inline-size: 36rem;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    background: none;
+  }
+
+  .admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .admin-button--danger {
+    border-color: var(--admin-error);
+    color: var(--admin-error);
+  }
+
+  /* The controls' one live region: it keeps its place at the top of the controls. */
+  .admin-status--controls {
+    min-block-size: 1.5em;
+    margin: 0;
+    font-weight: 600;
+    line-height: var(--bibo-leading-small);
+  }
+
+  .admin-status--controls[data-tone="pending"] {
+    color: var(--ink-soft);
+  }
+
+  .admin-status--controls[data-tone="success"] {
+    color: var(--admin-success);
+  }
+
+  .admin-status--controls[data-tone="error"] {
+    color: var(--admin-error);
+  }
+
+  .admin-tracking__link {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .admin-tracking__url {
+    display: block;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--bibo-color-navy-soft);
+    border-radius: var(--bibo-radius-soft);
+    background-color: var(--bibo-color-cream);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--bibo-text-small);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  /* The cancel confirmation: a centred card over a dimmed page. */
+  .dialog-layer:has(.admin-dialog) {
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background-color: rgb(40 59 99 / 0.45);
+  }
+
+  .admin-dialog {
+    display: grid;
+    gap: 1rem;
+    max-inline-size: 30rem;
+    max-block-size: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border-radius: var(--bibo-radius-soft);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  .admin-dialog .dialog__title {
+    margin: 0;
+    font-family: var(--bibo-font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  .admin-dialog__text {
+    margin: 0;
+  }
+}

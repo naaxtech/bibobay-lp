@@ -1,0 +1,1947 @@
+/*
+ * BIBO Bay landing page: section grounds, paper primitives and section compositions.
+ * Imported by app/globals.css; every value draws on the --bibo-* brand tokens declared there.
+ * Nothing here starts hidden or transparent: motion (Task 4B) may enhance, never reveal.
+ *
+ * Kept as one file (Task 4C decision): the design pass changed a few rules per section rather than
+ * rewriting any, and every section's rules sit under its own banner below. Split it by section
+ * only when a section's rules grow past what one banner can hold.
+ *
+ * Shape rule (one radius per kind of thing, used everywhere): anything you press or that labels a
+ * state (buttons, chips, status tags, nav links, section labels) is a pill; a large surface (the
+ * hero window, friend stage, video player, editor prints) is a sticker (2rem) with a white
+ * die-cut border like the logo's; a tab is paper (1.25rem); a small note or video thumbnail is
+ * soft (0.75rem). Round cut-outs (faces, value stickers, the loop's heart) stay round.
+ *
+ * Rebrand 2026-10-15 (ruling R55): the page is Bibo Bay's sunlit reef. Grounds are water (light at
+ * the top of the page, deep where the videos play) and sand; the channel's own stills fill the art
+ * slots (R58), and the paper motifs that remain are the white sticker borders of the logo.
+ */
+
+/*
+ * The sticky header's height. In-page anchors and keyboard focus scroll clear of it. On a desktop
+ * it is 80px, the rulebook's cap; the logo sticker is a touch taller and overhangs its lower edge.
+ */
+:root {
+  --site-header-height: 5.25rem;
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --site-header-height: 5rem;
+  }
+}
+
+@layer base {
+  html {
+    /* src: https://nextjs.org/docs/app/api-reference/components/link#scroll-offset-with-sticky-headers · next 16.3.8 · 2026-10-05 */
+    scroll-padding-top: calc(var(--site-header-height) + 1rem);
+  }
+}
+
+@layer components {
+  /* ---------- Layout ---------- */
+
+  .landing-container {
+    inline-size: 100%;
+    max-inline-size: 80rem;
+    margin-inline: auto;
+    padding-inline: var(--bibo-space-gutter);
+  }
+
+  .landing-section {
+    position: relative;
+    background-color: var(--ground);
+    color: var(--ink);
+  }
+
+  /* ---------- Editor art (CMS images) in its paper frame ---------- */
+
+  /* A pre-sized still filling its frame, as next/image's `fill` does for CMS art. */
+  .art-fill {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .cms-art {
+    position: relative;
+    overflow: hidden;
+    border: 0.375rem solid var(--bibo-color-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-ocean) 12%, var(--bibo-color-paper));
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  /* A section's own art: a die-cut print, slightly askew like everything pinned to this page. */
+  .cms-art--print {
+    inline-size: 100%;
+    aspect-ratio: 4 / 3;
+    border-width: clamp(0.4rem, 0.3rem + 0.4vw, 0.625rem);
+    border-radius: var(--bibo-radius-sticker);
+    box-shadow: var(--bibo-shadow-lifted);
+    rotate: -1.5deg;
+  }
+
+  .cms-art--sticker {
+    flex: none;
+    inline-size: 5.5rem;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    rotate: -4deg;
+  }
+
+  /* A value's sticker: a round die-cut of a channel still, like the faces on the friend tabs. */
+  .cms-art--thumb {
+    flex: none;
+    inline-size: clamp(4rem, 3.4rem + 2vw, 5.25rem);
+    aspect-ratio: 1;
+    border-width: 0.25rem;
+    border-radius: 50%;
+    rotate: -4deg;
+  }
+
+  /* At the heart of the screen-to-life loop, exactly where the paper sun sits without it. */
+  .cms-art--round {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 29%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    translate: -50% -50%;
+  }
+
+  /* ---------- Grounds and accents: the CMS section theme picks the paper and the ink ---------- */
+
+  /*
+   * "paper": clear shallow water, nearly white. "sea": sunlit lagoon water, lighter towards the
+   * surface. "sand": the sea floor. "navy": the deep sea, lit from the surface above. Navy text on
+   * every light ground and cream text on the deep keep AA contrast at body size.
+   */
+  [data-ground] {
+    --ground: color-mix(in srgb, var(--bibo-color-lagoon) 7%, var(--bibo-color-paper));
+    --ground-top: var(--ground);
+    --ink: var(--bibo-color-navy);
+    --ink-soft: var(--bibo-color-navy-soft);
+  }
+
+  [data-ground="sand"] {
+    --ground: var(--bibo-color-sand);
+  }
+
+  [data-ground="sea"] {
+    --ground: color-mix(in srgb, var(--bibo-color-lagoon) 34%, var(--bibo-color-paper));
+    --ground-top: color-mix(in srgb, var(--bibo-color-lagoon) 14%, var(--bibo-color-paper));
+  }
+
+  [data-ground="navy"] {
+    --ground: color-mix(in srgb, var(--bibo-color-ocean-deep) 42%, var(--bibo-color-navy));
+    --ink: var(--bibo-color-cream);
+    --ink-soft: color-mix(in srgb, var(--bibo-color-cream) 84%, var(--bibo-color-navy));
+  }
+
+  /* Water is lighter towards the surface: sea sections fade down from it, the deep is lit from above. */
+  .landing-section[data-ground="sea"] {
+    background-image: linear-gradient(to bottom, var(--ground-top), var(--ground));
+  }
+
+  .landing-section[data-ground="navy"] {
+    background-image: radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--bibo-color-ocean) 32%, transparent), transparent 70%);
+  }
+
+  /*
+   * --accent-ink is the accent's text colour on the section's own ground; --accent-ink-paper is the
+   * same accent's text colour on a white surface (a card, a stage, a stamp), whatever the ground.
+   */
+  [data-accent="teal"] {
+    --accent: var(--bibo-color-teal);
+    --accent-ink: var(--bibo-color-teal-ink);
+    --accent-ink-paper: var(--bibo-color-teal-ink);
+  }
+
+  [data-accent="yellow"] {
+    --accent: var(--bibo-color-yellow);
+    --accent-ink: var(--bibo-color-orange-ink);
+    --accent-ink-paper: var(--bibo-color-orange-ink);
+  }
+
+  [data-accent="orange"] {
+    --accent: var(--bibo-color-orange);
+    --accent-ink: var(--bibo-color-orange-ink);
+    --accent-ink-paper: var(--bibo-color-orange-ink);
+  }
+
+  [data-accent="purple"] {
+    --accent: var(--bibo-color-purple);
+    --accent-ink: var(--bibo-color-purple-ink);
+    --accent-ink-paper: var(--bibo-color-purple-ink);
+  }
+
+  [data-ground="navy"][data-accent] {
+    --accent-ink: var(--bibo-color-yellow);
+  }
+
+  /*
+   * Rebrand review I1: yellow ink is for text on the deep-sea ground itself. White surfaces inside a
+   * deep-sea section (the video player, a friend's stage, a chosen tab, a status stamp) take the
+   * accent's paper ink again, so their labels keep AA contrast on white. The focus colour stays sun
+   * yellow (re-review N1): these surfaces' own rings are drawn outside them, on the deep sea, and the
+   * one link inside a white surface (a video's cover) draws its own navy ring.
+   */
+  [data-ground="navy"] :is(.storybook, .friend-stage, .friend-tab, .story-tab[aria-selected="true"], .paper-stamp) {
+    --accent-ink: var(--accent-ink-paper, var(--bibo-color-navy));
+  }
+
+  /* ---------- Paper primitives ---------- */
+
+  /*
+   * A section's label (the class keeps its paper-tape name): a white bubble pill with a bead of the
+   * section's accent, in the display face. Sentence case, no tracking: a label, not a shouted eyebrow.
+   */
+  .paper-tape {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.3rem 1rem 0.35rem 0.7rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--bibo-color-teal)) 45%, transparent), var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .paper-tape::before {
+    flex: none;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    border-radius: 50%;
+    background-color: var(--accent, var(--bibo-color-teal));
+    box-shadow: inset -0.15rem -0.15rem 0 rgb(40 59 99 / 0.18);
+    content: "";
+  }
+
+  /* A status mark (concept, story concept): an outlined pill on white. */
+  .paper-stamp {
+    display: inline-block;
+    padding: 0.2rem 0.75rem;
+    border: 2px solid currentColor;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--accent-ink, var(--bibo-color-navy));
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+  }
+
+  .detail-label {
+    color: var(--accent-ink, var(--bibo-color-navy));
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  .chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .chip-list > li {
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-teal)) 16%, var(--bibo-color-paper));
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  .paper-edge {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: calc(100% - 1px);
+    inline-size: 100%;
+    block-size: clamp(1rem, 0.6rem + 1.8vw, 2.25rem);
+    color: var(--ground-top, var(--ground));
+    fill: currentColor;
+    pointer-events: none;
+  }
+
+  .paper-mood {
+    display: block;
+  }
+
+  /* ---------- Links and buttons ---------- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-block-size: 3rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--bibo-radius-pill);
+    font-family: var(--bibo-font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    text-decoration: none;
+    transition-property: translate, box-shadow, background-color;
+    transition-duration: var(--bibo-duration-quick);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .btn:hover {
+    translate: 0 -2px;
+    box-shadow: var(--bibo-shadow-lifted);
+  }
+
+  .btn:active {
+    translate: 0 1px;
+    box-shadow: none;
+    transition-duration: var(--bibo-duration-press);
+  }
+
+  /* YouTube's play mark on links to the channel or a video: sized to the text, in YouTube's colours. */
+  .youtube-mark {
+    /* Inline even in a block label: Tailwind's base layer makes every svg a block. */
+    display: inline-block;
+    flex: none;
+    inline-size: 1.4em;
+    block-size: 1em;
+    margin-inline-end: 0.5em;
+    vertical-align: -0.12em;
+  }
+
+  .footer-link--button {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  /* The analytics choices: a centred card over a dimmed page (the menu dialog fills the screen). */
+  .dialog-layer:has(.analytics-dialog) {
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background-color: rgb(40 59 99 / 0.45);
+  }
+
+  .analytics-dialog .dialog__title {
+    font-family: var(--bibo-font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  .analytics-dialog {
+    max-inline-size: 34rem;
+    max-block-size: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.75rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-paper);
+  }
+
+  .analytics-dialog__text {
+    margin-block-start: 0.75rem;
+    color: var(--bibo-color-navy-soft);
+  }
+
+  .analytics-dialog__status {
+    margin-block-start: 1rem;
+    font-weight: 600;
+  }
+
+  .analytics-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-block-start: 1.25rem;
+  }
+
+  .footer-link--social {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /*
+   * The primary button is a chunky yellow toy key, the I of the logo: a lip of deeper amber below
+   * it that a press flattens. Navy on yellow is 6.5:1. It is the same on every ground.
+   */
+  .btn-primary {
+    --btn-lip: color-mix(in srgb, var(--bibo-color-orange) 55%, var(--bibo-color-yellow));
+    background-color: var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+    box-shadow: 0 0.25rem 0 var(--btn-lip), 0 0.5rem 1.25rem rgb(11 92 184 / 0.18);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0.375rem 0 var(--btn-lip), 0 0.75rem 1.5rem rgb(11 92 184 / 0.22);
+  }
+
+  [data-surface="navy"] .btn-primary {
+    background-color: var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+  }
+
+  /* White die-cut, like the logo's sticker borders, with a ring of the reef's teal. */
+  .btn-paper {
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--bibo-color-teal) 55%, transparent), 0 0.25rem 0 color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+  }
+
+  /*
+   * Tactile press with the motion layer running (html[data-motion="full"], set by GsapProvider):
+   * GSAP eases --btn-press (pressed 0.96, back to 1 in under 180 ms) and the button scales by it.
+   * The CSS :active nudge stands down then, so a press is animated once; without the motion layer
+   * (no JavaScript, reduced motion) the nudge stays the press. While --btn-press is unset this
+   * transform is invalid at computed-value time, so an unpressed button has no transform at all.
+   */
+  html[data-motion="full"] .btn {
+    transform: scale(var(--btn-press));
+  }
+
+  html[data-motion="full"] .btn:active {
+    translate: none;
+  }
+
+  html[data-motion="full"] .btn:hover:active {
+    translate: 0 -2px;
+  }
+
+  .text-link {
+    color: inherit;
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-color: var(--accent, currentColor);
+    text-decoration-thickness: 0.14em;
+    text-underline-offset: 0.22em;
+    transition: text-decoration-color var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .text-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .prose-paper > * + * {
+    margin-block-start: 1rem;
+  }
+
+  .prose-paper a {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-color: var(--accent, currentColor);
+    text-underline-offset: 0.2em;
+  }
+
+  .skip-link {
+    position: fixed;
+    z-index: 80;
+    inset-block-start: 0.75rem;
+    inset-inline-start: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-navy);
+    color: var(--bibo-color-cream);
+    font-weight: 700;
+    text-decoration: none;
+    translate: 0 calc(-100% - 1.5rem);
+  }
+
+  .skip-link:focus {
+    translate: 0 0;
+  }
+
+  /* ---------- Site header and mobile menu ---------- */
+
+  .site-header {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 40;
+    block-size: var(--site-header-height);
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 6%, var(--bibo-color-paper));
+    color: var(--bibo-color-navy);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--bibo-color-ocean) 14%, transparent);
+  }
+
+  .site-header__home {
+    display: inline-flex;
+    border-radius: var(--bibo-radius-soft);
+  }
+
+  /* The logo is a die-cut sticker: on a desktop it sits a little low and laps over the header's edge. */
+  @media (min-width: 64rem) {
+    .site-header__home {
+      position: relative;
+      z-index: 1;
+      align-self: flex-start;
+      margin-block-start: 0.5rem;
+    }
+  }
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    padding-inline: 1rem;
+    border-radius: var(--bibo-radius-pill);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .nav-link:hover {
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 30%, transparent);
+  }
+
+  .menu-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-block-size: 2.75rem;
+    padding: 0.5rem 1.15rem 0.5rem 0.95rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-paper);
+    font-family: var(--bibo-font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .menu-button__icon {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+  }
+
+  .dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+  }
+
+  .mobile-menu {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 6%, var(--bibo-color-paper));
+    color: var(--bibo-color-navy);
+  }
+
+  .mobile-menu__bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    block-size: var(--site-header-height);
+  }
+
+  .mobile-menu__body {
+    display: grid;
+    gap: 2rem;
+    padding-block: 1.25rem 2.5rem;
+  }
+
+  .mobile-menu__link {
+    display: flex;
+    align-items: center;
+    min-block-size: 3.75rem;
+    border-block-end: 1px solid color-mix(in srgb, var(--bibo-color-navy) 14%, transparent);
+    color: inherit;
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-h3);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .mobile-menu__cta {
+    justify-self: start;
+  }
+
+  .mobile-menu__bay {
+    position: relative;
+    flex: none;
+    block-size: 10rem;
+    margin-block-start: auto;
+  }
+
+  /* ---------- Hero: the friends in the sunlit Bay ---------- */
+
+  /*
+   * The opening sits in sunlit water: the reef (sunbeams, bubbles, sand) is drawn behind everything
+   * and its sand runs off the bottom into the sand band below. Room is left beneath the window for
+   * the sand to show.
+   */
+  .hero {
+    isolation: isolate;
+    padding-block: clamp(1.75rem, 1rem + 2.5vw, 3.25rem) clamp(7.5rem, 4.5rem + 7vw, 11.5rem);
+  }
+
+  .hero__reef {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+  }
+
+  .hero__grid {
+    display: grid;
+    align-items: center;
+    gap: 2.75rem 3rem;
+  }
+
+  @media (min-width: 64rem) {
+    .hero__grid {
+      grid-template-columns: minmax(0, 11fr) minmax(0, 13fr);
+    }
+  }
+
+  /*
+   * The tagline as the channel sets it: each sentence on its own line, in the logo's teal, orange and
+   * purple inks (each over 4.5:1 on the lightest water). Sized so three short lines, the promise and
+   * both CTAs share the first viewport with the friends.
+   */
+  .hero-title {
+    font-size: clamp(2.5rem, 1.5rem + 3vw, 4.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.015em;
+  }
+
+  .hero-title__line {
+    display: block;
+  }
+
+  .hero-title__line[data-ink="0"] {
+    color: var(--bibo-color-teal-ink);
+  }
+
+  .hero-title__line[data-ink="1"] {
+    color: var(--bibo-color-orange-ink);
+  }
+
+  .hero-title__line[data-ink="2"] {
+    color: var(--bibo-color-purple-ink);
+  }
+
+  .hero__lead {
+    max-inline-size: 36ch;
+    margin-block-start: 1.5rem;
+    color: var(--ink-soft);
+    font-size: var(--bibo-text-lead);
+    line-height: var(--bibo-leading-lead);
+  }
+
+  .hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-block-start: 2.25rem;
+  }
+
+  .hero-postcard {
+    position: relative;
+    margin: 0;
+  }
+
+  /* The friends' window: the still's own wide shape, in the logo's white die-cut border. */
+  .hero-postcard__art {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 1600 / 880;
+    border: clamp(0.5rem, 0.3rem + 0.6vw, 0.8rem) solid var(--bibo-color-paper);
+    border-radius: var(--bibo-radius-sticker);
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+    box-shadow: 0 1.5rem 3rem -1rem rgb(11 92 184 / 0.45), 0 0.3rem 0 color-mix(in srgb, var(--bibo-color-lagoon) 35%, var(--bibo-color-paper));
+  }
+
+  @media (min-width: 64rem) {
+    .hero-postcard__art {
+      rotate: 1.25deg;
+    }
+  }
+
+  /* The CMS greeting as a yellow bubble label stuck on the window's corner. */
+  .hero-postcard__label {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: -1.15rem;
+    inset-inline-start: 1.25rem;
+    padding: 0.4rem 1.1rem 0.45rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-yellow);
+    box-shadow: 0 0 0 3px var(--bibo-color-paper), var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.2;
+    rotate: -3deg;
+  }
+
+  /* ---------- Trust strip: one band of masking tape ---------- */
+
+  .trust-band {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* A band of pale sand lifted off the sea floor (the clip keeps its pebbled edges). */
+  .trust-band::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0 -3rem;
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 55%, var(--ground));
+    content: "";
+    rotate: -0.8deg;
+    clip-path: polygon(
+      0% 4px, 4% 0, 9% 5px, 14% 1px, 20% 6px, 26% 0, 31% 4px, 37% 1px, 43% 6px, 49% 2px, 55% 5px, 61% 0, 67% 4px,
+      73% 1px, 79% 6px, 85% 2px, 91% 5px, 96% 0, 100% 4px,
+      100% calc(100% - 3px), 96% 100%, 90% calc(100% - 5px), 84% calc(100% - 1px), 78% calc(100% - 6px), 72% 100%,
+      66% calc(100% - 4px), 60% calc(100% - 1px), 54% calc(100% - 6px), 48% calc(100% - 2px), 42% calc(100% - 5px),
+      36% 100%, 30% calc(100% - 4px), 24% calc(100% - 1px), 18% calc(100% - 6px), 12% calc(100% - 2px),
+      6% calc(100% - 5px), 0% calc(100% - 1px)
+    );
+  }
+
+  /* Four short principles as a quiet two-by-two set of type: the tape band is the decoration, so no bullets. */
+  .trust-list {
+    display: grid;
+    gap: 0.6rem 2.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    .trust-list {
+      grid-template-columns: repeat(2, max-content);
+    }
+  }
+
+  .trust-list__item {
+    font-family: var(--bibo-font-display);
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  /* ---------- Promise ---------- */
+
+  .promise-quote-mark {
+    display: block;
+    inline-size: clamp(4.5rem, 3rem + 5vw, 7.5rem);
+    margin-block: 1.5rem -0.35rem;
+    rotate: -6deg;
+  }
+
+  @media (min-width: 64rem) {
+    .promise-quote-mark {
+      margin-block-end: -0.85rem;
+    }
+  }
+
+  .promise-quote-mark__piece {
+    fill: var(--accent, var(--bibo-color-orange));
+  }
+
+  .sun-rays {
+    flex: none;
+    inline-size: 3rem;
+    block-size: 3rem;
+  }
+
+  /* ---------- Bay friends ---------- */
+
+  .friend-tabs {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--bibo-space-gutter));
+    padding: 0.5rem var(--bibo-space-gutter) 0.85rem;
+    scroll-padding-inline: var(--bibo-space-gutter);
+    scroll-snap-type: x proximity;
+  }
+
+  .friend-tabs > .friend-tab {
+    flex: 0 0 13rem;
+    scroll-snap-align: start;
+  }
+
+  @media (min-width: 40rem) {
+    .friend-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: visible;
+      margin-inline: 0;
+      padding: 0;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .friend-tabs {
+      grid-template-columns: minmax(0, 1fr);
+      align-content: start;
+    }
+  }
+
+  .friend-tab {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.6rem;
+    min-block-size: 2.75rem;
+    padding: 0.8rem 1rem 0.85rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 55%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bibo-color-navy) 12%, transparent);
+    color: var(--bibo-color-navy);
+    text-align: start;
+    cursor: pointer;
+    transition-property: background-color, box-shadow, rotate;
+    transition-duration: var(--bibo-duration-quick);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .friend-tab:hover {
+    background-color: var(--bibo-color-paper);
+  }
+
+  .friend-tab[aria-selected="true"] {
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 3px var(--friend-accent), var(--bibo-shadow-paper);
+    rotate: -0.75deg;
+  }
+
+  /* A tab with the friend's face: the round face beside the name and role. */
+  .friend-tab[data-avatar] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.1rem 0.85rem;
+    padding: 0.6rem 1rem 0.6rem 0.6rem;
+  }
+
+  .friend-tab__avatar {
+    position: relative;
+    grid-row: span 3;
+    overflow: hidden;
+    inline-size: 3.5rem;
+    aspect-ratio: 1;
+    border: 3px solid var(--bibo-color-paper);
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+    box-shadow: 0 0 0 2px var(--friend-accent);
+  }
+
+  .friend-tab[data-avatar] .friend-tab__name::before {
+    display: none;
+  }
+
+  .friend-tab[data-avatar] .friend-tab__role {
+    padding-inline-start: 0;
+  }
+
+  .friend-tab[data-avatar] .friend-tab__status {
+    justify-self: start;
+  }
+
+  .friend-tab__name {
+    display: flex;
+    flex: 1 0 100%;
+    align-items: center;
+    gap: 0.55rem;
+    font-family: var(--bibo-font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .friend-tab__name::before {
+    flex: none;
+    inline-size: 0.8rem;
+    block-size: 0.8rem;
+    border-radius: 46% 54% 52% 48% / 55% 45% 55% 45%;
+    background-color: var(--friend-accent);
+    content: "";
+    transition: scale var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .friend-tab[aria-selected="true"] .friend-tab__name::before {
+    scale: 1.35;
+  }
+
+  .friend-tab__role {
+    padding-inline-start: 1.35rem;
+    color: var(--bibo-color-navy-soft);
+    font-size: var(--bibo-text-small);
+    line-height: 1.35;
+  }
+
+  .friend-tab__status {
+    padding: 0.05rem 0.55rem;
+    border: 1.5px solid currentColor;
+    border-radius: var(--bibo-radius-pill);
+    color: var(--accent-ink, var(--bibo-color-navy));
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  /*
+   * Tab panels (friend stages, storybooks) all share one grid cell, so the selector is always as
+   * tall as its tallest panel and choosing another never moves anything below it (spec §7 "no layout
+   * jump"). Unchosen panels stay laid out but unpainted; useRovingTabs makes them inert and
+   * aria-hidden, so only the chosen one can be seen, reached or announced. They sit above the chosen
+   * panel, so the one just left can fade out over it (the motion layer holds it visible meanwhile);
+   * hidden or inert, they never catch a pointer.
+   */
+  .friend-stages,
+  .storybooks {
+    display: grid;
+  }
+
+  .friend-stages > [role="tabpanel"],
+  .storybooks > [role="tabpanel"] {
+    grid-area: 1 / 1;
+  }
+
+  .friend-stage[inert],
+  .storybook[inert] {
+    z-index: 1;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /*
+   * Kept from before panels stayed laid out: a panel given the `hidden` attribute instead (a future
+   * selector that does not need a steady height, or a no-JS fallback) still leaves the layout entirely.
+   */
+  .friend-stage[hidden],
+  .storybook[hidden] {
+    display: none;
+  }
+
+  /*
+   * Under reduced motion a switch is instant. The global reduced-motion rule (globals.css) turns every
+   * style change into a 0.01 ms transition, and a visibility transition paints its starting value for
+   * the frame it starts in: the panel left behind would show for one more frame and the chosen one
+   * would not. Panels and everything in them therefore change with no transition at all.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .friend-stages > [role="tabpanel"],
+    .friend-stages > [role="tabpanel"] *,
+    .friend-stages > [role="tabpanel"] *::before,
+    .friend-stages > [role="tabpanel"] *::after,
+    .storybooks > [role="tabpanel"],
+    .storybooks > [role="tabpanel"] *,
+    .storybooks > [role="tabpanel"] *::before,
+    .storybooks > [role="tabpanel"] *::after {
+      transition-property: none;
+    }
+  }
+
+  .friend-stage {
+    display: grid;
+    /* On a phone the art keeps its shape; a panel stretched to the tallest friend grows its text side. */
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    border: 0.5rem solid var(--bibo-color-paper);
+    border-radius: var(--bibo-radius-sticker);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: 0 1.5rem 3rem -1.25rem rgb(11 92 184 / 0.45);
+  }
+
+  .friend-stage__art {
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background-color: color-mix(in srgb, var(--bibo-color-lagoon) 30%, var(--bibo-color-paper));
+  }
+
+  .friend-stage__art {
+    position: relative;
+    aspect-ratio: 4 / 3;
+  }
+
+  .friend-stage__art > .paper-mood,
+  .storybook__cover > .paper-mood {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .friend-stage__text {
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    gap: 0.9rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 3rem);
+  }
+
+  .friend-stage__kind {
+    color: var(--accent-ink, var(--bibo-color-navy-soft));
+    font-weight: 600;
+  }
+
+  .friend-stage__catchphrase {
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-lead);
+    font-weight: 500;
+  }
+
+  @media (min-width: 48rem) {
+    .friend-stage {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      grid-template-rows: none;
+      min-block-size: 30rem;
+    }
+
+    .friend-stage__art {
+      aspect-ratio: auto;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .friend-stage {
+      block-size: 100%;
+    }
+  }
+
+  /* ---------- Story concepts: bookmarks over an open storybook ---------- */
+
+  .story-tabs {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .story-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    min-block-size: 2.75rem;
+    padding: 1rem 1.15rem 1.1rem;
+    border-radius: var(--bibo-radius-paper) var(--bibo-radius-paper) var(--bibo-radius-soft) var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-purple)) 10%, var(--bibo-color-paper));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bibo-color-navy) 10%, transparent);
+    color: var(--bibo-color-navy);
+    text-align: start;
+    cursor: pointer;
+    transition-property: background-color, box-shadow, translate;
+    transition-duration: var(--bibo-duration-quick);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .story-tab:hover {
+    background-color: var(--bibo-color-paper);
+  }
+
+  .story-tab[aria-selected="true"] {
+    background-color: var(--bibo-color-paper);
+    box-shadow: var(--bibo-shadow-paper);
+    translate: 0 -4px;
+  }
+
+  .story-tab__title {
+    font-family: var(--bibo-font-display);
+    font-size: 1.1875rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .story-tab__status {
+    color: var(--accent-ink, var(--bibo-color-navy));
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  /*
+   * Which story concept is open (ruling R22): a row of paper bookmark ticks, one per concept. Read
+   * ones are tinted, the open one is inked and stands taller, the rest are outlined paper. There is
+   * no track behind them and nothing fills over time; they change only when a tab is chosen, with a
+   * short ease that the reduced-motion tokens collapse to nothing.
+   */
+  .story-progress {
+    margin-block-start: 1.5rem;
+  }
+
+  .story-progress__stops {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.4rem;
+    block-size: 0.875rem;
+  }
+
+  .story-progress__stop {
+    inline-size: 2.25rem;
+    block-size: 0.5rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-paper);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--bibo-color-navy) 28%, transparent);
+    transform-origin: bottom;
+    transition-property: background-color, box-shadow, scale;
+    transition-duration: var(--bibo-duration-base);
+    transition-timing-function: var(--bibo-ease-paper);
+  }
+
+  .story-progress__stop[data-state="past"] {
+    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-purple)) 45%, var(--bibo-color-paper));
+    box-shadow: none;
+  }
+
+  .story-progress__stop[data-state="current"] {
+    background-color: var(--accent-ink, var(--bibo-color-navy));
+    box-shadow: none;
+    scale: 1 1.75;
+  }
+
+  /* The storybooks share one spread (see "Tab panels" above), so the gap is set on each of them. */
+  .story-progress ~ .storybooks > .storybook {
+    margin-block-start: 1rem;
+  }
+
+  .storybook {
+    display: grid;
+    /* On a phone the cover keeps its shape; a book stretched to the longest story grows its page. */
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    margin-block-start: 1.5rem;
+    border-radius: var(--bibo-radius-sticker);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-lifted);
+  }
+
+  .storybook__cover {
+    position: relative;
+    aspect-ratio: 16 / 10;
+  }
+
+  .storybook__stamp {
+    position: absolute;
+    inset-block-start: 1.25rem;
+    inset-inline-start: 1.25rem;
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 88%, transparent);
+  }
+
+  .storybook__page {
+    position: relative;
+    display: grid;
+    align-content: center;
+    padding: clamp(1.5rem, 1rem + 2.5vw, 3.25rem);
+  }
+
+  .storybook__facts {
+    display: grid;
+    gap: 1rem;
+    margin-block-start: 1.5rem;
+  }
+
+  .storybook__facts dd {
+    margin-block-start: 0.15rem;
+  }
+
+  .storybook__note {
+    margin-block-start: 1.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 22%, var(--bibo-color-paper));
+    rotate: -0.6deg;
+  }
+
+  @media (min-width: 48rem) {
+    .story-tabs {
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-flow: column;
+      gap: 1rem;
+    }
+
+    .storybook {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: none;
+    }
+
+    .storybook__cover {
+      aspect-ratio: auto;
+      min-block-size: 26rem;
+    }
+
+    /* The fold of the open book, shading the right-hand page. */
+    .storybook__page {
+      box-shadow: inset 1.25rem 0 1.5rem -1.25rem rgb(40 59 99 / 0.16);
+    }
+  }
+
+  /* ---------- Watch now: a player and its playlist in the deep-sea screening room ---------- */
+
+  .watch-layout {
+    display: grid;
+    /* One column that may shrink to the container: with an automatic column the sideways-scrolling playlist set the width (QA-1, 2 px of page overflow at 320 px). */
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "tabs" "progress" "books";
+    gap: 1.25rem;
+  }
+
+  .watch-layout > .story-tabs {
+    grid-area: tabs;
+  }
+
+  .watch-layout > .story-progress {
+    grid-area: progress;
+    margin-block-start: 0;
+  }
+
+  .watch-layout > .storybooks {
+    grid-area: books;
+  }
+
+  /* On a phone and tablet the playlist is a row of thumbnails that scrolls sideways. */
+  .watch-layout .story-tabs {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--bibo-space-gutter));
+    padding: 0.35rem var(--bibo-space-gutter) 0.85rem;
+    scroll-padding-inline: var(--bibo-space-gutter);
+    scroll-snap-type: x proximity;
+  }
+
+  .watch-layout .story-tab {
+    flex: 0 0 12.5rem;
+    padding: 0.55rem 0.55rem 0.8rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bibo-color-paper) 22%, transparent);
+    color: var(--ink);
+    scroll-snap-align: start;
+  }
+
+  .watch-layout .story-tab:hover {
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 18%, transparent);
+  }
+
+  .watch-layout .story-tab[aria-selected="true"] {
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0 0 3px var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+    translate: none;
+  }
+
+  .watch-layout .story-tab__title {
+    padding-inline: 0.2rem;
+    font-size: 1.0625rem;
+  }
+
+  .story-tab__thumb {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--bibo-radius-soft);
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 14%, transparent);
+  }
+
+  .watch-layout .story-progress__stop {
+    background-color: color-mix(in srgb, var(--bibo-color-paper) 22%, transparent);
+    box-shadow: none;
+  }
+
+  .watch-layout .story-progress__stop[data-state="past"] {
+    background-color: color-mix(in srgb, var(--bibo-color-yellow) 45%, transparent);
+  }
+
+  .watch-layout .story-progress__stop[data-state="current"] {
+    background-color: var(--bibo-color-yellow);
+  }
+
+  /* The player: the cover full width on top, the words below, at every width. */
+  .watch-layout .storybook {
+    grid-template-columns: none;
+    grid-template-rows: auto 1fr;
+    margin-block-start: 0;
+    border: 0.5rem solid var(--bibo-color-paper);
+    box-shadow: 0 2rem 3.5rem -1.5rem rgb(3 20 45 / 0.6);
+  }
+
+  .watch-layout .storybook__cover {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    min-block-size: 0;
+    border-radius: 1.5rem;
+  }
+
+  .watch-layout .storybook__page {
+    align-content: start;
+    padding: clamp(1.25rem, 0.9rem + 1.5vw, 2.25rem);
+    box-shadow: none;
+  }
+
+  .storybook__watch {
+    display: block;
+    color: var(--bibo-color-navy);
+    text-decoration: none;
+  }
+
+  /*
+   * Rebrand review I2: the card clips anything drawn outside the cover, and the cover's picture
+   * paints over anything drawn beneath it, so the focus ring is a layer above the picture, inside the
+   * cover's edge: a navy line with a white band inside it, visible on any picture. The transparent
+   * outline stays for forced-colours mode, where box shadows are not drawn and it takes a system colour.
+   */
+  .storybook__watch::after {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    border-radius: inherit;
+    content: "";
+    pointer-events: none;
+  }
+
+  .storybook__watch:focus-visible {
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+  }
+
+  .storybook__watch:focus-visible::after {
+    box-shadow: inset 0 0 0 3px var(--bibo-color-navy), inset 0 0 0 7px var(--bibo-color-paper);
+  }
+
+  /* The play disc: the yellow of the primary button, ringed in white, with a navy triangle. */
+  .storybook__play {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: clamp(3.5rem, 2.6rem + 3vw, 5rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: var(--bibo-color-yellow);
+    box-shadow: 0 0 0 0.375rem rgb(255 255 255 / 0.85), 0 0.75rem 1.5rem rgb(3 20 45 / 0.35);
+    translate: -50% -50%;
+    transition: scale var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .storybook__play::after {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    inline-size: 34%;
+    block-size: 38%;
+    background-color: var(--bibo-color-navy);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    content: "";
+    translate: 12% 0;
+  }
+
+  .storybook__watch:hover .storybook__play {
+    scale: 1.08;
+  }
+
+  /*
+   * On a phone the cover is small and its thumbnail's printed title runs across most of it, so the
+   * words "Watch on YouTube" are for assistive technology only there (re-review N2): the play disc
+   * shows it is a video, and the section's own intro says every video opens on YouTube. From 48rem
+   * the label is a white pill in the cover's lower-left corner.
+   */
+  .storybook__watch-label {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  @media (min-width: 48rem) {
+    .watch-layout .storybook__facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .storybook__watch-label {
+      inset-block: auto 1rem;
+      inset-inline-start: 1rem;
+      overflow: visible;
+      inline-size: auto;
+      block-size: auto;
+      padding: 0.45rem 1.05rem 0.5rem;
+      border-radius: var(--bibo-radius-pill);
+      background-color: var(--bibo-color-paper);
+      box-shadow: var(--bibo-shadow-paper);
+      color: var(--bibo-color-navy);
+      font-family: var(--bibo-font-display);
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: normal;
+      clip-path: none;
+    }
+  }
+
+  /* A desktop: the player on the left, the playlist as a column of thumbnails and titles beside it. */
+  @media (min-width: 64rem) {
+    .watch-layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+      grid-template-areas: "books tabs" "progress tabs";
+      align-items: start;
+      gap: 1rem 2rem;
+    }
+
+    .watch-layout .story-tabs {
+      display: grid;
+      grid-auto-flow: row;
+      gap: 0.6rem;
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+    }
+
+    .watch-layout .story-tab {
+      display: grid;
+      grid-template-columns: 7.5rem minmax(0, 1fr);
+      align-items: center;
+      gap: 0.25rem 0.85rem;
+      padding: 0.45rem 0.85rem 0.45rem 0.45rem;
+    }
+
+    .watch-layout .story-tab__thumb {
+      grid-row: span 2;
+    }
+
+    .watch-layout .story-tab__title {
+      padding-inline: 0;
+      font-size: 1rem;
+    }
+  }
+
+  /* ---------- Screen to real life: the loop ---------- */
+
+  .loop-diagram {
+    position: relative;
+    inline-size: min(100%, 30rem);
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+
+  .loop-diagram__drawing {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+  }
+
+  .loop-node {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    inline-size: clamp(4.75rem, 3.6rem + 4vw, 6.25rem);
+    aspect-ratio: 1;
+    padding: 0.5rem;
+    border-radius: 50%;
+    background-color: var(--bibo-color-paper);
+    box-shadow: inset 0 0 0 0.4rem var(--step-color), var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.125rem);
+    font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+    translate: -50% -50%;
+  }
+
+  .loop-steps {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .loop-step {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .loop-step__marker {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    margin-block-start: 0.45rem;
+    border-radius: 50%;
+    background-color: var(--step-color);
+    box-shadow: 0.125rem 0.1875rem 0 rgb(40 59 99 / 0.12);
+  }
+
+  /* ---------- What children can practise: a staggered typographic list ---------- */
+
+  .pillar {
+    display: grid;
+    gap: 0.75rem 2.5rem;
+    padding-block: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+    border-block-start: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .pillar:last-child {
+    border-block-end: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .pillar__head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .pillar__title {
+    font-family: var(--bibo-font-display);
+    font-size: clamp(2rem, 1.3rem + 3vw, 3.75rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+  }
+
+  /*
+   * Each value is marked by a strip of coloured paper tape laid under the lower half of its words
+   * (the page's tape motif, not a bullet dot); a long value carries the tape onto every line.
+   */
+  .pillar__ink {
+    --pillar-tape: var(--bibo-color-teal);
+    padding-inline: 0.08em;
+    background-image: linear-gradient(
+      to top,
+      transparent 0.06em,
+      color-mix(in srgb, var(--pillar-tape) 40%, transparent) 0.06em,
+      color-mix(in srgb, var(--pillar-tape) 40%, transparent) 0.44em,
+      transparent 0.44em
+    );
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .pillar:nth-child(6n + 2) .pillar__ink {
+    --pillar-tape: var(--bibo-color-yellow);
+  }
+
+  .pillar:nth-child(6n + 3) .pillar__ink {
+    --pillar-tape: var(--bibo-color-orange);
+  }
+
+  .pillar:nth-child(6n + 4) .pillar__ink {
+    --pillar-tape: var(--bibo-color-purple);
+  }
+
+  .pillar:nth-child(6n + 5) .pillar__ink {
+    --pillar-tape: var(--bibo-color-ocean);
+  }
+
+  .pillar:nth-child(6n + 6) .pillar__ink {
+    --pillar-tape: var(--bibo-color-seagrass);
+  }
+
+  .pillar:nth-child(3n + 2) {
+    padding-inline-start: 1.25rem;
+  }
+
+  .pillar:nth-child(3n) {
+    padding-inline-start: 2.5rem;
+  }
+
+  .pillar__body {
+    max-inline-size: 40ch;
+    color: var(--ink-soft);
+  }
+
+  .pillar__prompts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-block-start: 0.85rem;
+  }
+
+  /* Conversation starters as little speech bubbles. */
+  .pillar__prompts > li {
+    padding: 0.35rem 0.85rem;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+    background-color: var(--bibo-color-paper);
+    box-shadow: var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+    font-family: var(--bibo-font-display);
+    font-weight: 500;
+  }
+
+  @media (min-width: 64rem) {
+    .pillar {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+      align-items: center;
+    }
+
+    .pillar:nth-child(3n + 2) {
+      padding-inline-start: 9%;
+    }
+
+    .pillar:nth-child(3n) {
+      padding-inline-start: 18%;
+    }
+  }
+
+  /* ---------- The wider BIBO world: an index ---------- */
+
+  .eco-index {
+    display: grid;
+    column-gap: 3rem;
+  }
+
+  .eco-entry {
+    padding-block: 1.25rem 1.4rem;
+    border-block-start: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  /* An entry with approved art: its small print beside the name and lines. */
+  .eco-entry[data-art] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .eco-entry__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .eco-entry__name {
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-h3);
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .eco-entry__leader {
+    flex: 1 1 1.5rem;
+    border-block-end: 2px dotted color-mix(in srgb, var(--ink) 35%, transparent);
+  }
+
+  .eco-status {
+    flex: none;
+    padding: 0.1rem 0.65rem;
+    border: 1.5px solid currentColor;
+    border-radius: var(--bibo-radius-pill);
+    color: var(--ink);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .eco-status[data-status="in-development"] {
+    border-color: transparent;
+    background-color: var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+  }
+
+  .eco-status[data-status="available"] {
+    border-color: transparent;
+    background-color: var(--bibo-color-teal);
+    color: var(--bibo-color-navy);
+  }
+
+  .eco-entry__tagline {
+    margin-block-start: 0.35rem;
+    font-weight: 600;
+  }
+
+  .eco-entry__description {
+    color: var(--ink-soft);
+  }
+
+  @media (min-width: 48rem) {
+    .eco-index {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* ---------- Family voices (only when verified and enabled) ---------- */
+
+  .voice-notes {
+    display: grid;
+    gap: 2rem;
+  }
+
+  .voice-note {
+    margin: 0;
+    padding: 1.75rem;
+    border-radius: var(--bibo-radius-soft);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-paper);
+    rotate: -0.8deg;
+  }
+
+  .voice-notes > li:nth-child(even) .voice-note {
+    rotate: 0.9deg;
+  }
+
+  .voice-note blockquote {
+    font-family: var(--bibo-font-display);
+    font-size: var(--bibo-text-lead);
+    font-weight: 500;
+  }
+
+  .voice-note__attribution {
+    margin-block-start: 1rem;
+    color: var(--bibo-color-navy-soft);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+  }
+
+  @media (min-width: 48rem) {
+    .voice-notes {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* ---------- Founding families: a quiet cove ---------- */
+
+  .lead-cove {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    inline-size: 100%;
+    block-size: clamp(7rem, 5rem + 8vw, 12rem);
+    pointer-events: none;
+  }
+
+  .lead-slot {
+    align-self: start;
+  }
+
+  .lead-magnet {
+    max-inline-size: 40ch;
+  }
+
+  /*
+   * The free activity pack (R66): real page renders fanned like printed sheets beside the title,
+   * the download button and the file's real format line. Stacked on phones, side by side from 40rem.
+   */
+  .freebie-card {
+    display: grid;
+    gap: 1.5rem;
+    max-inline-size: 36rem;
+    padding: 1.25rem;
+    border-radius: var(--bibo-radius-paper);
+    background-color: var(--bibo-color-paper);
+    box-shadow: var(--bibo-shadow-paper);
+    color: var(--bibo-color-navy);
+  }
+
+  .freebie-card__pages {
+    position: relative;
+    justify-self: center;
+    inline-size: min(13rem, 62vw);
+    aspect-ratio: 1 / 1.08;
+  }
+
+  .freebie-card__page {
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inline-size: 68%;
+    block-size: auto;
+    border-radius: 0.4rem;
+    background-color: var(--bibo-color-paper);
+    box-shadow: 0 0.125rem 0.25rem rgb(40 59 99 / 0.12), 0 0.5rem 1.25rem rgb(40 59 99 / 0.16);
+  }
+
+  .freebie-card__page--0 {
+    z-index: 3;
+    inset-inline-start: 16%;
+    rotate: -3deg;
+  }
+
+  .freebie-card__page--1 {
+    z-index: 2;
+    inset-inline-start: 32%;
+    rotate: 7deg;
+  }
+
+  .freebie-card__page--2 {
+    z-index: 1;
+    inset-inline-start: 0;
+    rotate: -10deg;
+  }
+
+  .freebie-card__title {
+    font-family: var(--bibo-font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .freebie-card__description {
+    margin-block-start: 0.5rem;
+    color: var(--bibo-color-navy-soft, #4a5878);
+  }
+
+  .freebie-card__download {
+    margin-block-start: 1.25rem;
+    gap: 0.5rem;
+  }
+
+  .freebie-card__glyph {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    flex: none;
+  }
+
+  .freebie-card__meta {
+    margin-block-start: 0.625rem;
+    color: var(--bibo-color-navy-soft, #4a5878);
+    font-size: 0.875rem;
+  }
+
+  @media (min-width: 40rem) {
+    .freebie-card--pages {
+      grid-template-columns: 11rem minmax(0, 1fr);
+      align-items: center;
+      padding: 1.5rem;
+    }
+
+    .freebie-card__pages {
+      inline-size: 11rem;
+    }
+  }
+
+  /* ---------- FAQ ---------- */
+
+  .faq-list {
+    border-block-end: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .faq-item {
+    border-block-start: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .faq-item__question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-block-size: 2.75rem;
+    padding-block: 1.25rem;
+    font-family: var(--bibo-font-display);
+    font-size: clamp(1.1875rem, 1.1rem + 0.4vw, 1.4375rem);
+    font-weight: 600;
+    line-height: 1.25;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .faq-item__question::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-item__mark {
+    flex: none;
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
+    padding: 0.45rem;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--accent, var(--bibo-color-purple)) 20%, var(--bibo-color-paper));
+    color: var(--accent-ink, currentColor);
+    transition: rotate var(--bibo-duration-base) var(--bibo-ease-paper);
+  }
+
+  .faq-item[open] .faq-item__mark {
+    rotate: 45deg;
+  }
+
+  .faq-item__answer {
+    max-inline-size: 62ch;
+    padding-block-end: 1.5rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- Closing horizon and footer ---------- */
+
+  .final-bay {
+    position: relative;
+    aspect-ratio: 1440 / 550;
+    margin-block-start: clamp(1rem, 0.5rem + 2vw, 2.5rem);
+  }
+
+  /* An editor's closing panorama fills the same wide frame; a phone keeps a taller crop of it. */
+  .final-bay--art {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+  }
+
+  @media (min-width: 48rem) {
+    .final-bay--art {
+      aspect-ratio: 1440 / 600;
+    }
+  }
+
+  /* The closing scene stops short of the sand drawn over its foot, so the friends stand above it. */
+  .final-bay__scene {
+    position: absolute;
+    inset: 0;
+  }
+
+  .final-bay__scene--reef {
+    inset-block-end: 12%;
+  }
+
+  .final-bay__reef {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+  }
+
+  .site-footer {
+    --footer-ink-soft: color-mix(in srgb, var(--bibo-color-cream) 84%, var(--bibo-color-navy));
+    background-color: color-mix(in srgb, var(--bibo-color-ocean-deep) 30%, var(--bibo-color-navy));
+    color: var(--bibo-color-cream);
+  }
+
+  .footer-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    color: inherit;
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, var(--bibo-color-yellow) 70%, transparent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.25em;
+  }
+
+  .footer-link:hover {
+    text-decoration-color: var(--bibo-color-yellow);
+  }
+}
+
+/*
+ * Two sections in a row on the same plain paper read as one sheet: the second needs only half a
+ * section's space above it, or the seam becomes an empty band (FAQ into the closing invitation).
+ * The trust band keeps its own tight spacing. Unlayered, so it outranks the sections' padding utilities.
+ */
+.landing-section[data-ground="paper"] + .landing-section[data-ground="paper"]:not([data-section="trust"]) {
+  padding-block-start: calc(var(--bibo-space-section) / 2);
+}

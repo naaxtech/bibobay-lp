@@ -1,0 +1,73 @@
+import { useId, useState, type KeyboardEvent } from "react";
+
+const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+/**
+ * WAI-ARIA tabs with automatic activation and a roving tabindex: one tab stop for the whole
+ * list, arrow keys (either axis, since the list reflows between a grid and a column) move focus
+ * and selection with wrap-around, Home and End jump to the ends.
+ * src: https://www.w3.org/WAI/ARIA/apg/patterns/tabs/ · WAI-ARIA APG (living document) · 2026-10-05
+ */
+export function useRovingTabs(count: number) {
+  const baseId = useId();
+  const [selected, setSelected] = useState(0);
+  const tabId = (index: number) => `${baseId}-tab-${index}`;
+  const panelId = (index: number) => `${baseId}-panel-${index}`;
+
+  const select = (index: number, moveFocus: boolean) => {
+    setSelected(index);
+    if (moveFocus) document.getElementById(tabId(index))?.focus();
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const target = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : STEP[event.key] === undefined ? null : index + STEP[event.key]!;
+    if (target === null) return;
+    event.preventDefault();
+    select((target + count) % count, true);
+  };
+
+  return {
+    selected,
+    tabProps: (index: number) => ({
+      id: tabId(index),
+      role: "tab" as const,
+      type: "button" as const,
+      "aria-selected": index === selected,
+      "aria-controls": panelId(index),
+      tabIndex: index === selected ? 0 : -1,
+      onClick: () => select(index, false),
+      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => onKeyDown(event, index),
+    }),
+    panelProps: (index: number) => {
+      const chosen = index === selected;
+      return {
+        id: panelId(index),
+        role: "tabpanel" as const,
+        "aria-labelledby": tabId(index),
+        /*
+         * Every panel stays laid out, stacked in one grid cell by the stylesheet, so the stage is
+         * always as tall as its tallest panel and choosing another never moves the page (spec §7
+         * "no layout jump"). An unchosen panel is what `hidden` used to make it, minus leaving the
+         * layout: unreachable (inert: no focus, no clicks, no find-in-page), silent to assistive
+         * technology (aria-hidden), and unpainted (landing.css hides `[role=tabpanel][inert]`).
+         * The motion layer may hold the panel being left on screen while it fades out.
+         */
+        inert: !chosen,
+        "aria-hidden": chosen ? undefined : true,
+        // The chosen panel of plain text must still be reachable from the keyboard.
+        tabIndex: chosen ? 0 : -1,
+      };
+    },
+  };
+}
+
+/**
+ * True from the first render in which `chosen` is true, and from then on. Every tab panel stays laid
+ * out (see `panelProps`), so a lazy image in an unchosen panel still loads once its section nears;
+ * panels render their big art only once they have been chosen, and keep it after.
+ */
+export function useEverChosen(chosen: boolean): boolean {
+  const [seen, setSeen] = useState(chosen);
+  if (chosen && !seen) setSeen(true);
+  return chosen || seen;
+}

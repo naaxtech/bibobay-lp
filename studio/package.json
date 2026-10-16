@@ -1,0 +1,36 @@
+{
+  "name": "bibobay-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "sanity dev",
+    "build": "sanity build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@sanity/client": "8.9.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sanity": "6.17.0",
+    "styled-components": "6.5.3"
+  },
+  "overrides": {
+    "@module-federation/dts-plugin": {
+      "adm-zip": "0.6.1",
+      "undici": "7.29.1"
+    },
+    "@vercel/frameworks": {
+      "js-yaml": "3.15.2",
+      "smol-toml": "1.7.1"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}
