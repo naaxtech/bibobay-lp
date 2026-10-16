@@ -83,15 +83,16 @@ failure, the hourly send cap, or Resend not yet configured.
   retry, and Vercel may start a Hobby run anywhere in its hour. A send whose outcome is unknown (a
   timeout, a provider server error) is retried only within 23 hours of that attempt, so on Hobby it
   gets at most one retry, and one made in the hour after a run is parked for a human before any
-  retry (reported as `delivery_expired`; nothing is claimed as sent). On **Pro**, raise the schedule in `vercel.json` (for example `*/15 * * * *`); the worker
-  needs no other change, since every run claims only rows that are due.
+  retry (reported as `delivery_expired`; nothing is claimed as sent). On **Pro**, raise the
+  schedule in `vercel.json` (for example `*/15 * * * *`); the worker needs no other change, since
+  every run claims only rows that are due.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
   `{ sent, failed, skipped, deferred }`.
-- One run stops claiming 40 seconds after the request started, or after 100 rows per outbox, and every send spends one unit of
-  the same hourly budget as the forms (`LEAD_ACK_SEND_LIMIT_PER_HOUR`). Rows the budget did not
-  cover stay due for the next run.
+- One run stops claiming 40 seconds after the request started, or after 100 rows per outbox, and
+  every send spends one unit of the same hourly budget as the forms
+  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`). Rows the budget did not cover stay due for the next run.
 - To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.

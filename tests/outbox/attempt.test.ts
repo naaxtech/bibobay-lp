@@ -226,3 +226,13 @@ describe("a failure that parks the row for a human (Task 8a review I1)", () => {
     expect(events.filter((event) => event.event === "delivery_expired")).toEqual([]);
   });
 });
+
+describe("a final failure whose record changed nothing (re-review N2)", () => {
+  it("reports nothing when the record function found no claimed row", async () => {
+    const { channel } = fakeChannel([{ ...row("a"), attempts: 7 }], { record: async () => false });
+    const { ctx, events } = context({ deliver: async (): Promise<EmailSendResult> => ({ status: "failed", errorCode: "rate_limit_exceeded" }) });
+    await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
+    expect(events.filter((event) => event.event === "delivery_expired")).toEqual([]);
+  });
+});
+

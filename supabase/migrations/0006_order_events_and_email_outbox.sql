@@ -268,7 +268,11 @@ begin
       -- R92: never email a withdrawn adult, whatever the kind.
       v_status := 'skipped';
       update public.lead_delivery_events as event
-         set status = 'skipped', last_error_code = 'lead_withdrawn', updated_at = now()
+         set status = 'skipped', last_error_code = 'lead_withdrawn',
+             -- Re-review N1: a lost attempt (the row was sending) keeps its time; the claim ends.
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else event.last_attempt_at end,
+             claimed_at = null,
+             updated_at = now()
        where event.id = r.id;
       v_skipped := v_skipped + 1;
     elsif r.attempts >= 8
@@ -281,6 +285,7 @@ begin
              last_error_code = case when r.status = 'sending' or r.unconfirmed_since is not null then 'stale_unconfirmed' else event.last_error_code end,
              unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else event.unconfirmed_since end,
              next_attempt_at = 'infinity',
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else event.last_attempt_at end,
              claimed_at = null,
              updated_at = now()
        where event.id = r.id;
@@ -290,6 +295,8 @@ begin
       update public.lead_delivery_events as event
          set status = 'sending',
              attempts = event.attempts + 1,
+             -- A stuck send was a real attempt: it keeps its time until this one is recorded (N1).
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else event.last_attempt_at end,
              claimed_at = now(),
              -- A stuck send may have gone out: unconfirmed from when it was claimed.
              unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else event.unconfirmed_since end,
@@ -461,7 +468,10 @@ begin
 
     if v_skip is not null then
       update public.order_email_outbox as outbox
-         set status = 'skipped', last_error_code = v_skip, updated_at = now()
+         set status = 'skipped', last_error_code = v_skip,
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else outbox.last_attempt_at end,
+             claimed_at = null,
+             updated_at = now()
        where outbox.id = r.id;
       v_skipped := v_skipped + 1;
     elsif r.attempts >= 8
@@ -472,6 +482,7 @@ begin
              last_error_code = case when r.status = 'sending' or r.unconfirmed_since is not null then 'stale_unconfirmed' else outbox.last_error_code end,
              unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else outbox.unconfirmed_since end,
              next_attempt_at = 'infinity',
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else outbox.last_attempt_at end,
              claimed_at = null,
              updated_at = now()
        where outbox.id = r.id;
@@ -480,6 +491,7 @@ begin
       update public.order_email_outbox as outbox
          set status = 'sending',
              attempts = outbox.attempts + 1,
+             last_attempt_at = case when r.status = 'sending' then r.claimed_at else outbox.last_attempt_at end,
              claimed_at = now(),
              unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else outbox.unconfirmed_since end,
              updated_at = now()

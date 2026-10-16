@@ -98,15 +98,17 @@ export function failureParksRow(attempt: number, errorCode: string): boolean {
 }
 
 async function record<K extends string, T extends ClaimedItem<K>>(channel: OutboxChannel<K, T>, item: T, outcome: OutboxOutcome, context: AttemptContext<K>) {
+  let recorded: boolean;
   try {
-    await channel.record(item.id, outcome);
+    recorded = await channel.record(item.id, outcome);
   } catch (error) {
     // The row stays `sending`; a later claim (after 15 minutes) re-sends it under the same key.
     context.log({ event: "delivery_record_failed", kind: item.kind, code: codeOf(error) });
     return;
   }
-  // Review I1: a final failure leaves the row for a human, so it is reported, not just logged.
-  if (outcome.status === "failed" && failureParksRow(item.attempt, outcome.errorCode)) {
+  // Review I1: a final failure leaves the row for a human, so it is reported, not just logged
+  // (re-review N2: only when the record function did park this row).
+  if (recorded && outcome.status === "failed" && failureParksRow(item.attempt, outcome.errorCode)) {
     context.log({ event: "delivery_expired", count: 1, kind: item.kind, code: outcome.errorCode });
   }
 }

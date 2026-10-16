@@ -19,7 +19,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(146);
+select plan(149);
 
 -- ---------------------------------------------------------------------------
 -- Functions and grants
@@ -215,6 +215,9 @@ set local role service_role;
 create temp table claim_c2 on commit drop as select public.claim_lead_deliveries(10, (select lead_id from lead_c)) as result;
 select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_c2), (select event_id from queued_c), 'a row stuck in sending for over 15 minutes is claimed again, under the same id (R91)');
 select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_c2), 2, 'as its next attempt');
+reset role;
+select is((select last_attempt_at from public.lead_delivery_events where id = (select event_id from queued_c)), now() - interval '16 minutes', 'the lost attempt keeps its time when the row is claimed again (re-review N1)');
+set local role service_role;
 
 reset role;
 select is((select unconfirmed_since from public.lead_delivery_events where id = (select event_id from queued_c)), now() - interval '16 minutes', 'the stuck attempt counts as unconfirmed from when it was claimed');
@@ -228,6 +231,10 @@ reset role;
 select ok(
   (select e.status = 'failed' and e.last_error_code = 'stale_unconfirmed' and e.next_attempt_at = 'infinity'::timestamptz from public.lead_delivery_events as e where e.id = (select event_id from queued_c)),
   'it is parked as failed with stale_unconfirmed'
+);
+select ok(
+  (select e.last_attempt_at = now() - interval '16 minutes' and e.claimed_at is null from public.lead_delivery_events as e where e.id = (select event_id from queued_c)),
+  'with the lost attempt''s time as its last attempt, and no claim left (re-review N1)'
 );
 select is((select acknowledgement_status from public.lead_submissions where email = 'parent-c@example.com'), 'failed', 'and the lead mirrors the failure');
 
@@ -521,6 +528,11 @@ select ok(
   (select x.status = 'failed' and x.last_error_code = 'stale_unconfirmed' and x.next_attempt_at = 'infinity'::timestamptz
      from public.order_email_outbox as x where x.id = (select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_b)),
   'as failed with stale_unconfirmed'
+);
+select ok(
+  (select x.last_attempt_at = now() - interval '16 minutes' and x.claimed_at is null
+     from public.order_email_outbox as x where x.id = (select (result -> 'claimed' -> 0 ->> 'id')::uuid from oclaim_b)),
+  'keeping the lost attempt''s time and no claim (re-review N1)'
 );
 update public.order_email_outbox set attempts = 7, status = 'failed', last_error_code = 'rate_limit_exceeded'
  where order_id = (select order_id from order_b) and kind = 'staff_alert';
