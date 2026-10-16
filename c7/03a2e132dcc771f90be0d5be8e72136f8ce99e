@@ -1,0 +1,71 @@
+tests/admin/page-copy.test.ts
+  s_36fcf8940d4895::t_21548cd27d75f0 75-77
+  s_36fcf8940d4895::t_c07225517d5395 38-41
+  s_36fcf8940d4895::t_35d4cc55a0e001 3-16,26-37,42-74,114-115
+  s_36fcf8940d4895::t_53ce67a824b221 19-25
+  s_36fcf8940d4895::t_7527e6629d8322 2
+  s_36fcf8940d4895::t_51ee01ff1fab44 1,17-18,78-95,97-99,101-113
+  s_36fcf8940d4895::t_7b7929ce4aac5c 96
+  s_36fcf8940d4895::t_2a087cadd28bd8 100
+app/admin/layout.tsx
+  s_36fcf8940d4895::t_7a9f358b6f073e 1-23
+tests/admin/ui-admin-frame.test.tsx
+  s_36fcf8940d4895::t_6cd29f5df964bb 1-198
+components/admin/page-copy.ts
+  s_36fcf8940d4895::t_5994d3380a2443 1-44,55-59,62-64,66-68
+  s_36fcf8940d4895::t_f0712a02bc741d 45-54,60-61,65
+tests/admin/quote-money.test.ts
+  s_36fcf8940d4895::t_cbd034ccf1e59f 1-126
+app/globals.css
+  s_36fcf8940d4895::t_72b0993835f3a0 12-13
+tests/admin/admin-access.test.ts
+  s_36fcf8940d4895::t_1a4c7ec634d7b1 1-165
+components/admin/AdminFrame.tsx
+  s_36fcf8940d4895::t_b11c483c0c4d88 1-48
+tests/admin/ui-login-page.test.tsx
+  s_36fcf8940d4895::t_52b6af183f31c9 1-62
+components/admin/admin.css
+  s_36fcf8940d4895::t_3b583812049831 1-149
+components/admin/SignOutButton.tsx
+  s_36fcf8940d4895::t_d8eb45a692da8c 1-4,6-41,43-56
+  s_36fcf8940d4895::t_f0712a02bc741d 5,42
+components/admin/LoginForm.tsx
+  s_36fcf8940d4895::t_f0712a02bc741d 5,18,22,24,26,28,30,34,105
+  s_36fcf8940d4895::t_b8fff67b8cabd2 1-4,6-17,19-21,23,25,27,29,31-33,35-104,106-181
+lib/admin/access.ts
+  s_36fcf8940d4895::t_18348938eb780f 1-71
+components/admin/admin-request.ts
+  s_36fcf8940d4895::t_f0712a02bc741d 28-30
+  s_36fcf8940d4895::t_06a5686a8f1880 1-27,31-34
+tests/admin/ui-login-form.test.tsx
+  s_36fcf8940d4895::t_fd664a4d06ca67 1-120,122-125,127-225
+  s_36fcf8940d4895::t_51ee01ff1fab44 121,126
+app/admin/login/page.tsx
+  s_36fcf8940d4895::t_bbeb8c23507a79 1-26
+e2e/admin/admin-pages.spec.ts
+  s_36fcf8940d4895::t_ca01181aa9ea76 26-28
+  s_36fcf8940d4895::t_560c25b1d19e63 135-136
+  s_36fcf8940d4895::t_b6a9648fac91b3 1-25,29-134,137-140
+components/admin/metadata.ts
+  s_36fcf8940d4895::t_2536ac1d2a62a5 1-10
+components/admin/navigate.ts
+  s_36fcf8940d4895::t_4d0839a08eb3ad 1-9
+lib/orders/quote-money.ts
+  s_36fcf8940d4895::t_726fd4d7550eaa 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c703a2e132dcc771f90be0d5be8e72136f8ce99e",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
