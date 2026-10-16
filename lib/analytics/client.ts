@@ -3,10 +3,11 @@ import { cleanCapture, cleanProperties, type AnalyticsEvent } from "./events";
 import { analyticsAllowed, forgetChoiceForTests, writeChoice } from "./preference";
 
 /**
- * The browser side of analytics (ruling R70). PostHog loads as a first-party chunk (the
- * no-external build, so it cannot fetch PostHog's remote scripts under our 'strict-dynamic' CSP,
- * ruling R50) only when analytics are configured and allowed. Events sent before it has loaded wait
- * in a short queue.
+ * The browser side of analytics (ruling R144: opt-in, replacing R70's opt-out). PostHog loads as a
+ * first-party chunk (the no-external build, so it cannot fetch PostHog's remote scripts under our
+ * 'strict-dynamic' CSP, ruling R50) only when analytics are configured and the visitor has said yes.
+ * Before that answer nothing is loaded and every event is dropped, never kept for later. Events
+ * sent after the "yes" while the SDK is still loading wait in a short queue.
  *
  * Review C1: with cookieless_mode "always", PostHog ignores opt_out_capturing / opt_in_capturing
  * (posthog-core: "Consent opt in/out is not valid with cookieless_mode=\"always\""). The visitor's
@@ -39,6 +40,11 @@ export function posthogOptions(config: AnalyticsConfig): PostHogOptions {
     persistence: "memory",
     person_profiles: "never",
     autocapture: false,
+    // Any truthy value, "history_change" included, also sends the page view of the page PostHog
+    // starts on (posthog-core `_loaded` -> `_captureInitialPageview`, cookieless mode needs no
+    // opt-in), so the page on which the visitor says yes is counted; later client-side navigations
+    // are counted from the history API.
+    // src: https://raw.githubusercontent.com/PostHog/posthog-js/posthog-js@1.438.11/packages/browser/src/posthog-core.ts · posthog-js 1.438.11 · 2026-10-17
     capture_pageview: "history_change",
     capture_pageleave: true,
     save_referrer: true,
@@ -65,7 +71,7 @@ function send(event: AnalyticsEvent, properties: Record<string, unknown>): void 
   if (clean && client) client.capture(event, clean);
 }
 
-/** True while statistics may be sent: not turned off on this page, in another tab or by the browser. */
+/** True while statistics may be sent: the visitor said yes (here or in another tab) and has not said no since. */
 export function analyticsActive(): boolean {
   return !stopped && analyticsAllowed();
 }
@@ -118,16 +124,18 @@ export function track(event: AnalyticsEvent, properties: Record<string, unknown>
 }
 
 /**
- * The visitor turned statistics off: stop now and remember it on this device. PostHog keeps
- * running (its opt-out is a no-op in cookieless mode), but before_send drops every event from here.
+ * The visitor said no in the consent notice, or turned statistics off in the footer: stop now and
+ * remember it on this device. A PostHog already running keeps running (its opt-out is a no-op in
+ * cookieless mode), but before_send drops every event from here. The answer is written last, so
+ * whatever follows it (the notice, the provider) already sees statistics stopped.
  */
 export function stopAnalytics(): void {
-  writeChoice("off");
   stopped = true;
   queue.length = 0;
+  writeChoice("off");
 }
 
-/** The visitor turned statistics on again. */
+/** The visitor said yes in the consent notice, or turned statistics on in the footer. */
 export function resumeAnalytics(config: AnalyticsConfig | null): Promise<boolean> {
   writeChoice("on");
   return startAnalytics(config);

@@ -27,7 +27,7 @@ What exists today and what does not:
 | Staff sign-in and the staff order APIs (`/api/admin/session`, `/api/admin/orders/[reference]/{quote,status,tracking-link}`): staff access rules, quotes, status changes, new tracking links | built (Task 8b; needs Supabase Auth accounts, `staff_users` rows and `PAYMENT_HOST_ALLOWLIST`) |
 | Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`): sign in, the order list, an order with its quote, status and tracking-link controls | built (Task 8c; needs Supabase Auth accounts and `staff_users` rows; the signed-in pages are proven in unit tests, a live pass on a preview waits for Task 12) |
 | Email outbox worker (`/api/cron/email-outbox`, Vercel cron every 15 minutes), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase, Resend and a Vercel Pro plan) |
-| Error reports (Sentry) and cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
+| Error reports (Sentry) and consent-first, cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11); Vercel needs a Pro plan, because Hobby is for non-commercial use only |
 
 "Task N" refers to the numbered tasks in the implementation plan under `docs/superpowers/plans/`.
@@ -86,7 +86,8 @@ The full pre-release list, including running Playwright against a production bui
 - [docs/cms-operations.md](docs/cms-operations.md): working in the Studio, feature toggles, publishing and preview.
 - [docs/database-security.md](docs/database-security.md): tables, row level security, functions and grants, migrations.
 - [docs/deployment.md](docs/deployment.md): environment variables, Vercel, webhooks, health checks, CI, known advisories.
-- [docs/observability.md](docs/observability.md): cookieless visit statistics (PostHog): what is counted, what never is, setup.
+- [docs/observability.md](docs/observability.md): consent-first, cookieless visit statistics (PostHog): what is counted, what never is, setup.
+- [docs/data-protection.md](docs/data-protection.md): the personal data the site handles, the legal basis and consent record for each use, what is kept on the device, the owner's tasks before launch, and handling a request from a person.
 - [docs/manual-checkout-operations.md](docs/manual-checkout-operations.md): the manual ordering workflow: what exists and what is still to come.
 - [docs/qa-checklist.md](docs/qa-checklist.md): release checklist with exact commands.
 - [docs/incident-runbook.md](docs/incident-runbook.md): removal requests, parked emails, rollback, switching commerce off, secret rotation.

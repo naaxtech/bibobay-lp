@@ -2,9 +2,11 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Ruling R70: PostHog runs for every visitor in cookieless mode (no cookies, no local or session
- * storage, no person profiles), loads none of PostHog's remote code, and stops for anyone who turns
- * it off or whose browser asks not to be tracked. The SDK is replaced here by a recorder.
+ * Ruling R144: visit statistics are opt-in. PostHog runs in cookieless mode (no cookies, no local
+ * or session storage, no person profiles) and loads none of PostHog's remote code, but only after
+ * the visitor has said yes; nothing is loaded, counted or queued before that, and it stops for
+ * anyone who says no or turns it off. A browser that sends Global Privacy Control or Do Not Track
+ * is not counted unless the visitor says yes on this site. The SDK is replaced here by a recorder.
  */
 const sdk = vi.hoisted(() => {
   const calls = { init: [] as Array<[string, Record<string, unknown>]>, capture: [] as Array<[string, Record<string, unknown>]>, optOut: 0, optIn: 0, imported: 0 };
@@ -65,7 +67,7 @@ class FakeObserver {
 import { AnalyticsChoices } from "@/components/analytics/AnalyticsChoices";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { posthogOptions, resetAnalyticsForTests, resumeAnalytics, startAnalytics, stopAnalytics, track } from "@/lib/analytics/client";
-import { ANALYTICS_PREFERENCE_KEY } from "@/lib/analytics/preference";
+import { ANALYTICS_PREFERENCE_KEY, writeChoice } from "@/lib/analytics/preference";
 
 const CONFIG = { key: "phc_ExampleKey0123456789abcdefABCDEF", apiHost: "https://ph.example.com" };
 const PAGEVIEW = (event = "$pageview") => ({
@@ -80,6 +82,16 @@ const settle = () => act(async () => {
 });
 
 const captured = (name: string) => sdk.calls.capture.filter(([event]) => event === name);
+
+/** The SDK module as a loader the tests can count. */
+const recordingLoader = () => vi.fn(async () => ({ default: sdk.posthog }) as unknown as typeof import("posthog-js/dist/module.no-external"));
+
+/** The visitor answers in another tab: the stored answer changes and this tab hears a `storage` event. */
+const answerInAnotherTab = (answer: "on" | "off") =>
+  act(async () => {
+    window.localStorage.setItem(ANALYTICS_PREFERENCE_KEY, answer);
+    window.dispatchEvent(new StorageEvent("storage", { key: ANALYTICS_PREFERENCE_KEY, newValue: answer, storageArea: window.localStorage }));
+  });
 
 beforeEach(() => {
   resetAnalyticsForTests();
@@ -128,8 +140,35 @@ describe("PostHog options", () => {
   });
 });
 
+describe("startAnalytics and track before and after an answer (ruling R144)", () => {
+  it("loads nothing for a configured site while the visitor has not answered", async () => {
+    const load = recordingLoader();
+    await expect(startAnalytics(CONFIG, load)).resolves.toBe(false);
+    expect(load).not.toHaveBeenCalled();
+    expect(sdk.calls.init).toHaveLength(0);
+  });
+
+  it("queues nothing before an answer: an event from before the \"yes\" is never sent", async () => {
+    track("lead_submitted", { persisted: true, acknowledgementQueued: true });
+    track("cta_clicked", { section: "hero" });
+    writeChoice("on");
+    await expect(startAnalytics(CONFIG, recordingLoader())).resolves.toBe(true);
+    expect(sdk.calls.init).toHaveLength(1);
+    expect(sdk.calls.capture).toEqual([]);
+  });
+
+  it("loads and starts PostHog once the visitor has said yes", async () => {
+    writeChoice("on");
+    const load = recordingLoader();
+    await expect(startAnalytics(CONFIG, load)).resolves.toBe(true);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(sdk.calls.init).toEqual([[CONFIG.key, expect.objectContaining({ cookieless_mode: "always", capture_pageview: "history_change" })]]);
+  });
+});
+
 describe("AnalyticsProvider", () => {
-  it("does nothing at all without a configuration", async () => {
+  it("does nothing at all without a configuration, even after a yes", async () => {
+    writeChoice("on");
     render(<AnalyticsProvider config={null} />);
     await settle();
     expect(sdk.calls.init).toHaveLength(0);
@@ -137,7 +176,22 @@ describe("AnalyticsProvider", () => {
     expect(sdk.calls.capture).toHaveLength(0);
   });
 
-  it("starts for every visitor, with no consent step, and reports what they do", async () => {
+  it("loads nothing and counts nothing while the visitor has not answered", async () => {
+    document.body.innerHTML = `<section data-section="episodes"><a id="video" href="https://www.youtube.com/watch?v=3birY6XZ3_c">Watch on YouTube</a></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    const link = document.getElementById("video")!;
+    link.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(link);
+    FakeObserver.intersect(document.querySelector("[data-section='episodes']")!);
+    await settle();
+    expect(sdk.calls.capture).toEqual([]);
+    expect(sdk.calls.init).toHaveLength(0);
+  });
+
+  it("starts for a visitor who said yes, and reports what they do", async () => {
+    writeChoice("on");
     document.body.innerHTML = `<section data-section="episodes"><a id="video" href="https://www.youtube.com/watch?v=3birY6XZ3_c">Watch on YouTube</a></section>`;
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
@@ -148,14 +202,44 @@ describe("AnalyticsProvider", () => {
     expect(sdk.calls.capture).toContainEqual(["youtube_clicked", { kind: "video", video_id: "3birY6XZ3_c", section: "episodes", label: "Watch on YouTube" }]);
   });
 
-  it("holds events sent before the SDK has loaded, then sends them once", async () => {
+  it("starts the moment the visitor says yes on this page, and watches the sections from then on", async () => {
+    document.body.innerHTML = `<section data-section="episodes"></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    await act(async () => {
+      writeChoice("on");
+    });
+    await settle();
+    expect(sdk.calls.init).toHaveLength(1);
+    FakeObserver.intersect(document.querySelector("[data-section='episodes']")!);
+    expect(captured("section_viewed")).toEqual([["section_viewed", { section: "episodes" }]]);
+  });
+
+  it("starts when the visitor says yes in another tab", async () => {
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    await answerInAnotherTab("on");
+    await settle();
+    expect(sdk.calls.init).toHaveLength(1);
+  });
+
+  it("holds events sent after the yes while the SDK is still loading, then sends them once", async () => {
+    writeChoice("on");
     render(<AnalyticsProvider config={CONFIG} />);
     track("lead_submitted", { persisted: true, acknowledgementQueued: true, email: "ana@example.com" });
     await settle();
     expect(sdk.calls.capture.filter(([event]) => event === "lead_submitted")).toEqual([["lead_submitted", { persisted: true, acknowledgementQueued: true }]]);
   });
 
-  it("never starts in a browser that sends Global Privacy Control or Do Not Track", async () => {
+  // Whatever the browser sends, no answer means nothing starts; that GPC/DNT browsers are not even
+  // asked is the notice's job (tests/analytics/consent-notice.test.tsx).
+  it("starts nothing for a visitor who has not answered, with Global Privacy Control, Do Not Track or neither", async () => {
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    cleanup();
     Object.defineProperty(navigator, "globalPrivacyControl", { value: true, configurable: true });
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
@@ -168,6 +252,14 @@ describe("AnalyticsProvider", () => {
     expect(sdk.calls.init).toHaveLength(0);
   });
 
+  it("starts in a Global Privacy Control browser once the visitor said yes on this site (ruling R147)", async () => {
+    Object.defineProperty(navigator, "globalPrivacyControl", { value: true, configurable: true });
+    writeChoice("on");
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(1);
+  });
+
   it("never starts for a visitor who turned statistics off", async () => {
     window.localStorage.setItem(ANALYTICS_PREFERENCE_KEY, "off");
     render(<AnalyticsProvider config={CONFIG} />);
@@ -176,6 +268,7 @@ describe("AnalyticsProvider", () => {
   });
 
   it("leaves the staff pages alone on a hard load, and drops a page view of them after a client-side navigation (8c-M1)", async () => {
+    writeChoice("on");
     window.history.pushState({}, "", "/admin/orders/BB-1A2B-3C4D");
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
@@ -193,6 +286,7 @@ describe("AnalyticsProvider", () => {
   });
 
   it("leaves the editors' Studio alone", async () => {
+    writeChoice("on");
     window.history.pushState({}, "", "/studio/desk");
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
@@ -203,6 +297,7 @@ describe("AnalyticsProvider", () => {
 
 describe("AnalyticsChoices (footer)", () => {
   it("lets a visitor turn statistics off and on again, and remembers the choice on this device only", async () => {
+    writeChoice("on");
     render(<><AnalyticsProvider config={CONFIG} /><AnalyticsChoices config={CONFIG} /></>);
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Analytics choices" }));
@@ -224,6 +319,32 @@ describe("AnalyticsChoices (footer)", () => {
     expect(beforeSend(PAGEVIEW())).not.toBeNull();
   });
 
+  it("lets a visitor who never answered turn statistics on from the footer", async () => {
+    render(<><AnalyticsProvider config={CONFIG} /><AnalyticsChoices config={CONFIG} /></>);
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Analytics choices" }));
+    const dialog = screen.getByRole("dialog", { name: "Analytics choices" });
+    expect(within(dialog).getByText("Visit statistics are off for this browser.")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Turn statistics off" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Turn statistics on" }));
+    await settle();
+    expect(window.localStorage.getItem(ANALYTICS_PREFERENCE_KEY)).toBe("on");
+    expect(sdk.calls.init).toHaveLength(1);
+  });
+
+  it("keeps the open dialog true when the visitor answers in another tab", async () => {
+    render(<AnalyticsChoices config={CONFIG} />);
+    fireEvent.click(screen.getByRole("button", { name: "Analytics choices" }));
+    const dialog = screen.getByRole("dialog", { name: "Analytics choices" });
+    expect(within(dialog).getByRole("status").textContent).toBe("Visit statistics are off for this browser.");
+    await answerInAnotherTab("on");
+    expect(within(dialog).getByRole("status").textContent).toBe("Visit statistics are on for this browser.");
+    expect(within(dialog).getByRole("button", { name: "Turn statistics off" })).toBeTruthy();
+    await answerInAnotherTab("off");
+    expect(within(dialog).getByRole("status").textContent).toBe("Visit statistics are off for this browser.");
+    expect(within(dialog).getByRole("button", { name: "Turn statistics on" })).toBeTruthy();
+  });
+
   it("is not offered when analytics are not configured: there is nothing to choose", () => {
     render(<AnalyticsChoices config={null} />);
     expect(screen.queryByRole("button", { name: "Analytics choices" })).toBeNull();
@@ -233,11 +354,15 @@ describe("AnalyticsChoices (footer)", () => {
 describe("turning statistics off (review C1: cookieless_mode \"always\" ignores PostHog's opt-out)", () => {
   const beforeSend = () => sdk.calls.init[0]![1].before_send as (capture: unknown) => unknown;
 
+  beforeEach(() => {
+    writeChoice("on");
+  });
+
   it("drops PostHog's own page views and page leaves from the moment statistics are turned off, until they are on again", async () => {
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
     expect(beforeSend()(PAGEVIEW())).not.toBeNull();
-    stopAnalytics();
+    act(() => stopAnalytics());
     expect(beforeSend()(PAGEVIEW())).toBeNull();
     expect(beforeSend()(PAGEVIEW("$pageleave"))).toBeNull();
     await act(async () => {
@@ -249,23 +374,28 @@ describe("turning statistics off (review C1: cookieless_mode \"always\" ignores 
   it("drops events once statistics were turned off in another tab", async () => {
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
-    window.localStorage.setItem(ANALYTICS_PREFERENCE_KEY, "off");
+    await answerInAnotherTab("off");
     expect(beforeSend()(PAGEVIEW())).toBeNull();
   });
 
   it("never starts PostHog when statistics are turned off while it is still loading, and can start it later", async () => {
     render(<AnalyticsProvider config={CONFIG} />);
-    stopAnalytics();
+    act(() => stopAnalytics());
     await settle();
     expect(sdk.calls.init).toHaveLength(0);
     await act(async () => {
       await resumeAnalytics(CONFIG);
     });
+    await settle();
     expect(sdk.calls.init).toHaveLength(1);
   });
 });
 
 describe("PostHog toolbar links (review M2)", () => {
+  beforeEach(() => {
+    writeChoice("on");
+  });
+
   afterEach(() => {
     window.history.replaceState({}, "", "/");
   });
@@ -298,9 +428,23 @@ describe("PostHog toolbar links (review M2)", () => {
     await settle();
     expect(window.location.hash).toBe("#lead");
   });
+
+  it("never loads PostHog for a toolbar link while the visitor has not answered, so nothing is written to the device", async () => {
+    resetAnalyticsForTests();
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/#__posthog=eyJhY3Rpb24iOiJwaF9hdXRob3JpemUifQ");
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    expect(sdk.calls.init).toHaveLength(0);
+    expect(window.localStorage.length).toBe(0);
+  });
 });
 
 describe("section views (review M4)", () => {
+  beforeEach(() => {
+    writeChoice("on");
+  });
+
   it("counts each section once when it reaches the middle of the screen", async () => {
     document.body.innerHTML = `<section data-section="episodes"></section>`;
     render(<AnalyticsProvider config={CONFIG} />);
@@ -327,7 +471,7 @@ describe("section views (review M4)", () => {
     document.body.innerHTML = `<section data-section="lead"></section>`;
     render(<AnalyticsProvider config={CONFIG} />);
     await settle();
-    stopAnalytics();
+    act(() => stopAnalytics());
     const section = document.querySelector("[data-section='lead']")!;
     FakeObserver.intersect(section);
     expect(captured("section_viewed")).toEqual([]);
@@ -337,9 +481,44 @@ describe("section views (review M4)", () => {
     FakeObserver.intersect(section);
     expect(captured("section_viewed")).toEqual([["section_viewed", { section: "lead" }]]);
   });
+
+  it("counts a section once per page view, even when statistics are turned off and on again", async () => {
+    document.body.innerHTML = `<section data-section="lead"></section>`;
+    render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    const section = document.querySelector("[data-section='lead']")!;
+    FakeObserver.intersect(section);
+    act(() => stopAnalytics());
+    await act(async () => {
+      await resumeAnalytics(CONFIG);
+    });
+    await settle();
+    FakeObserver.intersect(section);
+    expect(captured("section_viewed")).toEqual([["section_viewed", { section: "lead" }]]);
+  });
+
+  it("counts the same section again on the next page view", async () => {
+    document.body.innerHTML = `<section data-section="lead"></section>`;
+    const { rerender } = render(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    const section = document.querySelector("[data-section='lead']")!;
+    FakeObserver.intersect(section);
+    nav.pathname = "/privacy";
+    rerender(<AnalyticsProvider config={CONFIG} />);
+    await settle();
+    FakeObserver.intersect(section);
+    expect(captured("section_viewed")).toEqual([
+      ["section_viewed", { section: "lead" }],
+      ["section_viewed", { section: "lead" }],
+    ]);
+  });
 });
 
 describe("middle-click (review M13)", () => {
+  beforeEach(() => {
+    writeChoice("on");
+  });
+
   it("counts a YouTube link opened with the middle button", async () => {
     document.body.innerHTML = `<section data-section="hero"><a id="yt" href="https://www.youtube.com/@bibobay-tv">Watch on YouTube</a></section>`;
     render(<AnalyticsProvider config={CONFIG} />);

@@ -1,13 +1,20 @@
 # Observability: visit statistics and error reports
 
 How the site counts visits (PostHog, ruling R70: owner request 2026-10-16, "track all website
-users, what they do and where they come from") and how it reports errors (Sentry, Task 10M-a), and
-what neither ever collects. Both are off until their environment variables are set.
+users, what they do and where they come from"; made opt-in by ruling R144 on 2026-10-17, when the
+owner asked for cookie consent and GDPR compliance) and how it reports errors (Sentry, Task 10M-a),
+and what neither ever collects. Both are off until their environment variables are set, and visit
+statistics are also off for each visitor until that visitor says yes. The personal data the site
+handles, the legal basis of each use and the owner's tasks before launch are in
+[data-protection.md](data-protection.md).
 
 ## What is counted
 
-PostHog runs on every public page (not the Studio, and not the staff pages under `/admin`) whenever
-`NEXT_PUBLIC_POSTHOG_KEY` holds a project key. There is no consent banner, because nothing is stored on the visitor's device:
+PostHog can run on every public page (not the Studio, and not the staff pages under `/admin`)
+whenever `NEXT_PUBLIC_POSTHOG_KEY` holds a project key, but only for a visitor who has said yes in
+the consent notice or turned statistics on in Analytics choices ([Consent](#consent-nobody-is-counted-until-they-say-yes)).
+Before that, nothing is counted and the PostHog code is not even loaded. Once it runs, these are the
+events it sends:
 
 | Event | When | Properties |
 |---|---|---|
@@ -15,7 +22,7 @@ PostHog runs on every public page (not the Studio, and not the staff pages under
 | `youtube_clicked` | A link to the channel, its subscribe prompt or a video | `kind` (`channel`, `subscribe`, `video`), `video_id`, `section`, `label` |
 | `freebie_downloaded` | The activity pack: a click on the signed download route `/api/freebies/download` (or any `/freebies/*.pdf`); `file` is the pathname only, never the token | `file`, `section` |
 | `cta_clicked` | Any other link (click or middle-click) | `destination` (`anchor`, `internal`, `external`), `section`, `label` |
-| `section_viewed` | A landing section reaches the middle of the screen (once per page view, also after client-side navigation; a section seen while statistics are off counts once they are on) | `section` |
+| `section_viewed` | A landing section reaches the middle of the screen (once per page view, also after client-side navigation; a section seen while statistics are off is counted when it is next in the middle of the screen once they are on) | `section` |
 | `tab_selected` | A friend or video tab other than the one showing | `section`, `label` |
 | `faq_opened` | A question is opened | `index`, `section` |
 | `menu_opened` | The phone menu | `section` |
@@ -29,10 +36,20 @@ Where visitors come from: PostHog's Web analytics dashboard groups `$pageview` b
 PostHog strips the address before GeoIP runs, so no location is added. Tag links you share, for example
 `https://<domain>/?utm_source=youtube&utm_medium=video_description&utm_campaign=activity_pack`.
 
+What happens to the address is PostHog's own statement: "In cookieless mode, the IP is stripped
+before transformations run, so GeoIP enrichment and bot detection won't enrich your events." Its
+documentation says nothing more about where the address goes, so the privacy page says only that
+the address is removed from the event and not stored with the statistics, and the owner asks PostHog
+to confirm the rest ([data-protection.md](data-protection.md#before-launch-owner), item 7).
+
+- src: https://posthog.com/docs/privacy/data-storage · PostHog docs, "IP data capture configuration" (cookieless mode strips the IP before transformations; "Discard client IP data" does not apply in that mode) · 2026-10-17
+
 ## What is never collected
 
-- No cookies, no local or session storage (`cookieless_mode: "always"`, `persistence: "memory"`),
-  no person profiles (`person_profiles: "never"`), no `identify` call. PostHog counts unique
+- No cookies, and PostHog itself writes no local or session storage (`cookieless_mode: "always"`,
+  `persistence: "memory"`); the visitor's answer is the one entry the site keeps
+  ([Consent](#consent-nobody-is-counted-until-they-say-yes)). No person profiles
+  (`person_profiles: "never"`), no `identify` call. PostHog counts unique
   visitors with a hash it computes on its servers from a salt that rotates daily, so a visitor
   is not recognised on a later day.
 - No autocapture, session replay, heatmaps, dead-click or rage-click capture, exception capture,
@@ -62,32 +79,62 @@ PostHog strips the address before GeoIP runs, so no location is added. Tag links
   loading off, so it never fetches scripts from PostHog under the site's `'strict-dynamic'` CSP. The
   configured host is added to `connect-src` only.
 
+## Consent: nobody is counted until they say yes
+
+Statistics are opt-in (ruling R144, which overrode R70's "on unless the visitor turns them off"):
+
+- **Everyone starts uncounted.** With a key set, a visitor with no stored answer sees the consent
+  notice "Can we count your visit?" (`components/analytics/ConsentNotice.tsx`) on their first visit.
+  Until they answer, and after "No, do not count me", nothing is counted, no PostHog code is fetched
+  and nothing is sent. Clicks and sections seen before the answer are dropped, not queued for later:
+  "Yes, count my visit" starts the counting on the page the visitor is on.
+- **The notice** is not a modal: it takes no focus when it appears, the page stays usable without an
+  answer, the two buttons look the same, nothing is chosen in advance, and it links to the privacy
+  page (ruling R148). After an answer, focus moves to the page's skip link so a keyboard or
+  screen-reader user is not left nowhere (ruling R153); the link shows itself only for keyboard focus. It is not shown when no key is set (ruling R146: asking consent for statistics that cannot
+  run would be untrue), on staff pages or in the Studio, or to a visitor who has already answered.
+- **The stored answer.** Either answer is kept in `localStorage` under `bibo.analytics.v1` (`on` or
+  `off`, `lib/analytics/preference.ts`), so the visitor is not asked again. It is the only thing
+  analytics ever keep on the device, and it is strictly necessary to honour the answer, so it needs
+  no consent of its own (ruling R145). An answer given in another tab hides the notice at once and is
+  followed there. Where storage is blocked the answer lasts for the page, and the notice comes back on
+  the next load.
+- **Global Privacy Control or Do Not Track** (ruling R147): such a browser is not asked and not
+  counted, unless that visitor turns statistics on in Analytics choices; an explicit "yes" given on
+  this site wins over the browser signal.
+- **Changing the answer:** **Analytics choices** in the footer (on every page, including the 404
+  page, and even if an editor removes the legal links) says whether statistics are on for this
+  browser and turns them off or on. Turning them off stops the counting at once, also in other open
+  tabs (`before_send`, above).
+
 ## Who is not counted
 
+- A visitor who has not answered the notice, or who answered "No, do not count me".
 - A browser that sends Global Privacy Control or Do Not Track, unless that visitor turns statistics
   on in Analytics choices.
-- A visitor who turns statistics off under **Analytics choices** in the footer (on every page,
-  including the 404 page, and even if an editor removes the legal links). The choice is kept in
-  `localStorage` (`bibo.analytics.v1`), which is the only thing analytics ever store, and only after
-  that choice; where storage is blocked it lasts for the page.
+- A visitor who turns statistics off under **Analytics choices** in the footer.
 - Anyone on a staff page (`/admin`) or in the Studio (`/studio`): see "What is never collected".
 - Automated browsers: PostHog drops events from known bots and from browsers driven by automation
   (`navigator.webdriver`), so crawlers and test runs do not inflate the numbers. The e2e spec
   stands in for a person's browser for that reason.
-- Everyone, when `NEXT_PUBLIC_POSTHOG_KEY` is empty: no SDK download, no request, no footer link.
+- Everyone, when `NEXT_PUBLIC_POSTHOG_KEY` is empty: no SDK download, no request, no consent notice,
+  no footer link.
 
 ## Setting it up (provisioning task)
 
 1. Create the PostHog project under the BIBO Bay owner account. Pick the US or EU region and set
    `NEXT_PUBLIC_POSTHOG_HOST` to match (`https://us.i.posthog.com` or `https://eu.i.posthog.com`).
+   Where EU or UK visitors are expected, the EU region is the one listed in
+   [data-protection.md](data-protection.md#before-launch-owner).
 2. **Project settings → Web analytics → Cookieless server hash mode: on.** Without it PostHog
    ignores every event this site sends.
 3. Set `NEXT_PUBLIC_POSTHOG_KEY` (the project key, `phc_…`; never a personal key, `phx_…`, which
    `verify:env` refuses) in Vercel, then redeploy: Next inlines `NEXT_PUBLIC_` values into the
    build. `verify:env` also fails a key or host that is set but malformed, which would otherwise
    leave analytics silently off.
-4. Check: open the site, click a YouTube link and the activity pack, then confirm the events in
-   PostHog's Activity view.
+4. Check: open the site, answer "Yes, count my visit" in the notice, click a YouTube link and the
+   activity pack, then confirm the events in PostHog's Activity view. In a second, private window,
+   answer "No, do not count me" and confirm that nothing arrives.
 
 The privacy page's fallback text (`lib/content/legal-fallback.ts`) describes all of this; keep it
 in step with the code, and have the owner and a lawyer review it before launch.
@@ -95,12 +142,20 @@ in step with the code, and have the owner and a lawyer review it before launch.
 ## Proof
 
 - Unit: `tests/analytics/*` (allow-list, address and referrer trimming, click meaning, options,
-  opt-out, GPC/DNT, wiring into the footer, CSP, signup outcome).
-- Browser: `e2e/analytics/analytics.spec.ts`, skipped unless `E2E_ANALYTICS=1`. Run it against a
-  production build made with a placeholder key and `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com`
-  (Playwright answers that host itself; no real request is made). It checks that events reach the
-  host with trimmed addresses, that nothing is written to cookies or storage, that GPC stops all
-  requests, and that after the footer switch no event is sent, also across client-side navigation.
+  the opt-in default and the stored answer, the consent notice, GPC/DNT, wiring into the footer,
+  CSP, signup outcome).
+- Browser: `e2e/analytics/analytics.spec.ts` and `e2e/analytics/consent.spec.ts`. Their keyed parts
+  are skipped unless `E2E_ANALYTICS=1`; run them against a production build made with a placeholder
+  key and `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` (Playwright answers that host itself; no
+  real request is made). They check that nothing is sent before an answer or after "No", that no
+  PostHog code is even downloaded before a "Yes" (no script response carries the installed
+  posthog-js version until then; ruling R152), that a "Yes" sends events to the host with trimmed
+  addresses, that the answer is the only thing stored
+  and no cookie is set, that the answer holds across a reload and another tab, that the notice is
+  reachable by keyboard, fits a phone screen and stays off the staff pages, that GPC stops all
+  requests and shows no notice, and that after the footer switch no event is sent, also across
+  client-side navigation. The keyless part of `consent.spec.ts` checks that a build without a key
+  shows no notice and no footer link.
 
 ## Error reports (Sentry)
 

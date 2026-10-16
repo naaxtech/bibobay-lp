@@ -68,13 +68,25 @@ export const UI_COPY = {
     retry: "Try again",
     home: "Back to Bibo Bay",
   },
-  /** Visit statistics (ruling R70): the footer's choices dialog. */
+  /**
+   * Visit statistics are opt-in (ruling R144): the notice shown on a first visit while analytics
+   * are configured. Two equal answers and no pre-selected one (ruling R148). Tasks quoting it (the
+   * privacy text, the browser specs) use these strings verbatim.
+   */
+  consentNotice: {
+    title: "Can we count your visit?",
+    body: "BIBO Bay would like to count visits with PostHog to learn which pages, videos and activities families use, and how they find us. Counting sets no cookies, builds no profile of you and never records what you type. The only thing it keeps on this device is your answer; change it any time under Analytics choices in the footer.",
+    accept: "Yes, count my visit",
+    decline: "No, do not count me",
+    privacy: "Privacy page",
+  },
+  /** Visit statistics (ruling R144, opt-in): the footer's choices dialog. */
   analytics: {
     choices: "Analytics choices",
     explainer: [
       "BIBO Bay counts visits to learn which pages, videos and activities families use, and how they find us: the page, the site or campaign that sent you, your browser, operating system and device type, your browser's language and time zone, how far you scroll and how long you stay, and which buttons and links you choose.",
-      "It uses no cookies and builds no profile of you. To count visitors, PostHog combines your network address and browser details with a value that changes every day, and does not keep the address. It never records what you type into the form. A browser that sends Global Privacy Control or Do Not Track is not counted.",
-      "If you turn statistics off, this browser remembers that choice on your device.",
+      "It uses no cookies and builds no profile of you. To count visitors, PostHog combines your network address and browser details with a value that changes every day, then removes the address from the event before it is processed further, so the address is not stored with the statistics. It never records what you type into the form. A browser that sends Global Privacy Control or Do Not Track is not asked and not counted, unless you turn statistics on here.",
+      "Statistics stay off until you say yes. Your answer, yes or no, is kept on this device; change it here at any time.",
     ],
     statusOn: "Visit statistics are on for this browser.",
     statusOff: "Visit statistics are off for this browser.",

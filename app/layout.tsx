@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { ConsentNotice } from "@/components/analytics/ConsentNotice";
 import { analyticsConfig } from "@/lib/analytics/config";
 import { SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { atRequestTime } from "@/lib/next/request-time";
@@ -42,8 +43,15 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en" className={`${displayFace.variable} ${bodyFace.variable}`}>
       <body>
         <RenderPerRequest />
+        {/*
+          Rulings R144/R148: the consent notice comes first in the body, so keyboard and
+          screen-reader users reach it early. It renders in the browser only, and only when there
+          is something to ask: a PostHog key, no answer yet, no Global Privacy Control or Do Not
+          Track, and not a staff or Studio page.
+        */}
+        <ConsentNotice config={analyticsConfig()} />
         {children}
-        {/* Ruling R70: cookieless visit statistics on every page; nothing without a PostHog key. */}
+        {/* Ruling R144: consent-first, cookieless visit statistics, started by a "yes"; nothing without a PostHog key. */}
         <AnalyticsProvider config={analyticsConfig()} />
       </body>
     </html>

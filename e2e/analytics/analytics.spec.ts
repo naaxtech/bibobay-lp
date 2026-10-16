@@ -1,71 +1,25 @@
-import { gunzipSync } from "node:zlib";
+import { expect, test } from "@playwright/test";
 
-import { expect, test, type BrowserContext, type Page, type Request } from "@playwright/test";
+import { hydrated } from "../shop/shop-helpers";
+import { PERSON_UA, named, storageKeys, watch } from "./support";
 
 /**
- * Ruling R70: cookieless visit statistics, proven in a browser. Skipped unless E2E_ANALYTICS=1, and
- * run against a production build made with a placeholder project key and
- * NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com. Playwright answers that host and YouTube itself:
- * no request leaves the machine.
+ * Rulings R70 and R144: cookieless visit statistics, opt-in, proven in a browser. Nothing is counted
+ * until the visitor accepts the consent notice; the only thing stored on the device is that answer.
+ * Skipped unless E2E_ANALYTICS=1, and run against a production build made with a placeholder project
+ * key and NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com. Playwright answers that host and YouTube
+ * itself: no request leaves the machine. The notice itself is covered in consent.spec.ts.
  */
-const HOST = "https://ph.example.com";
 test.skip(process.env.E2E_ANALYTICS !== "1", "needs a production build with placeholder PostHog values (docs/observability.md)");
-
-interface SentEvent {
-  event: string;
-  properties: Record<string, unknown>;
-}
-
-/** PostHog posts JSON, gzip (compression=gzip-js) or base64 form data; read whichever it sent. */
-function eventsIn(request: Request): SentEvent[] {
-  const url = new URL(request.url());
-  const raw = request.postDataBuffer();
-  if (!raw) return [];
-  let text: string;
-  if (url.searchParams.get("compression") === "gzip-js" || (raw[0] === 0x1f && raw[1] === 0x8b)) text = gunzipSync(raw).toString("utf8");
-  else {
-    text = raw.toString("utf8");
-    if (text.startsWith("data=")) text = Buffer.from(decodeURIComponent(text.slice(5)), "base64").toString("utf8");
-  }
-  const body = JSON.parse(text) as unknown;
-  const list = Array.isArray(body) ? body : (body as { batch?: unknown[] }).batch ?? [body];
-  return list as SentEvent[];
-}
-
-/**
- * PostHog drops events from automated browsers (navigator.webdriver, "HeadlessChrome"): bots are
- * not counted. These tests stand in for a person's browser so the events are sent.
- */
-const PERSON_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-
-async function watch(context: BrowserContext) {
-  await context.addInitScript(() => {
-    Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false });
-    Object.defineProperty(Navigator.prototype, "userAgentData", { get: () => ({ brands: [{ brand: "Chromium", version: "140" }, { brand: "Google Chrome", version: "140" }], mobile: false, platform: "Windows" }) });
-  });
-  const requests: Request[] = [];
-  const events: SentEvent[] = [];
-  await context.route(`${HOST}/**`, async (route) => {
-    requests.push(route.request());
-    if (route.request().method() === "POST") events.push(...eventsIn(route.request()));
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: 1 }) });
-  });
-  await context.route(/^https:\/\/(www\.)?youtube\.com\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>YouTube</title>" }));
-  return { requests, events };
-}
-
-const named = (events: SentEvent[], name: string) => events.filter((event) => event.event === name);
-
-async function storageKeys(page: Page) {
-  return page.evaluate(() => [...Object.keys(localStorage), ...Object.keys(sessionStorage)]);
-}
 
 test.describe("visit statistics (cookieless PostHog)", () => {
   test.use({ viewport: { width: 1440, height: 900 }, userAgent: PERSON_UA });
 
-  test("counts the visit, where it came from and what the visitor chose, storing nothing on the device", async ({ page, context, baseURL }) => {
+  test("counts the visit, where it came from and what the visitor chose, storing only the visitor's answer on the device", async ({ page, context, baseURL }) => {
     const { requests, events } = await watch(context);
     await page.goto("/?utm_source=youtube&utm_medium=video&utm_campaign=launch&gclid=abc123&email=parent%40example.com");
+    // R144: nothing is counted until the visitor says yes.
+    await page.getByRole("button", { name: "Yes, count my visit" }).click();
 
     await expect.poll(() => named(events, "$pageview").length, { timeout: 15_000 }).toBeGreaterThan(0);
     const view = named(events, "$pageview")[0]!;
@@ -111,25 +65,43 @@ test.describe("visit statistics (cookieless PostHog)", () => {
 
     // Only ingestion requests: no scripts, flags or remote configuration fetched from PostHog.
     for (const request of requests) expect(request.method(), request.url()).toBe("POST");
-    // Cookieless: nothing in cookies or storage.
+    // Cookieless: no cookies, and the only thing in storage is the visitor's own answer.
     expect((await context.cookies()).map((cookie) => cookie.name)).toEqual([]);
-    expect(await storageKeys(page)).toEqual([]);
+    expect(await storageKeys(page)).toEqual(["bibo.analytics.v1"]);
     // Only allow-listed events left the browser.
     const allowed = new Set(["$pageview", "$pageleave", "youtube_clicked", "freebie_downloaded", "cta_clicked", "section_viewed", "tab_selected", "faq_opened", "menu_opened", "lead_submitted"]);
     for (const event of events) expect(allowed.has(event.event), event.event).toBe(true);
   });
 
   test("a PostHog toolbar link changes nothing on the device (re-review M2)", async ({ page, context }) => {
-    const { events } = await watch(context);
+    const { requests, events } = await watch(context);
     const state = Buffer.from(JSON.stringify({ action: "ph_authorize", token: "phc_PlaceholderKey0123456789abcdefABCDEF" })).toString("base64");
-    for (const hash of [`#__posthog=${state}`, `#state=${encodeURIComponent(JSON.stringify({ action: "ph_authorize" }))}`]) {
+    const hashes = [`#__posthog=${state}`, `#state=${encodeURIComponent(JSON.stringify({ action: "ph_authorize" }))}`];
+
+    // An unanswered visitor: nothing is loaded, so nothing touches the link, the device or the network.
+    await page.goto(`/${hashes[0]}`);
+    await hydrated(page.locator("form.lead-form"));
+    await expect(page.getByRole("region", { name: "Can we count your visit?" })).toBeVisible();
+    await page.waitForTimeout(4_000);
+    expect(requests).toHaveLength(0);
+    expect(await page.evaluate(() => window.location.hash)).toBe(hashes[0]);
+    expect(await storageKeys(page)).toEqual([]);
+
+    // After "yes" PostHog starts and the site removes the toolbar state from the address.
+    await page.getByRole("button", { name: "Yes, count my visit" }).click();
+    await expect.poll(() => named(events, "$pageview").length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect.poll(() => page.evaluate(() => window.location.hash), { timeout: 15_000 }).toBe("");
+    expect(await storageKeys(page)).toEqual(["bibo.analytics.v1"]);
+
+    // The answer is now stored: each full load counts, strips the hash and stores nothing more.
+    for (const hash of hashes) {
       const sent = events.length;
-      // A full load each time: going from "/" to "/#…" alone would only move to an anchor.
+      // A full load each time: going from "/" to "/#..." alone would only move to an anchor.
       await page.goto("about:blank");
       await page.goto(`/${hash}`);
       await expect.poll(() => named(events.slice(sent), "$pageview").length, { timeout: 15_000 }).toBeGreaterThan(0);
       expect(await page.evaluate(() => window.location.hash)).toBe("");
-      expect(await storageKeys(page)).toEqual([]);
+      expect(await storageKeys(page)).toEqual(["bibo.analytics.v1"]);
     }
   });
 
@@ -139,15 +111,19 @@ test.describe("visit statistics (cookieless PostHog)", () => {
     const { requests } = await watch(context);
     const page = await context.newPage();
     await page.goto("/");
+    await hydrated(page.locator("form.lead-form"));
+    await expect(page.locator("[data-consent-notice]")).toHaveCount(0);
     await page.locator("#lead").scrollIntoViewIfNeeded();
     await page.waitForTimeout(4_000);
     expect(requests).toHaveLength(0);
+    await expect(page.locator("[data-consent-notice]")).toHaveCount(0);
     await context.close();
   });
 
   test("stops at once, across client-side navigation and after a reload, once the visitor turns statistics off", async ({ page, context }) => {
     const { requests, events } = await watch(context);
     await page.goto("/");
+    await page.getByRole("button", { name: "Yes, count my visit" }).click();
     await expect.poll(() => requests.length, { timeout: 15_000 }).toBeGreaterThan(0);
     await page.getByRole("button", { name: "Analytics choices" }).click();
     const dialog = page.getByRole("dialog", { name: "Analytics choices" });

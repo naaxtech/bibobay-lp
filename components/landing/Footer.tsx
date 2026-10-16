@@ -50,7 +50,9 @@ export function Footer({ settings }: FooterProps) {
               </ul>
             </nav>
           ) : analytics ? (
-            // Review I2: the only way to turn statistics off stays, whatever an editor removes.
+            // Review I2: Analytics choices stays, whatever an editor removes. It is the only way to turn
+            // statistics off after a "yes", and to turn them on for a visitor who said no or whose
+            // browser sends Global Privacy Control or Do Not Track (never asked by the notice, R147).
             <ul className="grid gap-1">
               <li>
                 <AnalyticsChoices config={analytics} />
