@@ -126,7 +126,9 @@ project); otherwise nothing loads and nothing is sent.
   keeps its method, its URL without the query and the user agent only; the user, all extra data and
   stack-frame variables are removed; every string at every depth of contexts, tags, breadcrumbs and
   messages, and the request URL, transaction name and span descriptions, is cut to 2,000
-  characters, loses any query (also a path's query in mid-text), and has email-shaped text
+  characters, is percent-decoded where it can be (so `parent%40example.com` in a path is caught;
+  a malformed escape never stops the check), loses any query (also a path's query in mid-text),
+  and has email-shaped text
   replaced by `[email]` and a private order link's token by `/orders/[token]` (any 64-digit hex
   run becomes `[token]`).
 - **Environment tag:** Vercel's `VERCEL_ENV` (browser: `NEXT_PUBLIC_VERCEL_ENV`), else `development`.

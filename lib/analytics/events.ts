@@ -1,4 +1,5 @@
 import { maskPrivatePaths } from "../privacy/private-links";
+import { decodeLeniently } from "../privacy/decode";
 
 /**
  * What may leave the browser (ruling R70). The owner wants every visit counted, with what visitors
@@ -53,18 +54,9 @@ const bounded = (value: string) => value.slice(0, MAX_FIELD);
  */
 function holdsEmail(value: string): boolean {
   if (!AT_SIGN.test(value)) return false;
-  let text = value;
-  for (let round = 0; round < 3; round += 1) {
-    if (EMAIL.test(text)) return true;
-    try {
-      const decoded = decodeURIComponent(text);
-      if (decoded === text) break;
-      text = decoded;
-    } catch {
-      break;
-    }
-  }
-  return EMAIL.test(text);
+  // Re-review 3 M1: decoded leniently, so a stray "%" or an escape cut by MAX_FIELD cannot hide an
+  // encoded address beside it (decodeURIComponent threw on the whole text).
+  return EMAIL.test(value) || EMAIL.test(decodeLeniently(value));
 }
 
 function isEventName(event: string): event is AnalyticsEvent {

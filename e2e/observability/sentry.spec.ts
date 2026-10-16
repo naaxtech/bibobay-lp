@@ -38,7 +38,8 @@ test("sends error reports only, and no item carries a token, a query or an email
   // A Vercel build always has a release (withSentryConfig takes the commit), and only then does the
   // SDK send sessions (re-review 2 N1). This build has none, so give it one, as Vercel would.
   await page.addInitScript(() => {
-    (window as unknown as { _sentryRelease: { id: string } })._sentryRelease = { id: "e2e-release" };
+    // A string, as a Vercel build injects it (re-review 3 M3).
+    (window as unknown as { _sentryRelease: string })._sentryRelease = "e2e-release";
   });
   const requests: Request[] = [];
   await page.route(`${INGEST}/**`, async (route) => {

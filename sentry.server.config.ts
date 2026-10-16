@@ -11,7 +11,8 @@ if (dsn) {
       dsn,
       environment: sentryEnvironmentFrom({ VERCEL_ENV: process.env.VERCEL_ENV }),
       // No request sessions (re-review 2 N1): error reports only.
-      makeHttpIntegration: (settings) => Sentry.httpIntegration(settings),
+      // disableIncomingRequestSpans as in the SDK's own Next.js default (Next instruments requests itself).
+      makeHttpIntegration: (settings) => Sentry.httpIntegration({ ...settings, disableIncomingRequestSpans: true }),
     }),
   );
 }

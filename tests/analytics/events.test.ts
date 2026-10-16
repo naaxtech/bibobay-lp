@@ -151,3 +151,20 @@ describe("long addresses (Task 7b re-review 2 O-a)", () => {
     expect(clean!.properties).not.toHaveProperty("$pathname");
   });
 });
+
+describe("encoded email addresses next to a broken escape (Task 7b re-review 3 M1)", () => {
+  const page = (pathname: string) => cleanCapture({ uuid: "u-3", event: "$pageview", properties: { $pathname: pathname, $current_url: `https://bibo.example${pathname}`, token: "phc_fixture", distinct_id: "d" } });
+
+  it("drops a path whose 2,000-character cut lands inside a later escape", () => {
+    // 22 + 1,976 = 1,998 characters, so the cut at 2,000 leaves "%2" at the end.
+    const clean = page(`/parent%40example.com/${"z".repeat(1_976)}%20end`);
+    expect(clean!.properties).not.toHaveProperty("$pathname");
+    expect(clean!.properties.$current_url).toBe("https://bibo.example/");
+  });
+
+  it("drops a short path with a stray percent sign beside an encoded address", () => {
+    const clean = page("/parent%40example.com/100%");
+    expect(clean!.properties).not.toHaveProperty("$pathname");
+    expect(clean!.properties.$current_url).toBe("https://bibo.example/");
+  });
+});

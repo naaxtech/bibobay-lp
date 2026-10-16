@@ -83,3 +83,10 @@ describe("Sentry tracing switches (ruling R86, re-review 2 N2)", () => {
     expect(report.errors.join("\n")).toContain(name);
   });
 });
+
+describe("one message per refused name (re-review 3 M4)", () => {
+  it("names a public tracing variable once", () => {
+    const errors = verifyEnvironment({ NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "1" }, "production").errors;
+    expect(errors.filter((line) => line.includes("NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE"))).toHaveLength(1);
+  });
+});

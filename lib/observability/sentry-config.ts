@@ -1,5 +1,6 @@
 import type { Breadcrumb, ErrorEvent, Event } from "@sentry/nextjs";
 
+import { decodeLeniently } from "../privacy/decode";
 import { maskPrivatePaths } from "../privacy/private-links";
 
 /** The parts of these SDK types this file relies on (the package's index does not re-export them). */
@@ -30,8 +31,12 @@ const QUERY_IN_TEXT = /((?:[a-z][a-z0-9+.-]*:\/\/[^\s/?#"'<>]+)?\/[^\s?#"'<>]*)\
 const cap = (value: string) => (value.length > MAX_TEXT ? `${value.slice(0, MAX_TEXT)}…` : value);
 const maskEmails = (value: string) => (value.includes("@") ? value.replace(EMAIL, MASK) : value);
 const stripQueries = (value: string) => (value.includes("?") ? value.replace(QUERY_IN_TEXT, "$1") : value);
-/** Free text: cut to MAX_TEXT, queries removed, email addresses and private order tokens masked. */
-const maskText = (value: string) => maskPrivatePaths(maskEmails(stripQueries(cap(value))));
+/**
+ * Free text: cut to MAX_TEXT, percent-decoded (leniently, so `parent%40example.com` in a URL path is
+ * seen as the address it is; re-review 3), queries removed, email addresses and private order
+ * tokens masked.
+ */
+const maskText = (value: string) => maskPrivatePaths(maskEmails(stripQueries(decodeLeniently(cap(value)))));
 
 /** A URL or path without its query string and fragment; other strings unchanged. */
 function withoutQuery(value: string): string {
@@ -104,7 +109,7 @@ function scrubRequest(request: NonNullable<Event["request"]>): Event["request"] 
   return clean;
 }
 
-/** beforeSend / beforeSendTransaction: see the file comment for what survives. */
+/** beforeSend (and beforeSendTransaction, should traces ever be wired): see the file comment for what survives. */
 export function scrubEvent<T extends Event>(event: T): T {
   const clean: T = { ...event };
   delete clean.user;
@@ -187,8 +192,8 @@ export interface SentrySettings {
 const DROPPED_INTEGRATIONS = /^(Replay|BrowserTracing|BrowserSession|ProcessSession)/;
 
 /**
- * Error reports only (ruling R86): no `tracesSampleRate` or `tracesSampler`, so the SDK traces
- * nothing, and no browser tracing or replay integration.
+ * Error reports only (ruling R86): `tracesSampleRate` null and no `tracesSampler`, so the SDK traces
+ * nothing; no browser tracing, replay or session integration.
  */
 export function sentryOptions({ dsn, environment, makeHttpIntegration }: SentrySettings) {
   return {
@@ -202,8 +207,9 @@ export function sentryOptions({ dsn, environment, makeHttpIntegration }: SentryS
     sendDefaultPii: false,
     dataCollection: MINIMAL_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent) => scrubEvent(event),
-    // Runs only with traceLifecycle "static", and tracing is off; kept so a trace could never skip the scrubber.
-    beforeSendTransaction: (event: TransactionEvent) => scrubEvent(event),
+    // No beforeSendTransaction (re-review 3): SDK 11 ignores it under span streaming and warns at
+    // every start, and tracing is off. Were traces ever wanted with traceLifecycle "static", wire
+    // `(event: TransactionEvent) => scrubEvent(event)` here, plus a beforeSendSpan scrubber.
     beforeBreadcrumb: (crumb: Breadcrumb) => scrubBreadcrumb(crumb),
     // Never session replay, tracing or sessions, even if a default integration set offered them; on
     // Node.js, the Http integration again without sessions.

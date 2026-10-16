@@ -181,7 +181,7 @@ describe("shared Sentry options", () => {
     const event = errorEvent();
     expect(options.beforeSend?.(event)).toEqual(scrubEvent(errorEvent()));
     expect(options.beforeBreadcrumb?.({ message: ADDRESS })).toEqual({ message: "[email]" });
-    expect(typeof options.beforeSendTransaction).toBe("function");
+    // No beforeSendTransaction: see "sets no beforeSendTransaction" below (re-review 3).
   });
 
   it("keeps the old trace rates on record, unused (ruling R86)", () => {
@@ -361,5 +361,18 @@ describe("the fields that skipped the cap (re-review 2 N3, N4)", () => {
     }
     const crumb = scrubBreadcrumb({ category: "console", data: { arguments: [new Unprintable()] } });
     expect(crumb.data?.arguments).toEqual(["[unprintable]"]);
+  });
+});
+
+describe("re-review 3 follow-ups", () => {
+  it("masks a percent-encoded email address in a URL path", () => {
+    const scrubbed = scrubEvent(errorEvent({ request: { url: "https://bibo.example/u/parent%40example.com/x", method: "GET" }, message: "failed for /u/parent%2540example.com" }));
+    expect(JSON.stringify(scrubbed)).not.toMatch(/parent(%40|%2540|@)example\.com/);
+  });
+
+  // SDK 11 warns at every start that beforeSendTransaction is ignored (span streaming), and tracing
+  // is off: the option is not set. scrubEvent stays the function to wire with traceLifecycle "static".
+  it("sets no beforeSendTransaction, which SDK 11 only warns about", () => {
+    expect(sentryOptions({ dsn: DSN, environment: "production" })).not.toHaveProperty("beforeSendTransaction");
   });
 });

@@ -40,6 +40,7 @@
     "@electric-sql/pglite-pgtap": "0.0.9",
     "@next/env": "16.3.8",
     "@playwright/test": "1.63.0",
+    "@sentry/core": "11.8.0",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/react": "16.3.3",
     "@types/node": "24.19.1",
