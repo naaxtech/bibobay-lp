@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent } from "react";
 
 import { useOrderPad } from "@/components/shop/OrderPadProvider";
@@ -104,8 +105,13 @@ function refusalMessage(status: number, body: unknown): string {
  * optional notes and the order consent tick; nothing about a child, no price, no payment.
  *
  * It posts the pad's product ids and quantities (never names or prices) with one random submission
- * key per order attempt (ruling R81), made on the first send and sent again on every retry until the
- * server stores the order, so a request whose answer was lost is never stored twice. On a stored
+ * key per order attempt (ruling R81), made on the first send and sent again on every retry of the
+ * same request until the server stores the order, so a request whose answer was lost is never stored
+ * twice. The key belongs to what is sent (ruling R93, Task 7c review M1): when anything changes
+ * (a corrected email or address, another quantity) the next send gets a new key, because the server
+ * answers a repeated key with the first order and would otherwise drop the correction, or refuse a
+ * different email for ever. If a product can no longer be ordered, the page is fetched again
+ * (`router.refresh()`) so the pad is pruned against the current catalogue (review M4). On a stored
  * order it hands the receipt to the page and empties the pad through the provider (`pad.clear()`),
  * so every open page sees it. Every other answer keeps the pad and everything typed.
  *
@@ -131,8 +137,9 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
   const summaryRef = useRef<HTMLDivElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
   const pendingRef = useRef(false);
-  /** R81: this order attempt's key; null until the first send. */
-  const keyRef = useRef<string | null>(null);
+  /** R81/R93: this order attempt's key and the content it was made for; null until the first send. */
+  const keyRef = useRef<{ key: string; content: string } | null>(null);
+  const router = useRouter();
   const listed = useMemo(() => new Set(listedIds), [listedIds]);
   const countryCodes = useMemo(() => countries.map((country) => country.code), [countries]);
 
@@ -185,9 +192,8 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
     }
     setErrors({});
 
-    keyRef.current ??= newSubmissionKey();
     const optional = (name: keyof OrderFieldValues, value: string) => (value.trim() ? { [name]: value.trim() } : {});
-    const body = {
+    const content = {
       contactName: values.contactName.trim(),
       email: values.email.trim(),
       ...optional("phone", values.phone),
@@ -200,7 +206,13 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
       ...optional("notes", values.notes),
       consent: true,
       lines,
-      submissionKey: keyRef.current,
+    };
+    // The server stores the email lower-cased, so letter case alone is not a change (R93).
+    const sent = JSON.stringify({ ...content, email: content.email.toLowerCase() });
+    if (keyRef.current?.content !== sent) keyRef.current = { key: newSubmissionKey(), content: sent };
+    const body = {
+      ...content,
+      submissionKey: keyRef.current.key,
       // Sent as found: a person leaves it empty, and the server turns anything else away.
       [HONEYPOT_FIELD]: text(HONEYPOT_FIELD),
     };
@@ -228,7 +240,10 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
         returnFocus = false;
         showFieldErrors(fieldErrors);
       } else {
-        setOutcome(refusalMessage(response.status, answer));
+        const message = refusalMessage(response.status, answer);
+        setOutcome(message);
+        // Review M4: the page's catalogue may be older than the server's; read it again.
+        if (message === ORDER_COPY.outcome.productsUnavailable) router.refresh();
       }
     } catch {
       setOutcome(ORDER_COPY.outcome.notConfirmed);

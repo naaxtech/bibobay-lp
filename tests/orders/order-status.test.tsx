@@ -138,3 +138,12 @@ describe("order times", () => {
     expect(container.innerHTML).toBe("");
   });
 });
+
+describe("fields the view must never show, even when an answer carries them (Task 7c review M5c)", () => {
+  it("leaves out an email, an address and money passed through with the order", () => {
+    const carried = { ...ORDER, email: "parent@example.com", addressLine1: "14 Lagoon Terrace", city: "Seaside", subtotalMinor: 4599, currency: "AUD", paymentUrl: "https://pay.example.com/q/1" } as unknown as TrackedOrder;
+    render(<OrderStatusView order={carried} />);
+    const text = screen.getByRole("region").textContent ?? "";
+    for (const value of ["parent@example.com", "14 Lagoon Terrace", "Seaside", "4599", "45.99", "AUD", "pay.example.com"]) expect(text).not.toContain(value);
+  });
+});

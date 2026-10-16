@@ -276,6 +276,32 @@ for (const { name, use } of VIEWPORTS) {
       expect(await page.locator("body").innerText()).not.toContain(TOKEN);
     });
 
+    // Task 7c review M2: a client-side move to /orders/<token> left the earlier page's document in
+    // place, so its referrer rule applied and same-origin requests carried the token as Referer.
+    test("the private link opens as a page of its own, so no later request carries the token", async ({ page }) => {
+      await answerOrders(page, [[200, stored()]]);
+      await orderFromShop(page, [TULA]);
+      await fillOrder(page);
+      await submit(page);
+      const link = page.getByRole("main").getByRole("link", { name: ORDER_COPY.received.privateLink });
+      await expect(link).toBeVisible();
+      const referers: string[] = [];
+      page.on("request", (request) => {
+        const referer = request.headers()["referer"];
+        if (referer) referers.push(referer);
+      });
+      const [document] = await Promise.all([
+        page.waitForResponse((response) => response.request().resourceType() === "document" && new URL(response.url()).pathname === `/orders/${TOKEN}`, { timeout: 10_000 }),
+        link.click(),
+      ]);
+      expect(document.headers()["referrer-policy"]).toBe("no-referrer");
+      await expect(page.getByRole("heading", { level: 1, name: ORDER_COPY.orderLink.failureTitle })).toBeVisible();
+      await page.getByRole("main").getByRole("link", { name: ORDER_COPY.orderLink.trackLink }).click();
+      await expect(page).toHaveURL("/track");
+      await expect(page.getByRole("form", { name: ORDER_COPY.track.formLabel })).toBeVisible();
+      expect(referers.filter((referer) => referer.includes(TOKEN))).toEqual([]);
+    });
+
     test("a malformed private link is a 404 that never says why", async ({ page }) => {
       const response = await page.goto("/orders/not-a-token");
       expect(response?.status()).toBe(404);

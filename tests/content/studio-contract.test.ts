@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { schemaTypes } from "@/studio/schemaTypes";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
 import { LANDING_PAGE_QUERY } from "@/lib/sanity/queries";
 import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 import { ISO_COUNTRY_CODES } from "@/lib/orders/countries";
 import { ORDER_COUNTRY_CODES, orderCountriesProblem } from "@/studio/schemaTypes/countries";
+import { CONSENT_VERSION as STUDIO_CONSENT_VERSION, orderConsentVersionProblem } from "@/studio/schemaTypes/consent";
+import { CONSENT_VERSION_PATTERN } from "@/lib/leads/dependencies";
+
+// lib/leads/dependencies is server-only; this test reads one constant from it.
+vi.mock("server-only", () => ({}));
 
 type Field = { name: string; type: string; of?: Array<{ type: string; to?: Array<{ type: string }> }>; to?: Array<{ type: string }>; fields?: Field[]; initialValue?: unknown };
 type Schema = { name: string; type: string; fields?: Field[] };
@@ -133,5 +138,28 @@ describe("order countries in the Studio (R85)", () => {
   it("asks for an order consent version whenever the order consent sentence is set (R82)", () => {
     const field = (types.get("legalSettings")?.fields as Array<Field & { description?: string }> | undefined)?.find((f) => f.name === "orderConsentCopyVersion");
     expect(field?.description).toMatch(/change it whenever/i);
+  });
+});
+
+describe("the order consent version check (Task 7c review M5a, M5b)", () => {
+  it("asks for a version when the sentence is set, accepts none when it is not, and accepts only a short token", () => {
+    expect(orderConsentVersionProblem("", "I agree.")).toMatch(/version/i);
+    expect(orderConsentVersionProblem(undefined, "I agree.")).toMatch(/version/i);
+    expect(orderConsentVersionProblem("", "")).toBe(true);
+    expect(orderConsentVersionProblem(undefined, undefined)).toBe(true);
+    expect(orderConsentVersionProblem("order-2", "I agree.")).toBe(true);
+    expect(orderConsentVersionProblem(" order-2 ", "I agree.")).toBe(true);
+    expect(orderConsentVersionProblem("<b>2</b>", "I agree.")).toMatch(/token/i);
+    expect(orderConsentVersionProblem("x".repeat(41), "I agree.")).toMatch(/token/i);
+  });
+
+  it("is the Studio rule the field runs", () => {
+    const field = (types.get("legalSettings")?.fields as Array<Field & { validation?: unknown }> | undefined)?.find((f) => f.name === "orderConsentCopyVersion");
+    expect(String(field?.validation)).toContain("orderConsentVersionProblem");
+  });
+
+  it("uses the same token pattern as the site (no drift from lib/leads/dependencies.ts)", () => {
+    expect(STUDIO_CONSENT_VERSION.source).toBe(CONSENT_VERSION_PATTERN.source);
+    expect(STUDIO_CONSENT_VERSION.flags).toBe(CONSENT_VERSION_PATTERN.flags);
   });
 });

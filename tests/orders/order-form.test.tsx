@@ -8,6 +8,8 @@ import { ORDER_PAD_STORAGE_KEY } from "@/lib/orders/constants";
 import { countryOptions } from "@/lib/orders/countries";
 
 vi.mock("server-only", () => ({}));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 /*
  * Task 7c: the order form. Adults only (spec §3 ruling 2): contact and delivery details, notes and
@@ -30,6 +32,7 @@ let answers: Answer[] = [];
 const requests: Array<{ url: string; init: RequestInit }> = [];
 
 beforeEach(() => {
+  refresh.mockClear();
   window.localStorage.clear();
   window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: PAD }));
   answers = [];
@@ -354,5 +357,67 @@ describe("answers", () => {
     fillValid();
     await submit();
     expect(body(0).submissionKey).not.toBe(body(1).submissionKey);
+  });
+});
+
+describe("the submission key follows what is sent (Task 7c review M1, ruling R93)", () => {
+  it("makes a new key when the email is corrected after an answer was lost, so the corrected request can be stored", async () => {
+    answers = ["network-error", STORED];
+    renderForm();
+    fillValid();
+    await submit();
+    fireEvent.change(input(ORDER_COPY.form.email.label), { target: { value: "parent.two@example.com" } });
+    await submit();
+    expect(requests).toHaveLength(2);
+    expect(body(1).submissionKey).toMatch(UUID);
+    expect(body(1).submissionKey).not.toBe(body(0).submissionKey);
+  });
+
+  it("makes a new key when the delivery address changes, so a correction is never answered with the first order", async () => {
+    answers = ["network-error", STORED];
+    renderForm();
+    fillValid();
+    await submit();
+    fireEvent.change(input(ORDER_COPY.form.addressLine1.label), { target: { value: "14 Harbour Road" } });
+    await submit();
+    expect(body(1).submissionKey).not.toBe(body(0).submissionKey);
+  });
+
+  it("keeps the key when only the email's letter case or spacing differs (the server stores it lower-cased)", async () => {
+    answers = ["network-error", STORED];
+    renderForm();
+    fillValid();
+    await submit();
+    fireEvent.change(input(ORDER_COPY.form.email.label), { target: { value: "  PARENT@Example.com " } });
+    await submit();
+    expect(body(1).submissionKey).toBe(body(0).submissionKey);
+  });
+});
+
+describe("a product that can no longer be ordered (Task 7c review M4)", () => {
+  it("asks the server for the page again, so the pad is pruned against the current catalogue", async () => {
+    answers = [{ status: 400, body: { ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.productsUnavailable } }];
+    renderForm();
+    fillValid();
+    await submit();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh the page for any other answer", async () => {
+    answers = [{ status: 503, body: { ok: false } }, { status: 400, body: { ok: false, fieldErrors: { city: "too_long" } } }, STORED];
+    renderForm();
+    fillValid();
+    await submit();
+    await submit();
+    await submit();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("the name problem (Task 7c review M3)", () => {
+  it("names the only rule there is (one line), and never asks for letters only", () => {
+    const message = orderFieldErrorMessage("contactName", "invalid");
+    expect(message).toMatch(/one line/i);
+    expect(message).not.toMatch(/letters|spaces only/i);
   });
 });

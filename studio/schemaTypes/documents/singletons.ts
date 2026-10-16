@@ -1,9 +1,7 @@
 import { defineArrayMember, defineField, defineType } from "sanity";
 
+import { orderConsentVersionProblem } from "../consent";
 import { orderCountriesProblem } from "../countries";
-
-/** The consent-version token the site stores (lib/leads/dependencies.ts CONSENT_VERSION_PATTERN). */
-const CONSENT_VERSION = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/;
 
 export const siteSettings = defineType({ name: "siteSettings", title: "Site settings", type: "document", fields: [
   defineField({ name: "title", type: "string", validation: (rule) => rule.required() }),
@@ -75,12 +73,7 @@ export const legalSettings = defineType({ name: "legalSettings", title: "Legal a
     description: "Stored with each order as the version of the order consent sentence the buyer agreed to. Change it whenever you change that sentence. A short token: letters, digits, . _ : - (at most 40 characters).",
     type: "string",
     validation: (rule) =>
-      rule.custom((value, context) => {
-        const copy = (context.document as { orderConsentCopy?: unknown } | undefined)?.orderConsentCopy;
-        const version = typeof value === "string" ? value.trim() : "";
-        if (!version) return typeof copy === "string" && copy.trim() ? "Set a version whenever the order consent sentence is set" : true;
-        return CONSENT_VERSION.test(version) ? true : "Use a short token: letters, digits, . _ : - (at most 40 characters)";
-      }),
+      rule.custom((value, context) => orderConsentVersionProblem(value, (context.document as { orderConsentCopy?: unknown } | undefined)?.orderConsentCopy)),
   }),
 ] });
 

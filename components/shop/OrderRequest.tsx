@@ -96,10 +96,15 @@ function OrderReceived({ receipt, trackingEnabled }: { receipt: OrderReceipt; tr
         <div className="order-received__private">
           <h3 className="order-received__subtitle">{ORDER_COPY.received.privateLinkTitle}</h3>
           <p>
-            {/* No prefetch: the private page is looked up only when the buyer opens it. */}
-            <Link href={privateLink} prefetch={false} className="text-link">
+            {/*
+              A plain link (Task 7c review M2): the private page loads as a document of its own, so its
+              Referrer-Policy no-referrer and no-store apply. A client-side move would keep this page's
+              document, and same-origin requests would then carry the token as their Referer. Nothing
+              is prefetched: the private page is looked up only when the buyer opens it.
+            */}
+            <a href={privateLink} className="text-link">
               {ORDER_COPY.received.privateLink}
-            </Link>
+            </a>
           </p>
           <p className="order-received__note">{ORDER_COPY.received.privateNote}</p>
         </div>

@@ -10,6 +10,7 @@ import type { LegalSettings, Product, SiteSettings } from "@/lib/content/types";
 import { ORDER_PAD_STORAGE_KEY } from "@/lib/orders/constants";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", async (original) => ({ ...(await original<typeof import("next/navigation")>()), useRouter: () => ({ refresh: () => undefined }) }));
 
 const { draft } = vi.hoisted(() => ({ draft: { isEnabled: false } }));
 vi.mock("next/headers", () => ({ draftMode: async () => draft }));

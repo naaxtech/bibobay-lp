@@ -34,9 +34,13 @@ tested. Do not take orders by any other route in the meantime.
   (the sentence and its version come from the CMS legal settings; see
   [cms-operations.md](cms-operations.md#legal-text-consent-version-and-indexing)). The country list
   is the CMS `orderCountries`, or every country.
-- Each order attempt carries a random submission key. If a customer's connection drops and the form
-  sends the same request again, the database answers with the first order's reference and stores
-  nothing new: one order, one set of queued emails.
+- Each order attempt carries a random submission key. The form never resends by itself: if a
+  customer's connection drops and they press send again without changing anything, the database
+  answers with the first order's reference and stores nothing new: one order, one set of queued
+  emails. If anything sent changes first (a corrected email or address, another quantity), or the
+  page is reloaded, the next send is a new attempt with a new key. After a lost answer, staff may
+  therefore see two requests from the same person; confirm with the customer and cancel the one
+  they don't want.
 - Once stored, the page shows the order reference and, with tracking on, the private tracking link
   (shown once; only a hash of it is kept) and the way to `/track`. The order pad empties.
 - `/track` finds an order by its reference and the email it was placed with; `/orders/<token>`
