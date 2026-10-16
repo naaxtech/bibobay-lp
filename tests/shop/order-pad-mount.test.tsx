@@ -13,8 +13,8 @@ vi.mock("server-only", () => ({}));
 const { draft } = vi.hoisted(() => ({ draft: { isEnabled: false } }));
 vi.mock("next/headers", () => ({ draftMode: async () => draft }));
 
-const { getSiteSettings } = vi.hoisted(() => ({ getSiteSettings: vi.fn() }));
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings }));
+const { getGateSettings } = vi.hoisted(() => ({ getGateSettings: vi.fn() }));
+vi.mock("@/lib/sanity/fetch", () => ({ getGateSettings }));
 
 import { OrderPadMount } from "@/components/shop/OrderPadMount";
 
@@ -31,7 +31,7 @@ const settle = () =>
 beforeEach(() => {
   window.localStorage.clear();
   draft.isEnabled = false;
-  getSiteSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
+  getGateSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
 });
 
 afterEach(() => {
@@ -49,14 +49,14 @@ describe("OrderPadMount (the commerce layout)", () => {
   });
 
   it("mounts the order pad while commerce is on, so the shop's controls work", async () => {
-    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true });
+    getGateSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: true });
     render(await OrderPadMount({ children: <AddToOrder productId="plush-tula" productName="Tula plush" /> }));
     await settle();
     expect(screen.getByRole("button", { name: `${UI_COPY.orderPad.add}: Tula plush` })).toBeTruthy();
   });
 
   it("accepts only a literal true, like the commerce gate", async () => {
-    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "true" as unknown as boolean });
+    getGateSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "true" as unknown as boolean });
     render(await OrderPadMount({ children: <AddToOrder productId="plush-tula" productName="Tula plush" /> }));
     await settle();
     expect(screen.queryByRole("button")).toBeNull();
@@ -65,7 +65,7 @@ describe("OrderPadMount (the commerce layout)", () => {
   it("reads the settings an editor previews while draft mode is on", async () => {
     draft.isEnabled = true;
     await OrderPadMount({ children: null });
-    expect(getSiteSettings).toHaveBeenCalledWith({ preview: true });
+    expect(getGateSettings).toHaveBeenCalledWith({ preview: true });
   });
 
   it("wraps the commerce pages only, so no other page downloads the order pad's code", () => {

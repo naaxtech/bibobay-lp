@@ -51,11 +51,11 @@ describe("lead route errors", () => {
 
 describe("operational warnings (ruling R52)", () => {
   it("sends the send-cap and failure events to Sentry as warnings, and keeps the log line", () => {
-    logLeadEvent({ event: "delivery_send_capped", kind: "acknowledgement" });
+    logLeadEvent({ event: "delivery_send_capped", kind: "acknowledgement", budget: "lead_acknowledgement" });
     logLeadEvent({ event: "delivery_send_cap_unavailable", kind: "staff_alert", code: "PGRST301" });
     logLeadEvent({ event: "lead_store_failed", code: "23505" });
     expect(reported.events).toEqual([
-      ["delivery_send_capped", { kind: "acknowledgement" }],
+      ["delivery_send_capped", { kind: "acknowledgement", budget: "lead_acknowledgement" }],
       ["delivery_send_cap_unavailable", { kind: "staff_alert", code: "PGRST301" }],
       ["lead_store_failed", { code: "23505" }],
     ]);

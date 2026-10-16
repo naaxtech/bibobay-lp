@@ -304,7 +304,7 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
     const report = read("docs/qa-report-2026-10-02.md");
     expect(report).toMatch(/Final verification: appended by the controller after the fix wave/);
     expect(report).not.toMatch(/\b300 passed\b|\b10 failed\b|\b165 passed\b|c703a2e/);
-    expect(report).toMatch(/nothing renders `app\/global-error\.tsx`/);
+    expect(report).toMatch(/`app\/global-error\.tsx` is rendered in a unit test/);
     expect(report).toMatch(/never sees 401 for a signed-out visitor or 403/);
     expect(report).toMatch(/proven in Vitest only/);
   });

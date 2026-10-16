@@ -89,7 +89,7 @@ export const ORDER_COPY = {
     sending: "Sending your order request…",
     errorSummaryTitle: "Please check these details",
     errors: {
-      contactName: { required: "Enter your full name.", invalid: "Keep your name on one line.", too_long: "Keep your name under 120 characters." },
+      contactName: { required: "Enter your full name.", invalid: "Keep your name on one line, without links or web addresses and without the characters < and >.", too_long: "Keep your name under 120 characters." },
       email: { required: "Enter your email.", invalid: "Enter an email like name@example.com.", too_long: "That email is too long." },
       phone: { invalid: "Enter a phone number of at least 6 digits, using digits, spaces and + ( ) . - only.", too_long: "Keep the phone number under 32 characters." },
       addressLine1: { required: "Enter the delivery address.", invalid: "Keep the address on one line.", too_long: "Keep the address under 200 characters." },

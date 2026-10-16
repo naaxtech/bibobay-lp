@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
@@ -69,5 +72,25 @@ describe("the order routes gate on that read", () => {
     // Switched off: the same request is refused at the gate.
     client({ commerceEnabled: false, trackingEnabled: false });
     expect((await POST(notJson())).status).toBe(404);
+  });
+});
+
+describe("every server module that decides commerce or tracking gating reads through the gate settings (R127)", () => {
+  it.each([
+    "components/shop/OrderPadMount.tsx",
+    "app/(commerce)/order/page.tsx",
+    "app/(commerce)/shop/page.tsx",
+    "app/(commerce)/shop/[slug]/page.tsx",
+    "app/orders/[token]/page.tsx",
+    "app/orders/[token]/not-found.tsx",
+    "app/track/page.tsx",
+  ])("%s calls getGateSettings and never the tag-only getSiteSettings", (path) => {
+    const source = readFileSync(resolve(process.cwd(), path), "utf8");
+    expect(source).toMatch(/\bgetGateSettings\(/);
+    expect(source).not.toMatch(/\bgetSiteSettings\b/);
+  });
+
+  it("the commerce layout, which makes no gating decision, does not read settings at all", () => {
+    expect(readFileSync(resolve(process.cwd(), "app/(commerce)/layout.tsx"), "utf8")).not.toMatch(/getSiteSettings|getGateSettings/);
   });
 });

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { isCommerceEnabled } from "@/lib/commerce/gate";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 import { OrderPadProvider } from "./OrderPadProvider";
 
 /**
@@ -12,6 +12,6 @@ import { OrderPadProvider } from "./OrderPadProvider";
  * Draft mode reads the settings an editor previews, as the pages do.
  */
 export async function OrderPadMount({ children }: { children: ReactNode }) {
-  const settings = await getSiteSettings({ preview: await isDraftMode() });
+  const settings = await getGateSettings({ preview: await isDraftMode() });
   return isCommerceEnabled(settings) ? <OrderPadProvider>{children}</OrderPadProvider> : <>{children}</>;
 }

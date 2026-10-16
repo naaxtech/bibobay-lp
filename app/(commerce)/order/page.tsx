@@ -11,7 +11,7 @@ import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import { countryOptions, orderCountryCodes } from "@/lib/orders/countries";
 import { orderConsentFrom } from "@/lib/orders/dependencies";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
-import { getLegalSettings, getListedProducts, getSiteSettings } from "@/lib/sanity/fetch";
+import { getLegalSettings, getListedProducts, getGateSettings } from "@/lib/sanity/fetch";
 import { seoEnvironment } from "@/lib/seo/metadata";
 
 /**
@@ -25,7 +25,7 @@ import { seoEnvironment } from "@/lib/seo/metadata";
  */
 async function load() {
   const preview = await isDraftMode();
-  const settings = await getSiteSettings({ preview });
+  const settings = await getGateSettings({ preview });
   if (!isCommerceEnabled(settings)) notFound();
   return { preview, settings };
 }

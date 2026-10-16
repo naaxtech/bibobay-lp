@@ -15,8 +15,8 @@ vi.mock("next/navigation", async (original) => ({ ...(await original<typeof impo
 const { draft } = vi.hoisted(() => ({ draft: { isEnabled: false } }));
 vi.mock("next/headers", () => ({ draftMode: async () => draft }));
 
-const { getSiteSettings, getListedProducts, getLegalSettings } = vi.hoisted(() => ({ getSiteSettings: vi.fn(), getListedProducts: vi.fn(), getLegalSettings: vi.fn() }));
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings, getListedProducts, getLegalSettings }));
+const { getGateSettings, getListedProducts, getLegalSettings } = vi.hoisted(() => ({ getGateSettings: vi.fn(), getListedProducts: vi.fn(), getLegalSettings: vi.fn() }));
+vi.mock("@/lib/sanity/fetch", () => ({ getGateSettings, getListedProducts, getLegalSettings }));
 
 import OrderPage, { generateMetadata } from "@/app/(commerce)/order/page";
 
@@ -50,7 +50,7 @@ let answer: { status: number; body: unknown } = { status: 200, body: {} };
 beforeEach(() => {
   window.localStorage.clear();
   draft.isEnabled = false;
-  getSiteSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
+  getGateSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
   getListedProducts.mockReset().mockResolvedValue([tula, bob]);
   getLegalSettings.mockReset().mockResolvedValue(LEGAL);
   answer = { status: 200, body: { ok: true, persisted: true, acknowledgementQueued: true, message: ORDER_COPY.outcome.received, reference: REFERENCE, trackingToken: TOKEN } };
@@ -84,14 +84,14 @@ describe("/order while commerce is off (the default)", () => {
   });
 
   it("accepts only a literal true", async () => {
-    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "yes" as unknown as boolean });
+    getGateSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "yes" as unknown as boolean });
     await expect(OrderPage()).rejects.toMatchObject(NOT_FOUND);
   });
 });
 
 describe("/order while commerce is on", () => {
   beforeEach(() => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
   });
 
   it("is kept out of search results", async () => {
@@ -157,13 +157,13 @@ describe("/order while commerce is on", () => {
 
   it("offers the CMS countries, or every country when it lists none (R85)", async () => {
     setPad([{ productId: "product-tula", quantity: 2 }]);
-    getSiteSettings.mockResolvedValue({ ...ON, orderCountries: ["PH", "AU"] });
+    getGateSettings.mockResolvedValue({ ...ON, orderCountries: ["PH", "AU"] });
     withPad(await OrderPage());
     await settle();
     const select = screen.getByLabelText(ORDER_COPY.form.country.label) as HTMLSelectElement;
     expect(Array.from(select.options).map((option) => option.value)).toEqual(["", "AU", "PH"]);
     cleanup();
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     withPad(await OrderPage());
     await settle();
     expect((screen.getByLabelText(ORDER_COPY.form.country.label) as HTMLSelectElement).options).toHaveLength(250);
@@ -176,7 +176,7 @@ describe("after the order is stored", () => {
   });
 
   it("shows the reference, the private link with its note and the way to /track, with the pad empty", async () => {
-    getSiteSettings.mockResolvedValue(TRACKING);
+    getGateSettings.mockResolvedValue(TRACKING);
     withPad(await OrderPage());
     await settle();
     await sendValidOrder();
@@ -195,7 +195,7 @@ describe("after the order is stored", () => {
   });
 
   it("answers a repeated request as already received, with the reference and no private link (R81)", async () => {
-    getSiteSettings.mockResolvedValue(TRACKING);
+    getGateSettings.mockResolvedValue(TRACKING);
     answer = { status: 200, body: { ok: true, persisted: true, acknowledgementQueued: false, duplicate: true, message: ORDER_COPY.outcome.alreadyReceived, reference: REFERENCE } };
     withPad(await OrderPage());
     await settle();
@@ -208,7 +208,7 @@ describe("after the order is stored", () => {
   });
 
   it("mentions no tracking page, and links no private page, while tracking is off", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     // The server leaves the token out while tracking is off; the page would not link one anyway.
     answer = { status: 200, body: { ok: true, persisted: true, acknowledgementQueued: true, message: ORDER_COPY.outcome.received, reference: REFERENCE, trackingToken: TOKEN } };
     withPad(await OrderPage());
@@ -222,7 +222,7 @@ describe("after the order is stored", () => {
   });
 
   it("says a repeat was already received without pointing at a tracking page that is off", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     answer = { status: 200, body: { ok: true, persisted: true, acknowledgementQueued: false, duplicate: true, message: ORDER_COPY.outcome.alreadyReceivedUntracked, reference: REFERENCE } };
     withPad(await OrderPage());
     await settle();

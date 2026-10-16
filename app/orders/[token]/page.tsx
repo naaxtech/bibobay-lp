@@ -10,7 +10,7 @@ import { isTrackingEnabled } from "@/lib/commerce/gate";
 import { createTrackingDependencies } from "@/lib/orders/dependencies";
 import { TRACKING_TOKEN_PATTERN } from "@/lib/orders/fields";
 import { trackOrderByToken } from "@/lib/orders/track";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 
 /**
  * A private order link (Task 7c, spec §10 step 11 and §11): /orders/<token>, the token issued once
@@ -24,7 +24,7 @@ import { getSiteSettings } from "@/lib/sanity/fetch";
  * path with no referrer, no-store and noindex; the robots metadata says noindex too.
  */
 async function gate() {
-  const settings = await getSiteSettings();
+  const settings = await getGateSettings();
   if (!isTrackingEnabled(settings)) notFound();
   return settings;
 }

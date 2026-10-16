@@ -108,7 +108,7 @@ export type LeadLogEvent =
   | { event: "lead_config_invalid"; code: "consent_version_invalid" }
   | { event: "delivery_enqueue_failed"; kind: DeliveryKind; code: string }
   /** Fix wave D-I1: `budget` names the kind's bucket (`send:<budget>`); the send paths always set it. */
-  | { event: "delivery_send_capped"; kind: DeliveryKind; budget?: SendBudget }
+  | { event: "delivery_send_capped"; kind: DeliveryKind; budget: SendBudget }
   | { event: "delivery_send_cap_unavailable"; kind: DeliveryKind; budget?: SendBudget; code: string }
   | { event: "delivery_attempted"; kind: DeliveryKind; status: DeliveryOutcome["status"]; code?: string }
   | { event: "delivery_record_failed"; kind: DeliveryKind; code: string }

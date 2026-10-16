@@ -12,7 +12,7 @@ import { ShopFrame } from "@/components/shop/ShopFrame";
 import { isCommerceEnabled } from "@/lib/commerce/gate";
 import type { Product } from "@/lib/content/types";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
-import { getProductBySlug, getSiteSettings } from "@/lib/sanity/fetch";
+import { getProductBySlug, getGateSettings } from "@/lib/sanity/fetch";
 import { productMetadata, seoEnvironment } from "@/lib/seo/metadata";
 
 interface ProductPageProps {
@@ -26,7 +26,7 @@ interface ProductPageProps {
  */
 async function load(params: ProductPageProps["params"]) {
   const preview = await isDraftMode();
-  const settings = await getSiteSettings({ preview });
+  const settings = await getGateSettings({ preview });
   if (!isCommerceEnabled(settings)) notFound();
   const { slug } = await params;
   const product = await getProductBySlug(slug, { preview });

@@ -6,7 +6,7 @@ import { TrackOrderForm } from "@/components/forms/TrackOrderForm";
 import { SiteFrame } from "@/components/legal/SiteFrame";
 import { isTrackingEnabled } from "@/lib/commerce/gate";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 import { seoEnvironment } from "@/lib/seo/metadata";
 
 /**
@@ -16,7 +16,7 @@ import { seoEnvironment } from "@/lib/seo/metadata";
  */
 async function load() {
   const preview = await isDraftMode();
-  const settings = await getSiteSettings({ preview });
+  const settings = await getGateSettings({ preview });
   if (!isTrackingEnabled(settings)) notFound();
   return { preview, settings };
 }

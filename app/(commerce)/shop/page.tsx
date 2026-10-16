@@ -9,7 +9,7 @@ import { ShopFrame } from "@/components/shop/ShopFrame";
 import { isCommerceEnabled } from "@/lib/commerce/gate";
 import type { Product } from "@/lib/content/types";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
-import { getListedProducts, getSiteSettings } from "@/lib/sanity/fetch";
+import { getListedProducts, getGateSettings } from "@/lib/sanity/fetch";
 import { seoEnvironment, shopMetadata } from "@/lib/seo/metadata";
 
 /**
@@ -19,7 +19,7 @@ import { seoEnvironment, shopMetadata } from "@/lib/seo/metadata";
  */
 async function load() {
   const preview = await isDraftMode();
-  const settings = await getSiteSettings({ preview });
+  const settings = await getGateSettings({ preview });
   if (!isCommerceEnabled(settings)) notFound();
   return { preview, settings };
 }

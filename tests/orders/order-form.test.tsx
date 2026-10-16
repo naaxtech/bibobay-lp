@@ -415,9 +415,12 @@ describe("a product that can no longer be ordered (Task 7c review M4)", () => {
 });
 
 describe("the name problem (Task 7c review M3)", () => {
-  it("names the only rule there is (one line), and never asks for letters only", () => {
+  it("says what is refused in plain words (one line, no links or web addresses, no < or >), and never asks for letters only", () => {
     const message = orderFieldErrorMessage("contactName", "invalid");
     expect(message).toMatch(/one line/i);
+    expect(message).toMatch(/links or web addresses/i);
+    expect(message).toContain("<");
+    expect(message).toContain(">");
     expect(message).not.toMatch(/letters|spaces only/i);
   });
 });

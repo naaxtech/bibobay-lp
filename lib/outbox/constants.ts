@@ -62,7 +62,7 @@ export const OUTBOX_LIMITS = {
   idempotencyWindowHours: 23,
 } as const;
 
-/** One cron run (app/api/cron/email-outbox): R88 schedules it once a day on Vercel Hobby. */
+/** One cron run (app/api/cron/email-outbox): ruling R134 schedules it every 15 minutes (see vercel.json) on a Vercel Pro plan. */
 /**
  * A failure with one of these codes is final at any attempt (next_attempt_at 'infinity'):
  * the provider already holds this idempotency key with another message (migration 0006 record

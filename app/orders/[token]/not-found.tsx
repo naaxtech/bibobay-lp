@@ -7,7 +7,7 @@ import { SimplePageShell } from "@/components/legal/SimplePageShell";
 import { NOT_FOUND_COPY } from "@/components/legal/legal-copy";
 import { isTrackingEnabled } from "@/lib/commerce/gate";
 import { SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { getSiteSettings } from "@/lib/sanity/fetch";
+import { getGateSettings } from "@/lib/sanity/fetch";
 
 /** Titled like every 404, so the title says nothing about orders. */
 export const metadata: Metadata = { title: `${NOT_FOUND_COPY.title} | ${SAFE_FALLBACK_SETTINGS.title}` };
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: `${NOT_FOUND_COPY.title} | ${SAFE_FAL
  * the site's ordinary 404 page, so a switched-off site says nothing about orders.
  */
 export default async function OrderNotFound() {
-  const settings = await getSiteSettings();
+  const settings = await getGateSettings();
   if (!isTrackingEnabled(settings)) return SiteNotFound();
   return (
     <SimplePageShell settings={settings} title={ORDER_COPY.orderLink.notFoundTitle} preview={false}>

@@ -12,8 +12,8 @@ vi.mock("server-only", () => ({}));
 const { draft } = vi.hoisted(() => ({ draft: { isEnabled: false } }));
 vi.mock("next/headers", () => ({ draftMode: async () => draft }));
 
-const { getSiteSettings, getListedProducts, getProductBySlug } = vi.hoisted(() => ({ getSiteSettings: vi.fn(), getListedProducts: vi.fn(), getProductBySlug: vi.fn() }));
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings, getListedProducts, getProductBySlug }));
+const { getGateSettings, getListedProducts, getProductBySlug } = vi.hoisted(() => ({ getGateSettings: vi.fn(), getListedProducts: vi.fn(), getProductBySlug: vi.fn() }));
+vi.mock("@/lib/sanity/fetch", () => ({ getGateSettings, getListedProducts, getProductBySlug }));
 
 // Sanity's image CDN, as lib/sanity/image.ts builds it once a project is configured.
 vi.mock("@/lib/sanity/image", () => ({
@@ -49,7 +49,7 @@ const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
 beforeEach(() => {
   draft.isEnabled = false;
-  getSiteSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
+  getGateSettings.mockReset().mockResolvedValue(SAFE_FALLBACK_SETTINGS);
   getListedProducts.mockReset().mockResolvedValue([tula, bob, breathing, sticker]);
   getProductBySlug.mockReset().mockResolvedValue(null);
 });
@@ -66,7 +66,7 @@ describe("/shop while commerce is off (the default)", () => {
   });
 
   it("accepts only a literal true", async () => {
-    getSiteSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "yes" as unknown as boolean });
+    getGateSettings.mockResolvedValue({ ...SAFE_FALLBACK_SETTINGS, commerceEnabled: "yes" as unknown as boolean });
     await expect(ShopPage()).rejects.toMatchObject(NOT_FOUND);
     expect(getListedProducts).not.toHaveBeenCalled();
   });
@@ -74,7 +74,7 @@ describe("/shop while commerce is off (the default)", () => {
 
 describe("/shop while commerce is on", () => {
   beforeEach(() => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
   });
 
   it("is headed with the CMS shop label and explains the order request, with no price anywhere", async () => {
@@ -132,7 +132,7 @@ describe("/shop while commerce is on", () => {
   it("reads drafts while an editor previews", async () => {
     draft.isEnabled = true;
     withPad(await ShopPage());
-    expect(getSiteSettings).toHaveBeenCalledWith({ preview: true });
+    expect(getGateSettings).toHaveBeenCalledWith({ preview: true });
     expect(getListedProducts).toHaveBeenCalledWith({ preview: true });
   });
 
@@ -163,14 +163,14 @@ describe("/shop/[slug]", () => {
   });
 
   it("answers 404 for a draft or unknown product", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     await expect(ProductPage(params("not-a-product"))).rejects.toMatchObject(NOT_FOUND);
     await expect(productPageMetadata(params("not-a-product"))).rejects.toMatchObject(NOT_FOUND);
     expect(getProductBySlug).toHaveBeenCalledWith("not-a-product", { preview: false });
   });
 
   it("shows the product: pictures with their alt text, details, codes, the CMS notice and Add to order", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue(detailed);
     withPad(await ProductPage(params("tula-plush")));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Tula plush");
@@ -192,7 +192,7 @@ describe("/shop/[slug]", () => {
   });
 
   it("leaves out the codes, notice and details a product does not have", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue(bob);
     withPad(await ProductPage(params("bob-plush")));
     expect(document.querySelector("dl")).toBeNull();
@@ -203,14 +203,14 @@ describe("/shop/[slug]", () => {
 
   // A picture without a file reference resolves to no URL (as lib/sanity/image.ts does), so it is never shown.
   it("draws no empty list of more pictures when none of them can be shown (review Minor 7)", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue({ ...detailed, images: [detailed.images[0]!, { asset: { _ref: "" }, alt: "A picture whose file is missing" }] });
     withPad(await ProductPage(params("tula-plush")));
     expect(screen.queryByRole("list", { name: UI_COPY.shop.morePictures("Tula plush") })).toBeNull();
   });
 
   it("puts the CMS notice in a named region, not a complementary landmark inside main (review Minor 7)", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue(detailed);
     withPad(await ProductPage(params("tula-plush")));
     const main = screen.getByRole("main");
@@ -219,7 +219,7 @@ describe("/shop/[slug]", () => {
   });
 
   it("shows a sold-out product as sold out, with no way to add it", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue({ ...detailed, status: "sold-out" });
     withPad(await ProductPage(params("tula-plush")));
     expect(screen.getByText(UI_COPY.shop.soldOut)).toBeTruthy();
@@ -228,7 +228,7 @@ describe("/shop/[slug]", () => {
   });
 
   it("takes its metadata from the product SEO with the site title, and shares the first picture", async () => {
-    getSiteSettings.mockResolvedValue(ON);
+    getGateSettings.mockResolvedValue(ON);
     getProductBySlug.mockResolvedValue(detailed);
     const meta = await productPageMetadata(params("tula-plush"));
     expect(meta.title).toBe(`Tula the turtle plush | ${ON.title}`);

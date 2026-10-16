@@ -13,8 +13,9 @@ vi.mock("server-only", () => ({}));
 const { draft, requestHeaders } = vi.hoisted(() => ({ draft: { isEnabled: false }, requestHeaders: new Headers({ "x-forwarded-for": "203.0.113.9" }) }));
 vi.mock("next/headers", () => ({ draftMode: async () => draft, headers: async () => requestHeaders }));
 
-const { getSiteSettings } = vi.hoisted(() => ({ getSiteSettings: vi.fn() }));
-vi.mock("@/lib/sanity/fetch", () => ({ getSiteSettings }));
+const { getGateSettings } = vi.hoisted(() => ({ getGateSettings: vi.fn() }));
+// app/not-found.tsx (the ordinary 404) only renders content, so it reads the tag-only settings.
+vi.mock("@/lib/sanity/fetch", () => ({ getGateSettings, getSiteSettings: getGateSettings }));
 
 const { createTrackingDependencies, trackOrderByToken, DEPS } = vi.hoisted(() => ({
   createTrackingDependencies: vi.fn(),
@@ -54,7 +55,7 @@ const found: TrackingResult = { status: 200, body: { ok: true, order: ORDER } };
 
 beforeEach(() => {
   draft.isEnabled = false;
-  getSiteSettings.mockReset().mockResolvedValue(ON);
+  getGateSettings.mockReset().mockResolvedValue(ON);
   createTrackingDependencies.mockReset().mockReturnValue(DEPS);
   trackOrderByToken.mockReset().mockResolvedValue(found);
 });
@@ -66,7 +67,7 @@ afterEach(() => {
 
 describe("/track", () => {
   it.each(OFF.map((settings) => [JSON.stringify([settings.commerceEnabled, settings.trackingEnabled]), settings] as const))("answers 404 while tracking is off %s", async (_flags, settings) => {
-    getSiteSettings.mockResolvedValue(settings);
+    getGateSettings.mockResolvedValue(settings);
     await expect(TrackPage()).rejects.toMatchObject(NOT_FOUND);
     await expect(trackMetadata()).rejects.toMatchObject(NOT_FOUND);
   });
@@ -175,7 +176,7 @@ describe("the tracking form", () => {
 
 describe("/orders/[token]", () => {
   it.each(OFF.map((settings) => [JSON.stringify([settings.commerceEnabled, settings.trackingEnabled]), settings] as const))("answers 404 while tracking is off %s, looking nothing up", async (_flags, settings) => {
-    getSiteSettings.mockResolvedValue(settings);
+    getGateSettings.mockResolvedValue(settings);
     await expect(OrderLinkPage(params(TOKEN))).rejects.toMatchObject(NOT_FOUND);
     await expect(orderLinkMetadata()).rejects.toMatchObject(NOT_FOUND);
     expect(createTrackingDependencies).not.toHaveBeenCalled();
@@ -232,7 +233,7 @@ describe("the private order link's not-found state", () => {
   });
 
   it("is the site's ordinary 404 page while tracking is off, saying nothing about orders", async () => {
-    getSiteSettings.mockResolvedValue(SAFE_FALLBACK_SETTINGS);
+    getGateSettings.mockResolvedValue(SAFE_FALLBACK_SETTINGS);
     render(await OrderNotFound());
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(NOT_FOUND_COPY.title);
     expect(screen.getByRole("main").textContent).not.toMatch(/order|track/i);
