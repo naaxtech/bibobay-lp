@@ -1,0 +1,20 @@
+docs/qa-report-2026-10-02.md
+  s_36fcf8940d4895::t_49b588f09d2000 15
+  s_36fcf8940d4895::t_e2c5559e2c1a16 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2cee4b359578b0f4b14ce30370918e272e6e7a20",
+  "prompts": {},
+  "sessions": {
+    "s_36fcf8940d4895": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "922e3bf7-0b94-4269-929f-239834a71039",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
