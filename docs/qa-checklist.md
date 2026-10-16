@@ -67,6 +67,24 @@ CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef npx next start -p 3261 
 E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3261 npx playwright test e2e/analytics e2e/observability
 ```
 
+Then check the consent notice by hand against the same keyed server (ruling R144), in a private
+window of a browser that sends neither Global Privacy Control nor Do Not Track, with the network panel
+open and filtered to `ph.example.com` (the placeholder is not a PostHog server, so each request
+fails, which is enough to see that it was sent):
+
+- First visit: the notice "Can we count your visit?" appears at the foot of the screen with "Yes,
+  count my visit", "No, do not count me" and the "Privacy page" link; nothing takes focus, the page
+  can be scrolled and used without answering, and no request goes to the PostHog host.
+- "No, do not count me": the notice goes and no request goes to the PostHog host. After a reload the
+  notice stays away, and scrolling, clicking a YouTube link or opening a question still sends nothing.
+- In a new private window, "Yes, count my visit": the notice goes and a page view (`$pageview`) goes
+  to the PostHog host.
+- With the host filter cleared and the JS filter on instead: none of the scripts loaded before the answer
+  is PostHog's (a keyed build loads the Sentry chunk at start-up, which is expected), and the PostHog
+  chunk appears only after "Yes, count my visit".
+- In that window, open **Analytics choices** in the footer: it says "Visit statistics are on for this
+  browser."; "Turn statistics off" stops every later request, also after moving to another page.
+
 **End-to-end tests never call the real `/api/leads`.** Every lead request in `e2e/` is answered by
 `page.route`, and a context guard fails the test on any unrouted call. The deployment verifier also
 blocks `/api/leads`. Keep it that way: once Supabase is configured, a real call writes a real row and

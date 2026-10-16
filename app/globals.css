@@ -11,6 +11,8 @@
 @import "../components/orders/order.css";
 /* The staff frame, the sign-in page and the sign-out button (Task 8c); after the form styles it builds on. */
 @import "../components/admin/admin.css";
+/* The consent notice for visit statistics (ruling R144); after the landing styles it builds on (.btn, .btn-paper). */
+@import "../components/analytics/consent-notice.css";
 
 /*
  * BIBO Bay design tokens. lib/brand/tokens.ts is the typed mirror of this block, and

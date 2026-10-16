@@ -53,6 +53,10 @@ describe("repository fallback legal text (ruling R30)", () => {
     // reports when it is configured. Nothing else watches visitors.
     expect(privacy).toMatch(/PostHog/);
     expect(privacy).toMatch(/Sentry/);
+    // Ruling R149: the host is named too (vercel.json, docs/deployment.md), beside the sentence about
+    // the servers every website uses.
+    expect(privacy).toMatch(/Vercel hosts the website and runs the code that serves these pages\./);
+    expect(privacy).toMatch(/Like any website, the servers that deliver these pages receive your browser's requests/);
     expect(privacy).not.toMatch(/Google Analytics|Facebook Pixel|Meta Pixel|Mailchimp|Stripe/i);
   });
 
@@ -63,12 +67,26 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/operating system/i);
     expect(privacy).toMatch(/how far down each page you scroll and how long you stay/i);
     expect(privacy).toMatch(/value that changes every day/i);
-    expect(privacy).toMatch(/does not keep the address/i);
+    // Review S8: PostHog's documentation says only that, in cookieless mode, the address is stripped
+    // from the event before its transformations run (docs/observability.md cites it), so the text
+    // says that much and no more. The wording was "it does not keep the address" before fix round 1.
+    expect(privacy).toMatch(/then removes the address from the event before it is processed further, so the address is not stored with the statistics/i);
+    expect(privacy).not.toMatch(/does not keep the address/i);
   });
 
-  it("does not claim to store nothing on the device: the off choice is stored (review M2)", () => {
+  it("does not claim to store nothing on the device: the visitor's answer is stored (review M2, ruling R145)", () => {
     expect(privacy).not.toMatch(/stores nothing on your device[,.;]/i);
-    expect(privacy).toMatch(/stores nothing on your device unless you turn statistics off/i);
+    // lib/analytics/preference.ts: one localStorage entry (`bibo.analytics.v1`), "on" or "off", kept
+    // after either answer; where storage is blocked the answer lives in the page's memory only.
+    expect(privacy).toMatch(/Cookies and what is kept on your device/);
+    expect(privacy).toMatch(/your answer to the notice is kept as one entry in this browser's storage on your device/i);
+    expect(privacy).toMatch(/so you are not asked again/i);
+    expect(privacy).toMatch(/until you clear this website's data/i);
+    expect(privacy).toMatch(/lasts only until this page is reloaded or closed/i);
+    // The opt-out wording (only an "off" choice was stored) is gone.
+    expect(privacy).not.toMatch(/unless you turn statistics off/i);
+    // Commerce off: no order list is kept, so the device section does not mention one.
+    expect(privacy).not.toMatch(/order list/i);
   });
 
   it("describes error reports exactly as the scrubber sends them (Task 10M-a)", () => {
@@ -78,14 +96,54 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/question mark/i);
   });
 
-  it("describes the visit statistics exactly as the code runs them (ruling R70)", () => {
+  it("describes the visit statistics exactly as the code runs them: opt-in behind the notice (rulings R70, R144, R147)", () => {
     expect(privacy).toMatch(/no cookies/i);
     expect(privacy).toMatch(/no profile/i);
     expect(privacy).toMatch(/never records what you type/i);
     expect(privacy).toMatch(/site or campaign that sent you/i);
     expect(privacy).toMatch(/Global Privacy Control/);
     expect(privacy).toMatch(/Analytics choices/);
-    expect(privacy).toMatch(/only when statistics are switched on/i);
+    // Ruling R144: nothing is counted before a "yes" in the notice, whose title is quoted verbatim.
+    expect(privacy).toMatch(/a notice titled "Can we count your visit\?" asks on your first visit/);
+    expect(privacy).toMatch(/only if you say yes/i);
+    expect(privacy).toMatch(/until you answer, and if you say no, nothing is counted and nothing is sent to PostHog/i);
+    // Ruling R147: a GPC or DNT browser is not asked and not counted; the footer dialog can turn it on.
+    expect(privacy).toMatch(/is not shown the notice and is not counted, unless you turn statistics on under Analytics choices/i);
+    expect(privacy).toMatch(/change your answer at any time under Analytics choices at the foot of every page/i);
+    expect(privacy).toMatch(/saying no stops the counting at once/i);
+    // The opt-out default (ruling R70 before R144) is gone.
+    expect(privacy).not.toMatch(/only when statistics are switched on/i);
+    expect(privacy).not.toMatch(/when they are switched on/i);
+  });
+
+  it("states the legal basis for each use, and that no decision is automated (ruling R149)", () => {
+    // Ruling R151 (review B1): consent is the basis only while the person is on the list.
+    expect(privacy).toMatch(/legal basis for keeping your signup and sending you these emails, while you are on the list, is your consent, which you give by ticking the consent box/i);
+    // Review nit 7: a Global Privacy Control visitor can give it only under Analytics choices.
+    expect(privacy).toMatch(/legal basis for counting your visit is also your consent, which you give by saying yes in the notice, or by turning statistics on under Analytics choices\./i);
+    expect(privacy).toMatch(/you can withdraw your consent at any time/i);
+    expect(privacy).toMatch(/our legitimate interest in keeping the website working and safe is the legal basis for the rate-limit counts and the error reports/i);
+    expect(privacy).toMatch(/We make no decisions about you by automated means\./);
+    // Commerce off: there is no order request, so no basis for one.
+    expect(privacy).not.toMatch(/before any sale/i);
+  });
+
+  it("lists the visitor's rights, withdrawal and the right to complain (ruling R149)", () => {
+    expect(privacy).toMatch(/Your rights/);
+    for (const right of [
+      /under data-protection law you can ask to see the details we hold about you/i,
+      /to have them corrected or deleted/i,
+      /to limit or object to how we use them/i,
+      /to receive them in a form you can take elsewhere/i,
+      /withdraw your consent at any time, and this does not affect what was done before you withdrew it/i,
+      /complain to the data-protection authority where you live/i,
+    ])
+      expect(privacy).toMatch(right);
+    // With no removal channel the text still promises no channel (P-I1).
+    expect(privacy).toMatch(/Joining the list is not open yet/);
+    // With a channel, deletion is among the things a person can ask for.
+    const withChannel = textOf(legalFallbackFor({ contactEmail: "owner@example.com" }, {}).privacy);
+    expect(withChannel).toMatch(/to be removed from the list, to have your details deleted, or to see the details we hold about you/i);
   });
 
   it("states the honest limits: no child data, no card data, no stored IP address, no advertising cookies", () => {
@@ -99,7 +157,8 @@ describe("repository fallback legal text (ruling R30)", () => {
   it("does not promise an unsubscribe link, nor a reply channel nobody has configured (P-I1; wording per channel is in tests/privacy)", () => {
     expect(privacy).not.toMatch(/unsubscribe/i);
     expect(privacy).not.toMatch(/reply to any BIBO Bay email/i);
-    expect(privacy).toMatch(/How to ask for removal or a copy/);
+    // The heading was "How to ask for removal or a copy" until ruling R149 renamed it.
+    expect(privacy).toMatch(/Your rights/);
   });
 
   it("describes retention as the database implements it, without inventing a period", () => {
@@ -111,6 +170,17 @@ describe("repository fallback legal text (ruling R30)", () => {
     expect(privacy).toMatch(/nothing deletes it automatically/i);
     expect(privacy).toMatch(/rate-limit/i);
     expect(privacy).not.toMatch(/\b\d+\s*(days|months|years)\b/i);
+  });
+
+  it("gives a basis for the record kept after a withdrawal, right after the retention paragraph (ruling R151, review B1)", () => {
+    const kept =
+      "After you withdraw, we keep the record of your signup, its email delivery records and the record of your withdrawal only so that we never email you again and can show that we respected your choice; the legal basis for that is our legitimate interest in respecting it.";
+    for (const text of [privacy, textOf(legalFallbackFor({ commerceEnabled: true }, {}).privacy)]) {
+      const lines = text.split("\n");
+      const retention = lines.findIndex((line) => line.startsWith("We keep your signup, and its delivery records, for as long as the list exists"));
+      expect(retention).toBeGreaterThan(-1);
+      expect(lines[retention + 1]).toBe(kept);
+    }
   });
 
   it("mentions the delivery records kept for each email (lead_delivery_events)", () => {
@@ -219,6 +289,11 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
     expect(privacy).toMatch(/acknowledging your request, without prices/i);
   });
 
+  it("states the legal basis for handling an order request: the step asked for before a sale (ruling R149)", () => {
+    expect(privacy).toMatch(/handling your order request is the step you asked us to take before any sale, and that request is its legal basis/i);
+    expect(privacy).toMatch(/We make no decisions about you by automated means\./);
+  });
+
   it("names exactly what the staff alert carries: the reference, name, email address and products, and no delivery details (R107)", () => {
     // lib/email/order-emails.ts buildStaffOrderAlert: reference, contact name, email, the lines. No address, phone or notes.
     expect(privacy).toMatch(/team is told that a request arrived, in a note that carries the order's reference, your name and email address and the products you asked for, but not your delivery address/i);
@@ -227,6 +302,8 @@ describe("repository fallback legal text while commerce is on (Task 7b)", () => 
   it("describes the order list kept on the device, and the private link kept out of statistics and error reports", () => {
     expect(privacy).toMatch(/only which products you added and how many/i);
     expect(privacy).toMatch(/\/orders\/\[token\]/);
+    // Ruling R149: the device section lists the order list beside the visitor's answer.
+    expect(privacy).toMatch(/the order list described above is kept in this browser's storage as well/i);
   });
 
   it("counts order requests and lookups against the keyed code, never storing the address", () => {

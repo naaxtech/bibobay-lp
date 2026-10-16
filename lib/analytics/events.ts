@@ -2,8 +2,9 @@ import { maskPrivatePaths } from "../privacy/private-links";
 import { decodeLeniently } from "../privacy/decode";
 
 /**
- * What may leave the browser (ruling R70). The owner wants every visit counted, with what visitors
- * do and where they come from; nothing that identifies a person goes with it. Every event passes
+ * What may leave the browser (ruling R70; opt-in since R144, so only after the visitor's "yes").
+ * The owner wants every visit of a visitor who said yes counted, with what visitors do and where
+ * they come from; nothing that identifies a person goes with it. Every event passes
  * through `cleanCapture`, PostHog's `before_send`, so this file is the single gate. A private order
  * link's token (Task 7b) never leaves either: every address, path and label carries
  * `/orders/[token]` instead.

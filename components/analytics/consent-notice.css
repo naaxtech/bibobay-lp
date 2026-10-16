@@ -1,0 +1,139 @@
+/*
+ * The consent notice for visit statistics (rulings R144, R148; components/analytics/ConsentNotice.tsx).
+ * A paper card fixed to the foot of the viewport: the full width less 16px gutters on a phone, a
+ * card of readable width in the lower left corner from a tablet up. It sits above the page and the
+ * sticky header (40) but under every modal dialog (.dialog-layer, 70) and the skip link (80), so an
+ * open dialog covers it and makes it inert. It never reaches up to the header: past the space
+ * between the header and the foot of the screen its text scrolls inside it.
+ *
+ * Both answers are the same .btn-paper at the same width: neither is louder (no nudge). There is no
+ * entrance motion, so there is nothing to reduce under prefers-reduced-motion; the buttons' own
+ * press and hover use the token durations, which collapse to zero there (app/globals.css).
+ *
+ * While it is shown, ConsentNotice keeps its height in --consent-notice-space on <html>. The page is
+ * padded by it so the foot of every page (the footer's links) can scroll clear of the notice, and
+ * keyboard focus is scrolled clear of it too.
+ */
+
+@layer components {
+  :root {
+    --consent-notice-offset: 1rem;
+  }
+
+  @media (min-width: 48rem) {
+    :root {
+      --consent-notice-offset: var(--bibo-space-gutter);
+    }
+  }
+
+  /*
+   * The card itself never scrolls, so nothing clips the buttons' hover lift. When the screen is too
+   * short for all of it (a phone held sideways, a large zoom), only the text gives way and scrolls:
+   * the heading and both answers stay whole, and the card still ends below the header.
+   */
+  .consent-notice {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    inset-inline: 1rem;
+    inset-block-end: var(--consent-notice-offset);
+    max-block-size: calc(100dvh - var(--site-header-height) - var(--consent-notice-offset) - 1rem);
+    padding: 1.25rem;
+    /* A real border, not only a shadow, so the card keeps its edge in forced-colours mode. */
+    border: 2px solid color-mix(in srgb, var(--bibo-color-teal) 45%, var(--bibo-color-paper));
+    border-radius: var(--bibo-radius-paper);
+    background-color: var(--bibo-color-paper);
+    color: var(--bibo-color-navy);
+    box-shadow: var(--bibo-shadow-lifted);
+  }
+
+  .consent-notice__title {
+    flex-shrink: 0;
+    margin: 0;
+    font-size: 1.375rem;
+    line-height: var(--bibo-leading-h3);
+  }
+
+  .consent-notice__text {
+    min-block-size: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin-block: 0.5rem 0;
+    color: var(--bibo-color-navy-soft);
+    font-size: var(--bibo-text-small);
+    line-height: var(--bibo-leading-small);
+  }
+
+  /* One column on a phone (the answers stacked, each the full width); two equal columns from 40rem. */
+  .consent-notice__actions {
+    flex-shrink: 0;
+    display: grid;
+    gap: 0.75rem;
+    margin-block-start: 1rem;
+  }
+
+  .consent-notice__link {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    min-block-size: 2.75rem;
+    color: var(--bibo-color-navy);
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-color: var(--bibo-color-teal);
+    text-decoration-thickness: 0.14em;
+    text-underline-offset: 0.22em;
+    transition: text-decoration-color var(--bibo-duration-quick) var(--bibo-ease-paper);
+  }
+
+  .consent-notice__link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  @media (min-width: 40rem) {
+    .consent-notice__actions {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .consent-notice__link {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .consent-notice {
+      inset-inline: var(--bibo-space-gutter) auto;
+      inline-size: min(38rem, calc(100% - 2 * var(--bibo-space-gutter)));
+      padding: 1.5rem;
+    }
+
+    .consent-notice__text {
+      font-size: var(--bibo-text-body);
+      line-height: var(--bibo-leading-body);
+    }
+  }
+
+  /*
+   * No cookie wall: while the notice is shown the page is padded by its height, so the footer's
+   * links can scroll clear of it. Without :has() the padding is simply absent.
+   * src: https://developer.mozilla.org/en-US/docs/Web/CSS/:has · Baseline widely available, across browsers since December 2023 · 2026-10-17
+   */
+  body:has(.consent-notice) {
+    padding-block-end: calc(var(--consent-notice-space, 0px) + var(--consent-notice-offset) + 1rem);
+  }
+
+  html:has(.consent-notice) {
+    scroll-padding-block-end: calc(var(--consent-notice-space, 0px) + var(--consent-notice-offset) + 1rem);
+  }
+
+  @media print {
+    .consent-notice {
+      display: none;
+    }
+
+    body:has(.consent-notice) {
+      padding-block-end: 0;
+    }
+  }
+}

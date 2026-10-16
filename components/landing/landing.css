@@ -460,7 +460,12 @@
     translate: 0 calc(-100% - 1.5rem);
   }
 
-  .skip-link:focus {
+  /*
+   * Shown only for keyboard-driven focus: the consent notice moves focus here after an answer
+   * (ruling R153), and after a mouse click that programmatic focus must not reveal the link.
+   * src: https://developer.mozilla.org/en-US/docs/Web/CSS/:focus-visible · 2026-10-17
+   */
+  .skip-link:focus-visible {
     translate: 0 0;
   }
 
