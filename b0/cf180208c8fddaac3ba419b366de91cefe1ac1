@@ -1,0 +1,57 @@
+tests/content/studio-contract.test.ts
+  s_37deb30b6489aa::t_fa57178d0bc661 183
+  s_37deb30b6489aa::t_39c2f00f0a0c65 5-10,58-62,175-182,184-217
+tests/security/revalidation.test.ts
+  s_37deb30b6489aa::t_8f5fdbca6cd387 124-125
+  s_37deb30b6489aa::t_19024eb81987c7 105
+lib/content/claims.ts
+  s_37deb30b6489aa::t_35013545e74f6c 1-8
+studio/schemaTypes/contact.ts
+  s_37deb30b6489aa::t_f23de40eaa7f7e 1-16
+lib/content/fallback.ts
+  s_37deb30b6489aa::t_101025b04956b4 2,114-125
+lib/content/normalize.ts
+  s_37deb30b6489aa::t_06467b1105a0b6 3-5,131-142
+lib/content/types.ts
+  s_37deb30b6489aa::t_16c28a87cd8c4b 28,30-31
+lib/sanity/fetch.ts
+  s_37deb30b6489aa::t_012d354f8c00f6 2-3,6,53-57
+lib/sanity/presentation.ts
+  s_37deb30b6489aa::t_55f8a9b740c842 2
+lib/sanity/queries.ts
+  s_37deb30b6489aa::t_5fe4c71a2a22ff 4
+lib/security/revalidation.ts
+  s_37deb30b6489aa::t_b7081c9e60e5b5 45
+studio/presentation/resolve.ts
+  s_37deb30b6489aa::t_c242fc841a840e 7,17
+studio/schemaTypes/documents/singletons.ts
+  s_37deb30b6489aa::t_184fbcfd5384fe 4,81-98
+studio/schemaTypes/objects/index.ts
+  s_37deb30b6489aa::t_b26c471b44c431 79
+studio/scripts/seed-data.ts
+  s_37deb30b6489aa::t_e9613dc30ff3a2 75,107-119
+studio/structure.ts
+  s_37deb30b6489aa::t_81c01c135e31d7 3
+tests/content/contact-page-content.test.ts
+  s_37deb30b6489aa::t_f6caa01435bb35 1-116
+tests/content/feature-defaults.test.ts
+  s_37deb30b6489aa::t_9d258285e2e7d5 80
+tests/content/public-seed-integration.test.ts
+  s_37deb30b6489aa::t_cb8f45047739d7 4-6,16,56-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0cf180208c8fddaac3ba419b366de91cefe1ac1",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
