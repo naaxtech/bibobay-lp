@@ -1,7 +1,7 @@
 import { isCountryCode } from "../orders/countries";
 import { FREEBIE_PATH } from "./freebie";
 import { DELIVERY_CLAIM_PATTERN } from "./claims";
-import { DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
+import { COMING_SOON_FALLBACK, DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
 import { plain, stegaText } from "./stega";
 import type { BrandPillar, Character, ContactPageContent, Cta, EcosystemEntry, EpisodePreview, FaqItem, ImageWithAlt, LandingPageContent, LegalSettings, PortableContent, SectionConfig, SectionId, SectionIntro, Seo, SiteSettings, SocialLink, Testimonial } from "./types";
 
@@ -21,12 +21,25 @@ const fileUrl = (raw: unknown): string | undefined => { const value = plain(raw)
 /**
  * The lead section's download. A CMS lead section decides for itself (its reference, or none); a
  * landing document with no lead section keeps the repository's pack like every other fallback.
- * Only an available file at an accepted location is offered.
+ * Only an available file at an accepted location is offered. While the download's "Coming soon"
+ * switch is on (R240) it is never available: the card shows it as coming soon, with a title.
  */
 const leadMagnet = (rawLead: unknown, fallback: LandingPageContent["lead"]["leadMagnet"]): { leadMagnet?: NonNullable<typeof fallback> } => {
   if (!rawLead || typeof rawLead !== "object") return fallback ? { leadMagnet: fallback } : {};
-  const magnet = record(record(rawLead).leadMagnet), url = fileUrl(magnet.fileUrl);
-  return magnet.available === true && url ? { leadMagnet: { title: text(magnet.title), description: text(magnet.description), fileUrl: url, available: true } } : {};
+  const magnet = record(record(rawLead).leadMagnet), url = fileUrl(magnet.fileUrl), title = text(magnet.title);
+  if (magnet.comingSoon === true) {
+    return title ? { leadMagnet: { title, description: text(magnet.description), ...(url ? { fileUrl: url } : {}), available: false, comingSoon: { note: text(magnet.comingSoonNote, COMING_SOON_FALLBACK.note) } } } : {};
+  }
+  return magnet.available === true && url ? { leadMagnet: { title, description: text(magnet.description), fileUrl: url, available: true } } : {};
+};
+/**
+ * R240: while the download is coming soon, the section's description and button label, the two
+ * sentences that promise the file, take the download's coming-soon wording (or the repository's).
+ */
+const comingSoonWording = (rawLead: unknown): { description: string; buttonLabel: string } | null => {
+  const magnet = record(record(rawLead).leadMagnet);
+  if (magnet.comingSoon !== true) return null;
+  return { description: text(magnet.comingSoonDescription, COMING_SOON_FALLBACK.description), buttonLabel: text(magnet.comingSoonButtonLabel, COMING_SOON_FALLBACK.buttonLabel) };
 };
 const href = (raw: unknown): string | undefined => { const value = plain(raw); return typeof value === "string" && /^\/(?!\/)[\w/#?=&%-]*$|^#[a-zA-Z][\w-]*$/.test(value) ? value : validUrl(value); };
 const cta = (raw: unknown, fallback: Cta): Cta => {
@@ -113,7 +126,7 @@ export function normalizeLandingContent(raw: unknown, options: { testimonialsEna
     pillarsIntro: intro(v.pillarsIntro, f.pillarsIntro), pillars: items(v.pillars, f.pillars, (entry): BrandPillar | undefined => { const id = itemId(entry), title = text(entry.title); if (!id || !title) return; const art = image(entry.image, title); return { id, title, description: text(entry.description), prompts: stringList(entry.prompts, []), ...(art ? { image: art } : {}) }; }),
     ecosystemIntro: intro(v.ecosystemIntro, f.ecosystemIntro), ecosystem: items(v.ecosystem, f.ecosystem, (entry): EcosystemEntry | undefined => { const id = itemId(entry), name = text(entry.name); if (!id || !name) return; const art = image(entry.image, name), status = plain(entry.status); return { id, name, tagline: text(entry.tagline), description: text(entry.description), status: status === "available" || status === "in-development" ? status : "idea", ...(art ? { image: art } : {}), ...(status === "available" && text(record(entry.cta).label) ? { cta: cta(entry.cta, { label: name, href: "#ecosystem" }) } : {}) }; }),
     testimonialsIntro: intro(v.testimonialsIntro, f.testimonialsIntro), testimonials: allowProof ? testimonials : [],
-    lead: { ...intro(lead, f.lead), buttonLabel: text(lead.buttonLabel, f.lead.buttonLabel), consentCopy: text(lead.consentCopy, f.lead.consentCopy), successMessage: text(lead.successMessage, f.lead.successMessage), errorMessage: text(lead.errorMessage, f.lead.errorMessage), ...leadMagnet(v.lead, f.lead.leadMagnet) },
+    lead: { ...intro(lead, f.lead), buttonLabel: text(lead.buttonLabel, f.lead.buttonLabel), consentCopy: text(lead.consentCopy, f.lead.consentCopy), successMessage: text(lead.successMessage, f.lead.successMessage), errorMessage: text(lead.errorMessage, f.lead.errorMessage), ...leadMagnet(v.lead, f.lead.leadMagnet), ...comingSoonWording(v.lead) },
     faqIntro: intro(v.faqIntro, f.faqIntro), faqs: items(v.faqs, f.faqs, (entry): FaqItem | undefined => { const id = itemId(entry), question = text(entry.question), answer = text(entry.answer); return id && question && answer ? { id, question, answer } : undefined; }),
     finalCta: { ...intro(finalCta, f.finalCta), cta: cta(finalCta.cta, f.finalCta.cta) },
   };

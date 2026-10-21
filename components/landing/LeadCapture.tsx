@@ -45,7 +45,8 @@ export interface LeadCaptureProps {
 }
 
 export function LeadCapture({ section, lead, form, art }: LeadCaptureProps) {
-  const magnet = lead.leadMagnet?.available && lead.leadMagnet.fileUrl ? lead.leadMagnet : null;
+  // An offered download needs its file; a coming-soon one (R240) is shown without one.
+  const magnet = lead.leadMagnet && (lead.leadMagnet.comingSoon || (lead.leadMagnet.available && lead.leadMagnet.fileUrl)) ? lead.leadMagnet : null;
   const artBeside = art && !form;
   return (
     <SectionShell section={section} headingId="lead-heading" className="relative overflow-x-clip pb-40 pt-16 sm:pb-48 sm:pt-24">
@@ -59,7 +60,7 @@ export function LeadCapture({ section, lead, form, art }: LeadCaptureProps) {
           {lead.description ? <p className="mt-5 max-w-[46ch] text-lead text-(--ink-soft)">{lead.description}</p> : null}
           {magnet ? (
             <div className="mt-8">
-              <FreebieCard magnet={{ ...magnet, fileUrl: magnet.fileUrl! }} anchor={form ? "#lead-form" : "#lead"} />
+              <FreebieCard magnet={magnet} anchor={form ? "#lead-form" : "#lead"} />
             </div>
           ) : null}
           {art && form ? <CmsArt frame="print" art={art} sizes="(min-width: 64rem) 20rem, 90vw" className="mt-10 max-w-[20rem]" /> : null}
