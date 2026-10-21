@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { UI_COPY } from "@/components/landing/ui-copy";
+import { stegaCleanText } from "@/lib/content/stega";
 import { ORDER_PAD_MAX_LINES } from "@/lib/orders/constants";
 import { useOrderPad } from "./OrderPadProvider";
 
@@ -39,7 +40,7 @@ export function AddToOrder({ productId, productName }: { productId: string; prod
   return (
     <div className="add-to-order">
       {/* One label, starting with the visible words: a hidden span would be block-level, and Chromium then names it "Add to order : …". */}
-      <button type="button" className="btn btn-primary" onClick={onAdd} aria-label={`${UI_COPY.orderPad.add}: ${productName}`}>
+      <button type="button" className="btn btn-primary" onClick={onAdd} aria-label={`${UI_COPY.orderPad.add}: ${stegaCleanText(productName)}`}>
         {UI_COPY.orderPad.add}
       </button>
       <p role="status" className="add-to-order__status">

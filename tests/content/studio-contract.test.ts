@@ -20,6 +20,15 @@ const covers = (name: string, keys: string[]) => {
   for (const key of keys) expect(actual.has(key), `${name}.${key} must be editable`).toBe(true);
 };
 
+describe("Studio document titles", () => {
+  // Without a title field or a preview, the Studio titles a document with its raw content (an object
+  // dump in the pane header, Presentation's document list and search). Each singleton names itself.
+  it.each([["landingPage", "Landing page"], ["legalSettings", "Legal and consent"]])("%s is titled %j", (name, title) => {
+    const preview = (types.get(name) as { preview?: { select?: Record<string, string>; prepare?: (value: Record<string, unknown>) => { title?: unknown } } } | undefined)?.preview;
+    expect(preview?.prepare?.({})).toEqual({ title });
+  });
+});
+
 describe("Studio content model", () => {
   it("models every public contract field with editable typed data", () => {
     covers("siteSettings", ["title", "description", "canonicalUrl", "canonicalUrlVerified", "seo", "commerceEnabled", "trackingEnabled", "testimonialsEnabled", "contactEmail", "studioUrl", "socialLinks", "navigation", "footer"]);

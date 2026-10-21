@@ -1,5 +1,6 @@
 import { BayBackdrop } from "@/components/brand/BayBackdrop";
 import { ReefBackdrop } from "@/components/brand/ReefBackdrop";
+import { stegaCleanText } from "@/lib/content/stega";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage } from "./CmsArt";
 import { CtaLink } from "./CtaLink";
@@ -74,7 +75,7 @@ export function Hero({ section, hero, links, art, meetsSand = false }: HeroProps
               <ArtImage art={art} sizes="(min-width: 80rem) 44rem, (min-width: 64rem) 56vw, 100vw" priority />
             </div>
           ) : (
-            <div className="hero-postcard__art" role="img" aria-label={hero.artworkDescription}>
+            <div className="hero-postcard__art" role="img" aria-label={stegaCleanText(hero.artworkDescription)}>
               <BayBackdrop className="absolute inset-0" />
             </div>
           )}
