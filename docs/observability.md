@@ -231,8 +231,8 @@ also sent to Sentry as warnings, tagged with the event, kind and code only:
 - `delivery_message_invalid`: a claimed row could not be turned into a truthful email (for example a
   staff alert with no staff address, or a quote with a non-https payment link); it is recorded as
   `failed` with `message_invalid`.
-- `delivery_record_failed`: the outcome could not be recorded; the row stays `sending` and is
-  re-sent after 15 minutes under the same idempotency key.
+- `delivery_record_failed`: the outcome could not be recorded; the row
+  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`.
 - `delivery_expired`: rows parked for a human: a final failure (the eighth attempt, or
   `invalid_idempotent_request`), tagged with its kind and code, or unconfirmed sends older than 23
   hours (`stale_unconfirmed`, as a count).
@@ -242,10 +242,14 @@ Routine lines, not reported: `delivery_attempted` (with `status` and a failure c
 per cron run with `sent`, `failed`, `skipped` and `deferred`). An unexpected failure of the cron
 route is reported as `outbox_worker_failed` (area `outbox`) and answered 500 `{ ok: false }`.
 
-The cron worker runs every 15 minutes (`vercel.json`; a Vercel Pro plan, see
-[deployment.md](deployment.md#email-outbox-worker-task-8a)), so a failed send is retried within about a
-quarter of an hour. A `delivery_expired` alert therefore means the retries are used up and a person has to
-act: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
+Every email is still attempted right after the API answer (R88); the cron worker is only the retry net.
+It runs once a day (`0 6 * * *` in `vercel.json`, because the site stays on the Hobby plan, ruling R180,
+2026-10-21; see [deployment.md](deployment.md#email-outbox-worker-task-8a)). A failed send is retried at the
+next daily run, up to 8 attempts. A send whose outcome is unknown (a timeout, a provider server error) may
+only be retried within 23 hours of the claim of the first attempt that left it unconfirmed, so on this
+schedule such a row gets at most one retry before it is parked as `delivery_expired` for a person. A `delivery_expired`
+alert therefore means a person has to act, and on this schedule it will be more common than on a
+15-minute one: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
 

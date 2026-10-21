@@ -255,9 +255,9 @@ describe("Vercel build settings", () => {
     expect(JSON.stringify(config)).not.toMatch(/\bbunx?\b|\$\{|secret|token/i);
   });
 
-  it("schedules the email outbox worker every 15 minutes, which needs a Pro plan (final review O-I2, R134; supersedes the once-a-day Hobby schedule of R88)", () => {
+  it("schedules the email outbox worker once a day, scheduled 06:00 UTC (Hobby fires it between 06:00 and 06:59), because the site stays on Hobby (R180, 2026-10-21; supersedes R134's every-15-minutes Pro schedule, restores R88)", () => {
     const config = JSON.parse(readFileSync(resolve("vercel.json"), "utf8")) as { crons?: unknown };
-    expect(config.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "*/15 * * * *" }]);
+    expect(config.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "0 6 * * *" }]);
     expect(existsSync(resolve("app/api/cron/email-outbox/route.ts"))).toBe(true);
   });
 });

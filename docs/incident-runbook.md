@@ -59,13 +59,13 @@ order's contact details needs the owner's decision, and the order's history is a
 
 ## Parked emails
 
-An email that cannot be sent is retried by the cron worker (every 15 minutes) up to 8 times. Two
+An email that cannot be sent is attempted up to 8 times in all (right after the answer, then once per daily run) by the cron worker (once a day on the Hobby plan, R180). Two
 situations stop the retries and leave the row for a person; both are reported to Sentry as
 `delivery_expired` and appear in the outbox tables as `status = 'failed'` with `next_attempt_at` set
 to infinity:
 
 - **`stale_unconfirmed`**: a send whose outcome is unknown (a timeout, a provider server error) was
-  retried for 23 hours and never confirmed. The provider remembers an idempotency key for 24 hours,
+  not confirmed within the 23-hour window (on a daily schedule such a row gets at most one retry before it is parked). The provider remembers an idempotency key for 24 hours,
   so past that point a retry could deliver a second copy of an email that did arrive.
 - **A final failure code**: the eighth failed attempt, or `invalid_idempotent_request` (the provider
   already holds this key with different content).
@@ -108,7 +108,7 @@ Nothing is claimed as sent for a parked row. Work through them like this.
    ```
 
 4. If it **was not delivered**, and the cause is fixed (for example a wrong `RESEND_FROM` or an expired
-   key), put the row back in the queue. The next cron run sends it:
+   key), put the row back in the queue. The next cron run sends it (once a day, 06:00–06:59 UTC on Hobby; to send it now, call the worker by hand as in [deployment.md](deployment.md#email-outbox-worker-task-8a)):
 
    ```sql
    update public.order_email_outbox

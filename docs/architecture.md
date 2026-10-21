@@ -15,7 +15,7 @@ where Task N is a task in the implementation plan under `docs/superpowers/plans/
 | Email | Resend 6.32, optional |
 | Validation | Zod 4.6 on the server; shared field rules in `lib/leads/fields.ts` for the browser |
 | Tests | Vitest (jsdom) with PGlite + pgTAP for the database; Playwright (Chromium) for the browser |
-| Hosting | Vercel Pro (`vercel.json` pins `npm ci`; Hobby is non-commercial only); not provisioned yet (Task 11) |
+| Hosting | Vercel Hobby by owner decision R180 (`vercel.json` pins `npm ci`; Hobby is restricted to non-commercial personal use and its fair-use guidelines count advertising a product sale as commercial, so a Pro plan is required at the latest before commerce is switched on); not provisioned yet (Task 11) |
 
 ## Folders
 
@@ -59,7 +59,7 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/api/leads` | ƒ | POST: founding-family signup |
 | `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
 | `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
-| `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run every 15 minutes by Vercel Cron (`vercel.json`; needs a Pro plan); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
+| `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run once a day, scheduled 06:00 UTC (Hobby fires it between 06:00 and 06:59), by Vercel Cron (`vercel.json`; Hobby allows one run a day); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
 | `/api/admin/session` | ƒ | POST: staff sign-in (email and password, Supabase Auth; rate-limited; one generic refusal); DELETE: sign-out. Same-origin JSON only; 503 without Supabase (Task 8b) |
 | `/api/admin/orders/[reference]/quote` | ƒ | POST: active staff save a quote (`intent: "save"`, never notifies) or send one saved revision (`intent: "send"`, queued once, emailed after the answer) (Task 8b) |
 | `/api/admin/orders/[reference]/status` | ƒ | POST: active staff move an order one step, naming the status they saw (`{from, to}`); 409 if it moved on (Task 8b) |

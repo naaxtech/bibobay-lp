@@ -26,10 +26,10 @@ What exists today and what does not:
 | Order and tracking pages (`/order`, `/track`, `/orders/[token]`), idempotent order requests, order consent and countries from the CMS | built (Task 7c) |
 | Staff sign-in and the staff order APIs (`/api/admin/session`, `/api/admin/orders/[reference]/{quote,status,tracking-link}`): staff access rules, quotes, status changes, new tracking links | built (Task 8b; needs Supabase Auth accounts, `staff_users` rows and `PAYMENT_HOST_ALLOWLIST`) |
 | Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`): sign in, the order list, an order with its quote, status and tracking-link controls | built (Task 8c; needs Supabase Auth accounts and `staff_users` rows; the signed-in pages are proven in unit tests, a live pass on a preview waits for Task 12) |
-| Email outbox worker (`/api/cron/email-outbox`, Vercel cron every 15 minutes), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase, Resend and a Vercel Pro plan) |
+| Email outbox worker (`/api/cron/email-outbox`, Vercel cron once a day), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase, Resend; the cron is the retry net and runs once a day on Hobby, R180) |
 | Error reports (Sentry) and consent-first, cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
 | Live Sanity project (Studio https://bibobay.sanity.studio, project `k82r18ol`, dataset `production`), seeded with the claim-safe starter content; publishing refreshes the site through the signed webhook | live (2026-10-21; [docs/cms-operations.md](docs/cms-operations.md#the-live-project)) |
-| Live Supabase and Vercel projects | not provisioned yet (Task 11); Vercel needs a Pro plan, because Hobby is for non-commercial use only |
+| Live Supabase and Vercel projects | not provisioned yet (Task 11); Vercel stays on Hobby (R180, 2026-10-21), which is restricted to non-commercial personal use (its [fair-use guidelines](https://vercel.com/docs/limits/fair-use-guidelines) count advertising a product sale as commercial); a Pro plan is required at the latest before commerce is switched on |
 
 "Task N" refers to the numbered tasks in the implementation plan under `docs/superpowers/plans/`.
 

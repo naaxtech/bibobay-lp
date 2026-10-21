@@ -9,7 +9,7 @@ export const siteSettings = defineType({ name: "siteSettings", title: "Site sett
   defineField({ name: "canonicalUrl", title: "Verified canonical URL", type: "url", description: "Only add after ownership/DNS is verified." }),
   defineField({ name: "canonicalUrlVerified", title: "Canonical URL ownership verified", type: "boolean", initialValue: false }),
   defineField({ name: "seo", type: "seo" }),
-  defineField({ name: "commerceEnabled", title: "Enable public commerce", type: "boolean", initialValue: false }),
+  defineField({ name: "commerceEnabled", title: "Enable public commerce", description: "Before switching this on, a Vercel Pro plan and the 15-minute email schedule must be in place (docs/deployment.md).", type: "boolean", initialValue: false }),
   defineField({ name: "trackingEnabled", title: "Enable public order tracking", type: "boolean", initialValue: false }),
   defineField({
     name: "orderCountries",
