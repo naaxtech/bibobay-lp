@@ -3,6 +3,7 @@ import { Fredoka, Plus_Jakarta_Sans } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
+import { Analytics } from "@vercel/analytics/next";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ConsentNotice } from "@/components/analytics/ConsentNotice";
 import { analyticsConfig } from "@/lib/analytics/config";
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         {children}
         {/* Ruling R144: consent-first, cookieless visit statistics, started by a "yes"; nothing without a PostHog key. */}
         <AnalyticsProvider config={analyticsConfig()} />
+        <Analytics />
       </body>
     </html>
   );
