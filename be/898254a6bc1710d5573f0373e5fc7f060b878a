@@ -1,0 +1,28 @@
+e2e/bot-check/bot-check.spec.ts
+  s_37deb30b6489aa::t_b65d79c097233b 1
+  s_37deb30b6489aa::t_92d671acde369b 2-210
+.github/workflows/ci.yml
+  s_37deb30b6489aa::t_46a43caeaad2e4 375-437
+  s_37deb30b6489aa::t_78fd98ad75fd33 374,438-443
+tests/scripts/ci-workflow.test.ts
+  s_37deb30b6489aa::t_8d70cf7b8df75e 133-135
+  s_37deb30b6489aa::t_e06d2b479e4738 138
+  s_37deb30b6489aa::t_c031e7a380a6d6 267-294
+  s_37deb30b6489aa::t_ecf59a6cebf042 295-296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "be898254a6bc1710d5573f0373e5fc7f060b878a",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
