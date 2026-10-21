@@ -1,0 +1,82 @@
+lib/contact/page-state.ts
+  s_37deb30b6489aa::t_dce1e6f7cf55be 1-13
+app/page.tsx
+  s_37deb30b6489aa::t_b5848e9d75a28b 41
+  s_37deb30b6489aa::t_89ff4b5c02d3ce 7
+components/landing/CtaLink.tsx
+  s_37deb30b6489aa::t_b5848e9d75a28b 29
+lib/content/legal-fallback.ts
+  s_37deb30b6489aa::t_1f5d019f1d5753 58-67
+  s_37deb30b6489aa::t_11ad87c9890cde 251
+  s_37deb30b6489aa::t_2a81abd7cef1a7 198-200
+  s_37deb30b6489aa::t_67eb61bfa49857 38-46
+  s_37deb30b6489aa::t_42c006b936b2ba 248
+  s_37deb30b6489aa::t_5b66d3a6956822 257-259,264,268-269
+  s_37deb30b6489aa::t_8a026f7f8416a5 163-165
+  s_37deb30b6489aa::t_0a3f7afa2c4dad 121-123
+  s_37deb30b6489aa::t_aebae51461cabe 173
+  s_37deb30b6489aa::t_1b9474c01b9a5f 101-106
+components/legal/LegalDocument.tsx
+  s_37deb30b6489aa::t_ffd1b8e2cf95b5 23
+  s_37deb30b6489aa::t_a00569e43441f9 37
+  s_37deb30b6489aa::t_82d5418e9d83ea 13-14
+tests/contact/contact-footer.test.tsx
+  s_37deb30b6489aa::t_1d974c2d958296 1-95
+components/legal/SiteFrame.tsx
+  s_37deb30b6489aa::t_b5848e9d75a28b 10,25-26,47
+lib/seo/metadata.ts
+  s_37deb30b6489aa::t_8170dd7062b82e 7-9,132-160,239-240,243,248
+components/legal/LegalPage.tsx
+  s_37deb30b6489aa::t_e0c3bc1ed14dcd 27
+  s_37deb30b6489aa::t_5df18a4099b96b 3
+tests/scripts/deployment-checks.test.ts
+  s_37deb30b6489aa::t_8d63c17660940b 309-310,329,334-335,435,439-440
+  s_37deb30b6489aa::t_31065cbb04d953 469,479
+  s_37deb30b6489aa::t_9f18a1ec4cb2fe 8
+  s_37deb30b6489aa::t_981342e556bdbf 441-442
+scripts/lib/deployment-checks.ts
+  s_37deb30b6489aa::t_6bc1a482c7acd7 297-303
+tests/content/legal-pages.test.tsx
+  s_37deb30b6489aa::t_65c14e708a1a7a 491
+  s_37deb30b6489aa::t_bdc39a72b0b004 11,438-490,492-502
+  s_37deb30b6489aa::t_62259439bc8da4 503
+e2e/crawl/public-routes.spec.ts
+  s_37deb30b6489aa::t_2afb93150d69c1 44
+app/sitemap.ts
+  s_37deb30b6489aa::t_b5848e9d75a28b 6-8,18-23,26-27,31
+app/contact/page.tsx
+  s_37deb30b6489aa::t_89ff4b5c02d3ce 1-55
+components/landing/Footer.tsx
+  s_37deb30b6489aa::t_b5848e9d75a28b 6,15-16,25-26,28,33-34
+tests/seo/metadata.test.ts
+  s_37deb30b6489aa::t_8d63c17660940b 231-238
+components/landing/LandingPage.tsx
+  s_37deb30b6489aa::t_b5848e9d75a28b 16-17,30,46
+tests/contact/contact-page.test.tsx
+  s_37deb30b6489aa::t_7e745d0067f4d6 9
+  s_37deb30b6489aa::t_c41e59b231117c 79
+  s_37deb30b6489aa::t_e9a9af9bde08dd 69
+  s_37deb30b6489aa::t_0d70a256ab7ded 1
+  s_37deb30b6489aa::t_a3b1496159323c 2-8,10-68,70-78,80-154
+scripts/verify-deployment.ts
+  s_37deb30b6489aa::t_30c4bf7790e49b 6
+  s_37deb30b6489aa::t_3005b9ca421f08 60-61
+e2e/contact/contact-form.spec.ts
+  s_37deb30b6489aa::t_89a9ee978d3d07 1-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "48c39319054891e74e6754a256cc28428a633e4f",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
