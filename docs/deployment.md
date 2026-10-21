@@ -76,10 +76,15 @@ Not created yet (Task 11). Settings to use:
   never from `.nvmrc`. `engines` (`^22.22.2 || ^24.15.0 || >=26.0.0`) resolves to 24.x there, and
   `.nvmrc` says `24` so every CI job runs the production runtime. Node 26 is accepted locally (the
   local gates ran on it); check again when Vercel lists 26.
-- **A Vercel Pro plan is required** (final review O-I2, ruling R134). Vercel's Hobby plan is
-  restricted to non-commercial personal use, and this site keeps a mailing list and takes order
-  requests, which is commercial use. Hobby is acceptable only for a private preview before anything
-  commercial is reachable. Pro also lets the email cron run every 15 minutes (below).
+- The site runs on the Hobby plan by owner decision (ruling R180, 2026-10-21), which supersedes
+  R134's "Pro required" for now. Vercel's Hobby plan is restricted to non-commercial personal use; its
+  fair-use guidelines (https://vercel.com/docs/limits/fair-use-guidelines) count advertising the sale
+  of a product as commercial. By owner decision R180 the site stays on Hobby for now, and a Pro plan
+  is required at the latest before commerce is switched on (`commerceEnabled`). To upgrade, restore `*/15 * * * *` (R134) in `vercel.json` together with the tests and
+  docs: change every file that says once a day, which are `vercel.json`, `README.md`,
+  `docs/deployment.md`, `docs/architecture.md`, `docs/observability.md`, `docs/incident-runbook.md`,
+  `lib/outbox/constants.ts`, `studio/schemaTypes/documents/singletons.ts` and the tests in
+  `tests/scripts`.
 - The build runs `npm run verify:env -- production` first; it fails on a forbidden public name (Vercel's own
   `NEXT_PUBLIC_VERCEL_*` names are allowed) or a short `LEAD_IP_HASH_SECRET` or `CRON_SECRET`.
 - Production branch: keep the feature branch until review; choose the production branch deliberately
@@ -95,15 +100,25 @@ and later quotes) is written to a database outbox first, then attempted right af
 (ruling R88). The cron worker is the retry net for what that attempt could not send: a provider
 failure, the hourly send cap, or Resend not yet configured.
 
-- `vercel.json` schedules `/api/cron/email-outbox` at `*/15 * * * *` (every 15 minutes), which needs a
-  Vercel **Pro** plan (ruling R134). A **Hobby** plan accepts at most one run a day and is not for
-  commercial use, so it is not an option for launch (see [Vercel project](#vercel-project)). A failed
-  email is retried within about 15 minutes. A send whose outcome is unknown (a timeout, a provider
-  server error) is retried only within 23 hours of that attempt, which on a 15-minute schedule leaves
-  many tries; one still unconfirmed after 23 hours is parked for a human (reported as
-  `delivery_expired`; nothing is claimed as sent; see
-  [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change, since
-  every run claims only rows that are due.
+- `vercel.json` schedules `/api/cron/email-outbox` at `0 6 * * *`, once a day (ruling R180, the
+  original schedule of R88), because the site stays on the Hobby plan (see
+  [Vercel project](#vercel-project)). Per
+  [Vercel's cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing) (last updated
+  2026-07-15) Hobby allows a cron at most once a day with hourly precision, so this job fires between
+  06:00 and 06:59 UTC; a more frequent expression fails the deployment. On Pro the schedule goes back
+  to `*/15 * * * *` (R134), together with the tests and docs.
+- The cron is only the retry net: every email is still attempted right after the API answer (R88),
+  except repeat-signup rows for an already-listed lead, which are never sent straight away. On
+  a daily schedule a failed send is retried at the next daily run, up to 8 attempts in all
+  (`OUTBOX_LIMITS.maxAttempts`, which counts the first send). A send whose outcome is unknown (a
+  timeout, a provider server error) may only be retried within 23 hours of the claim of the first
+  attempt that left it unconfirmed (`idempotencyWindowHours`, `unconfirmed_since`). On a daily
+  schedule that leaves at most one retry: after the send right after the answer, the next daily run
+  is usually inside the window, so the row gets one retry under the same idempotency key; a send
+  still unconfirmed after that retry, or left unconfirmed by a daily run, is parked at the next run
+  as `delivery_expired` for a human (nothing is claimed as sent; see
+  [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change,
+  since every run claims only rows that are due.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
@@ -111,7 +126,9 @@ failure, the hourly send cap, or Resend not yet configured.
 - One run stops claiming 40 seconds after the request started, or after 100 rows per outbox, and
   every send spends one unit of the hourly bucket of its own message kind
   (`send:<kind>`, cap `LEAD_ACK_SEND_LIMIT_PER_HOUR`; quotes use `send:quote`). Rows the budget did
-  not cover stay due for the next run.
+  not cover stay due for the next run. With one run a day, emails deferred by the hourly per-kind
+  cap, and repeat-signup rows that are never sent straight away, drain at most
+  `LEAD_ACK_SEND_LIMIT_PER_HOUR` (default 60) per kind per day (and at most 100 rows per outbox per run).
 - To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.

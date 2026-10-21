@@ -33,6 +33,13 @@ const listIn = (pattern: RegExp) => {
   return match[1]!.split(",").map((value) => value.trim().replace(/'/g, ""));
 };
 
+describe("migration 0006: retry backoff", () => {
+  it("caps the backoff at 6 hours, under a day, because the docs say a failed send is retried at the next daily run", () => {
+    const caps = Array.from(SQL.matchAll(/least\(interval '(\d+) hours?', interval '1 minute' \* power\(2, least\((?:event|outbox)\.attempts, 12\)\)\)/g), (match) => match[1]);
+    expect(caps).toEqual(["6", "6"]);
+  });
+});
+
 describe("migration 0006: guards and privileges", () => {
   it("stops unless it runs as a role that bypasses row level security, after 0001-0005", () => {
     expect(SQL).toMatch(/do \$guard\$ begin if not exists \( select 1 from pg_catalog\.pg_roles r where r\.rolname = current_user and \(r\.rolbypassrls or r\.rolsuper\) \) then raise exception/);
