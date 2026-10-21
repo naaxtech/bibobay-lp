@@ -9,7 +9,7 @@ import { submitLead, type LeadApiBody } from "@/lib/leads/submit";
  *
  * Answers `{ ok, persisted, acknowledgementQueued, message }` (plus `download` on a stored signup when a download is
  * configured, and `fieldErrors` on a 400 with field problems). `persisted: true` only after the database confirmed the write; the message never
- * says an email was sent. Statuses: 200 stored · 400 invalid or honeypot · 413 too large ·
+ * says an email was sent. Statuses: 200 stored · 400 invalid or honeypot · 403 bot check refused (R219) · 413 too large ·
  * 415 not JSON · 429 rate limited · 500 write failed · 503 storage not configured, limiter down, or
  * (P-I1, Ruling R125) no way to ask for removal: neither email sending nor a CMS contact address is
  * configured, answered with `LEAD_SIGNUPS_CLOSED_MESSAGE` (lib/leads/submit.ts) in the same shape.

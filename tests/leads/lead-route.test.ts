@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/leads/route";
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
 import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { clientKeyFromHeaders } from "@/lib/leads/http";
@@ -204,6 +205,16 @@ describe("POST /api/leads with Supabase configured (mocked), removal by writing 
     expect(rpcCalls[1]?.[1]).toMatchObject({ p_email: "parent@example.com", p_consent: true, p_consent_version: "1", p_age_band: "6-8" });
     // Resend is not configured, so the outbox row stays pending for the retry worker.
     expect(rpcCalls[2]?.[1]).toEqual({ p_lead_id: LEAD_ID, p_kind: "acknowledgement", p_claim: false });
+  });
+
+  it("passes a bot-check refusal through as 403 with no-store, before any counter or write", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
+    const response = await post(VALID);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: BOT_CHECK_MESSAGES.refused });
+    expect(rpcCalls).toEqual([]);
   });
 
   it("creates the Supabase client with the server-only key and no browser session", async () => {

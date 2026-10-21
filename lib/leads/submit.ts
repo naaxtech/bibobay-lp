@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
+import { runBotCheck, type BotCheck } from "@/lib/bot-check/gate";
 import { FORM_COPY } from "@/components/forms/form-copy";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
 import type { LeadMagnetLink } from "@/lib/email/lead-emails";
@@ -14,7 +16,7 @@ import { isHoneypotFilled, validateLeadSubmission, type AgeBand, type LeadFieldE
 /**
  * Founding-family signup orchestration (spec §9). Order matters and is the whole point:
  *
- *   honeypot → validation → storage configured? → removal channel? → shared rate limit → durable write
+ *   honeypot → validation → storage configured? → removal channel? → bot check (R216) → shared rate limit → durable write
  *   → outbox rows → answer → (claim → the kind's send budget → email attempt → outcome recorded)
  *
  * Success is reported only after the write (spec §9.8). An email problem after the write never
@@ -105,6 +107,10 @@ export type LeadLogEvent =
   /** P-I1: a signup refused because no removal channel exists (a warning; reaches Sentry, R52). */
   | { event: "lead_removal_channel_unconfigured" }
   | { event: "lead_honeypot" }
+  /** R219: refused is expected noise (info); unavailable and unconfigured are warnings. The token is never logged. */
+  | { event: "lead_bot_check_refused"; reason: string }
+  | { event: "lead_bot_check_unavailable"; reason: string }
+  | { event: "lead_bot_check_unconfigured"; reason: string }
   | { event: "lead_config_invalid"; code: "consent_version_invalid" }
   | { event: "delivery_enqueue_failed"; kind: DeliveryKind; code: string }
   /** Fix wave D-I1: `budget` names the kind's bucket (`send:<budget>`); the send paths always set it. */
@@ -123,6 +129,8 @@ export interface LeadSubmissionDependencies {
    * email, or write to the contact address). Null: signups are closed (503, nothing stored).
    */
   removalChannel: RemovalChannel;
+  /** The bot check (R215): off, misconfigured (fails closed) or on with a verifier. */
+  botCheck: BotCheck;
   /** The shared limiter. Null with storage configured is a misconfiguration and fails closed. */
   rateLimiter: RateLimiter | null;
   /** Null while Resend is not configured: acknowledgements and staff alerts wait in the outbox as `pending`. */
@@ -162,7 +170,7 @@ export interface LeadApiBody {
 }
 
 export interface LeadSubmissionResult {
-  status: 200 | 400 | 429 | 500 | 503;
+  status: 200 | 400 | 403 | 429 | 500 | 503;
   body: LeadApiBody;
   retryAfterSeconds?: number;
 }
@@ -325,6 +333,12 @@ export async function submitLead(input: unknown, dependencies: LeadSubmissionDep
   if (!dependencies.removalChannel) {
     log({ event: "lead_removal_channel_unconfigured" });
     return refused(503, LEAD_SIGNUPS_CLOSED_MESSAGE);
+  }
+
+  const gate = await runBotCheck(dependencies.botCheck, validation.botCheckToken, "lead");
+  if (!gate.ok) {
+    log({ event: `lead_bot_check_${gate.kind}`, reason: gate.reason });
+    return refused(gate.status, gate.kind === "refused" ? BOT_CHECK_MESSAGES.refused : BOT_CHECK_MESSAGES.unavailable);
   }
 
   try {

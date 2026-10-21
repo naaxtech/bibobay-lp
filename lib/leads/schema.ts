@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { BOT_CHECK_TOKEN_FIELD, BOT_CHECK_TOKEN_MAX_LENGTH } from "@/lib/bot-check/fields";
 import {
   AGE_BANDS,
   EMAIL_PATTERN,
@@ -71,15 +72,17 @@ export const leadSubmissionSchema = z.strictObject({
   utm: z.strictObject(Object.fromEntries(UTM_KEYS.map((key) => [key, utmValue.optional()])) as Record<(typeof UTM_KEYS)[number], z.ZodOptional<typeof utmValue>>).optional(),
   /** The honeypot: only ever empty here; a filled one is turned away before validation. */
   [HONEYPOT_FIELD]: z.literal("").optional(),
+  /** The bot-check token: metadata for the gate, never part of the record (R218). */
+  [BOT_CHECK_TOKEN_FIELD]: z.string().min(1).max(BOT_CHECK_TOKEN_MAX_LENGTH).optional(),
 });
 
-export type LeadSubmission = z.output<typeof leadSubmissionSchema>;
+export type LeadSubmission = Omit<z.output<typeof leadSubmissionSchema>, typeof BOT_CHECK_TOKEN_FIELD>;
 
 /** Why a body was refused as a whole rather than field by field. */
 export type LeadFormError = "invalid_body" | "unexpected_fields" | "invalid_metadata";
 
 export type LeadValidationResult =
-  | { ok: true; data: LeadSubmission }
+  | { ok: true; data: LeadSubmission; botCheckToken?: string }
   | { ok: false; fieldErrors: LeadFieldErrors; formError?: LeadFormError };
 
 const FIELD_CODES = new Set<LeadFieldErrorCode>(["required", "invalid", "too_long"]);
@@ -88,7 +91,10 @@ const FIELD_CODES = new Set<LeadFieldErrorCode>(["required", "invalid", "too_lon
 export function validateLeadSubmission(input: unknown): LeadValidationResult {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, fieldErrors: {}, formError: "invalid_body" };
   const parsed = leadSubmissionSchema.safeParse(input);
-  if (parsed.success) return { ok: true, data: parsed.data };
+  if (parsed.success) {
+    const { [BOT_CHECK_TOKEN_FIELD]: botCheckToken, ...data } = parsed.data;
+    return botCheckToken === undefined ? { ok: true, data } : { ok: true, data, botCheckToken };
+  }
 
   const found: LeadFieldErrors = {};
   let formError: LeadFormError | undefined;

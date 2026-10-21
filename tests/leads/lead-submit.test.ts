@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
+import { BOT_CHECK_MESSAGES, type BotCheckAction } from "@/lib/bot-check/fields";
+import type { BotCheck } from "@/lib/bot-check/gate";
+import type { BotCheckVerdict } from "@/lib/bot-check/turnstile";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
 import type { DeliveryKind, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
 import * as leadSubmitModule from "@/lib/leads/submit";
@@ -148,11 +151,109 @@ function dependencies(overrides: Partial<LeadSubmissionDependencies> = {}): Lead
     log: () => {},
     // P-I1 (Ruling R125): a way to ask for removal exists; tests of the closed state pass null.
     removalChannel: { kind: "contact", email: "hello@bibobay.example" },
+    botCheck: { state: "off" },
     ...overrides,
   };
 }
 
 const VALID = { email: "Parent@Example.com", consent: true, firstName: "Ana", ageBand: "3-5" };
+
+const TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
+
+function verifierReturning(verdict: BotCheckVerdict) {
+  const verify = vi.fn(async (_token: string | undefined, _action: BotCheckAction): Promise<BotCheckVerdict> => verdict);
+  const botCheck: BotCheck = { state: "on", verifier: { verify } };
+  return { verify, botCheck };
+}
+
+describe("bot check (R215, R216, R219)", () => {
+  it("is skipped when off: a signup with no token is stored", async () => {
+    const repo = fakeRepository();
+    const result = await submitLead(VALID, dependencies({ repository: repo.repository, botCheck: { state: "off" } }));
+    expect(result.status).toBe(200);
+    expect(repo.calls).toContain("submitLead");
+  });
+
+  it("refused gives 403, and nothing is counted or stored", async () => {
+    const repo = fakeRepository();
+    const consume = vi.fn(allowAll.consume);
+    const log = vi.fn();
+    const { verify, botCheck } = verifierReturning({ outcome: "refused", reason: "rejected" });
+    const result = await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ repository: repo.repository, rateLimiter: { consume }, botCheck, log }));
+    expect(result.status).toBe(403);
+    expect(result.body).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: BOT_CHECK_MESSAGES.refused });
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(consume).not.toHaveBeenCalled();
+    expect(repo.calls).toEqual([]);
+    expect(log).toHaveBeenCalledWith({ event: "lead_bot_check_refused", reason: "rejected" });
+  });
+
+  it("unavailable gives 503 and a reported event", async () => {
+    const repo = fakeRepository();
+    const consume = vi.fn(allowAll.consume);
+    const log = vi.fn();
+    const { botCheck } = verifierReturning({ outcome: "unavailable", reason: "timeout" });
+    const result = await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ repository: repo.repository, rateLimiter: { consume }, botCheck, log }));
+    expect(result.status).toBe(503);
+    expect(result.body).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: BOT_CHECK_MESSAGES.unavailable });
+    expect(consume).not.toHaveBeenCalled();
+    expect(repo.calls).toEqual([]);
+    expect(log).toHaveBeenCalledWith({ event: "lead_bot_check_unavailable", reason: "timeout" });
+  });
+
+  it("misconfigured gives 503 and a reported event", async () => {
+    const repo = fakeRepository();
+    const log = vi.fn();
+    const result = await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ repository: repo.repository, botCheck: { state: "misconfigured", problem: "half" }, log }));
+    expect(result.status).toBe(503);
+    expect(result.body.message).toBe(BOT_CHECK_MESSAGES.unavailable);
+    expect(repo.calls).toEqual([]);
+    expect(log).toHaveBeenCalledWith({ event: "lead_bot_check_unconfigured", reason: "half" });
+  });
+
+  it("is not asked for a honeypot hit, a validation failure or a missing removal channel", async () => {
+    const { verify, botCheck } = verifierReturning({ outcome: "passed" });
+    await submitLead({ ...VALID, website: "x", botCheckToken: TOKEN }, dependencies({ botCheck }));
+    await submitLead({ email: "nope", consent: false, botCheckToken: TOKEN }, dependencies({ botCheck }));
+    await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ botCheck, removalChannel: null }));
+    await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ botCheck, repository: null }));
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("passed proceeds: verified once for the lead action, before the rate limit, and the token goes nowhere else", async () => {
+    const repo = fakeRepository();
+    const order: string[] = [];
+    const consume = vi.fn(async () => {
+      order.push("consume");
+      return { allowed: true, remaining: 4, retryAfterSeconds: 0 };
+    });
+    const verify = vi.fn(async (_token: string | undefined, _action: BotCheckAction): Promise<BotCheckVerdict> => {
+      order.push("verify");
+      return { outcome: "passed" };
+    });
+    const submitSpy = vi.spyOn(repo.repository, "submitLead");
+    const log = vi.fn();
+    const result = await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ repository: repo.repository, rateLimiter: { consume }, botCheck: { state: "on", verifier: { verify } }, log }));
+    expect(result.status).toBe(200);
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith(TOKEN, "lead");
+    expect(order.slice(0, 2)).toEqual(["verify", "consume"]);
+    const stored = submitSpy.mock.calls[0]![0];
+    expect(Object.keys(stored)).not.toContain("botCheckToken");
+    expect(JSON.stringify(stored)).not.toContain(TOKEN);
+    expect(JSON.stringify(stored)).not.toContain("botCheckToken");
+    expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("botCheckToken");
+    expect(JSON.stringify(result.body)).not.toContain(TOKEN);
+  });
+
+  it("a refusal's log entry does not carry the token", async () => {
+    const log = vi.fn();
+    const { botCheck } = verifierReturning({ outcome: "refused", reason: "missing_token" });
+    await submitLead({ ...VALID, botCheckToken: TOKEN }, dependencies({ botCheck, log }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN);
+  });
+});
 
 describe("validation and consent", () => {
   it("persists nothing and answers 400 with field errors when the email is missing", async () => {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { after } from "next/server";
 
+import { createBotCheck } from "@/lib/bot-check/gate";
 import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 import { getStaffNotificationEmail, createEmailSenderFromEnv } from "@/lib/email/client";
 import { createSupabaseRateLimiter } from "@/lib/security/rate-limit";
@@ -150,6 +151,7 @@ export async function createLeadDependencies(request: Request, env: Record<strin
     repository: storage ? createSupabaseLeadRepository(storage) : null,
     // P-I1 (Ruling R125): email sending (reply to the acknowledgement) or the CMS contact address.
     removalChannel: removalChannelFrom(settings, env),
+    botCheck: createBotCheck(env),
     rateLimiter: storage ? createSupabaseRateLimiter(storage) : null,
     mailer: email?.sender ?? null,
     copy,
