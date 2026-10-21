@@ -1,0 +1,42 @@
+tests/leads/lead-schema.test.ts
+  s_37deb30b6489aa::t_a2fc52833b0e76 159-187
+tests/leads/lead-route.test.ts
+  s_37deb30b6489aa::t_7dd19bd5fed037 210-217
+  s_37deb30b6489aa::t_899af0a220020d 4
+  s_37deb30b6489aa::t_76ae8566c6efbe 218-219
+app/api/leads/route.ts
+  s_37deb30b6489aa::t_3e46211058ac8b 12
+lib/leads/submit.ts
+  s_37deb30b6489aa::t_feb2df5470e3bb 3-4,19,110-113,132-133
+  s_37deb30b6489aa::t_64e005fff8ae31 173
+  s_37deb30b6489aa::t_ea4d977b411a85 338-341
+  s_37deb30b6489aa::t_c90ee4fdac4e40 342-343
+lib/leads/dependencies.ts
+  s_37deb30b6489aa::t_2e52426a547247 5
+  s_37deb30b6489aa::t_0aa2b8693a2471 154
+tests/leads/lead-submit.test.ts
+  s_37deb30b6489aa::t_18afefdc42f299 207,211
+  s_37deb30b6489aa::t_7886527adcd014 7-9
+  s_37deb30b6489aa::t_cba1dd5e2a9337 154,161-206,208-210,212-256
+  s_37deb30b6489aa::t_43e1b19bc3688f 257
+tests/observability/lead-reporting.test.ts
+  s_37deb30b6489aa::t_9b95069086b936 65-77
+lib/leads/schema.ts
+  s_37deb30b6489aa::t_0fa4c0113f408d 3,75-76,79,85,94-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c6e71185ca12d5597ce840e98afecee69167cf05",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
