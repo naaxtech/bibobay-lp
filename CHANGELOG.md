@@ -2,6 +2,20 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-21 — Sanity CMS live
+
+### Added
+
+- The live Sanity project (`k82r18ol`, dataset `production`) under the BIBO Bay account, with the Studio hosted at https://bibobay.sanity.studio and its schema deployed. `/studio` on the site redirects there.
+- The 32 claim-safe starter documents are seeded (commerce, tracking and testimonials stay off) and pass the Studio's validation.
+- Publishing refreshes the site: a signed webhook calls `/api/revalidate` for every create, update and delete.
+- Draft preview is wired end to end for the Studio's Presentation tool: the site checks the preview secret with a Viewer token and lets the Studio frame it.
+
+### Changed
+
+- `studio/sanity.cli.ts` names the hosted Studio (`deployment.appId`), so later deploys replace it without asking, and turns on Sanity's auto-updates.
+- The CMS, deployment and architecture docs and the README describe the live project.
+
 ## 2026-10-17 — Consent notice and privacy notice
 
 ### Changed

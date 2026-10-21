@@ -16,10 +16,31 @@ SANITY_STUDIO_PROJECT_ID=<project id> SANITY_STUDIO_DATASET=production npm --pre
   without them. Never put a token in a `SANITY_STUDIO_*` variable: those values reach the browser.
 - `SANITY_STUDIO_PREVIEW_URL` (optional, https or `http://localhost`) turns on the Presentation tool.
 - `npm --prefix studio run build` builds it; deploying it to Sanity hosting is done by the BIBO Bay
-  owner account (`npx sanity deploy` from `studio/`), not by CI. No live project exists yet (Task 11).
-- `npm --prefix studio run seed -- --dry-run` lists the 29 claim-safe starter documents. Without
+  owner account, not by CI.
+- `npm --prefix studio run seed -- --dry-run` lists the 32 claim-safe starter documents. Without
   `--dry-run`, and with a server-only `SANITY_WRITE_TOKEN`, it creates the missing ones with
   `createIfNotExists`: it never overwrites an editor's changes.
+
+## The live project
+
+Live since 2026-10-21 under the BIBO Bay owner account:
+
+| What | Value |
+|---|---|
+| Studio | https://bibobay.sanity.studio (sign in with the BIBO Bay account); `/studio` on the site redirects there |
+| Project and dataset | `k82r18ol`, `production` (public, so the site reads published content without a token) |
+| Website | https://www.bibobay.com: publishing refreshes it through the webhook (see "Publishing and when the site updates") |
+| CORS origins | `http://localhost:3333` (local Studio, with credentials); `http://localhost:3000`, `https://www.bibobay.com` and the Vercel preview origin, without credentials (the site reads Sanity only on its server) |
+
+After a schema change, redeploy the Studio from `studio/`:
+
+```bash
+SANITY_STUDIO_PROJECT_ID=k82r18ol SANITY_STUDIO_DATASET=production SANITY_STUDIO_PREVIEW_URL=https://www.bibobay.com npx sanity deploy
+```
+
+`studio/sanity.cli.ts` names the hosted Studio (`deployment.appId`), so the deploy replaces it without
+asking, and turns on Sanity's auto-updates. The deploy also uploads the schema. Leave out
+`SANITY_STUDIO_PREVIEW_URL` and the deployed Studio loses its Presentation tool.
 
 ## What is in the Studio
 
@@ -161,18 +182,20 @@ with the server-only `SANITY_API_READ_TOKEN` (Viewer role), then shows drafts wi
 preview" notice and `noindex`; `/api/draft-mode/disable` exits. The Studio side is wired too:
 `presentationTool` in `studio/sanity.config.ts` uses
 `previewUrl: { origin, previewMode: { enable: "/api/draft-mode/enable" } }`, with the origin from
-`SANITY_STUDIO_PREVIEW_URL`. To use it once the projects are provisioned (Task 11): set
-`SANITY_STUDIO_PREVIEW_URL` where the Studio runs, and `SANITY_API_READ_TOKEN` and
-`SANITY_STUDIO_ORIGIN` on the site. Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no
-Presentation tool at all.
+`SANITY_STUDIO_PREVIEW_URL`. On the live project this is configured: the hosted Studio is built with
+`SANITY_STUDIO_PREVIEW_URL=https://www.bibobay.com`, and the site has `SANITY_API_READ_TOKEN` and
+`SANITY_STUDIO_ORIGIN=https://bibobay.sanity.studio`. Open **Presentation** in the Studio to edit
+with the page beside you. Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no Presentation tool
+at all.
 
 ## Publishing and when the site updates
 
 Published content is cached by the site and expired by a signed webhook:
 
-1. In Sanity (project settings, API, webhooks), create a webhook: URL
-   `https://<site>/api/revalidate`, method POST, trigger on create, update and delete, projection
-   `{_type, _id}`, secret = the site's `SANITY_REVALIDATE_SECRET`.
+1. The live project has this webhook (Sanity, project settings, API, webhooks: "Website cache
+   refresh"): URL `https://www.bibobay.com/api/revalidate`, method POST, on create, update and
+   delete of every document, projection `{_type, _id}`, secret = the site's
+   `SANITY_REVALIDATE_SECRET`. A new site needs the same webhook with its own URL.
 2. On publish, the site expires the cache tag for that document type, and the next visitor sees the
    change. Publishing a download (`leadMagnet`) refreshes the landing page.
 3. The site caches published content with no time limit, except the two commerce switches
