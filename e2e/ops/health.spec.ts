@@ -13,7 +13,7 @@ import { CONFIGURED } from "./environment";
  * Both are never cached, answer HEAD, and refuse POST.
  */
 
-const READINESS_KEYS = ["contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
+const READINESS_KEYS = ["botCheck", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
 const READINESS_STATUS = CONFIGURED ? 200 : 503;
 
 test.describe("GET /api/health", () => {

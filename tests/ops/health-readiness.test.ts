@@ -57,11 +57,11 @@ describe("GET /api/health", () => {
 
 describe("readiness checks", () => {
   it("is all false with nothing configured", () => {
-    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, contact: false, revalidation: false, legalReviewed: false });
+    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, contact: false, revalidation: false, legalReviewed: false, botCheck: false });
   });
 
   it("is ready with Sanity, Supabase lead storage, the revalidation secret and a removal channel, even without email or reviewed legal text", () => {
-    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: false });
+    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: false, botCheck: false });
   });
 
   it("counts a way to ask for removal toward readiness (P-I1, Ruling R125): email sending or a contact address", () => {
@@ -97,6 +97,17 @@ describe("readiness checks", () => {
   });
 });
 
+describe("readiness botCheck", () => {
+  const KEYS = { NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA", TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA" };
+
+  it("is true only when the bot check is on, and never changes ready", () => {
+    expect(readinessChecks({ ...CONFIGURED, ...KEYS }, { legalReviewed: false, settings: CONTACT })).toMatchObject({ botCheck: true, ready: true });
+    expect(readinessChecks({ ...CONFIGURED, ...KEYS, TURNSTILE_SECRET_KEY: "" }, { legalReviewed: false, settings: CONTACT })).toMatchObject({ botCheck: false, ready: true });
+    expect(readinessChecks({ ...CONFIGURED, NEXT_PUBLIC_TURNSTILE_SITE_KEY: KEYS.NEXT_PUBLIC_TURNSTILE_SITE_KEY }, { legalReviewed: false, settings: CONTACT }).botCheck).toBe(false);
+    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toMatchObject({ botCheck: false, ready: false });
+  });
+});
+
 describe("GET /api/readiness", () => {
   it("answers 503 with booleans only when production dependencies are missing", async () => {
     getLegalSettings.mockResolvedValue(FALLBACK);
@@ -105,7 +116,7 @@ describe("GET /api/readiness", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(Object.keys(body).sort()).toEqual(["contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
+    expect(Object.keys(body).sort()).toEqual(["botCheck", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
     for (const value of Object.values(body)) expect(typeof value).toBe("boolean");
     expect(body.ready).toBe(false);
   });
@@ -118,7 +129,7 @@ describe("GET /api/readiness", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: true });
+    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: true, botCheck: false });
     for (const value of [...Object.values(CONFIGURED), CONTACT.contactEmail]) expect(text).not.toContain(value);
   });
 

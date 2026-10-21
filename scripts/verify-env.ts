@@ -1,4 +1,5 @@
 import { analyticsConfig } from "../lib/analytics/config";
+import { botCheckConfig, type BotCheckProblem } from "../lib/bot-check/config";
 import { sentryDsnFrom } from "../lib/observability/sentry-dsn";
 import { parsePaymentHostAllowlist } from "../lib/security/payment-url";
 import { SERVER_SECRET_MIN_LENGTH } from "../lib/security/secrets";
@@ -36,7 +37,17 @@ const allowedPublicNames = new Set([
   // Task 10M-a: a Sentry DSN can only submit events. Its server names (SENTRY_AUTH_TOKEN,
   // SENTRY_ORG, SENTRY_PROJECT) are refused here under NEXT_PUBLIC_.
   "NEXT_PUBLIC_SENTRY_DSN",
+  // Bot check (Cloudflare Turnstile): a site key is public by design (it is rendered in the page).
+  // TURNSTILE_SECRET_KEY is a server name and is refused under NEXT_PUBLIC_.
+  "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
 ]);
+
+const BOT_CHECK_PROBLEMS: Record<BotCheckProblem, string> = {
+  half: "only one of the two keys is set",
+  malformed: "a key is not the shape Turnstile issues",
+  mixed_keys: "a Cloudflare test key is mixed with a real key",
+  test_keys_in_production: "Cloudflare test keys are set in production",
+};
 
 /**
  * Vercel prefixes every System Environment Variable with the framework prefix (VERCEL_* becomes
@@ -138,11 +149,19 @@ export function verifyEnvironment(
     );
   }
 
+  // Bot check (R215): a misconfigured pair makes every form answer 503, so a production build fails
+  // instead. Variable names and a reason only, never a value.
+  const botCheck: string[] = [];
+  const botCheckState = botCheckConfig(env);
+  if (phase === "production" && botCheckState.state === "misconfigured") {
+    botCheck.push(`NEXT_PUBLIC_TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY: ${BOT_CHECK_PROBLEMS[botCheckState.problem]}; every form would answer 503`);
+  }
+
   return {
-    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0 && payment.length === 0,
+    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0 && payment.length === 0 && botCheck.length === 0,
     phase,
     forbiddenPublic,
-    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring, ...payment],
+    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring, ...payment, ...botCheck],
   };
 }
 

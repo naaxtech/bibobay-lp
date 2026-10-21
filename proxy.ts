@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { botCheckFrameSources } from "./lib/bot-check/config";
 import { monitoringConnectSources } from "./lib/observability/monitoring-env";
 import { NONCE_HEADER, buildContentSecurityPolicy, createNonce, securityEnvironment } from "./lib/security/headers";
 import { STAFF_SESSION_COOKIE, cookiesMayBeInsecureFor, createStaffAuthClient, isStaffPath, staffAuthEnvironment, withinStaffAuthTimeout } from "./lib/supabase/staff-session";
@@ -66,7 +67,7 @@ export async function proxy(request: NextRequest) {
     const nonce = createNonce();
     // Monitoring hosts, connect-src only (Task 10M-a, ruling R70): the Sentry ingest origin and the
     // PostHog host, each only when configured. The SDKs are bundled; script-src stays nonce-only.
-    const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment(), extraConnectSources: monitoringConnectSources() });
+    const policy = buildContentSecurityPolicy({ nonce, environment: securityEnvironment(), extraConnectSources: monitoringConnectSources(), extraFrameSources: botCheckFrameSources(process.env) });
     requestHeaders.set(NONCE_HEADER, nonce);
     requestHeaders.set("content-security-policy", policy);
     response = NextResponse.next({ request: { headers: requestHeaders } });
