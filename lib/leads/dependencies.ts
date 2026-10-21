@@ -106,7 +106,8 @@ export function logLeadEvent(entry: LeadLogEvent): void {
  */
 export function leadMagnetFrom(lead: LandingPageContent["lead"], settings: SiteSettings, env: Record<string, string | undefined> = process.env): LeadMagnetLink | null {
   const magnet = lead.leadMagnet;
-  if (!magnet?.available || !magnet.fileUrl) return null;
+  // R240: a coming-soon download is never handed out, whatever else the value claims.
+  if (!magnet?.available || magnet.comingSoon || !magnet.fileUrl) return null;
   const origin = seoEnvironment(settings, env).baseUrl;
   if (FREEBIE_PATH.test(magnet.fileUrl)) {
     if (!origin) return null;
@@ -124,7 +125,8 @@ export function leadMagnetFrom(lead: LandingPageContent["lead"], settings: SiteS
  */
 export function immediateDownloadFrom(lead: LandingPageContent["lead"], env: Record<string, string | undefined> = process.env): { url: string; title: string } | null {
   const magnet = lead.leadMagnet;
-  if (!magnet?.available || !magnet.fileUrl) return null;
+  // R240: a coming-soon download is never handed out, whatever else the value claims.
+  if (!magnet?.available || magnet.comingSoon || !magnet.fileUrl) return null;
   if (FREEBIE_PATH.test(magnet.fileUrl)) {
     const token = signDownloadToken({ fileUrl: magnet.fileUrl, ttlSeconds: IMMEDIATE_DOWNLOAD_TTL_SECONDS }, env);
     return token ? { url: downloadPath(token), title: magnet.title } : null;

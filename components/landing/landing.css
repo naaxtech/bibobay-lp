@@ -1825,6 +1825,26 @@
     font-size: 0.875rem;
   }
 
+  /* R240: a download the CMS marks "Coming soon". The badge is the ecosystem's "In development" pill. */
+  .freebie-card__soon {
+    justify-self: start;
+    inline-size: fit-content;
+    margin-block-end: 0.625rem;
+    padding: 0.1rem 0.65rem;
+    border-radius: var(--bibo-radius-pill);
+    background-color: var(--bibo-color-yellow);
+    color: var(--bibo-color-navy);
+    font-size: var(--bibo-text-small);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .freebie-card__note {
+    margin-block-start: 1rem;
+    color: var(--bibo-color-navy);
+    font-weight: 600;
+  }
+
   @media (min-width: 40rem) {
     .freebie-card--pages {
       grid-template-columns: 11rem minmax(0, 1fr);

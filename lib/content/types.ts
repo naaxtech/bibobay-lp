@@ -12,7 +12,11 @@ export interface BrandPillar { id: string; title: string; description: string; p
 export interface EcosystemEntry { id: string; name: string; tagline: string; description: string; status: "idea" | "in-development" | "available"; image?: ImageWithAlt; cta?: Cta }
 export interface Testimonial { id: string; quote: string; attribution: string; verified: boolean }
 export interface FaqItem { id: string; question: string; answer: string }
-export interface LeadMagnet { title: string; description: string; fileUrl?: string; available: boolean }
+export interface LeadMagnet {
+  title: string; description: string; fileUrl?: string; available: boolean;
+  /** Ruling R240: shown as coming soon. Then `available` is false and nobody is given the file. */
+  comingSoon?: { note: string };
+}
 export interface ProductCategory { id: string; name: string; slug: string; description: string; image?: ImageWithAlt; order: number }
 export interface CommerceNotice { title: string; body: string; cta?: Cta }
 export interface Product { id: string; name: string; slug: string; description: string; details: PortableContent; images: ImageWithAlt[]; category?: ProductCategory; status: "draft" | "listed" | "sold-out"; order: number; seo?: Seo; commerceNotice?: CommerceNotice; sku?: string; variant?: string; pack?: string }

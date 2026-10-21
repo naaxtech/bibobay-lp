@@ -52,7 +52,7 @@ const questions = [
   ["what", "What is BIBO Bay?", "BIBO Bay is a gentle underwater world of mindful content for curious little learners ages 2–6: songs, stories and playful adventures with Tula, Bob and Lumi."],
   ["episodes", "Where can we watch?", "On the Bibo Bay YouTube channel, @bibobay-tv. Every video on this page opens there."],
   ["ages", "Who is it for?", "Little learners ages 2–6, and the grown-ups watching with them."],
-  ["signup", "What happens when I join?", "Your request to join the founding-family list is recorded when the signup service accepts it. Once it is stored, the page shows the download button for the activity pack. A confirmation email is not guaranteed."],
+  ["signup", "What happens when I join?", "Your request to join the founding-family list is recorded when the signup service accepts it. Once it is stored, the page shows the download button for the activity pack whenever the pack is available. A confirmation email is not guaranteed."],
 ] as const;
 const sectionIds = ["hero", "trust", "promise", "characters", "episodes", "offline", "pillars", "ecosystem", "testimonials", "lead", "faq", "finalCta"] as const;
 
@@ -64,7 +64,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     ...extensions.map(([id, name, tagline]) => ({ _id: collectionId("ecosystemEntry", id), _type: "ecosystemEntry", name, tagline, description: `A possible future space for ${tagline.toLowerCase()}.`, status: "idea" })),
     ...questions.map(([id, question, answer]) => ({ _id: collectionId("faqItem", id), _type: "faqItem", question, answer })),
     // The one download: a PDF in content/freebies, served only by the signed route (R140).
-    { _id: "leadMagnet-activity-pack", _type: "leadMagnet", title: "Bibo Bay Activity Pack", description: "Eight printable pages: colour the sea friends, count with Bob, match fruit with Tula, practise bubble breathing, a bedtime chart and a watch-together page.", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: true },
+    { _id: "leadMagnet-activity-pack", _type: "leadMagnet", title: "Bibo Bay Activity Pack", description: "Eight printable pages: colour the sea friends, count with Bob, match fruit with Tula, practise bubble breathing, a bedtime chart and a watch-together page.", fileUrl: "/freebies/bibo-bay-activity-pack.pdf", available: true, comingSoon: false },
   ];
   const siteSettings: SeedDocument = {
     _id: "siteSettings", _type: "siteSettings", title: "BIBO Bay", description: "Mindful songs, stories and playful learning for little learners ages 2–6, with Tula, Bob and Lumi.",

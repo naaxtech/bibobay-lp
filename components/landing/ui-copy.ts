@@ -97,6 +97,8 @@ export const UI_COPY = {
   getFreebie: "Get the free pack",
   /** The line under the locked card's button. */
   freebieGate: "Free for everyone on the list.",
+  /** The badge on a download the CMS marks "Coming soon" (R240). */
+  freebieComingSoon: "Coming soon",
   /** The form's download button, shown only after the server confirms the signup. */
   downloadFreebie: "Download the free pack",
   /** The repository pack's format line, from its real page count and size. */

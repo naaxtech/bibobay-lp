@@ -2,6 +2,16 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-22 — Activity pack "Coming soon" switch
+
+### Added
+
+- A **Coming soon** switch on each download in the Studio (R240). On: the card shows a Coming soon badge and a note instead of the download button, nobody is given the file (not after signing up, not by email), and the signup section's description and button label switch to coming-soon wording, editable in three fields that appear under the switch. Off: the pack is offered exactly as before.
+
+### Changed
+
+- The seeded FAQ answer "What happens when I join?" says the page shows the download button "whenever the pack is available".
+
 ## 2026-10-21 — Contact form
 
 ### Added
