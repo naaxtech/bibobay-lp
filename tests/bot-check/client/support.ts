@@ -32,7 +32,6 @@ export function installFakeTurnstile(): FakeTurnstile {
       fake.removes.push(id);
     },
   };
-  window.turnstile = fake;
   return fake;
 }
 

@@ -54,6 +54,8 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
       current.api = null;
       current.widgetId = null;
       current.started = false;
+      current.interactive = false;
+      current.failed = false;
       current.token = null;
       settle({ problem: "unavailable" });
     };
@@ -67,7 +69,11 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
     loadTurnstile().then(
       (api) => {
         const container = containerRef.current;
-        if (!current.mounted || !container || current.widgetId !== null) return;
+        if (!current.mounted || current.widgetId !== null) return;
+        if (!container) {
+          current.started = false;
+          return;
+        }
         // src: https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/ · turnstile api v0 (hosted) · 2026-10-22
         current.api = api;
         current.widgetId = api.render(container, {
@@ -95,6 +101,7 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
           "after-interactive-callback": () => {
             current.interactive = false;
           },
+          // src: https://developers.cloudflare.com/turnstile/troubleshooting/client-side-errors/ · turnstile api.js v0 (hosted) · 2026-10-22
           // Returning true tells Turnstile the error is handled, so it prints nothing to the console.
           "error-callback": () => {
             current.failed = true;
@@ -117,7 +124,11 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
     if (siteKey === null) return Promise.resolve({ problem: "unavailable" });
     if (current.token !== null) return Promise.resolve({ token: current.token });
     if (current.interactive) return Promise.resolve({ problem: "interactive" });
-    if (current.failed) return Promise.resolve({ problem: "unavailable" });
+    if (current.failed) {
+      // A failed widget is retried by the next submit: a keyboard user's Enter fires no focusin to prepare it again.
+      current.failed = false;
+      if (current.api && current.widgetId !== null) current.api.reset(current.widgetId);
+    }
     prepare();
     return new Promise<BotCheckTokenResult>((resolve) => {
       const timer = setTimeout(() => {

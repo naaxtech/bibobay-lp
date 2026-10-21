@@ -48,6 +48,7 @@ function mount(siteKey: string | null = "site-key", width = 320) {
 
 async function ready() {
   await act(async () => {
+    window.turnstile = fake;
     window.__bibobayTurnstileOnload?.();
   });
 }
@@ -174,11 +175,47 @@ describe("token()", () => {
       firstScript().dispatchEvent(new Event("error"));
     });
     await expect(pending).resolves.toEqual({ problem: "unavailable" });
-    await expect(handle().token()).resolves.toEqual({ problem: "unavailable" });
+    expect(turnstileScripts()).toHaveLength(0);
     act(() => handle().prepare());
     expect(turnstileScripts()).toHaveLength(1);
     await ready();
     expect(fake.renders).toHaveLength(1);
+  });
+
+  it("after a script error, token() alone retries the load", async () => {
+    const { handle } = mount();
+    act(() => handle().prepare());
+    await act(async () => {
+      firstScript().dispatchEvent(new Event("error"));
+    });
+    const pending = handle().token();
+    expect(turnstileScripts()).toHaveLength(1);
+    await ready();
+    expect(fake.renders).toHaveLength(1);
+    await act(async () => {
+      fire(options0(), "callback", "t1");
+    });
+    await expect(pending).resolves.toEqual({ token: "t1" });
+  });
+
+  it("an api that is missing after load gives unavailable", async () => {
+    const { handle } = mount();
+    act(() => handle().prepare());
+    const pending = handle().token();
+    await act(async () => {
+      window.__bibobayTurnstileOnload?.();
+    });
+    await expect(pending).resolves.toEqual({ problem: "unavailable" });
+    expect(turnstileScripts()).toHaveLength(0);
+  });
+
+  it("a slot that is not mounted yet does not wedge the hook", async () => {
+    const { result } = renderHook(() => useBotCheck("site-key", "lead"));
+    act(() => result.current.prepare());
+    await ready();
+    expect(fake.renders).toHaveLength(0);
+    act(() => result.current.prepare());
+    expect(turnstileScripts()).toHaveLength(1);
   });
 
   it("load timeout gives unavailable after 15 s, and a later prepare retries", async () => {
@@ -186,12 +223,17 @@ describe("token()", () => {
     const { handle } = mount();
     act(() => handle().prepare());
     const pending = handle().token();
+    const timedOut = firstScript();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
     await expect(pending).resolves.toEqual({ problem: "unavailable" });
+    expect(timedOut.isConnected).toBe(false);
+    expect(window.__bibobayTurnstileOnload).toBeTypeOf("function");
+    expect(() => window.__bibobayTurnstileOnload?.()).not.toThrow();
     act(() => handle().prepare());
     expect(turnstileScripts()).toHaveLength(1);
+    expect(firstScript()).not.toBe(timedOut);
   });
 
   it("a widget that never answers times out after 15 s", async () => {
@@ -206,7 +248,7 @@ describe("token()", () => {
     await expect(pending).resolves.toEqual({ problem: "unavailable" });
   });
 
-  it("error-callback returns true and makes the token unavailable", async () => {
+  it("error-callback returns true, and the next token() resets the widget and waits", async () => {
     const { handle } = mount();
     act(() => handle().prepare());
     await ready();
@@ -215,7 +257,23 @@ describe("token()", () => {
       returned = fire(options0(), "error-callback", "110200");
     });
     expect(returned).toBe(true);
-    await expect(handle().token()).resolves.toEqual({ problem: "unavailable" });
+    const pending = handle().token();
+    expect(fake.resets).toEqual(["w1"]);
+    await act(async () => {
+      fire(options0(), "callback", "t2");
+    });
+    await expect(pending).resolves.toEqual({ token: "t2" });
+  });
+
+  it("a waiting submit is released at once when the widget errors", async () => {
+    const { handle } = mount();
+    act(() => handle().prepare());
+    await ready();
+    const pending = handle().token();
+    await act(async () => {
+      fire(options0(), "error-callback", "400020");
+    });
+    await expect(pending).resolves.toEqual({ problem: "unavailable" });
   });
 });
 

@@ -29,21 +29,24 @@ let abandon: (() => void) | null = null;
 export function loadTurnstile(timeoutMs: number = TURNSTILE_LOAD_TIMEOUT_MS): Promise<TurnstileApi> {
   if (pending) return pending;
   const win: TurnstileWindow = window;
+  if (win.turnstile) return Promise.resolve(win.turnstile);
   const script = document.createElement("script");
   const attempt = new Promise<TurnstileApi>((resolve, reject) => {
-    const timer = setTimeout(() => fail("turnstile load timed out"), timeoutMs);
-    const settle = (finish: () => void) => {
+    const timer = setTimeout(() => fail("turnstile load timed out", true), timeoutMs);
+    const settle = (finish: () => void, keepNoop = false) => {
       clearTimeout(timer);
-      delete win[ONLOAD_NAME];
+      // After a timeout the script may still arrive: its callback must find something harmless, not throw.
+      if (keepNoop) win[ONLOAD_NAME] = () => undefined;
+      else delete win[ONLOAD_NAME];
       abandon = null;
       finish();
     };
-    const fail = (reason: string) =>
+    const fail = (reason: string, keepNoop = false) =>
       settle(() => {
         script.remove();
         if (pending === attempt) pending = null;
         reject(new Error(reason));
-      });
+      }, keepNoop);
     abandon = () => settle(() => script.remove());
     win[ONLOAD_NAME] = () => {
       const api = win.turnstile;
@@ -72,5 +75,6 @@ export function resetTurnstileLoaderForTests(): void {
   abandon?.();
   pending = null;
   abandon = null;
+  delete (window as TurnstileWindow)[ONLOAD_NAME];
   document.querySelectorAll(`script[src^="${TURNSTILE_ORIGIN}"]`).forEach((element) => element.remove());
 }
