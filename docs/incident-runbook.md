@@ -72,7 +72,8 @@ to infinity:
 
 Nothing is claimed as sent for a parked row. Work through them like this.
 
-1. List what is parked (both outboxes):
+1. List what is parked (the signup and order outboxes; a parked contact alert is read under
+   [Contact messages](#contact-messages)):
 
    ```sql
    select 'lead' as outbox, id, kind, attempts, last_error_code, last_attempt_at, unconfirmed_since
@@ -123,6 +124,51 @@ Nothing is claimed as sent for a parked row. Work through them like this.
 5. If a row keeps parking, read the Sentry event for its kind and code before trying again. The
    common causes are a sender domain that is not verified, a revoked or wrong `RESEND_API_KEY`, and a
    provider quota.
+
+## Contact messages
+
+Each message from the contact form is a row in `public.contact_messages`, with one alert row in
+`public.contact_message_deliveries`. There is no inbox page (R168): staff read a message in its alert
+email, whose Reply-To is the sender's address (labelled unverified, because nothing on the form proves
+the sender owns it). When the alert is parked, read the message by SQL and reply by hand.
+
+1. List the parked alerts (`failed` with `next_attempt_at` set to infinity) with their messages:
+
+   ```sql
+   select delivery.id, delivery.attempts, delivery.last_error_code, delivery.unconfirmed_since,
+          message.created_at, message.topic, message.name, message.email, message.message
+   from public.contact_message_deliveries as delivery
+   join public.contact_messages as message on message.id = delivery.message_id
+   where delivery.status = 'failed' and delivery.next_attempt_at = 'infinity'
+   order by message.created_at;
+   ```
+
+   Never paste a result into a chat, a ticket or a document.
+2. Reply to the sender by hand from your own mailbox. Check first whether the alert actually went: in
+   the Resend dashboard look for the idempotency key `contact-delivery/<row id>` (the `id` from the
+   list); an `unconfirmed_since` value means the send may have reached the provider.
+3. Close the row so it stops appearing. The contact table has no `skipped` status, so mark it sent:
+
+   ```sql
+   update public.contact_message_deliveries
+   set status = 'sent', last_error_code = 'closed_by_staff', updated_at = now()
+   where id = '<row id>' and status = 'failed' and next_attempt_at = 'infinity';
+   ```
+
+4. If you would rather have the alert re-sent (the cause is fixed, and step 2 showed it did not go), put the
+   row back in the queue. The next cron run sends it ([deployment.md](deployment.md#email-outbox-worker-task-8a)):
+
+   ```sql
+   update public.contact_message_deliveries
+   set next_attempt_at = now(), attempts = 0, status = 'pending', last_error_code = null,
+       unconfirmed_since = null, claimed_at = null, updated_at = now()
+   where id = '<row id>' and status = 'failed' and next_attempt_at = 'infinity';
+   ```
+
+**The staff address was removed.** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued,
+their alerts wait: the worker claims no contact alert without a staff address, so none is parked, and
+`/api/readiness` shows `contact: false` and the form closes. Set the address again and the next cron run
+sends them. The worker drains contact alerts without `LEAD_IP_HASH_SECRET`; only the form needs it.
 
 ## Switching commerce off now
 

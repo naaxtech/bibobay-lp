@@ -2,6 +2,32 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-21 — Contact form
+
+### Added
+
+- The `/contact` page and `POST /api/contact` (R158-R177): a grown-up writes to the BIBO Bay team with a name, an email address, a topic (general, partnerships, press, shop and orders, privacy) and a message of 10 to 3,000 characters. There is no age field and no child data; the copy addresses parents, carers and professionals.
+- The page has three states (R158, R161): the form while it is open; otherwise the Studio contact address as a mailto link; otherwise only a closed notice. The first two are indexable (canonical `/contact`, listed in the sitemap) unless the CMS says noindex or the page is a draft preview; the closed notice is `noindex, follow`. The footer shows "Contact us" only while the form is open, and its mailto is unchanged.
+- The API (R159-R162, R171): JSON only, 32 KiB at most; a filled honeypot gets the generic 400; then field validation, the open check, and the shared database rate limit of 3 messages per 10 minutes per client (IPv6 per /64) and 100 per hour in all; then one `security definer` function stores the message and its outbox row in one transaction. `persisted: true` only after both exist. While the form is closed it answers 503 with `closed: true`.
+- Migration `0008_contact_messages.sql` (R159, R169, R175): `contact_messages` and `contact_message_deliveries`, both with forced row level security, no policy and no privilege for any API role, plus `submit_contact_message`, `claim_contact_deliveries` and `record_contact_delivery_attempt`, executable by `service_role` only. The lead outbox, its table and its functions are not altered. The contact outbox has no `skipped` status.
+- Delivery (R160, R170, R172): exactly one staff alert per message, to `STAFF_NOTIFICATION_EMAIL`, with the topic in the subject and Reply-To set to the sender's address (labelled unverified in the body). Nothing is emailed to the sender. It spends its own send budget, `send:contact_staff_alert`, under `LEAD_ACK_SEND_LIMIT_PER_HOUR`. It is attempted right after the answer; the cron worker now drains a third outbox, `contact`, after orders and signups, as the retry net for the next cron run (R174).
+- Availability (R161, R173, R177): the form is open only while Supabase, email sending, `STAFF_NOTIFICATION_EMAIL` and a valid `LEAD_IP_HASH_SECRET` are all configured. `/api/readiness` gains `contact`, reported and not required. If the staff address is removed after messages were queued, their alerts wait (never parked) and the form closes.
+- The Contact page document `contactPage` and the footer label `contactPageLabel` in the Studio (R163); the Studio seed now has 33 documents. A success message that claims delivery is refused by the Studio and replaced by the built-in text on the site.
+- One consent-gated visit-statistics event, `contact_submitted` (`persisted`, `topic`), after a stored answer only (R166).
+- The privacy fallback text names contact messages while the form is open, gives legitimate interest as the basis and states no retention period (R164, R174).
+
+### Changed
+
+- The deployment verifier fetches `/contact` with the other pages and its browser pass blocks `/api/contact` as well as `/api/leads`.
+- The restore sentence in `docs/deployment.md` now also lists `docs/database-security.md`, and a test pins the list against every doc that names the daily schedule (R176).
+- The architecture, database, deployment, observability, CMS, data-protection, runbook and QA docs and the README describe the contact form.
+
+### Decisions recorded
+
+- R168: an admin inbox page for messages is deferred. Trigger: the owner asks, or more than 20 messages arrive in a week. Until then staff read each message in its alert email, or by SQL when an alert is parked (`docs/incident-runbook.md`).
+- R174: legitimate interest is the basis for contact messages, no retention period is stated (the legal review owns it), and the retry of an alert is the next cron run.
+- Owner steps after merge (Studio deploy, the Contact page document, migration `0008`, Resend and the staff address, the legal review, one live check) are in `docs/deployment.md`.
+
 ## 2026-10-21 — Email cron back to once a day (Hobby plan)
 
 ### Changed
