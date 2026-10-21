@@ -1,0 +1,58 @@
+docs/architecture.md
+  s_37deb30b6489aa::t_572ec4c97a1c85 215-216
+supabase/migrations/0008_contact_messages.sql
+  s_37deb30b6489aa::t_d206895327f65e 190-191
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_59471ed45d80fe 140
+tests/contact/contact-route.test.ts
+  s_37deb30b6489aa::t_684e18b495865c 192
+CHANGELOG.md
+  s_37deb30b6489aa::t_4d96fd8385836b 11
+  s_37deb30b6489aa::t_8cbfcb163820ee 13
+tests/contact/contact-submit.test.ts
+  s_37deb30b6489aa::t_41fe4c241579da 128
+docs/deployment.md
+  s_37deb30b6489aa::t_03e8008eb1bd25 225-226
+tests/contact/contact-copy.test.ts
+  s_37deb30b6489aa::t_8b53aaa81272db 49-50,52,55-57
+  s_37deb30b6489aa::t_30ccb46bf33539 51,53-54
+supabase/tests/0007_contact_messages.sql
+  s_37deb30b6489aa::t_216e302dd3d470 273,277-281
+  s_37deb30b6489aa::t_4bd0dcb4d60e5d 24
+e2e/contact/contact-form.spec.ts
+  s_37deb30b6489aa::t_7c90d2338e9832 179
+lib/contact/submit.ts
+  s_37deb30b6489aa::t_ae604a0dc3338f 29-31
+  s_37deb30b6489aa::t_30c82eff36fff8 63-64
+docs/database-security.md
+  s_37deb30b6489aa::t_13bc01013767a8 268
+  s_37deb30b6489aa::t_4f2ea71517b5c9 92
+  s_37deb30b6489aa::t_641df9577c9e25 79
+docs/superpowers/plans/2026-10-21-contact-form.md
+  s_37deb30b6489aa::t_5f43ce64cea73a 60
+  s_37deb30b6489aa::t_aa9239d5bcfaec 59
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_f6c97e3192d4fe 562
+  s_37deb30b6489aa::t_3c69ed4fc8954c 565
+  s_37deb30b6489aa::t_85870f3067feef 561,563-564,566-567,570-571,573-575
+  s_37deb30b6489aa::t_13d0c352cf439d 572
+  s_37deb30b6489aa::t_09b113b56a86c6 568-569
+docs/observability.md
+  s_37deb30b6489aa::t_b894a8225f5de0 283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "33ea6ec6a4984bccf9f0ca480c70c5ec5025414f",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
