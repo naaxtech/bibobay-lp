@@ -309,10 +309,10 @@ style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://cdn.sanity.io;
 font-src 'self';
 connect-src 'self';
+frame-src https://challenges.cloudflare.com;   (only while the bot check is on)
 object-src 'none';
 base-uri 'self';
 form-action 'self';
-frame-src https://challenges.cloudflare.com;   (only while the bot check is on)
 frame-ancestors 'self' [SANITY_STUDIO_ORIGIN when set];
 upgrade-insecure-requests            (Vercel deployments only)
 ```

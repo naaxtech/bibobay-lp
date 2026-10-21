@@ -227,20 +227,24 @@ who should pass, or "Our spam check isn't answering just now" (HTTP 503), or an 
 **What to check, in this order.**
 
 1. Sentry: `lead_bot_check_unavailable`, `contact_bot_check_unavailable`, `order_bot_check_unavailable`
-   (Cloudflare or the secret) and `*_bot_check_unconfigured` (the two variables are wrong). The `reason`
-   tells which. `*_bot_check_refused` is info only and never reaches Sentry; a burst of it means bots are
+   (Cloudflare, the secret, or the token's hostname) and `*_bot_check_unconfigured` (the two variables are
+   wrong). The `reason` tells which; it is in the server's log line (Vercel runtime logs), not in the Sentry
+   event. `*_bot_check_refused` is info only and never reaches Sentry; a burst of it means bots are
    being turned away, which is the check working.
 2. `/api/readiness`: `botCheck` is true when the check is on. False with the variables set means they are
    set wrongly (one without the other, or Cloudflare's test keys in production).
 3. Cloudflare's status page, and the widget "BIBO Bay forms" in the brand's Cloudflare account: its domain
-   list must hold `bibobay.com`, and the secret must be the one in Vercel.
+   list must hold `bibobay.com`, the secret must be the one in Vercel, and `NEXT_PUBLIC_APP_URL` must be the
+   site's own origin (a token whose hostname does not match it is answered 503 `hostname_mismatch`).
 
 **Off-switch.** Remove both variables from the Production environment in Vercel, then redeploy the CURRENT
 production deployment (never an older one: R188). The forms then skip the check, and the honeypot and
 rate limits stay. Put the variables back, and redeploy again, when the cause is fixed.
 
-**Rotating the secret.** In Cloudflare rotate the widget's secret, set the new `TURNSTILE_SECRET_KEY` in
-Vercel Production, redeploy. Until then every submission answers 503.
+**Rotating the secret.** Rotate the secret in Cloudflare; both secrets are accepted for two hours. Within
+that window set the new `TURNSTILE_SECRET_KEY` in Vercel Production and redeploy the CURRENT production
+deployment (R188). If the window passes first, every form answers 503 (`*_bot_check_unavailable`, reason
+`secret_rejected`) until the redeploy. (src: https://developers.cloudflare.com/api/resources/turnstile/subresources/widgets/methods/rotate_secret/ · Cloudflare API v4 · 2026-10-22)
 
 ## Secret rotation
 
@@ -257,7 +261,7 @@ secret may have leaked, treat it as leaked: rotate it before you investigate. Ev
 | `RESEND_FROM`, `RESEND_REPLY_TO`, `STAFF_NOTIFICATION_EMAIL` | The sender, reply and staff-alert addresses (settings, not secrets) | Change in Vercel, redeploy | Until the sender is a verified domain, sends fail and rows retry, then park ([parked emails](#parked-emails)). |
 | `CRON_SECRET` | `/api/cron/email-outbox` (Vercel Cron sends it as a Bearer token) | Generate a new 32+ character random value, set it in Vercel Production, redeploy | The worker answers 401 or 503 until the redeploy: failed emails are not retried for that time; nothing is lost. |
 | `LEAD_IP_HASH_SECRET` | The keyed hash of client addresses in the rate limits (signups, orders, staff sign-in) | Generate a new 32+ character random value, set it, redeploy | Existing rate-limit counters stop matching, so every client starts fresh: limits briefly allow more. Nothing else is keyed by it. |
-| `TURNSTILE_SECRET_KEY` (with the public `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | The spam check on the signup, contact and order forms | See [Bot check](#bot-check-cloudflare-turnstile) | Forms answer 503 until the new secret is deployed |
+| `TURNSTILE_SECRET_KEY` (with the public `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | The spam check on the signup, contact and order forms | See [Bot check](#bot-check-cloudflare-turnstile) | Nothing for two hours; after that, 503 until the new secret is deployed. |
 | `SANITY_REVALIDATE_SECRET` | Verifies the signed Sanity webhook | Set the new value in Vercel **and** in the Sanity webhook's secret field, redeploy | Webhook calls answer 401 until both match, so published edits do not reach the site (the commerce switches still refresh within 300 seconds). |
 | `SANITY_API_READ_TOKEN` | Draft preview (a Viewer token) | Delete the token in the Sanity project's API settings, create a new Viewer token, set it, redeploy | Draft preview answers 503; published content is not affected. |
 | `SANITY_WRITE_TOKEN` | Only the Studio seed script, run locally; never set on Vercel | Delete it in Sanity; create one only when you next run the seed | Nothing on the site. |

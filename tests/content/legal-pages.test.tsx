@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AGE_BANDS } from "@/lib/leads/fields";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { LEGAL_FALLBACK, legalFallbackFor } from "@/lib/content/legal-fallback";
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
@@ -511,22 +512,34 @@ describe("while the bot check is on (R222, C7)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("changes nothing while the check is off", () => {
-    expect(legalFallbackFor({}, {}, false, false)).toBe(LEGAL_FALLBACK);
-    expect(textOf(legalFallbackFor({}, {}).privacy)).toBe(off);
+  it("changes nothing while the check is off: the text is the one pinned before the flag existed", () => {
+    // SHA-256 of the joined privacy text as built at commit 63d0d64, before `botCheck` existed.
+    const BEFORE = {
+      plain: "917f4a48b600db5c6b461f68faeba6c2325bbbd43058cd18b58cfe46320c0670",
+      commerce: "5d36578131deca7c60640c43b723838e27c3b5ef7ca281af33da66317c2af13f",
+      contact: "43903778be5ff63c5e85a8a3259215380b8146cbd043b459b51e4341f71871bb",
+      email: "bc703c3ee57d5b5834d0509e8ede0b10646d374fe6ef665c4f45f76ac0702ec6",
+    };
+    const sha = (content: PortableContent) => createHash("sha256").update(textOf(content)).digest("hex");
+    expect(sha(legalFallbackFor({}, {}, false, false).privacy)).toBe(BEFORE.plain);
+    expect(sha(legalFallbackFor({ commerceEnabled: true }, {}, false, false).privacy)).toBe(BEFORE.commerce);
+    expect(sha(legalFallbackFor({}, {}, true, false).privacy)).toBe(BEFORE.contact);
+    expect(sha(legalFallbackFor({ contactEmail: "owner@example.com" }, {}, false, false).privacy)).toBe(BEFORE.email);
+    expect(sha(legalFallbackFor({}, {}).privacy)).toBe(BEFORE.plain);
     expect(off).not.toMatch(/Cloudflare|Turnstile|spam check/i);
   });
 
   it("names Cloudflare Turnstile, what it receives, the addendum and that typing is never sent", () => {
     expect(on).toMatch(/Cloudflare Turnstile checks that a form is sent by a person and not by an automated program\. It loads only once you start filling in a form\./);
-    expect(on).toMatch(/Cloudflare then receives your network address, your browser's user-agent string and technical details of its connection, and the address of the page/);
+    expect(on).toMatch(/Cloudflare then receives information about your browser and its connection, such as your network address, your browser's user-agent string, technical details of the connection, the address of the page and this website's Turnstile key\./);
     expect(on).toContain("https://www.cloudflare.com/turnstile-privacy-policy/");
-    expect(on).toContain("does not receive anything you type");
+    expect(on).toContain("This website sends Cloudflare nothing you type");
+    expect(on).toContain("Turnstile key");
   });
 
   it("adds the spam check to the legitimate interest and says the website sets no cookie for it", () => {
     expect(on).toMatch(/keeping the website working and safe, which includes checking that forms are sent by people and not by automated programs, is the legal basis for the rate-limit counts, the spam check and the error reports/);
-    expect(on).toContain("The spam check runs inside a frame served by Cloudflare; this website sets no cookie for it.");
+    expect(on).toContain("Cloudflare's script draws the spam check inside a frame it serves; this website sets no cookie for it.");
   });
 
   it("leaves the terms alone, and the vendor denylist admits Cloudflare only when on", () => {

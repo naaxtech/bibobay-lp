@@ -210,11 +210,13 @@ The signup, contact and order forms ask Cloudflare Turnstile whether a person is
 both unset the CSP, every request and answer and the privacy text are exactly as before. The script loads
 only once someone starts filling in a form, and the widget is usually invisible.
 
-**Provisioning (brand Cloudflare account only, wrangler 4.151.3).** Log in with the three scopes the widget
-needs, then create the widget, which is bound to `bibobay.com` (that covers `www`) and nothing else:
+**Provisioning (brand Cloudflare account only, wrangler 4.151.3).** Use a wrangler config folder of its own
+(`XDG_CONFIG_HOME=<brand-only folder>`), so the brand login never replaces another entity's login. Log in with
+the scopes below, check that `wrangler whoami` shows the brand account (bibobay.official), then create the
+widget, which is bound to `bibobay.com` (that covers `www`) and nothing else:
 
 ```bash
-npx wrangler@4.151.3 login --device --scopes account:read user:read challenge-widgets.write
+npx wrangler@4.151.3 login --device --scopes account:read user:read challenge-widgets.write zone:read email_routing:write
 npx wrangler@4.151.3 whoami
 npx wrangler@4.151.3 turnstile widget create "BIBO Bay forms" --domain bibobay.com --mode managed --json
 ```
@@ -230,9 +232,12 @@ If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
   (probed on 2026-10-22), so `botCheckConfig` reports the state misconfigured when `VERCEL_ENV=production`
   and a test key is set: forms answer 503, `*_bot_check_unconfigured` is reported, and
   `scripts/verify-env.ts` fails the build, naming the variables and never their values.
-- **Order of go-live.** Merge with the keys unset (a no-op live), set both on Production, redeploy the
-  CURRENT production deployment (R188), then check `/api/readiness` shows `botCheck: true`, a `POST
-  /api/contact` without a token answers 403, and a real browser on www loads the widget on first focus
+- **Order of go-live.** Merge with the keys unset (a no-op live). Check `/privacy`: the repository
+  fallback names Cloudflare by itself; a Sanity privacy text must be edited to name it first. Then set both
+  keys on Production, redeploy the CURRENT production deployment (R188), then check `/api/readiness` shows
+  `botCheck: true`, a `POST /api/contact` without a token answers 403 (this needs an open contact form and a
+  valid body, with a topic one of the form's values, e.g. `press`; otherwise the 503 `closed` or a 400 comes
+  first), and a real browser on www loads the widget on first focus
   inside the form with no CSP violation.
 - **Off-switch.** Remove both variables from Production and redeploy the CURRENT production deployment
   (never an older one: R188). See the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile).
@@ -423,7 +428,7 @@ fails to build. CI has no secrets and checks names, strings and token shapes onl
 | `e2e-keyed` (after `verify`) | The analytics and Sentry browser run (ruling R130): `npm ci`, Playwright Chromium, `npm run build` with the placeholder `NEXT_PUBLIC_POSTHOG_KEY=phc_e2eplaceholder0000000000000000000000000`, `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` and `NEXT_PUBLIC_SENTRY_DSN=https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1`, `next start -p 3200 -H 127.0.0.1` with the placeholder `CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef`, and `E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability`; the report is uploaded on failure as `playwright-report-keyed` |
 | `e2e-contact` (after `verify`) | The contact form open (ruling R213), so the open-form contact specs never sit skipped: `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3300 -H 127.0.0.1` with the placeholder contact environment `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` (no secret; every page renders per request, so the form's open condition is read at start), and `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact`; every `/api/contact` call is answered by Playwright; the report is uploaded on failure as `playwright-report-contact` |
 
-The end-to-end tests never reach a real service: every lead, contact and order request is mocked or
+Apart from `e2e-bot-check`, which loads Cloudflare's real script and has the server call Cloudflare's siteverify with the published test secret, the end-to-end tests never reach a real service: every lead, contact and order request is mocked or
 answered by the fixture, every PostHog and Sentry request goes to a reserved example domain that
 Playwright answers itself, and no configuration or secret is present in CI (the values above are
 placeholders). `e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in

@@ -47,7 +47,7 @@ import type { PortableContent, SiteSettings } from "./types";
  * Bot check (R222, C7): while the check is on (`botCheckConfig(process.env).state === "on"`, passed in
  * by the page as `botCheck` so this file never reads the environment), the text also names
  * Cloudflare Turnstile as a service (what it receives, that it loads only once a form is started,
- * that it never sees what is typed, the addendum link), adds the spam check to the legitimate
+ * that this website sends it nothing typed, the addendum link), adds the spam check to the legitimate
  * interest in keeping the website working and safe, and says the website sets no cookie for it
  * (components/forms/bot-check loads Cloudflare's script and frame only on the first interaction
  * with a form; lib/bot-check/turnstile.ts sends Cloudflare no visitor address). It claims nothing
@@ -158,7 +158,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
       "Your answer to the notice is kept as one entry in this browser's storage on your device, so you are not asked again; a change you make under Analytics choices replaces it. It holds only yes or no, and it stays until you clear this website's data. If your browser blocks that storage, your answer lasts only until this page is reloaded or closed.",
     ),
     ...whenSelling(commerce, () => paragraph("The order list described above is kept in this browser's storage as well.")),
-    ...whenBotCheckOn(botCheck, () => paragraph("The spam check runs inside a frame served by Cloudflare; this website sets no cookie for it.")),
+    ...whenBotCheckOn(botCheck, () => paragraph("Cloudflare's script draws the spam check inside a frame it serves; this website sets no cookie for it.")),
     heading("Why we use your details"),
     paragraph(
       "To send you updates about BIBO Bay, which is what you agree to when you join, and to send you the download link for the free activity pack. Once email sending is set up, you receive one email confirming that you joined, and the BIBO Bay team may receive a short note with your email address, first name and age range so they know someone signed up.",
@@ -194,7 +194,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
     ),
     ...whenBotCheckOn(botCheck, () =>
       paragraph(
-        "Cloudflare Turnstile checks that a form is sent by a person and not by an automated program. It loads only once you start filling in a form. Cloudflare then receives your network address, your browser's user-agent string and technical details of its connection, and the address of the page; it does not receive anything you type into the form. Cloudflare describes how it handles this information in its Turnstile Privacy Addendum: https://www.cloudflare.com/turnstile-privacy-policy/",
+        "Cloudflare Turnstile checks that a form is sent by a person and not by an automated program. It loads only once you start filling in a form. Cloudflare then receives information about your browser and its connection, such as your network address, your browser's user-agent string, technical details of the connection, the address of the page and this website's Turnstile key. This website sends Cloudflare nothing you type into the form. Cloudflare describes how it handles this information, including its own use of it to improve Turnstile, in its Turnstile Privacy Addendum: https://www.cloudflare.com/turnstile-privacy-policy/",
       ),
     ),
     paragraph(
