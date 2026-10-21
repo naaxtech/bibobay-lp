@@ -1,0 +1,35 @@
+tests/bot-check/client/support.ts
+  s_37deb30b6489aa::t_9d1f53fc59e3ac 1-47
+components/preview/style-nonce.ts
+  s_37deb30b6489aa::t_5861d11e1ebd27 16-22,27-28
+components/forms/bot-check/load-turnstile.ts
+  s_37deb30b6489aa::t_a344263189aca8 1-33,35-76
+  s_37deb30b6489aa::t_92e8b7995f3cc3 34
+tests/bot-check/client/useBotCheck.test.tsx
+  s_37deb30b6489aa::t_405f463bf1df01 1-33,35-41,47-79,84-97,100-119,121-129,131-145,147-163,165-173,175-214,216-227,229-233,235-265
+  s_37deb30b6489aa::t_26cf75a76abd90 34,42-46,80-83,98-99,120,130,146,164,174,215,228,234
+components/forms/lead-form.css
+  s_37deb30b6489aa::t_6883ca9034562d 266-270
+components/forms/bot-check/BotCheckSlot.tsx
+  s_37deb30b6489aa::t_d9838cf5e3b03f 2-6,10
+  s_37deb30b6489aa::t_aba11fb420b7fa 1,7-9
+components/forms/bot-check/useBotCheck.ts
+  s_37deb30b6489aa::t_4082f9f15734ac 1-137,139-146
+  s_37deb30b6489aa::t_75e6534bdf97be 138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "483e5047241042c5f911cc5263df7605fa66b2f7",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
