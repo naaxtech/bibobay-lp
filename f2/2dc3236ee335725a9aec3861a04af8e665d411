@@ -1,0 +1,43 @@
+CHANGELOG.md
+  s_60f9b173af0be5::t_73999273a2b424 33-41
+README.md
+  s_60f9b173af0be5::t_27b2f32dfa61be 29,32
+docs/architecture.md
+  s_60f9b173af0be5::t_ef9875f709a493 18,62
+docs/database-security.md
+  s_60f9b173af0be5::t_cca29aa512cb56 74-75
+docs/deployment.md
+  s_60f9b173af0be5::t_77c053b508c466 79-87,103-121,129-131
+docs/incident-runbook.md
+  s_60f9b173af0be5::t_c9e09fe7c0d692 62,68,111
+docs/observability.md
+  s_60f9b173af0be5::t_99f0e7ab1993bb 234-235,245-252
+lib/outbox/constants.ts
+  s_60f9b173af0be5::t_1140cdfb75f548 65
+studio/schemaTypes/documents/singletons.ts
+  s_60f9b173af0be5::t_0ac53a73c5e6c3 12
+tests/outbox/migration-policy.test.ts
+  s_60f9b173af0be5::t_8661d4a110c644 36-42
+tests/scripts/ci-workflow.test.ts
+  s_60f9b173af0be5::t_91494e1ffb02ce 258,260
+tests/scripts/docs-claims.test.ts
+  s_60f9b173af0be5::t_50c4a166a0a8f4 109,119-120,231,233-271
+vercel.json
+  s_60f9b173af0be5::t_282b28b90b618b 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f22dc3236ee335725a9aec3861a04af8e665d411",
+  "prompts": {},
+  "sessions": {
+    "s_60f9b173af0be5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad2ec68c6b1ea68e4",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
