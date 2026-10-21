@@ -1,0 +1,85 @@
+CHANGELOG.md
+  s_37deb30b6489aa::t_7770d553d10efb 5-23
+app/api/draft-mode/disable/route.ts
+  s_37deb30b6489aa::t_3caf2705d8f664 1,3-8,10-11
+app/api/draft-mode/enable/route.ts
+  s_37deb30b6489aa::t_f721c9557b818c 2,9-10,18-19
+components/preview/PreviewNotice.tsx
+  s_37deb30b6489aa::t_8e93288b9d5902 2-3,6-8,12-18
+docs/architecture.md
+  s_37deb30b6489aa::t_3b29f1c36fb641 273-279
+docs/cms-operations.md
+  s_37deb30b6489aa::t_ee39c9f1094fda 180-203,205-217
+lib/content/brand-art.ts
+  s_37deb30b6489aa::t_83c5d20bc9be00 1,113-114
+lib/content/normalize.ts
+  s_37deb30b6489aa::t_9108a13b506343 4,10-14,16-17,19,30,46,58-59,61-63,65-67,72-73,79-80,84,93,98,113,122,127,133,143,145
+lib/sanity/client.ts
+  s_37deb30b6489aa::t_1a22b39f13a547 3,12-15,17-23
+lib/sanity/draft-mode.ts
+  s_37deb30b6489aa::t_955a89c8bd123b 1,5-6,16,41-65,71-74,79,90-98,115-168
+lib/sanity/fetch.ts
+  s_37deb30b6489aa::t_b3a2f77bb00f70 5,7,20-21,23,62-66,69,78,86,91
+lib/sanity/perspective.ts
+  s_37deb30b6489aa::t_09118fd8b9b80e 1-45
+lib/sanity/preview-actions.ts
+  s_37deb30b6489aa::t_52cd8936cf893c 1-21
+lib/seo/metadata.ts
+  s_37deb30b6489aa::t_e8e1cde3e9e785 7,17-19,67-68,111-112,127-128,147-148,173-174,229-230,256-257
+package-lock.json
+  s_37deb30b6489aa::t_816bd81fcde247 14,25,572-586,1165-1202,1818-1826,3384-3452,3465-3546,3572-3618,3628-3721,4581-4601,4626-4631,4658-4663,5313-5318,5822-5830,5878-5907,5914-5922,5943-5952,5959-5964,6021-6040,6176-6211,7062-7076,7249-7271,7375-7389,7663-7692,7710-7715,7775-7780,7796-7819,7978-7987,8063-8072,8161-8172,8817-8828,8896-8904,8929-8940,8973-9009,9423-9447,9606-9611,9719-9728,9795-9825,9849-9864,10116-10135,10190-10198,10447-10456,10507-10515,10653-10688,10712-10717,10765-10773,10965-10976,11080,11150-11187,11267-11281,11295-11308,11988-11997
+package.json
+  s_37deb30b6489aa::t_54870946736827 27,38
+tests/security/draft-mode.test.ts
+  s_37deb30b6489aa::t_d5b3ba386d8eb8 9-14
+components/preview/PreviewExitLink.tsx
+  s_067964ec53dcf3::t_13a656c8b2230f 1-22
+components/preview/VisualEditingClient.tsx
+  s_067964ec53dcf3::t_8efef48f9b40fb 1-51
+components/preview/VisualEditingLoader.tsx
+  s_067964ec53dcf3::t_26e2cfc0475747 1-18
+components/preview/presentation-context.ts
+  s_067964ec53dcf3::t_6a5394d24be681 1-19
+components/preview/refresh.ts
+  s_067964ec53dcf3::t_785cbaf050dbee 1-41
+lib/sanity/draft-mode-paths.ts
+  s_067964ec53dcf3::t_0fcbd022ed78e4 1-3
+tests/content/stega.test.ts
+  s_067964ec53dcf3::t_479d7ba975f556 1-175
+tests/security/live-preview.test.ts
+  s_330c0e3c3fd9ac::t_941e70b1c14766 1-240
+tests/support/stega.ts
+  s_330c0e3c3fd9ac::t_2ba1271fad487b 1-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "17274a6936807da015d10dfb51ec589b6cf90537",
+  "prompts": {},
+  "sessions": {
+    "s_067964ec53dcf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a7354fdeb6572445c",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_330c0e3c3fd9ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af0e01cabb46dddd8",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
