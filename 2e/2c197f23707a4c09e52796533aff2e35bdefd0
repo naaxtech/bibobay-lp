@@ -1,0 +1,61 @@
+vercel.json
+  s_37deb30b6489aa::t_eab037891b410a 6
+README.md
+  s_37deb30b6489aa::t_32403530cbfcf2 29
+  s_37deb30b6489aa::t_aee94324c451f1 32
+tests/scripts/ci-workflow.test.ts
+  s_37deb30b6489aa::t_ed6111b1bc9318 258
+  s_37deb30b6489aa::t_831ae60230b80e 260
+docs/database-security.md
+  s_37deb30b6489aa::t_22185cb8ed9adc 74-75
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_7be25e7915471a 231,233-235,239-240,266,269-271
+  s_37deb30b6489aa::t_705d884af77701 119-120
+  s_37deb30b6489aa::t_69fa5295420c4f 236-238,241-265
+  s_37deb30b6489aa::t_e99672a866123e 109
+  s_37deb30b6489aa::t_0f5da273112f3c 267
+  s_37deb30b6489aa::t_2732847b6eedfd 268
+docs/architecture.md
+  s_37deb30b6489aa::t_1f61f67faf486e 18
+  s_37deb30b6489aa::t_825aa27003e0f6 62
+studio/schemaTypes/documents/singletons.ts
+  s_37deb30b6489aa::t_2a0344a8a1924e 12
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_6dfa5c6440c1bb 111
+  s_37deb30b6489aa::t_8855163db81801 68
+  s_37deb30b6489aa::t_9606e68ba36c63 62
+lib/outbox/constants.ts
+  s_37deb30b6489aa::t_25f07969b8f13b 65
+docs/deployment.md
+  s_37deb30b6489aa::t_32403530cbfcf2 103-109
+  s_37deb30b6489aa::t_85df876f994224 110-121
+  s_37deb30b6489aa::t_04907c0ecd2993 80-82,84-87
+  s_37deb30b6489aa::t_ff92b34a26f91d 129-131
+  s_37deb30b6489aa::t_760bf76f5bcdba 79
+  s_37deb30b6489aa::t_a2c671b59da6af 83
+docs/observability.md
+  s_37deb30b6489aa::t_32403530cbfcf2 245-248,251-252
+  s_37deb30b6489aa::t_63fa658dc2857a 249-250
+  s_37deb30b6489aa::t_3aeef5c2e4f880 234-235
+tests/outbox/migration-policy.test.ts
+  s_37deb30b6489aa::t_9c1bf5e0116366 36-42
+CHANGELOG.md
+  s_37deb30b6489aa::t_dbf71a501325b6 10-12
+  s_37deb30b6489aa::t_32403530cbfcf2 5-9,13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2e2c197f23707a4c09e52796533aff2e35bdefd0",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
