@@ -1,0 +1,45 @@
+.env.example
+  s_37deb30b6489aa::t_14dbd92f5a549a 22
+app/(commerce)/shop/[slug]/page.tsx
+  s_37deb30b6489aa::t_0c54afc6493820 13,72
+components/forms/LeadForm.tsx
+  s_37deb30b6489aa::t_2810b072a01430 20,359,376
+components/landing/FreebieCard.tsx
+  s_37deb30b6489aa::t_6be522a3c3148b 2,17,48
+components/landing/Hero.tsx
+  s_37deb30b6489aa::t_92206b31f113f3 3,78
+components/preview/VisualEditingClient.tsx
+  s_37deb30b6489aa::t_8662f87ac1f6d5 3,16-30,62
+components/shop/AddToOrder.tsx
+  s_37deb30b6489aa::t_0c9e1786cf5f84 6,43
+components/shop/OrderPadSummary.tsx
+  s_37deb30b6489aa::t_621608f646f8c0 7,83
+docs/deployment.md
+  s_37deb30b6489aa::t_71038fdeab0811 37
+lib/security/headers.ts
+  s_37deb30b6489aa::t_16a638eb0cc45b 20-27,127-128
+studio/schemaTypes/documents/singletons.ts
+  s_37deb30b6489aa::t_ba2e40bb73ebcb 55-56,79
+tests/content/studio-contract.test.ts
+  s_37deb30b6489aa::t_2b075e9a6b3998 23-31
+tests/landing/stega-attributes.test.tsx
+  s_37deb30b6489aa::t_13df31c13fe1f2 1-103
+tests/security/headers.test.ts
+  s_37deb30b6489aa::t_e16014cd04f03a 12,77,79-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ee8ef780aa6e81178def9f35c8a8c7cf3dca780",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
