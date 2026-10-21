@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BotCheckSlot } from "@/components/forms/bot-check/BotCheckSlot";
 import { resetTurnstileLoaderForTests } from "@/components/forms/bot-check/load-turnstile";
-import { useBotCheck, type BotCheckHandle } from "@/components/forms/bot-check/useBotCheck";
+import { useBotCheck, type BotCheckHandle, type BotCheckTokenResult } from "@/components/forms/bot-check/useBotCheck";
 
 import { fire, installFakeTurnstile, turnstileScripts, type FakeTurnstile } from "./support";
 
@@ -257,8 +257,13 @@ describe("token()", () => {
       returned = fire(options0(), "error-callback", "110200");
     });
     expect(returned).toBe(true);
-    const pending = handle().token();
+    expect(handle().visible).toBe(true);
+    let pending: Promise<BotCheckTokenResult> = Promise.resolve({ problem: "unavailable" });
+    act(() => {
+      pending = handle().token();
+    });
     expect(fake.resets).toEqual(["w1"]);
+    expect(handle().visible).toBe(false);
     await act(async () => {
       fire(options0(), "callback", "t2");
     });

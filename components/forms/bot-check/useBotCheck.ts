@@ -26,7 +26,7 @@ const COMPACT_BELOW_PX = 300;
 
 /*
  * The widget callbacks are carried in a ref-held record so a render never rebuilds them. The handle
- * returned is stable for a given site key and action.
+ * returned changes only when the site key or `visible` changes; its functions are stable for a given site key.
  */
 export function useBotCheck(siteKey: string | null, action: BotCheckAction): BotCheckHandle {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -135,6 +135,7 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
     if (current.failed) {
       // A failed widget is retried by the next submit: a keyboard user's Enter fires no focusin to prepare it again.
       current.failed = false;
+      setVisible(false);
       if (current.api && current.widgetId !== null) current.api.reset(current.widgetId);
     }
     prepare();

@@ -229,6 +229,44 @@ test("lead body carries the token", async ({ page }) => {
   expect(bodies[0]?.[BOT_CHECK_TOKEN_FIELD]).toBe(DUMMY_TOKEN);
 });
 
+/*
+ * The slot is a zero-height grid row while the widget is invisible; the CSS pulls the button up by one
+ * gap so the form looks as it does with no check. "The element before the slot" is found from the slot
+ * itself: its previousElementSibling, skipping the absolutely positioned honeypot (.lead-form__trap).
+ */
+for (const { path, form, submit, field } of [
+  { path: "/contact", form: contactForm, submit: contactSubmit, field: contactEmail },
+  { path: "/", form: leadForm, submit: leadSubmit, field: leadEmail },
+]) {
+  test(`the empty slot adds no gap above the button on ${path}`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(path === "/" ? "/#lead" : path);
+    await expect(submit(page)).toBeEnabled();
+    await field(page).focus();
+    await waitForWidget(page);
+
+    const slot = form(page).locator(".bot-check");
+    await expect(slot).toHaveCount(1);
+    await expect(slot).not.toHaveAttribute("data-visible", /.*/);
+
+    const measured = await form(page).evaluate((formElement) => {
+      const slotElement = formElement.querySelector(".bot-check");
+      const button = formElement.querySelector(".lead-form__submit");
+      if (!slotElement || !button) return null;
+      let before = slotElement.previousElementSibling;
+      while (before?.classList.contains("lead-form__trap")) before = before.previousElementSibling;
+      if (!before) return null;
+      return {
+        distance: button.getBoundingClientRect().top - before.getBoundingClientRect().bottom,
+        rowGap: parseFloat(getComputedStyle(formElement).rowGap),
+      };
+    });
+    expect(measured).not.toBeNull();
+    expect(measured?.rowGap).toBeGreaterThan(0);
+    expect(Math.abs((measured?.distance ?? Number.NaN) - (measured?.rowGap ?? 0))).toBeLessThanOrEqual(1);
+  });
+}
+
 // This test calls Cloudflare's real siteverify with the published test secret (the server verifies
 // the dummy token there), so it needs network access. The placeholder Supabase behind the contact
 // route cannot store anything, so a request that passes the bot check ends later, at a non-403 status.

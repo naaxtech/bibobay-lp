@@ -242,7 +242,7 @@ If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
   first). Assert that the JSON `message` equals the refused copy ("We couldn't confirm this came from a
   person. Please try again."), not only the 403: a 403 from Cloudflare's edge or Vercel's would otherwise pass.
   Then do one real browser submission on www, a signup or a contact message from an address the owner
-  controls. Require the success copy, then check the Vercel runtime logs for no `*_bot_check_*` lines. This
+  controls. Require the success copy, then check the Vercel runtime logs for no `*_bot_check_*` lines on that real submission's request only (step (b)'s tokenless POST itself logs a `contact_bot_check_refused` line with reason `missing_token`, which is expected). This
   is the only check that sends a real token through siteverify, so it catches a wrong secret, a site key and
   secret from two different widgets, or a hostname mismatch. Sentry is not configured yet, so the reported
   warnings reach the Vercel logs only. Finally a real browser on www loads the widget on first focus inside

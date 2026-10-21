@@ -356,9 +356,10 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH, botCheckSiteKey
       </Link>
 
       {/*
-       * The outcome line never changes height. Its two wrappers stack four invisible CSS
-       * pseudo-elements in the status's grid cell (lead-form.css), one per long message the line can
-       * show. The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
+       * The outcome line never changes height. Nested wrappers stack invisible CSS
+       * pseudo-elements (a ::before and an ::after each) in the status's grid cell (lead-form.css), one per
+       * long message the line can show: two wrappers and four pseudo-elements with the bot check off, four
+       * wrappers and eight with it on. The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
        * success message cannot be read or announced before the server reports the message stored.
        * In a Studio preview they are cleaned of their click-to-edit payload: no edit link in an attribute.
        */}

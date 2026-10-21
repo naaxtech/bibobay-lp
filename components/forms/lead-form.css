@@ -269,8 +269,8 @@
     max-inline-size: 100%;
   }
 
-  /* The empty slot is still a grid item, so it would add a second 1.25rem gap above the button; this cancels it until the widget is shown. */
-  .lead-form > .bot-check:not([data-visible]) {
+  /* The empty slot is a zero-height grid row with a 1.25rem gap on each side, so the button sits 2.5rem below the field above; pulling the button up by one gap restores the no-slot spacing. Once the widget is visible, the slot and the button keep their normal gaps. */
+  .lead-form > .bot-check:not([data-visible]) + .lead-form__submit {
     margin-block-start: -1.25rem;
   }
 }
