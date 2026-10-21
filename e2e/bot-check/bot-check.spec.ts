@@ -62,10 +62,18 @@ const leadConsent = (page: Page) => leadForm(page).getByRole("checkbox");
 const leadSubmit = (page: Page) => leadForm(page).locator('button[type="submit"]');
 const leadStatus = (page: Page) => leadForm(page).getByRole("status");
 
-const challengeFrame = (page: Page) => page.locator(`iframe[src^="${TURNSTILE_ORIGIN}"]`);
+/*
+ * Turnstile draws its iframe inside a closed shadow root, so no CSS locator or querySelector sees it.
+ * Playwright's frame tree does list it.
+ */
+const challengeFrames = (page: Page) => page.frames().filter((frame) => frame.url().startsWith(TURNSTILE_ORIGIN));
 
 const answer = (route: Route, status: number, body: Record<string, unknown>) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+
+interface TurnstileResponse {
+  turnstile?: { getResponse?: () => string | undefined };
+}
 
 /** Counts calls to `window.turnstile.reset`, which the forms make after every request that carried a token (R218). */
 interface TurnstileProbe {
@@ -88,10 +96,10 @@ async function countResets(page: Page) {
 const resetCount = (page: Page) => page.evaluate(() => (window as unknown as TurnstileProbe).__turnstileResets ?? 0);
 const cspViolations = (page: Page) => page.evaluate(() => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? []);
 
-/** Fills a field first, which is the intent that loads and renders the widget (R217), then waits for its frame. */
+/** Call after the intent that loads the widget (R217): waits for its frame, then for the test key's token. */
 async function waitForWidget(page: Page) {
-  await expect(challengeFrame(page).first()).toBeAttached({ timeout: 15_000 });
-  await expect.poll(() => page.evaluate(() => "turnstile" in window), { timeout: 15_000 }).toBe(true);
+  await expect.poll(() => challengeFrames(page).length > 0, { timeout: 15_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => (window as unknown as TurnstileResponse).turnstile?.getResponse?.() ?? null), { timeout: 15_000 }).toBe(DUMMY_TOKEN);
 }
 
 test("no Cloudflare request on page view", async ({ page }) => {
@@ -102,11 +110,13 @@ test("no Cloudflare request on page view", async ({ page }) => {
   for (const path of ["/", "/contact"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1500);
   }
   expect(cloudflare).toEqual([]);
 });
 
 test("widget loads on intent with no CSP violation", async ({ page }) => {
+  test.setTimeout(60_000);
   const scripts: string[] = [];
   const consoleErrors: string[] = [];
   page.on("request", (request) => {
@@ -124,19 +134,41 @@ test("widget loads on intent with no CSP violation", async ({ page }) => {
   await contactName(page).focus();
   await waitForWidget(page);
   expect(scripts).toHaveLength(1);
-  expect(await challengeFrame(page).first().getAttribute("src")).toMatch(new RegExp(`^${TURNSTILE_ORIGIN}/`));
 
   // Focusing another field must not load or render a second widget.
   await contactEmail(page).focus();
-  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1000);
   expect(scripts).toHaveLength(1);
-  await expect(challengeFrame(page)).toHaveCount(1);
+  expect(challengeFrames(page)).toHaveLength(1);
 
   expect(await cspViolations(page)).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
 
+test("the check sets no cookie and sends nothing typed to Cloudflare", async ({ page, baseURL }) => {
+  test.setTimeout(60_000);
+  // Recording starts before the first keystroke, so every Cloudflare request from then on is covered,
+  // including those made from inside Cloudflare's own frame (Playwright reports them on the page).
+  const sentinel = `bibobay-sentinel-${Math.random().toString(36).slice(2, 10)}`;
+  const cloudflare: { url: string; postData: string }[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).hostname === TURNSTILE_HOST) cloudflare.push({ url: request.url(), postData: request.postData() ?? "" });
+  });
+  await page.goto("/contact");
+  await expect(contactSubmit(page)).toBeEnabled();
+
+  await contactName(page).fill(sentinel);
+  await contactMessage(page).fill(`message ${sentinel}`);
+  await waitForWidget(page);
+  await page.waitForTimeout(1000);
+
+  expect(cloudflare.length).toBeGreaterThan(0);
+  expect(cloudflare.filter((entry) => entry.url.includes(sentinel) || entry.postData.includes(sentinel))).toEqual([]);
+  expect(await page.context().cookies(baseURL)).toEqual([]);
+});
+
 test("contact body carries a fresh token each attempt", async ({ page }) => {
+  test.setTimeout(60_000);
   const bodies: Record<string, unknown>[] = [];
   const resetsAtRequest: number[] = [];
   let attempt = 0;
@@ -160,6 +192,7 @@ test("contact body carries a fresh token each attempt", async ({ page }) => {
   await contactSubmit(page).click();
   await expect(contactStatus(page)).toHaveText(CONTACT_FORM_COPY.outcome.rateLimited);
   await expect(contactSubmit(page)).toBeEnabled();
+  // The dummy token is always the same string, so the reset count, not the token value, is the proof of a fresh token.
   // The first token was spent by the 429, so the form reset the widget for the retry.
   await expect.poll(() => resetCount(page)).toBe(1);
 
@@ -174,6 +207,7 @@ test("contact body carries a fresh token each attempt", async ({ page }) => {
 });
 
 test("lead body carries the token", async ({ page }) => {
+  test.setTimeout(60_000);
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/leads", async (route) => {
     bodies.push(route.request().postDataJSON() as Record<string, unknown>);
@@ -207,4 +241,11 @@ test("server refuses without a token", async ({ request }) => {
 
   const passed = await request.post("/api/contact", { data: { ...body, [BOT_CHECK_TOKEN_FIELD]: DUMMY_TOKEN } });
   expect(passed.status()).not.toBe(403);
+  // Siteverify accepted the token: the answer is neither bot-check message. It ends at the placeholder
+  // Supabase limiter, which fails closed with the route's generic 503 text (lib/contact/submit.ts CONTACT_API_MESSAGES.error).
+  const message = ((await passed.json()) as { message: string }).message;
+  expect(message).not.toBe(BOT_CHECK_MESSAGES.refused);
+  expect(message).not.toBe(BOT_CHECK_MESSAGES.unavailable);
+  expect(passed.status()).toBe(503);
+  expect(message).toBe("The message could not be saved. Please try again.");
 });
