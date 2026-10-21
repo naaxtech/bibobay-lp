@@ -1,0 +1,34 @@
+supabase/downs/0008_contact_messages_down.sql
+  s_37deb30b6489aa::t_e3b86e949db3e9 1-55
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_cecfa85bc384fb 212-214
+docs/superpowers/plans/2026-10-21-contact-form.md
+  s_37deb30b6489aa::t_707fbd7b8a8d9b 76-95
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_15a6706d3e19ee 608-616,618-647
+  s_37deb30b6489aa::t_825ca4f6fae6a2 617
+tests/contact/migration-rollback.test.ts
+  s_37deb30b6489aa::t_83ccbc5325a6c3 1-43,45-46,48-58,60-152,166-214
+  s_37deb30b6489aa::t_db9c5ecf07d9bc 44,47,59
+  s_37deb30b6489aa::t_01c7fe0ea6002c 153-165
+docs/deployment.md
+  s_37deb30b6489aa::t_63a35bc5914bfe 253-306
+CHANGELOG.md
+  s_37deb30b6489aa::t_06ea08bb60abbe 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83e092c80107113d7df7475c1071dbe17c5d02d3",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
