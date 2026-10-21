@@ -13,7 +13,7 @@ export const SITEVERIFY_URL = `${TURNSTILE_ORIGIN}/turnstile/v0/siteverify`;
 
 export type BotCheckVerdict =
   | { outcome: "passed" }
-  | { outcome: "refused"; reason: "missing_token" | "rejected" | "hostname" | "action" }
+  | { outcome: "refused"; reason: "missing_token" | "rejected" | "action" }
   | {
       outcome: "unavailable";
       reason:
@@ -23,7 +23,8 @@ export type BotCheckVerdict =
         | "malformed_reply"
         | "secret_rejected"
         | "bad_request"
-        | "internal_error";
+        | "internal_error"
+        | "hostname_mismatch";
     };
 
 export interface BotCheckVerifier {
@@ -42,6 +43,8 @@ type Unavailable = Extract<BotCheckVerdict, { outcome: "unavailable" }>;
 // src: https://developers.cloudflare.com/turnstile/get-started/server-side-validation/ · turnstile api v0 (hosted) · 2026-10-22
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_RETRY_DELAY_MS = 500;
+
+type Exchange = { kind: "timeout" } | { kind: "network" } | { kind: "http"; status: number } | { kind: "reply"; value: unknown };
 
 interface Attempt {
   verdict: BotCheckVerdict;
@@ -69,23 +72,34 @@ export function createTurnstileVerifier(
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   const newKey = options.idempotencyKey ?? (() => crypto.randomUUID());
 
-  async function post(body: string): Promise<Response | "timeout" | "network"> {
+  // The whole exchange, headers and body, runs inside one deadline (R219): a stalled body cannot outlast timeoutMs, and the timer clears only once the reply is fully read.
+  async function exchange(body: string): Promise<Exchange> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timedOut = new Promise<"timeout">((resolve) => {
+    const timedOut = new Promise<Exchange>((resolve) => {
       timer = setTimeout(() => {
         controller.abort();
-        resolve("timeout");
+        resolve({ kind: "timeout" });
       }, timeoutMs);
     });
-    const request = doFetch(SITEVERIFY_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body,
-      signal: controller.signal,
-    }).catch((): "network" | "timeout" => (controller.signal.aborted ? "timeout" : "network"));
+    const run = async (): Promise<Exchange> => {
+      try {
+        const response = await doFetch(SITEVERIFY_URL, { method: "POST", headers: { "content-type": "application/json" }, body, signal: controller.signal });
+        if (!response.ok) {
+          await response.body?.cancel().catch(() => undefined);
+          return { kind: "http", status: response.status };
+        }
+        try {
+          return { kind: "reply", value: (await response.json()) as unknown };
+        } catch {
+          return controller.signal.aborted ? { kind: "timeout" } : { kind: "reply", value: undefined };
+        }
+      } catch {
+        return { kind: controller.signal.aborted ? "timeout" : "network" };
+      }
+    };
     try {
-      return await Promise.race([request, timedOut]);
+      return await Promise.race([run(), timedOut]);
     } finally {
       clearTimeout(timer);
     }
@@ -96,11 +110,10 @@ export function createTurnstileVerifier(
       // src: https://developers.cloudflare.com/turnstile/troubleshooting/testing/ · turnstile api v0 (hosted) · 2026-10-22
       if (config.testKeys) return { verdict: { outcome: "passed" }, retryable: false };
       // src: https://developers.cloudflare.com/turnstile/additional-configuration/hostname-management/ · turnstile api v0 (hosted) · 2026-10-22
+      // A missing or different hostname means NEXT_PUBLIC_APP_URL disagrees with the host being served: our configuration error, not a bot, so it is "unavailable" and gets reported.
       if (config.expectedHostname !== null) {
         const hostname = typeof reply.hostname === "string" ? reply.hostname.toLowerCase() : "";
-        if (hostname !== config.expectedHostname.toLowerCase()) {
-          return { verdict: { outcome: "refused", reason: "hostname" }, retryable: false };
-        }
+        if (hostname !== config.expectedHostname.toLowerCase()) return unavailable("hostname_mismatch", false);
       }
       // src: https://developers.cloudflare.com/turnstile/get-started/server-side-validation/ · turnstile api v0 (hosted) · 2026-10-22
       if (reply.action !== action) return { verdict: { outcome: "refused", reason: "action" }, retryable: false };
@@ -118,17 +131,12 @@ export function createTurnstileVerifier(
   }
 
   async function attempt(body: string, action: BotCheckAction): Promise<Attempt> {
-    const response = await post(body);
-    if (response === "timeout") return unavailable("timeout", true);
-    if (response === "network") return unavailable("network", true);
-    if (!response.ok) return unavailable("http", response.status >= 500);
+    const result = await exchange(body);
+    if (result.kind === "timeout") return unavailable("timeout", true);
+    if (result.kind === "network") return unavailable("network", true);
+    if (result.kind === "http") return unavailable("http", result.status >= 500);
 
-    let reply: Record<string, unknown> | null;
-    try {
-      reply = asRecord(await response.json());
-    } catch {
-      reply = null;
-    }
+    const reply = asRecord(result.value);
     if (reply === null || typeof reply.success !== "boolean") return unavailable("malformed_reply", false);
     return judge(reply, action);
   }

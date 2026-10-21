@@ -37,7 +37,7 @@ function fakeFetch(...steps: Array<Response | Error>) {
     calls.push({ url: String(input), init: init ?? {} });
     const step = steps[Math.min(calls.length - 1, steps.length - 1)] ?? new Error("no step");
     if (step instanceof Error) throw step;
-    return step.clone();
+    return new Response(await step.clone().text(), { status: step.status });
   }) as typeof fetch;
   return { fn, calls };
 }
@@ -50,9 +50,11 @@ const GOOD = { success: true, hostname: "www.bibobay.com", action: "lead" };
 
 function verifier(config: OnConfig, ...steps: Array<Response | Error>) {
   const f = fakeFetch(...steps);
+  let keysIssued = 0;
   return {
     calls: f.calls,
-    v: createTurnstileVerifier(config, { fetch: f.fn, retryDelayMs: 0, idempotencyKey: () => "key-1" }),
+    keysIssued: () => keysIssued,
+    v: createTurnstileVerifier(config, { fetch: f.fn, retryDelayMs: 0, idempotencyKey: () => `key-${++keysIssued}` }),
   };
 }
 
@@ -81,9 +83,20 @@ describe("createTurnstileVerifier", () => {
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "passed" });
   });
 
-  it("hostname mismatch", async () => {
-    const { v } = verifier(REAL, reply({ ...GOOD, hostname: "evil.example" }));
-    expect(await v.verify("tok", "lead")).toEqual({ outcome: "refused", reason: "hostname" });
+  it("a different hostname is our configuration error, unavailable/hostname_mismatch", async () => {
+    const { v, calls } = verifier(REAL, reply({ ...GOOD, hostname: "evil.example" }));
+    expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "hostname_mismatch" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("a missing hostname with real keys is unavailable/hostname_mismatch", async () => {
+    const { v } = verifier(REAL, reply({ success: true, action: "lead" }));
+    expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "hostname_mismatch" });
+  });
+
+  it("a missing action with real keys is refused/action", async () => {
+    const { v } = verifier(REAL, reply({ success: true, hostname: "www.bibobay.com" }));
+    expect(await v.verify("tok", "lead")).toEqual({ outcome: "refused", reason: "action" });
   });
 
   it("action mismatch", async () => {
@@ -104,6 +117,13 @@ describe("createTurnstileVerifier", () => {
     expect(await v.verify("tok", "order")).toEqual({ outcome: "passed" });
   });
 
+  it("absent or non-array error-codes is refused/rejected", async () => {
+    for (const failure of [{ success: false }, { success: false, "error-codes": "invalid-input-secret" }]) {
+      const { v } = verifier(REAL, reply(failure));
+      expect(await v.verify("tok", "lead")).toEqual({ outcome: "refused", reason: "rejected" });
+    }
+  });
+
   it("maps failure codes", async () => {
     const cases: Array<[string[], unknown]> = [
       [["timeout-or-duplicate"], { outcome: "refused", reason: "rejected" }],
@@ -121,17 +141,21 @@ describe("createTurnstileVerifier", () => {
   });
 
   it("internal-error twice is unavailable after the same key was retried", async () => {
-    const { v, calls } = verifier(REAL, reply({ success: false, "error-codes": ["internal-error"] }));
+    const { v, calls, keysIssued } = verifier(REAL, reply({ success: false, "error-codes": ["internal-error"] }));
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "internal_error" });
     expect(calls).toHaveLength(2);
-    expect(bodyOf(calls[0]).idempotency_key).toBe(bodyOf(calls[1]).idempotency_key);
+    expect(bodyOf(calls[0]).idempotency_key).toBe("key-1");
+    expect(bodyOf(calls[1]).idempotency_key).toBe("key-1");
+    expect(keysIssued()).toBe(1);
   });
 
   it("retries once after a network error, with the same key", async () => {
-    const { v, calls } = verifier(REAL, new TypeError("fetch failed"), reply(GOOD));
+    const { v, calls, keysIssued } = verifier(REAL, new TypeError("fetch failed"), reply(GOOD));
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "passed" });
     expect(calls).toHaveLength(2);
-    expect(bodyOf(calls[0]).idempotency_key).toBe(bodyOf(calls[1]).idempotency_key);
+    expect(bodyOf(calls[0]).idempotency_key).toBe("key-1");
+    expect(bodyOf(calls[1]).idempotency_key).toBe("key-1");
+    expect(keysIssued()).toBe(1);
   });
 
   it("a network error twice is unavailable/network", async () => {
@@ -160,19 +184,40 @@ describe("createTurnstileVerifier", () => {
     expect(await noFlag.v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "malformed_reply" });
   });
 
-  it("times out when fetch never settles", async () => {
-    const hang = (() => new Promise<Response>(() => undefined)) as typeof fetch;
+  it("times out when fetch never settles, and aborts it", async () => {
+    const signals: AbortSignal[] = [];
+    const hang = ((_: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal) signals.push(init.signal);
+      return new Promise<Response>(() => undefined);
+    }) as typeof fetch;
     const v = createTurnstileVerifier(REAL, { fetch: hang, timeoutMs: 20, retryDelayMs: 0 });
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "timeout" });
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
   });
 
-  it("times out when fetch rejects on the abort signal", async () => {
+  it("times out when fetch rejects on the abort signal, and aborts it", async () => {
+    const signals: AbortSignal[] = [];
     const hang = ((_: RequestInfo | URL, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
+        if (init?.signal) signals.push(init.signal);
         init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
       })) as typeof fetch;
     const v = createTurnstileVerifier(REAL, { fetch: hang, timeoutMs: 20, retryDelayMs: 0 });
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "timeout" });
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+  });
+
+  it("times out when the body stalls after the headers arrive", async () => {
+    const signals: AbortSignal[] = [];
+    const stalled = ((_: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal) signals.push(init.signal);
+      return Promise.resolve(new Response(new ReadableStream<Uint8Array>({ start: () => undefined }), { status: 200 }));
+    }) as typeof fetch;
+    const v = createTurnstileVerifier(REAL, { fetch: stalled, timeoutMs: 20, retryDelayMs: 0 });
+    expect(await v.verify("tok", "lead")).toEqual({ outcome: "unavailable", reason: "timeout" });
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
   });
 
   it("never logs", async () => {

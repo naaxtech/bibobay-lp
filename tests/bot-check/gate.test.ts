@@ -21,7 +21,7 @@ describe("createBotCheck", () => {
   });
 
   it("is misconfigured with one key", () => {
-    expect(createBotCheck({ [SITE]: "0x4AAAAAAAreal_site-key01" })).toEqual({ state: "misconfigured" });
+    expect(createBotCheck({ [SITE]: "0x4AAAAAAAreal_site-key01" })).toEqual({ state: "misconfigured", problem: "half" });
   });
 
   it("is on with a verifier when both keys are valid", () => {
@@ -40,11 +40,7 @@ describe("runBotCheck", () => {
   });
 
   it("misconfigured is a 503 unconfigured", async () => {
-    expect(await runBotCheck({ state: "misconfigured" }, "tok", "lead")).toMatchObject({
-      ok: false,
-      status: 503,
-      kind: "unconfigured",
-    });
+    expect(await runBotCheck({ state: "misconfigured", problem: "half" }, "tok", "lead")).toEqual({ ok: false, status: 503, kind: "unconfigured", reason: "half" });
   });
 
   it("passes when the verifier passes, and hands it the token and action", async () => {
@@ -54,13 +50,18 @@ describe("runBotCheck", () => {
   });
 
   it("refused is a 403 with its reason", async () => {
-    const { check } = stub({ outcome: "refused", reason: "hostname" });
+    const { check } = stub({ outcome: "refused", reason: "action" });
     expect(await runBotCheck(check, "tok", "lead")).toEqual({
       ok: false,
       status: 403,
       kind: "refused",
-      reason: "hostname",
+      reason: "action",
     });
+  });
+
+  it("a hostname mismatch is a 503 unavailable, not a refusal", async () => {
+    const { check } = stub({ outcome: "unavailable", reason: "hostname_mismatch" });
+    expect(await runBotCheck(check, "tok", "lead")).toEqual({ ok: false, status: 503, kind: "unavailable", reason: "hostname_mismatch" });
   });
 
   it("unavailable is a 503 with its reason", async () => {
