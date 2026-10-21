@@ -117,18 +117,21 @@ select results_eq(
 );
 select results_eq(
   $$ select f.signature from own_functions as f where pg_catalog.has_function_privilege('service_role', f.oid, 'EXECUTE') order by f.signature collate "C" $$,
-  $$ values ('claim_lead_deliveries(integer, uuid, text[])'::text),
+  $$ values ('claim_contact_deliveries(integer, uuid)'::text),
+            ('claim_lead_deliveries(integer, uuid, text[])'),
             ('claim_order_emails(integer, uuid, text[])'),
             ('consume_rate_limit(text, integer, integer)'),
             ('enqueue_lead_delivery(uuid, text, boolean)'),
             ('lookup_order_by_reference_email(text, text)'),
             ('lookup_order_by_token(text)'),
+            ('record_contact_delivery_attempt(uuid, text, text, text)'),
             ('record_lead_delivery_attempt(uuid, text, text, text)'),
             ('record_order_email_attempt(uuid, text, text, text)'),
             ('rotate_order_tracking_token(uuid)'),
+            ('submit_contact_message(text, text, text, text)'),
             ('submit_lead(text, boolean, text, text, text, text, text, jsonb)'),
             ('submit_order(text, text, text, text, text, boolean, text, jsonb, uuid, text, text, text, text, text)') $$,
-  'service_role can execute exactly the server''s functions (migrations 0001-0006)'
+  'service_role can execute exactly the server''s functions (migrations 0001-0008)'
 );
 select is_empty(
   $$ select f.signature from own_functions as f

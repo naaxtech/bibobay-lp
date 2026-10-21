@@ -9,18 +9,20 @@ import { RpcError, callRpc, type RpcClient } from "./rpc";
 /**
  * The outbox RPCs of migration 0006 (Task 8a). Every answer is rebuilt from its locked keys and
  * checked; anything unexpected is a `bad_response`, so a changed database answer can never put an
- * unvetted value into an email. Lead claims are parsed here too, for lib/supabase/leads.ts.
+ * unvetted value into an email. Lead claims are parsed here too, for lib/supabase/leads.ts, and
+ * the contact outbox (lib/supabase/contact.ts, migration 0008) reuses the checks it exports.
  */
 
-const isUuid = (value: unknown): value is string =>
+export const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const isText = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+export const isText = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 const isOptionalText = (value: unknown): value is string | null => value === null || isText(value);
-const isAttempt = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 1000;
+export const isAttempt = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 1000;
 
-function batchFrom<T>(fn: string, data: unknown, item: (raw: unknown) => T | null): ClaimBatch<T> {
+/** A claim function's `{claimed, skipped, expired}` answer, each claimed entry rebuilt by `item` (null refuses the whole batch). */
+export function batchFrom<T>(fn: string, data: unknown, item: (raw: unknown) => T | null): ClaimBatch<T> {
   if (!isRecord(data) || !Array.isArray(data.claimed) || !isCount(data.skipped) || !isCount(data.expired)) throw new RpcError(fn, "bad_response");
   const claimed = data.claimed.map(item);
   if (claimed.some((entry) => entry === null)) throw new RpcError(fn, "bad_response");

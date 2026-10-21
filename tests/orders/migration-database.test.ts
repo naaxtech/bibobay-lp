@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { applyMigrations, createSupabaseStandIn, migrationFiles, pgtapFiles, readPgtap, runTap, summariseTap } from "@/tests/support/supabase-db";
 
 /*
- * Applies every migration (0001-0007) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
+ * Applies every migration (0001-0008) in order inside a Supabase stand-in (tests/support/supabase-db.ts)
  * and runs every pgTAP file against the result, so each file proves its policy holds alongside all
  * the others. This is the same set Task 11 runs against the real project with `supabase test db`.
  * 0006_catalogue.sql (fix wave T-I4) sweeps the whole public schema, so a grant or a table a later
@@ -22,7 +22,7 @@ afterAll(async () => {
 });
 
 describe("every migration in Postgres", () => {
-  it("applies 0001 to 0007 in order", () => {
+  it("applies 0001 to 0008 in order", () => {
     expect(migrationFiles()).toEqual([
       "0001_leads_and_security.sql",
       "0002_orders.sql",
@@ -31,11 +31,20 @@ describe("every migration in Postgres", () => {
       "0005_shared_rate_limits_and_token_rotation.sql",
       "0006_order_events_and_email_outbox.sql",
       "0007_staff_access.sql",
+      "0008_contact_messages.sql",
     ]);
   });
 
-  it("has a pgTAP file for the leads, the orders, the tracking grants, the email outbox, staff access and the whole-schema sweep", () => {
-    expect(pgtapFiles()).toEqual(["0001_leads_rls.sql", "0002_orders_rls.sql", "0003_tracking_grants.sql", "0004_email_outbox.sql", "0005_staff_access.sql", "0006_catalogue.sql"]);
+  it("has a pgTAP file for the leads, the orders, the tracking grants, the email outbox, staff access, the whole-schema sweep and the contact messages", () => {
+    expect(pgtapFiles()).toEqual([
+      "0001_leads_rls.sql",
+      "0002_orders_rls.sql",
+      "0003_tracking_grants.sql",
+      "0004_email_outbox.sql",
+      "0005_staff_access.sql",
+      "0006_catalogue.sql",
+      "0007_contact_messages.sql",
+    ]);
   });
 
   it.each(pgtapFiles())("passes every pgTAP assertion in supabase/tests/%s", async (file) => {
@@ -112,13 +121,52 @@ describe("every migration in Postgres", () => {
     expect(failures).toEqual([]);
     expect(passed).toBe(planned);
   }, 120_000);
+
+  it("leaves the contact functions and both contact tables owned by a role that bypasses RLS", async () => {
+    const functions = await db.query<{ name: string; owner: string }>(
+      `select proname as name, pg_get_userbyid(proowner) as owner from pg_proc
+        where pronamespace = 'public'::regnamespace
+          and proname in ('submit_contact_message', 'claim_contact_deliveries', 'record_contact_delivery_attempt')
+        order by proname`,
+    );
+    expect(functions.rows).toEqual([
+      { name: "claim_contact_deliveries", owner: "migrator" },
+      { name: "record_contact_delivery_attempt", owner: "migrator" },
+      { name: "submit_contact_message", owner: "migrator" },
+    ]);
+    const tables = await db.query<{ name: string; owner: string }>(
+      `select relname as name, pg_get_userbyid(relowner) as owner from pg_class
+        where oid in ('public.contact_messages'::regclass, 'public.contact_message_deliveries'::regclass)
+        order by relname`,
+    );
+    expect(tables.rows).toEqual([
+      { name: "contact_message_deliveries", owner: "migrator" },
+      { name: "contact_messages", owner: "migrator" },
+    ]);
+  });
+
+  it("keeps the contact rules after a second application of every migration", async () => {
+    const { planned, passed, failures } = summariseTap(await runTap(db, readPgtap("0007_contact_messages.sql")));
+    expect(failures).toEqual([]);
+    expect(passed).toBe(planned);
+  }, 120_000);
 });
 
 describe("migration preconditions", () => {
+  it("refuses to apply the contact migration before the staff migration", async () => {
+    const fresh = await createSupabaseStandIn();
+    try {
+      await expect(applyMigrations(fresh, migrationFiles().filter((file) => !file.startsWith("0007") && !file.startsWith("0008")))).resolves.toBeUndefined();
+      await expect(applyMigrations(fresh, ["0008_contact_messages.sql"])).rejects.toThrow(/must be applied before 0008/);
+    } finally {
+      await fresh.close();
+    }
+  }, 120_000);
+
   it("refuses to apply the staff migration before the outbox migration", async () => {
     const fresh = await createSupabaseStandIn();
     try {
-      await expect(applyMigrations(fresh, migrationFiles().filter((file) => !file.startsWith("0006") && !file.startsWith("0007")))).resolves.toBeUndefined();
+      await expect(applyMigrations(fresh, migrationFiles().filter((file) => !file.startsWith("0006") && !file.startsWith("0007") && !file.startsWith("0008")))).resolves.toBeUndefined();
       await expect(applyMigrations(fresh, ["0007_staff_access.sql"])).rejects.toThrow(/must be applied before 0007/);
     } finally {
       await fresh.close();
