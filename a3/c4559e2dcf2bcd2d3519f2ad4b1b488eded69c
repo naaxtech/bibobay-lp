@@ -1,0 +1,57 @@
+docs/architecture.md
+  s_37deb30b6489aa::t_5422e815f96df5 196
+  s_37deb30b6489aa::t_590c11e00b31bd 54,61,82-85,173-195,197-217
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_aa5b006612249d 378
+  s_37deb30b6489aa::t_d60e1c757e9041 413-521,523-543,550-551
+  s_37deb30b6489aa::t_d04e963eb12bb2 363-364
+  s_37deb30b6489aa::t_b545ab344a501e 522
+  s_37deb30b6489aa::t_c09d8ba6078ecb 29-31
+  s_37deb30b6489aa::t_61023ba400c440 241
+  s_37deb30b6489aa::t_98284e2b6ee12a 544-549
+  s_8a88ed3ee70d55::t_5053ab4cf677df 2
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_808adf47895687 163
+  s_37deb30b6489aa::t_d9c27a5667f72c 75-76,128-162,164-172
+docs/database-security.md
+  s_37deb30b6489aa::t_a4c7c3f75db845 247-248
+  s_37deb30b6489aa::t_fb755e486d2cbb 9-10,71-72,90-92,239-246,249-274,297-302
+CHANGELOG.md
+  s_37deb30b6489aa::t_85ae701efdc22a 5-30
+README.md
+  s_37deb30b6489aa::t_eaed34a1dc4ecf 30
+docs/cms-operations.md
+  s_37deb30b6489aa::t_d95e5f79cabaa3 20,47,54,162-189
+docs/data-protection.md
+  s_37deb30b6489aa::t_7ececd490c3d61 36-37,141-145,169,205-206,224-230
+docs/deployment.md
+  s_37deb30b6489aa::t_cedd44bab4c731 41-44,85,132-135,186,199-243,265,275
+docs/observability.md
+  s_37deb30b6489aa::t_202b90431e1296 30,58,211,221-243,248
+docs/qa-checklist.md
+  s_37deb30b6489aa::t_636d08b6c64842 88-105,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a3c4559e2dcf2bcd2d3519f2ad4b1b488eded69c",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    },
+    "s_8a88ed3ee70d55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aacd47986ca3a4b33",
+        "model": "unknown"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
