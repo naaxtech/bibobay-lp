@@ -1,0 +1,35 @@
+docs/architecture.md
+  s_37deb30b6489aa::t_226defdca67bad 312
+docs/data-protection.md
+  s_37deb30b6489aa::t_df350e19614234 40,112-116
+docs/deployment.md
+  s_37deb30b6489aa::t_1f5ac538bd4eda 213-216,219,235-240,431
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_cfae583149f79a 230-232,237-238,244-247,264
+docs/observability.md
+  s_37deb30b6489aa::t_d2986e634b95ac 236-237,326-327,330-331
+docs/qa-checklist.md
+  s_37deb30b6489aa::t_d8f5cc031c0c20 88-89,94,98-99
+lib/content/legal-fallback.ts
+  s_37deb30b6489aa::t_df1899de668f29 50,161,197
+tests/content/legal-pages.test.tsx
+  s_37deb30b6489aa::t_2f68bb596cd81e 7,515-528,534,536-537,542
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_40f6dadf3941fd 470-475
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c69ee413d2f07c7bfab3c340e2bb58964ee2d4b6",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
