@@ -1,9 +1,11 @@
 # Deployment
 
-How the site is configured, deployed and checked. No live Sanity, Supabase or Vercel project
-exists yet: provisioning is Task 11, done under **the BIBO Bay owner account** (never a personal or
-another product's account). Secret values are entered only in the providers' secret stores, never
-in the repository, logs or documents.
+How the site is configured, deployed and checked. The Sanity project is live (2026-10-21, project
+`k82r18ol`, dataset `production`, Studio https://bibobay.sanity.studio; see
+[cms-operations.md](cms-operations.md#the-live-project)). The Supabase project and the production
+Vercel project are not provisioned yet (Task 11). Every provider account is **the BIBO Bay owner
+account** (never a personal or another product's account). Secret values are entered only in the
+providers' secret stores, never in the repository, logs or documents.
 
 ## Environment variables
 
@@ -136,7 +138,8 @@ unthrottled). Quotes need `PAYMENT_HOST_ALLOWLIST`; the quote email needs Resend
 ## Sanity webhook and Studio origin
 
 - Webhook: URL `https://<site>/api/revalidate`, POST, on create/update/delete of all documents,
-  projection `{_type, _id}`, secret = `SANITY_REVALIDATE_SECRET`. The route answers 503 while the
+  projection `{_type, _id}`, secret = `SANITY_REVALIDATE_SECRET`. The live project has one for
+  `https://www.bibobay.com`. The route answers 503 while the
   secret is unset, 413 for a body over 256 KiB, 401 for a bad or old (over 5 minutes) signature, 400
   for a signed body that is not a `{_type}` JSON object, and 200 otherwise (`revalidated: false`
   when the document type maps to no cache tag).
@@ -144,7 +147,8 @@ unthrottled). Quotes need `PAYMENT_HOST_ALLOWLIST`; the quote email needs Resend
 - `SANITY_STUDIO_ORIGIN` on the site, and `SANITY_STUDIO_PREVIEW_URL` (the website's origin) where the Studio
   is built or run: the Studio's `presentationTool` then opens `/api/draft-mode/enable` with a one-time
   secret (`previewMode.enable` is wired in `studio/sanity.config.ts`). Details: [cms-operations.md](cms-operations.md#preview-draft-mode).
-- Studio deploys (`npx sanity deploy` in `studio/`) are run by the owner, not by CI.
+- Studio deploys (`npx sanity deploy` in `studio/`, with the Studio variables above) are run by the
+  owner, not by CI. The exact command is in [cms-operations.md](cms-operations.md#the-live-project).
 
 ## Security headers and HSTS
 

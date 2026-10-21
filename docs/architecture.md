@@ -269,7 +269,7 @@ upgrade-insecure-requests            (Vercel deployments only)
   same-origin path only. Pages then read drafts without caching, show a "draft preview" notice and
   become `noindex`. `/api/draft-mode/disable` turns it off. The Studio side is wired:
   `presentationTool` in `studio/sanity.config.ts` passes `previewMode.enable: "/api/draft-mode/enable"`
-  with the origin from `SANITY_STUDIO_PREVIEW_URL`. It works once the projects and secrets exist (Task 11).
+  with the origin from `SANITY_STUDIO_PREVIEW_URL`. It is configured on the live Sanity project (2026-10-21).
 
 ## Metadata and indexing
 

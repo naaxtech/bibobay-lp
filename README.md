@@ -28,7 +28,8 @@ What exists today and what does not:
 | Staff order administration pages (`/admin/login`, `/admin/orders`, `/admin/orders/[reference]`): sign in, the order list, an order with its quote, status and tracking-link controls | built (Task 8c; needs Supabase Auth accounts and `staff_users` rows; the signed-in pages are proven in unit tests, a live pass on a preview waits for Task 12) |
 | Email outbox worker (`/api/cron/email-outbox`, Vercel cron every 15 minutes), order acknowledgement, staff order alert and quote emails, retries for signup emails | built (Task 8a; needs `CRON_SECRET`, Supabase, Resend and a Vercel Pro plan) |
 | Error reports (Sentry) and consent-first, cookieless visit statistics (PostHog), each off until its key is set | built (see [docs/observability.md](docs/observability.md)) |
-| Live Sanity, Supabase and Vercel projects | not provisioned yet (Task 11); Vercel needs a Pro plan, because Hobby is for non-commercial use only |
+| Live Sanity project (Studio https://bibobay.sanity.studio, project `k82r18ol`, dataset `production`), seeded with the claim-safe starter content; publishing refreshes the site through the signed webhook | live (2026-10-21; [docs/cms-operations.md](docs/cms-operations.md#the-live-project)) |
+| Live Supabase and Vercel projects | not provisioned yet (Task 11); Vercel needs a Pro plan, because Hobby is for non-commercial use only |
 
 "Task N" refers to the numbered tasks in the implementation plan under `docs/superpowers/plans/`.
 
