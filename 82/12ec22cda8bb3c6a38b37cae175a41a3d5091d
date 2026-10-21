@@ -1,0 +1,19 @@
+e2e/bot-check/bot-check.spec.ts
+  s_37deb30b6489aa::t_d21554373f73bb 65-69,74-77,99,101-102,113,119,140,142,148-169,171,195,210,244-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8212ec22cda8bb3c6a38b37cae175a41a3d5091d",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
