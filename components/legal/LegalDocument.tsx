@@ -10,6 +10,8 @@ export interface LegalDocumentProps {
   legal: LegalSettings;
   state: LegalPageState;
   settings: SiteSettings;
+  /** The contact form is open (R196): the fallback privacy text then says what a message stores. */
+  contactOpen?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ export interface LegalDocumentProps {
  * nothing is sold while commerce is off, and describes order requests while it is on. Only the
  * fallback privacy page adds the configured contact address: Sanity text carries its own.
  */
-export function LegalDocument({ kind, legal, state, settings }: LegalDocumentProps) {
+export function LegalDocument({ kind, legal, state, settings, contactOpen = false }: LegalDocumentProps) {
   if (state.source === "cms") {
     return (
       <>
@@ -32,7 +34,7 @@ export function LegalDocument({ kind, legal, state, settings }: LegalDocumentPro
       <p role="note" className="simple-page__note">
         {LEGAL_PAGE_COPY.fallbackNote}
       </p>
-      <PortableText value={legalFallbackFor(settings)[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
+      <PortableText value={legalFallbackFor(settings, process.env, contactOpen)[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
       {kind === "privacy" && settings.contactEmail ? (
         <p className="simple-page__contact">
           {LEGAL_PAGE_COPY.contactLead}{" "}

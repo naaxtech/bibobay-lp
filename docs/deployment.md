@@ -38,10 +38,10 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `SUPABASE_SERVICE_ROLE_KEY` | server | for lead storage | Supabase project | Calls the lead functions. Never public; a publishable key here is refused. |
 | `RESEND_API_KEY` | server | optional (email) | Resend account | Sends acknowledgements and staff alerts. Without it they wait in the outbox. |
 | `RESEND_FROM` | server | with `RESEND_API_KEY` | Resend account | Sender on a verified domain, e.g. `BIBO Bay <hello@example.com>`. No fallback sender. |
-| `RESEND_REPLY_TO` | server | optional | BIBO Bay owner | Where replies (removal requests) go; default: the sender. |
-| `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up). |
-| `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. Also keys the signed links for the free download (lib/freebies/token.ts); rotating it invalidates every download link already emailed (up to 30 days) and the one on any open page. |
-| `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Hourly cap on emails sent straight away, applied PER MESSAGE KIND (final review D-I1): the lead acknowledgement, lead staff alert, order acknowledgement and order staff alert each have their own bucket (`send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`), and staff quotes their own (`send:quote`), all with this cap (1 to 10000, default 60). A full bucket defers only its own kind: a flood of signups cannot hold back a quote. |
+| `RESEND_REPLY_TO` | server | optional | BIBO Bay owner | Where replies (removal requests) go; default: the sender. The contact staff alert ignores it: its Reply-To is the sender's address (R204). |
+| `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up) and for each contact message's alert. It also opens the contact form: without it the form is closed (R205). |
+| `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. Also keys the signed links for the free download (lib/freebies/token.ts); rotating it invalidates every download link already emailed (up to 30 days) and the one on any open page. The contact form is open only with a valid one, and its rate limit is keyed by it too. |
+| `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Hourly cap on emails sent straight away, applied PER MESSAGE KIND (final review D-I1): the lead acknowledgement, lead staff alert, order acknowledgement and order staff alert each have their own bucket (`send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`), staff quotes their own (`send:quote`), and the contact staff alert its own (`send:contact_staff_alert`), all with this cap (1 to 10000, default 60). A full bucket defers only its own kind: a flood of signups cannot hold back a quote. |
 | `PAYMENT_HOST_ALLOWLIST` | server | for staff quotes | BIBO Bay owner | Comma-separated exact host names of the payment providers a quote's payment link may point to, e.g. `pay.example.com,checkout.example.net` (no `https://`, no wildcards; a subdomain needs its own entry). Empty: staff cannot save any quote. An entry that is not one exact host fails `verify-env` (Task 8b). |
 | `CRON_SECRET` | server | for email retries | BIBO Bay owner (random, 32+ characters) | Authorises the email outbox worker: Vercel Cron sends it as `Authorization: Bearer <secret>`. Without it (or with a shorter one) the worker answers 503 and failed emails are not retried; a production build fails with a shorter one. |
 
@@ -82,7 +82,7 @@ Not created yet (Task 11). Settings to use:
   of a product as commercial. By owner decision R180 the site stays on Hobby for now, and a Pro plan
   is required at the latest before commerce is switched on (`commerceEnabled`). To upgrade, restore `*/15 * * * *` (R134) in `vercel.json` together with the tests and
   docs: change every file that says once a day, which are `vercel.json`, `README.md`,
-  `docs/deployment.md`, `docs/architecture.md`, `docs/observability.md`, `docs/incident-runbook.md`,
+  `docs/deployment.md`, `docs/architecture.md`, `docs/database-security.md`, `docs/observability.md`, `docs/incident-runbook.md`,
   `lib/outbox/constants.ts`, `studio/schemaTypes/documents/singletons.ts` and the tests in
   `tests/scripts`.
 - The build runs `npm run verify:env -- production` first; it fails on a forbidden public name (Vercel's own
@@ -118,7 +118,11 @@ failure, the hourly send cap, or Resend not yet configured.
   still unconfirmed after that retry, or left unconfirmed by a daily run, is parked at the next run
   as `delivery_expired` for a human (nothing is claimed as sent; see
   [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change,
-  since every run claims only rows that are due.
+  since every run claims only rows that are due. Contact staff alerts are the exception (R211): an
+  unconfirmed contact alert is never parked for its age. It is retried at every run under the same
+  idempotency key (once the provider has forgotten the key, as a new send) until its eighth
+  attempt, because staff receiving an alert twice is harmless and a lost alert leaves a stored
+  message nobody reads.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
@@ -129,13 +133,18 @@ failure, the hourly send cap, or Resend not yet configured.
   not cover stay due for the next run. With one run a day, emails deferred by the hourly per-kind
   cap, and repeat-signup rows that are never sent straight away, drain at most
   `LEAD_ACK_SEND_LIMIT_PER_HOUR` (default 60) per kind per day (and at most 100 rows per outbox per run).
+- The worker drains three outboxes in this order: orders (quotes first), then signups, then contact
+  alerts (`send:contact_staff_alert`). It claims no contact alert while `STAFF_NOTIFICATION_EMAIL` is
+  unset: those rows wait and are never parked. It needs no `LEAD_IP_HASH_SECRET` for them; only the
+  contact form does.
 - To run it by hand (for example after setting up Resend): `curl -H "Authorization: Bearer <secret>"
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.
 - A row the worker gave up on (8 attempts, a provider answer that the message's key was used for
-  another message, or an unconfirmed send older than 23 hours, ruling R91) stays `failed` with
-  `next_attempt_at` set to infinity, and is reported as `delivery_expired`
-  ([observability.md](observability.md)). See [database-security.md](database-security.md#outbox-states).
+  another message, or, for a signup or order email, an unconfirmed send older than 23 hours, ruling
+  R91) stays `failed` with `next_attempt_at` set to infinity, and is reported as `delivery_expired`
+  ([observability.md](observability.md)), with the `outbox` whose claim parked it. See
+  [database-security.md](database-security.md#outbox-states).
 
 ## Staff access (Task 8b)
 
@@ -179,7 +188,7 @@ The per-request CSP and the other headers are described in
 | Route | Answers | Use |
 |---|---|---|
 | `GET /api/health` | Always `200 {"status":"ok","version":"<commit sha or local>","time":"…"}`, `no-store`. No configuration detail, no dependency call. | Uptime checks. |
-| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret), revalidation and a signup removal channel (below) are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`, `leadRemovalChannel`. | Release gate. `email` and `legalReviewed` are reported, not required; `leadRemovalChannel` is required (see below). |
+| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret), revalidation and a signup removal channel (below) are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`, `leadRemovalChannel`, `contact`. | Release gate. `email`, `contact` and `legalReviewed` are reported, not required; `leadRemovalChannel` is required (see below). |
 
 Neither route ever returns a configuration value.
 
@@ -191,6 +200,109 @@ exists, and readiness is 503 without it. The consent sentence, the privacy and t
 exists ("reply to the acknowledgement email", or "write to <the contact address>") and promise nothing
 when there is none; the signup form then shows the 503 message. Set one of the two before launch.
 Handling a request: [incident-runbook.md](incident-runbook.md#removal-requests).
+
+## Contact form
+
+`/contact` and `POST /api/contact` (rulings R190-R209) take messages only while the contact form is open,
+and the contact form is open only when Supabase is configured (the project URL and a server key that is
+not a publishable one), email sending is configured (`RESEND_API_KEY` and `RESEND_FROM`),
+`STAFF_NOTIFICATION_EMAIL` is set and `LEAD_IP_HASH_SECRET` is a valid secret of 32+ characters (R205).
+It adds no environment name. `/api/readiness` reports the answer as `contact`; `contact` never changes
+`ready`.
+
+- **Closed.** `/contact` shows the Studio contact address as a mailto link when one is set, otherwise a
+  closed notice, and is `noindex` in the second case. The footer link is hidden, the sitemap leaves the
+  page out when it is the closed notice, and the API answers 503 `{ "ok": false, "persisted": false,
+  "closed": true }` and stores nothing.
+- **Removed later (R209).** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued, their
+  alerts wait (the worker claims no contact alert without a staff address, so none is parked), readiness
+  shows `contact: false` and the form closes. Removing the Resend key does the same: the worker answers
+  503 while Resend is unconfigured, so the alerts wait. Setting them again lets the next cron run send
+  them ([Email outbox worker](#email-outbox-worker-task-8a)).
+- **Limits and budget.** 3 messages per 10 minutes per client and, in all, as many per hour as the
+  alert's send cap (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R212), in the buckets `contact:<hmac>`
+  and `contact:global`; the alert spends `send:contact_staff_alert`, capped by the same value, so the
+  form's intake is capped at the alert's hourly send cap; a cron retry in the same hour, or a burst at
+  a window edge, can defer an alert to the next cron run. The alert is attempted
+  right after the answer; the cron worker is only the retry net, and retries an unconfirmed alert
+  until its eighth attempt rather than parking it (R211).
+- **Reading a message.** In the alert email (Reply-To is the sender, labelled unverified), or by SQL when
+  an alert is parked, which happens only after its eighth attempt or on `invalid_idempotent_request`
+  (R211; [incident-runbook.md](incident-runbook.md#contact-messages)).
+
+## Contact form: steps after merge
+
+1. **Studio:** from `studio/`, deploy the schema and the Studio with the command in
+   [cms-operations.md](cms-operations.md#the-live-project), signed in as the brand account. Confirm that
+   Presentation still opens the site.
+2. **The Contact page document:** run `npm --prefix studio run seed` (it creates only what is missing, so
+   only `contactPage` is added; it needs a temporary Editor token, deleted afterwards), or create the
+   document in the Studio. Publish it. The footer label is optional (the fallback is "Contact us").
+3. **Supabase (Task 11):** apply `0008_contact_messages.sql` with the rest, and run `supabase test db`,
+   which includes `supabase/tests/0007_contact_messages.sql`.
+4. **Resend (Task 11):** a verified domain, `RESEND_API_KEY`, `RESEND_FROM` and
+   `STAFF_NOTIFICATION_EMAIL`, with `LEAD_IP_HASH_SECRET` already set. After that `/api/readiness` shows
+   `contact: true` and the footer link appears.
+5. **Legal review:** confirm the legitimate-interest basis and decide on a retention period for contact
+   messages ([data-protection.md](data-protection.md#before-launch-owner), items 8 and 9).
+6. **A live check:** send one message from the live site. It should reach the staff inbox, and a reply
+   should go to the sender. Then delete the test message by SQL
+   ([data-protection.md](data-protection.md#handling-a-request-from-a-person)); its delivery row goes
+   with it.
+
+## Contact form: rollback
+
+**Normal rollback: revert the code.** Revert the merge commit of PR #8 on `main`, then push:
+
+```bash
+git revert -m 1 <merge-sha>
+git push origin main
+```
+
+The next deployment closes the form and removes `/contact`, `/api/contact` and the footer link. The
+tables stay, unused: migration 0008 only adds objects, and nothing reads or writes `contact_messages`
+or `contact_message_deliveries` without the reverted code. That includes the worker: once the revert is
+live, an alert that is not `sent` is never sent. Before reverting, list those messages and reply by
+hand ([incident-runbook.md](incident-runbook.md#contact-messages)); never paste a result into a chat, a
+ticket or a document:
+
+```sql
+select message.created_at, message.topic, message.name, message.email, message.message
+from public.contact_messages as message
+join public.contact_message_deliveries as delivery on delivery.message_id = message.id
+where delivery.status in ('pending', 'sending', 'failed')
+order by message.created_at;
+```
+
+To stop new messages before the revert is deployed, use **Instant Rollback** to the last production
+deployment before the merge ([incident-runbook.md](incident-runbook.md#rollback)); the next deployment
+from `main` brings the form back until the revert lands. Afterwards, verify the site as after any
+rollback.
+
+**Emergency schema rollback: the down script.** Only when the schema itself has to go, for example if
+the legal review rules that contact messages must not be stored. It deletes every stored contact
+message and every alert row, for good: nothing but a database backup brings them back. Revert the code
+first, so nothing writes to the tables while they are dropped. Then, from the repository root, with
+the Supabase CLI linked to the project, as the project owner:
+
+```bash
+npx supabase@2.121.0 db query --linked -f supabase/downs/0008_contact_messages_down.sql
+```
+
+It drops the three contact functions, then `contact_message_deliveries`, then `contact_messages`, in
+one transaction, and nothing else: no lead, order, staff or rate-limit object. No drop cascades, so if
+anything else depends on a contact table it drops nothing at all. It is not a migration:
+`supabase db push` reads only `supabase/migrations/`, never `supabase/downs/`. The migration history
+still lists 0008 afterwards, so to apply it again later, mark it reverted and push:
+
+```bash
+npx supabase@2.121.0 migration repair 0008 --status reverted --linked
+npx supabase@2.121.0 db push --linked
+```
+
+`tests/contact/migration-rollback.test.ts` runs 0001-0007, 0008, the down script and 0008 again in an
+embedded Postgres: the down script leaves the schema exactly as 0001-0007 left it, every earlier pgTAP
+file stays green, a second run changes nothing, and 0008 applies cleanly again.
 
 ## Verifying a deployment
 
@@ -213,7 +325,7 @@ origin fails, and the checks never run against a host you did not name. Printed 
 string and fragment, and a URL carrying a user name or password is refused, so a protection-bypass
 token cannot reach a CI log.
 
-The client-payload check fetches `/`, `/privacy`, `/terms` and `/thank-you` as HTML and as the
+The client-payload check fetches `/`, `/privacy`, `/terms`, `/thank-you` and `/contact` as HTML and as the
 React Server Components payload (`RSC: 1`) and runs the bundle scan's rules (below) over both.
 Pages that exist only behind a CMS switch (`/shop`, while commerce is on) are scanned the same way
 when they answer 200; switched off they must answer 404, and a server error or a redirect fails.
@@ -223,7 +335,7 @@ there, because the pages publish the address editors choose.
 
 `--browser` loads the page in Chromium (`npx playwright install chromium` once), scrolls it, and
 fails on console errors, uncaught errors, CSP violations or same-origin responses of 400 or more.
-It blocks and fails any request to `/api/leads`, so a verification never stores a lead.
+It blocks and fails any request to `/api/leads` or `/api/contact`, so a verification never stores a lead or a message.
 
 Exit codes: 0 pass, 1 a check failed, 2 usage or network error. These checks fail the old GitHub
 Pages blank page (its only script, `/src/main.tsx`, answered 404); a unit test pins that case.
@@ -265,11 +377,12 @@ fails to build. CI has no secrets and checks names, strings and token shapes onl
 | `e2e` (after `verify`) | `npm ci` only, as Vercel installs (so it proves the site builds without the Studio: `next build` type-checks `tsconfig.build.json`, which leaves tests out), Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
 | `e2e-commerce` (after `verify`) | The commerce-on browser run (ruling R130): copies the checkout without `.git` and `node_modules` to `../commerce-copy`, `node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy` (the script refuses any folder inside a git work tree), then in the copy `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3100 -H 127.0.0.1` with a wait on `/api/health`, and `E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npx playwright test e2e/shop e2e/commerce`; the report is uploaded on failure as `playwright-report-commerce` |
 | `e2e-keyed` (after `verify`) | The analytics and Sentry browser run (ruling R130): `npm ci`, Playwright Chromium, `npm run build` with the placeholder `NEXT_PUBLIC_POSTHOG_KEY=phc_e2eplaceholder0000000000000000000000000`, `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` and `NEXT_PUBLIC_SENTRY_DSN=https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1`, `next start -p 3200 -H 127.0.0.1` with the placeholder `CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef`, and `E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability`; the report is uploaded on failure as `playwright-report-keyed` |
+| `e2e-contact` (after `verify`) | The contact form open (ruling R213), so the open-form contact specs never sit skipped: `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3300 -H 127.0.0.1` with the placeholder contact environment `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` (no secret; every page renders per request, so the form's open condition is read at start), and `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact`; every `/api/contact` call is answered by Playwright; the report is uploaded on failure as `playwright-report-contact` |
 
-The end-to-end tests never reach a real service: every lead and order request is mocked or
+The end-to-end tests never reach a real service: every lead, contact and order request is mocked or
 answered by the fixture, every PostHog and Sentry request goes to a reserved example domain that
 Playwright answers itself, and no configuration or secret is present in CI (the values above are
-placeholders). `e2e-commerce` and `e2e-keyed` run the commands in
+placeholders). `e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in
 [qa-checklist.md](qa-checklist.md#2-browser-tests-against-a-production-build) (the ports aside). They were
 written from the commands the controller ran by hand on Windows; the first push proves them on
 Linux, and a red first run is fixed forward.

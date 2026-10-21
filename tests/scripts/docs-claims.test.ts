@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
@@ -25,6 +25,9 @@ const section = (markdown: string, heading: string) => {
   const next = markdown.slice(start + 3).search(/\r?\n## /);
   return next < 0 ? markdown.slice(start) : markdown.slice(start, start + 3 + next);
 };
+
+/** Every send bucket of every outbox (leads, orders and the contact alert), so a new outbox cannot go undocumented (R197 #17). */
+const ALL_SEND_BUDGETS = Object.values(SEND_BUDGETS).flatMap((budgets) => Object.values(budgets));
 
 describe("operations docs", () => {
   it("lists every status the revalidation webhook route answers with (review M6)", () => {
@@ -235,7 +238,7 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
     expect(flat(deployment())).toMatch(/runs on the Hobby plan by owner decision \(ruling R180, 2026-10-21\)/);
     expect(flat(deployment())).toMatch(/Hobby plan is restricted to non-commercial personal use; its fair-use guidelines \(https:\/\/vercel\.com\/docs\/limits\/fair-use-guidelines\) count advertising the sale of a product as commercial/);
     expect(flat(deployment())).toMatch(/a Pro plan is required at the latest before commerce is switched on \(`commerceEnabled`\)/);
-    expect(flat(deployment())).toMatch(/restore `\*\/15 \* \* \* \*` \(R134\) in `vercel\.json` together with the tests and docs: change every file that says once a day, which are `vercel\.json`, `README\.md`, `docs\/deployment\.md`, `docs\/architecture\.md`, `docs\/observability\.md`, `docs\/incident-runbook\.md`, `lib\/outbox\/constants\.ts`, `studio\/schemaTypes\/documents\/singletons\.ts` and the tests in `tests\/scripts`/);
+    expect(flat(deployment())).toMatch(/restore `\*\/15 \* \* \* \*` \(R134\) in `vercel\.json` together with the tests and docs: change every file that says once a day, which are `vercel\.json`, `README\.md`, `docs\/deployment\.md`, `docs\/architecture\.md`, `docs\/database-security\.md`, `docs\/observability\.md`, `docs\/incident-runbook\.md`, `lib\/outbox\/constants\.ts`, `studio\/schemaTypes\/documents\/singletons\.ts` and the tests in `tests\/scripts`/);
     expect(flat(deployment())).toMatch(/fires between 06:00 and 06:59 UTC/);
     expect(flat(deployment())).toMatch(/retried at the next daily run/);
     expect(flat(deployment())).toMatch(/leaves at most one retry[\s\S]{0,500}parked at the next run as `delivery_expired`/);
@@ -357,8 +360,8 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
 
   it("documents each per-kind send bucket and the removal-channel readiness key by their code names (D-I1, P-I1)", () => {
     const deploymentText = read("docs/deployment.md");
-    const buckets = [...Object.values(SEND_BUDGETS.leads), ...Object.values(SEND_BUDGETS.orders)];
-    expect(buckets).toHaveLength(5);
+    const buckets = ALL_SEND_BUDGETS;
+    expect(buckets).toHaveLength(6);
     for (const budget of buckets) {
       expect(deploymentText, budget).toContain(`\`${sendBudgetKey(budget)}\``);
       expect(read("docs/database-security.md"), budget).toContain(`\`${sendBudgetKey(budget)}\``);
@@ -372,7 +375,7 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
 
   it("names every per-kind bucket in the observability doc, with the removal-channel warning event (residual fixer, item 5)", () => {
     const observability = read("docs/observability.md");
-    for (const budget of [...Object.values(SEND_BUDGETS.leads), ...Object.values(SEND_BUDGETS.orders)]) {
+    for (const budget of ALL_SEND_BUDGETS) {
       expect(observability, budget).toContain(`\`${sendBudgetKey(budget)}\``);
     }
     expect(observability).toContain("`LEAD_ACK_SEND_LIMIT_PER_HOUR`");
@@ -405,5 +408,248 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
     expect(read("lib/admin/session.ts")).toMatch(/adminJson\(400, \{ ok: false, message: ADMIN_COPY\.session\.checkDetails \}\)/);
     expect(read("e2e/admin/admin-security.spec.ts")).toMatch(/CONFIGURED \? 400 : 503/);
     expect(read("e2e/ops/health.spec.ts")).toContain("expect(body.leadRemovalChannel).toBe(CONFIGURED)");
+  });
+});
+
+/*
+ * The contact form docs (rulings R190-R209): each claim is pinned to the code it describes, so the
+ * docs cannot drift from the route, the migration or the worker.
+ */
+describe("contact form docs (R190-R209)", () => {
+  const flat = (text: string) => text.replace(/\s+/g, " ");
+  const lines = (file: string) => read(file).split(/\r?\n/);
+
+  it("documents the readiness key, the staff address that opens the form, and the open condition (R193, R205)", () => {
+    expect(read("lib/ops/readiness.ts")).toContain("contact: boolean");
+    const deployment = read("docs/deployment.md");
+    const readinessRow = lines("docs/deployment.md").find((line) => line.startsWith("| `GET /api/readiness` |")) ?? "";
+    expect(readinessRow).toContain("`contact`");
+    const staffRow = lines("docs/deployment.md").find((line) => line.startsWith("| `STAFF_NOTIFICATION_EMAIL` |")) ?? "";
+    expect(staffRow).toMatch(/also opens the contact form/);
+    expect(flat(deployment)).toMatch(/the contact form is open only when[^.]*Supabase[^.]*`RESEND_API_KEY`[^.]*`RESEND_FROM`[^.]*`STAFF_NOTIFICATION_EMAIL`[^.]*`LEAD_IP_HASH_SECRET`/);
+    expect(flat(deployment)).toMatch(/`contact` never changes `ready`/);
+    expect(deployment).toContain("`/api/contact`");
+  });
+
+  it("names the contact tables, functions, buckets and limits in the database doc (R191, R201-R203, R207)", () => {
+    const database = read("docs/database-security.md");
+    for (const name of ["contact_messages", "contact_message_deliveries", "submit_contact_message", "claim_contact_deliveries", "record_contact_delivery_attempt", "contact:global", "contact:<HMAC of the client address>"]) {
+      expect(database, name).toContain(`\`${name}\``);
+    }
+    expect(database).toContain("`send:contact_staff_alert`");
+    expect(database).toMatch(/\| Contact messages per client \| `contact:<HMAC of the client address>` \| 3 per 10 minutes/);
+    expect(database).toMatch(/\| Contact messages in all \| `contact:global` \| `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\) from everyone together, the contact alert's own send cap \(R212\)/);
+    expect(flat(database)).toMatch(/no `skipped` status[^.]*"skipped": 0/);
+    expect(flat(database)).toMatch(/lead outbox[^.]*not altered/i);
+    expect(read("supabase/migrations/0008_contact_messages.sql")).toContain("create table if not exists public.contact_message_deliveries");
+  });
+
+  it("states the limits the code enforces (R203, R212)", () => {
+    const submit = read("lib/contact/submit.ts");
+    expect(submit).toContain('{ scope: "contact", maxHits: 3, windowSeconds: 600 }');
+    expect(submit).toContain('{ key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds }');
+    expect(submit).toContain("maxHits: dependencies.globalLimitPerHour");
+    expect(read("lib/contact/dependencies.ts")).toContain("globalLimitPerHour: sendLimitPerHour");
+    expect(submit).toContain("CONTACT_BODY_LIMIT_BYTES = 32 * 1024");
+    expect(flat(read("docs/architecture.md"))).toMatch(/3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR \(default 60, the alert's own send cap\) per hour in all/);
+  });
+
+  it("documents the contact events, the route failure and every contact warning that reaches Sentry (R198)", () => {
+    const observability = read("docs/observability.md");
+    const warning = /_(failed|unavailable|unconfigured|invalid)$/;
+    const reported = [...read("lib/contact/submit.ts").matchAll(/\{ event: "(\w+)"/g)].map((match) => match[1]!).filter((event) => warning.test(event));
+    expect([...new Set(reported)].sort()).toEqual(["contact_rate_limit_unavailable", "contact_store_failed", "contact_unconfigured"]);
+    for (const event of ["contact_submitted", "contact_route_failed", "contact_stored", "contact_rate_limited", "contact_honeypot", ...reported]) expect(observability, event).toContain(`\`${event}\``);
+    expect(read("app/api/contact/route.ts")).toContain('event: "contact_route_failed"');
+    expect(read("lib/analytics/events.ts")).toContain('contact_submitted: ["persisted", "topic"]');
+    expect(observability).toMatch(/\| `contact_submitted` \|[^|]*\| `persisted`, `topic` \|/);
+    expect(observability).toMatch(/`channel` `leads`,\s+`orders`, `contact` or `worker`/);
+    expect(observability).toContain("`send:contact_staff_alert`");
+  });
+
+  it("documents the Contact page document, the footer label and 33 seeded documents (R190, R195)", () => {
+    const cms = read("docs/cms-operations.md");
+    expect(cms).toContain("`contactPage`");
+    expect(cms).toContain("`contactPageLabel`");
+    expect(cms).toMatch(/lists the 33 claim-safe starter documents/);
+    expect(cms).not.toMatch(/\b32 claim-safe/);
+    expect(cms).toMatch(/Four singletons sit at the top of the desk/);
+    expect(read("studio/structure.ts")).toContain('"contactPage"');
+    expect(flat(cms)).toMatch(/after a schema change[^.]*redeploy/i);
+  });
+
+  it("describes the routes, the contact flow and the worker's three outboxes in the architecture doc (R190-R193, R201)", () => {
+    const architecture = read("docs/architecture.md");
+    const rows = lines("docs/architecture.md");
+    expect(rows.some((line) => line.startsWith("| `/contact` |"))).toBe(true);
+    expect(rows.some((line) => line.startsWith("| `/api/contact` |"))).toBe(true);
+    expect(architecture).toMatch(/^## Contact flow$/m);
+    expect(flat(architecture)).toMatch(/orders \(quotes first\), then signups, then contact alerts/);
+    expect(flat(architecture)).toMatch(/no email goes to the sender/i);
+    expect(flat(architecture)).toMatch(/Reply-To[^.]*sender/);
+  });
+
+  it("adds the contact messages to the data-protection record, its legal-review question and retention item (R196, R206)", () => {
+    const text = read("docs/data-protection.md");
+    expect(text).toContain("`contact_messages`");
+    expect(text).toContain("`contact_message_deliveries`");
+    const retention = flat(text.slice(text.indexOf("9. **Retention.**"), text.indexOf("10. **Withdrawn signups**")));
+    expect(retention).toMatch(/how long contact messages are kept \(none is set; the code never deletes them\)/);
+    const review = flat(text.slice(text.indexOf("8. **The lawyer's review**"), text.indexOf("9. **Retention.**")));
+    expect(review).toMatch(/The basis for contact messages[^]*legitimate interest in replying to people who write to us/);
+    expect(read("lib/content/legal-fallback.ts")).toContain("legitimate interest in replying to people who write to us");
+    expect(flat(text.slice(text.indexOf("## Handling a request from a person")))).toMatch(/delete from public\.contact_messages[^]*delivery rows cascade|cascade[^]*contact_messages/i);
+  });
+
+  it("tells staff how to find a parked contact alert and read the message (R200, R209)", () => {
+    const runbook = read("docs/incident-runbook.md");
+    expect(runbook).toContain("contact_message_deliveries");
+    expect(runbook).toContain("'infinity'");
+    expect(runbook).toContain("public.contact_messages");
+    expect(flat(runbook)).toMatch(/STAFF_NOTIFICATION_EMAIL[^.]*removed[^.]*wait/i);
+    expect(flat(runbook)).toMatch(/contact-delivery\/<row id>/);
+  });
+
+  it("adds a contact-open run to the QA checklist (R199)", () => {
+    const qa = read("docs/qa-checklist.md");
+    expect(qa).toContain("E2E_CONTACT_OPEN=1");
+    expect(qa).toContain("e2e/contact");
+    expect(read("e2e/contact/contact-form.spec.ts")).toContain("E2E_CONTACT_OPEN");
+  });
+
+  it("lists the contact form in the README and the changelog, with the owner's steps after merge", () => {
+    expect(read("README.md")).toMatch(/\| Contact form \(`\/contact`, `\/api\/contact`\)/);
+    const changelog = read("CHANGELOG.md");
+    const head = changelog.slice(changelog.indexOf("## 2026-10-21"), changelog.indexOf("## 2026-10-21", changelog.indexOf("## 2026-10-21") + 5));
+    expect(head).toMatch(/^## 2026-10-21 — Contact form/);
+    expect(head).toContain("R190-R209");
+    expect(changelog.indexOf("## 2026-10-21 — Contact form")).toBeLessThan(changelog.indexOf("## 2026-10-21 — Email cron back"));
+    expect(flat(read("docs/deployment.md"))).toMatch(/0008_contact_messages\.sql/);
+    expect(flat(read("docs/deployment.md"))).toMatch(/Contact form: steps after merge/);
+  });
+
+  it("covers the deployment verifier's contact checks as built (R199)", () => {
+    expect(read("scripts/lib/deployment-checks.ts")).toContain('FORM_API_PATHS = ["/api/leads", "/api/contact"]');
+    expect(flat(read("docs/deployment.md"))).toMatch(/fetches `\/`, `\/privacy`, `\/terms`, `\/thank-you` and `\/contact`/);
+    expect(flat(read("docs/deployment.md"))).toMatch(/blocks and fails any request to `\/api\/leads` or `\/api\/contact`/);
+  });
+
+  it("names every doc that says once a day in the restore sentence (R208)", () => {
+    const sentence = flat(read("docs/deployment.md")).match(/change every file that says once a day, which are[^]*?and the tests in `tests\/scripts`/)?.[0] ?? "";
+    expect(sentence).not.toBe("");
+    const files = ["README.md", ...readdirSync(resolve("docs")).filter((name) => name.endsWith(".md")).map((name) => `docs/${name}`)];
+    const saying = files.filter((file) => /once a day/.test(read(file)) && file !== "docs/deployment.md");
+    expect(saying).toContain("docs/database-security.md");
+    expect(sentence).toContain("`docs/deployment.md`");
+    for (const file of saying) expect(sentence, file).toContain(`\`${file}\``);
+  });
+
+  it("says the overall contact limit is the alert's send cap, with no fixed number, everywhere it is described (R212)", () => {
+    for (const file of ["docs/deployment.md", "docs/database-security.md", "docs/observability.md", "docs/architecture.md", "CHANGELOG.md"]) {
+      expect(read(file), file).not.toMatch(/100 per hour|100 messages in an hour/);
+    }
+    expect(read("docs/superpowers/plans/2026-10-21-contact-form.md")).toMatch(/\*\*R203 Rate limits\.\*\*[^\n]*superseded by R212/);
+    expect(flat(read("docs/deployment.md"))).toMatch(/3 messages per 10 minutes per client and, in all, as many per hour as the alert's send cap \(`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R212\)/);
+    expect(read("docs/observability.md")).toMatch(/`global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\), the alert's own send cap, R212/);
+    // The privacy text names no number: the cap is an operator setting.
+    const legal = read("lib/content/legal-fallback.ts");
+    const paragraph = legal.slice(legal.indexOf("Messages sent through the contact form are counted"), legal.indexOf("Those counts are not linked to your message."));
+    expect(paragraph).toMatch(/all messages together by the hour/);
+    expect(paragraph.slice(paragraph.indexOf("all messages together"))).not.toMatch(/\d/);
+  });
+
+  it("claims no more for the shared hourly cap than it does, and no less duplicates than a slow provider can cause (R211, R212)", () => {
+    const unwrapped = (file: string) => flat(read(file)).replace(/ (\*|--|\/\/) /g, " ");
+    const files = ["docs/deployment.md", "docs/database-security.md", "docs/observability.md", "docs/architecture.md", "docs/incident-runbook.md", "CHANGELOG.md", "docs/superpowers/plans/2026-10-21-contact-form.md", "lib/contact/submit.ts", "supabase/migrations/0008_contact_messages.sql"];
+    for (const file of files) {
+      expect(unwrapped(file), file).not.toMatch(/never stores more|than their (staff )?alerts can announce|never outruns|can never exceed|at worst (alert staff )?twice|staff may (now and then )?get (that |an )?alert twice|reach the staff inbox twice/i);
+    }
+    for (const file of ["docs/deployment.md", "docs/database-security.md", "docs/architecture.md", "CHANGELOG.md", "docs/superpowers/plans/2026-10-21-contact-form.md", "lib/contact/submit.ts"]) {
+      expect(unwrapped(file), file).toMatch(/(caps intake|intake is capped) at the alert's hourly send cap/);
+      expect(unwrapped(file), file).toMatch(/cron retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run/);
+    }
+    for (const file of ["docs/database-security.md", "docs/observability.md", "docs/incident-runbook.md", "supabase/migrations/0008_contact_messages.sql"]) {
+      expect(unwrapped(file), file).toMatch(/eight-attempt cap/);
+    }
+  });
+
+  it("says a contact alert is parked only at the attempt cap, never for the age of an unconfirmed send (R211)", () => {
+    expect(flat(read("docs/deployment.md"))).toMatch(/Contact staff alerts are the exception \(R211\): an unconfirmed contact alert is never parked for its age/);
+    const database = flat(section(read("docs/database-security.md"), "Contact messages (migration 0008)"));
+    expect(database).not.toMatch(/retried only within 23 hours/);
+    expect(database).toMatch(/an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt \(R211\)/);
+    const runbook = read("docs/incident-runbook.md");
+    expect(flat(section(runbook, "Parked emails"))).toMatch(/\*\*`stale_unconfirmed`\*\*: a signup or order email whose outcome is unknown/);
+    expect(flat(section(runbook, "Contact messages"))).toMatch(/A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` \(R211\)/);
+    const observability = flat(read("docs/observability.md"));
+    expect(observability).toMatch(/A `delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an `invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send \(R211\)/);
+    expect(observability).toMatch(/as a count, with the `outbox` whose claim parked them/);
+    for (const file of ["docs/observability.md", "docs/database-security.md"]) expect(flat(read(file)), file).toMatch(/A contact staff alert is re-sent whatever its age, until its eighth attempt \(R211\)/);
+    expect(read("CHANGELOG.md").slice(0, read("CHANGELOG.md").indexOf("## 2026-10-21 — Email cron back"))).toContain("R211");
+  });
+
+  it("documents the contact-open CI job with the workflow's own command and environment, and the same in the QA checklist (R213)", () => {
+    const workflow = parse(read(".github/workflows/ci.yml")) as { jobs: Record<string, { steps: Array<{ run?: string; env?: Record<string, string> }> }> };
+    const start = workflow.jobs["e2e-contact"]!.steps.find((step) => step.run?.includes("next start"))!.env!;
+    const row = lines("docs/deployment.md").find((line) => line.startsWith("| `e2e-contact` (after `verify`) |")) ?? "";
+    expect(row).not.toBe("");
+    const qa = read("docs/qa-checklist.md");
+    for (const [name, value] of Object.entries(start)) {
+      const pair = `${name}=${value.includes(" ") ? `"${value}"` : value}`;
+      expect(row, name).toContain(pair);
+      expect(qa, name).toContain(pair);
+    }
+    expect(row).toContain("E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact");
+    expect(qa).toContain("E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3262 npx playwright test e2e/contact");
+    expect(flat(read("docs/deployment.md"))).toMatch(/`e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in/);
+    expect(flat(qa)).toMatch(/CI runs them as three more jobs \(`e2e-commerce`, `e2e-keyed` and `e2e-contact`/);
+  });
+
+  it("documents the contact form's rollback: a revert of the PR #8 merge, and the emergency down script that deletes the messages (production layers 3 and 13)", () => {
+    const down = "npx supabase@2.121.0 db query --linked -f supabase/downs/0008_contact_messages_down.sql";
+    const repair = "npx supabase@2.121.0 migration repair 0008 --status reverted --linked";
+    const deployment = read("docs/deployment.md");
+    expect(deployment).toMatch(/^## Contact form: rollback$/m);
+    const rollback = flat(section(deployment, "Contact form: rollback"));
+    expect(rollback).toContain("git revert -m 1 <merge-sha>");
+    expect(rollback).toMatch(/merge commit of PR #8 on `main`/);
+    expect(rollback).toMatch(/next deployment closes the form and removes `\/contact`/);
+    expect(rollback).toMatch(/The tables stay, unused/);
+    expect(rollback).toMatch(/alert that is not `sent` is never sent/);
+    expect(rollback).toContain(down);
+    expect(rollback).toMatch(/deletes every stored contact message/i);
+    expect(rollback).toContain(repair);
+    const script = read("supabase/downs/0008_contact_messages_down.sql");
+    expect(script).toContain(down);
+    expect(script).toContain(repair);
+    expect(script).toContain('docs/deployment.md, "Contact form: rollback"');
+    const runbook = flat(section(read("docs/incident-runbook.md"), "Rollback"));
+    expect(runbook).toMatch(/\*\*The contact form\*\*[^.]*down script[^.]*emergencies only[^.]*\(\[deployment\.md\]\(deployment\.md#contact-form-rollback\)\)/);
+    expect(runbook).toMatch(/forward-only/);
+  });
+
+  it("walks all 13 production layers for the contact slice, each specified or deferred with a trigger", () => {
+    const plan = read("docs/superpowers/plans/2026-10-21-contact-form.md");
+    expect(plan).toMatch(/^## 13-layer walk$/m);
+    const rows = section(plan, "13-layer walk").split(/\r?\n/).filter((line) => /^\| \d+ \|/.test(line));
+    expect(rows.map((row) => Number(/^\| (\d+) \|/.exec(row)![1]))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    for (const row of rows) {
+      const ruling = row.split("|")[3]!.trim();
+      expect(ruling, row).toMatch(/^(Specified|N\/A|Deferred)\b/);
+      if (ruling.startsWith("Deferred") || /\bdeferred\b/i.test(row)) expect(row, row).toMatch(/\btrigger\b/i);
+    }
+    const walk = flat(section(plan, "13-layer walk"));
+    expect(walk).toContain("supabase/downs/0008_contact_messages_down.sql");
+    expect(walk).toContain("contact_message_deliveries_message_kind_key");
+    expect(walk).toMatch(/R200[^|]*more than 20 messages arrive in a week/);
+    expect(walk).toMatch(/`contact_submitted`[^|]*trigger: the owner provides the PostHog key/i);
+  });
+
+  it("keeps the daily-schedule words out of the files the restore sentence does not list", () => {
+    const changelog = read("CHANGELOG.md");
+    const entry = changelog.slice(changelog.indexOf("## 2026-10-21 — Contact form"), changelog.indexOf("## 2026-10-21 — Email cron back"));
+    expect(entry).not.toBe("");
+    expect(entry).not.toMatch(/once a day/);
+    for (const file of ["docs/cms-operations.md", "docs/data-protection.md", "docs/qa-checklist.md"]) expect(read(file), file).not.toMatch(/once a day/);
   });
 });

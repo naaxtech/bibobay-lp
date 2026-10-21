@@ -79,6 +79,22 @@ describe("the perspective a preview reads with (R162)", () => {
     expect(fetchSpy.mock.calls[2]?.[2]).toEqual({ cache: "no-store", perspective: "drafts" });
     vi.doUnmock("@/lib/sanity/client");
   });
+
+  it("the contact page's draft read uses the perspective cookie too, and its published read never does", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SANITY_PROJECT_ID", "k82r18ol");
+    vi.stubEnv("NEXT_PUBLIC_SANITY_DATASET", "production");
+    vi.stubEnv("SANITY_API_READ_TOKEN", "viewer-token");
+    cookieValues.set(PERSPECTIVE_COOKIE, "rSummer1,drafts");
+    const fetchSpy = vi.fn().mockResolvedValue(null);
+    vi.resetModules();
+    vi.doMock("@/lib/sanity/client", () => ({ getSanityClient: () => ({ fetch: fetchSpy }) }));
+    const { getContactPage } = await import("@/lib/sanity/fetch");
+    await getContactPage({ preview: true });
+    expect(fetchSpy.mock.calls[0]?.[2]).toEqual({ cache: "no-store", perspective: ["rSummer1", "drafts"] });
+    await getContactPage({ preview: false });
+    expect(fetchSpy.mock.calls[1]?.[2]).toMatchObject({ perspective: "published", next: { tags: ["contactPage"] } });
+    vi.doUnmock("@/lib/sanity/client");
+  });
 });
 
 describe("stega is for previews only (R159)", () => {

@@ -51,12 +51,14 @@ From the production build's route table (`ƒ` renders per request, `○` is stat
 | `/` | ƒ | The landing page (CMS sections, founding-family form) |
 | `/privacy`, `/terms` | ƒ | Legal pages: Sanity text, or the plain-language repository fallback (then noindex) |
 | `/thank-you` | ƒ | Neutral page explaining the list; never claims a signup happened; noindex |
+| `/contact` | ƒ | The contact page; every string comes from the CMS `contactPage` document, with a repository fallback. It shows the contact form while `contactFormOpen()` holds; otherwise the Studio contact address as a mailto link; otherwise a closed notice. In the first two states it is indexable (canonical `/contact`, listed in the sitemap) unless the CMS says noindex, and never in a draft preview; the closed notice is `noindex, follow` (R190, R193) |
 | `/shop`, `/shop/[slug]` | ƒ | Catalogue and product pages, with no price anywhere; 404 unless commerce is enabled in the CMS, decided before the catalogue is read (Task 7b). A sold-out product keeps its page, marked sold out and noindex; a draft or unknown slug is a 404 |
 | `/order` | ƒ | Order request: the order pad with names from the CMS catalogue, how paying works (nothing is charged here), and the order form; 404 unless commerce is enabled, decided before anything else is read; noindex (Task 7c) |
 | `/track`, `/orders/[token]` | ƒ | Order tracking by reference plus email, and by private link; 404 unless commerce and tracking are enabled; noindex. A malformed or unknown token is the same 404; `/orders/*` sends `Referrer-Policy: no-referrer`, `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow` (Task 7c) |
 | `/_not-found` | ƒ | 404 page |
 | `/studio` | ƒ | 307 to the Studio URL from site settings when it is https; 404 otherwise |
 | `/api/leads` | ƒ | POST: founding-family signup |
+| `/api/contact` | ƒ | POST: a message to the team. JSON only, 32 KiB at most; 503 with `closed: true` while the form is not open (R193, R205); the stored message is announced by one staff alert email, never to the sender |
 | `/api/orders` | ƒ | POST: order request; 404 unless commerce is enabled in the CMS (Task 7a) |
 | `/api/orders/track` | ƒ | POST: order tracking by token or reference plus email; 404 unless commerce and tracking are enabled (Task 7a) |
 | `/api/cron/email-outbox` | ƒ | GET: the email outbox worker, run once a day, scheduled 06:00 UTC (Hobby fires it between 06:00 and 06:59), by Vercel Cron (`vercel.json`; Hobby allows one run a day); `Authorization: Bearer <CRON_SECRET>` or 401; answers counts only (Task 8a) |
@@ -77,6 +79,10 @@ The robots rules keep crawlers out of the private and transactional paths (`/ord
 The header and footer show the shop link (the CMS label `navigation.commerceLabel`) only while
 commerce is enabled, the footer's "Track an order" link only while tracking is enabled too, and the
 sitemap lists `/shop` and the listed product pages only while commerce is on.
+The footer's "Contact us" link (the CMS label `contactPageLabel`) shows only while the contact form is
+open, after the shop and track links and before the legal links, unless an editor's own legal links
+already hold `/contact`; the sitemap lists `/contact` while the page offers a way to reach the team
+(the open form or a Studio contact address) and the CMS does not say noindex.
 
 ## Server and client boundary
 
@@ -163,6 +169,57 @@ The `download` in the answer is a 24-hour signed link to `/api/freebies/download
 - No raw IP address is stored. The rate-limit key is an HMAC of the client address (IPv6 bucketed
   per /64) under `LEAD_IP_HASH_SECRET`.
 - The database side (tables, functions, grants) is in [database-security.md](database-security.md).
+
+## Contact flow
+
+```
+ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
+  client checks                          415 / 413 (over 32 KiB) / 400 for bad requests
+                                         1 honeypot filled  -> 400, nothing counted or stored
+                                         2 Zod validation (strict object)  -> 400 with field codes
+                                         3 form open (contactFormOpen)?  no -> 503 { closed: true }
+                                         4 rate limit (DB: 3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR
+                                           (default 60, the alert's own send cap) per hour in all) -> 429 / 503 if the limiter fails
+                                         5 submit_contact_message()  -> 500 if the write fails
+                                           (the message and its outbox row, one transaction)
+                                         6 200 { ok, persisted: true }
+                                         7 after the response: claim the alert by message id
+                                           (claim_contact_deliveries), spend send:contact_staff_alert,
+                                           send it to STAFF_NOTIFICATION_EMAIL, record the outcome
+                                         8 later: the next cron run retries what is still due
+```
+
+- The form is open only when Supabase, email sending (`RESEND_API_KEY` and `RESEND_FROM`),
+  `STAFF_NOTIFICATION_EMAIL` and a valid `LEAD_IP_HASH_SECRET` are all configured (R205), so a message
+  is never taken that nobody would read. `contactFormOpen()` is the one definition the route,
+  `/api/readiness`, the page, the footer, the sitemap and the privacy fallback text use.
+- Each message gets exactly one staff alert (R192): to the staff address, with the topic label as the
+  only submitted text in the subject and Reply-To set to the sender's address (the one exception to the
+  rule that alerts carry no reply-to, R204; the body labels the address "unverified"). No email goes to
+  the sender: an anonymous form cannot prove who owns an address, so sending one would make the site a
+  mail relay.
+- Success is shown only for `ok && persisted === true`, and the copy says the message was received,
+  never that it was emailed. A CMS success message that claims delivery is replaced by the built-in
+  text.
+- The alert has an outbox of its own, `contact_message_deliveries` (R201): the lead outbox, its table
+  and its functions are untouched. It has no `skipped` status (R207), spends its own send budget and
+  sends under the idempotency key `contact-delivery/<row id>`.
+- The cron worker drains three outboxes in this order: orders (quotes first), then signups, then
+  contact alerts, so a staff alert waits behind emails to buyers and parents when the run's time runs
+  out. It claims no contact alert while `STAFF_NOTIFICATION_EMAIL` is unset: the rows wait and are never
+  parked (R209). It needs no `LEAD_IP_HASH_SECRET` for them; only the form does. Retries wait for
+  the next cron run ([deployment.md](deployment.md#email-outbox-worker-task-8a)). Unlike the other
+  outboxes, an alert whose send was unconfirmed is retried until its eighth attempt and never parked
+  for its age: a duplicate staff alert is harmless, a lost one is not (R211).
+- All messages together are capped per hour at the alert's own send cap
+  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`), so intake is capped at the alert's hourly send cap; a cron
+  retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run (R212).
+- No raw IP address is stored. The rate-limit key is the same HMAC of the client address as for
+  signups (IPv6 bucketed per /64).
+- A consent-gated visit-statistics event, `contact_submitted`, follows a stored answer only
+  ([observability.md](observability.md#what-is-counted)).
+- The database side is in [database-security.md](database-security.md#contact-messages-migration-0008).
+  An admin inbox page is deferred (R200); until then staff read messages in the alert email, or by SQL.
 
 ## Staff flow (Task 8b)
 

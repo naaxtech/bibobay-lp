@@ -27,6 +27,7 @@ events it sends:
 | `faq_opened` | A question is opened | `index`, `section` |
 | `menu_opened` | The phone menu | `section` |
 | `lead_submitted` | The signup form gets a stored answer | `persisted`, `acknowledgementQueued` |
+| `contact_submitted` | The contact form gets a stored answer (`persisted: true`); no other answer is counted | `persisted`, `topic` |
 
 `section` is the nearest landing section (`hero`, `episodes`, `lead`, …) or `header`, `footer`,
 `menu`. `label` is the link's visible words, at most 80 characters.
@@ -54,7 +55,7 @@ to confirm the rest ([data-protection.md](data-protection.md#before-launch-owner
   is not recognised on a later day.
 - No autocapture, session replay, heatmaps, dead-click or rage-click capture, exception capture,
   surveys, product tours, web experiments, feature flags or web vitals.
-- No form contents: `lead_submitted` carries the outcome only.
+- No form contents: `lead_submitted` carries the outcome only, and `contact_submitted` the outcome and the topic the visitor chose, never the name, the address or the message.
 - No private order link: the token in a `/orders/<token>` address (the tracking page, Task 7c)
   never leaves the browser. Every address, path and label is sent as `/orders/[token]`
   (`lib/privacy/private-links.ts`), and those pages send no referrer.
@@ -207,7 +208,7 @@ project); otherwise nothing loads and nothing is sent.
 the event, delivery kind and error code only (never an address or a lead id):
 `delivery_send_capped` (the hourly cap of one send bucket was hit: emails of that kind wait in the
 outbox; the buckets are `send:lead_acknowledgement`, `send:lead_staff_alert`,
-`send:order_acknowledgement`, `send:order_staff_alert` and `send:quote`, each capped at
+`send:order_acknowledgement`, `send:order_staff_alert`, `send:quote` and `send:contact_staff_alert`, each capped at
 `LEAD_ACK_SEND_LIMIT_PER_HOUR`), `delivery_send_cap_unavailable`, `delivery_enqueue_failed`,
 `lead_store_failed`, `lead_rate_limit_unavailable`, `lead_storage_unconfigured`,
 `lead_config_invalid` and `lead_removal_channel_unconfigured` (a signup was refused with the
@@ -217,11 +218,36 @@ failure of `/api/leads` is reported as `lead_route_failed` and answered with the
 
 Set a Sentry alert on `delivery_send_capped` and `lead_store_failed`.
 
+### Alerts from the contact form (rulings R192-R205)
+
+`logContactEvent` (`lib/contact/dependencies.ts`) writes the contact route's log lines under
+`scope: "contact"`: an event name and at most a scope or a short code, never a name, an address, a
+message or a row id. Every event whose name ends in `_failed`, `_unavailable` or `_unconfigured` is also
+sent to Sentry as a warning, tagged with the event and a code only; the others are routine log lines.
+
+| Event | Meaning | What to do |
+|---|---|---|
+| `contact_stored` | A message and its alert row were stored in one transaction. Routine, not reported. | Nothing. |
+| `contact_rate_limited` | A message was refused with 429 (`scope` is `client` for the 3 per 10 minutes limit or `global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), the alert's own send cap, R212). Routine, not reported. | A burst of `global` means the hour's whole alert budget was reached: look at the traffic. |
+| `contact_honeypot` | The hidden field was filled; the generic 400 was answered and nothing was counted or stored. Routine, not reported. | Nothing. |
+| `contact_store_failed` | A message passed every check but could not be stored (code: the database's); the visitor was told it was not saved. | Check Supabase status and the database logs now; messages are being lost. Set a Sentry alert on this one. |
+| `contact_rate_limit_unavailable` | The shared limiter is missing (code `missing`) or failed; the API answered 503 and stored nothing. | Check Supabase; the form fails closed without its limiter. |
+| `contact_unconfigured` | A message arrived while the form is not open (see `contact` in `/api/readiness`); the API answered 503 with `closed: true` and stored nothing. | Expected if you closed the form on purpose; otherwise fix the environment ([deployment.md](deployment.md#contact-form)). |
+| `contact_route_failed` | An unexpected failure of the contact route itself (also reported as an error, area `contact`); answered with the generic error. | Read the Sentry event; an unhandled code path. Set an alert. |
+
+The staff alert is sent through the same attempt step as the other outboxes, so its `delivery_*` lines
+(`delivery_attempted`, `delivery_send_capped`, `delivery_expired` and the rest, below) carry `channel`
+`contact` and the kind `contact_staff_alert`. Its send bucket is `send:contact_staff_alert`. A
+`delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an
+`invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send (R211)
+([incident-runbook.md](incident-runbook.md#contact-messages)). From the cron run, where every line
+says `channel` `worker`, a claim's `delivery_expired` carries `outbox` `contact`.
+
 ### Alerts from the email outbox (Task 8a)
 
 The sends made right after an answer and the cron worker (`/api/cron/email-outbox`) share one
 attempt step (`lib/outbox/attempt.ts`). Its log lines (`scope: "outbox"`, with `channel` `leads`,
-`orders` or `worker`; signup sends log under `scope: "leads"`) carry event names, message kinds,
+`orders`, `contact` or `worker`; signup sends log under `scope: "leads"`) carry event names, message kinds,
 counts and short codes only, never an address, a name, an order reference or a row id. These are
 also sent to Sentry as warnings, tagged with the event, kind and code only:
 
@@ -232,10 +258,13 @@ also sent to Sentry as warnings, tagged with the event, kind and code only:
   staff alert with no staff address, or a quote with a non-https payment link); it is recorded as
   `failed` with `message_invalid`.
 - `delivery_record_failed`: the outcome could not be recorded; the row
-  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`.
+  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. A contact staff alert is re-sent whatever its age, until its eighth attempt (R211).
 - `delivery_expired`: rows parked for a human: a final failure (the eighth attempt, or
-  `invalid_idempotent_request`), tagged with its kind and code, or unconfirmed sends older than 23
-  hours (`stale_unconfirmed`, as a count).
+  `invalid_idempotent_request`), tagged with its kind and code, or rows a claim parked (signup and
+  order sends unconfirmed for over 23 hours, or a lost eighth attempt, `stale_unconfirmed`), as a
+  count, with the `outbox` whose claim parked them (`leads`, `orders` or `contact`; the cron run logs
+  every outbox under `channel` `worker`). The `outbox` is on the log line; the Sentry event keeps
+  only its event, kind and code tags.
 
 Routine lines, not reported: `delivery_attempted` (with `status` and a failure code),
 `delivery_skipped` (a withdrawn lead or a superseded quote, as a count) and `worker_run` (one line
@@ -250,6 +279,8 @@ only be retried within 23 hours of the claim of the first attempt that left it u
 schedule such a row gets at most one retry before it is parked as `delivery_expired` for a person. A `delivery_expired`
 alert therefore means a person has to act, and on this schedule it will be more common than on a
 15-minute one: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
+Contact staff alerts are the exception (R211): an unconfirmed one is retried at every run until its
+eighth attempt, so a retry made after the provider has forgotten the key is a new send (at most one extra alert per such attempt, up to the eight-attempt cap), and none is lost to the 23-hour window.
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
 

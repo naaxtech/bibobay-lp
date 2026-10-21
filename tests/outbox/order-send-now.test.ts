@@ -177,4 +177,9 @@ describe("outboxLogger (ruling R52)", () => {
     expect(console.info).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "orders", event: "delivery_attempted", kind: "acknowledgement", status: "sent" }));
     expect(console.info).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "orders", event: "delivery_send_capped", kind: "acknowledgement", budget: "order_acknowledgement" }));
   });
+
+  it("keeps the outbox that parked rows on the cron run's warning line", () => {
+    outboxLogger("worker")({ event: "delivery_expired", count: 3, outbox: "contact" });
+    expect(console.warn).toHaveBeenCalledWith(JSON.stringify({ scope: "outbox", channel: "worker", event: "delivery_expired", count: 3, outbox: "contact" }));
+  });
 });

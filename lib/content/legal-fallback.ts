@@ -35,6 +35,15 @@ import type { PortableContent, SiteSettings } from "./types";
  * a payment link sent later by email, never card details. No retention period is stated: none is
  * set (`orders.retain_until` is inert). tests/content/legal-pages.test.tsx asserts every claim.
  *
+ * Contact form (R196, R206): while the form is open (`contactFormOpen()`, passed in by the page so
+ * this file never reaches the server-only availability check) the text also says what a message
+ * stores (supabase/migrations/0008_contact_messages.sql: `contact_messages`, with its delivery
+ * records in `contact_message_deliveries`; the fields in lib/contact/fields.ts), that the team
+ * receives it by email with the sender's address to reply to and that the sender is never emailed
+ * (lib/email/contact-emails.ts), how it is rate limited (lib/contact/submit.ts), the
+ * legitimate-interest basis and, as for orders, no retention period. Closed, the text is exactly
+ * what it was.
+ *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
  * default, which tells pages that Sanity has no text) stays unchanged.
  */
@@ -46,7 +55,16 @@ const paragraph = (text: string): PortableContent[number] => ({ _type: "block", 
 /** Blocks that appear only while commerce is on. */
 const whenSelling = (commerce: boolean, ...blocks: Array<() => PortableContent[number]>): PortableContent => (commerce ? blocks.map((block) => block()) : []);
 
-function privacyText(commerce: boolean, channel: RemovalChannel): PortableContent {
+/** Blocks that appear only while the contact form is open (R196). */
+const whenContactOpen = whenSelling;
+
+/** What the database stores, for the sentence naming Supabase. */
+function storedKinds(commerce: boolean, contact: boolean): string {
+  const kinds = ["signups", ...(commerce ? ["order requests"] : []), ...(contact ? ["contact messages"] : [])];
+  return kinds.length === 1 ? kinds[0]! : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`;
+}
+
+function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolean): PortableContent {
   return [
     paragraph(
       "BIBO Bay is a story world in development. This page explains what happens to the details you share through this website, in plain words.",
@@ -80,6 +98,12 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
       () => paragraph("When the team replies with a quote: the currency, the amounts quoted, the payment link they send you and when they sent it."),
       () => paragraph("Before you send it, your order list stays in this browser's storage on your device, holding only which products you added and how many. It reaches us only as part of an order request."),
     ),
+    ...whenContactOpen(
+      contact,
+      () => heading("What the contact form collects"),
+      () => paragraph("The contact form is for adults. When you send a message, the website stores your name, your email address, the topic you chose, your message and when you sent it. Please do not include details about a child."),
+      () => paragraph("The BIBO Bay team receives your message by email, with your email address as the address to reply to, so they can answer you. The website does not email you when you send a message."),
+    ),
     heading("What we do not collect"),
     paragraph(
       "We do not ask for your child's name, birthday, photo, school or any other detail about a child. The age range is broad and you can skip it.",
@@ -94,6 +118,9 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
       : paragraph(
           "Your IP address is not stored with your signup. To stop the form being flooded, the website keeps a rate-limit count of signup attempts, in 10-minute windows, against a one-way, keyed code made from your network address. That count is not linked to your signup and is used only to enforce the limit.",
         ),
+    ...whenContactOpen(contact, () =>
+      paragraph("Messages sent through the contact form are counted the same way: against the keyed code in 10-minute windows, and all messages together by the hour. Those counts are not linked to your message."),
+    ),
     heading("Visit statistics"),
     paragraph(
       "When this website is set up to count visits, a notice titled \"Can we count your visit?\" asks on your first visit whether BIBO Bay may count yours. Visits are counted with PostHog, to learn which pages, videos and activities families use and how they find BIBO Bay, and only if you say yes. Until you answer, and if you say no, nothing is counted and nothing is sent to PostHog.",
@@ -133,6 +160,9 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
         ),
       () => paragraph("Handling your order request is the step you asked us to take before any sale, and that request is its legal basis."),
     ),
+    ...whenContactOpen(contact, () =>
+      paragraph("To read and answer a message you send through the contact form. The legal basis for keeping it is our legitimate interest in replying to people who write to us."),
+    ),
     paragraph(
       "Our legitimate interest in keeping the website working and safe is the legal basis for the rate-limit counts and the error reports described on this page, and for the requests the servers receive in order to send pages back.",
     ),
@@ -140,7 +170,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
     paragraph("We do not sell your details or share them with advertisers."),
     heading("Services that handle your details"),
     paragraph("Vercel hosts the website and runs the code that serves these pages."),
-    paragraph(commerce ? "Supabase hosts the database where signups and order requests are stored." : "Supabase hosts the database where signups are stored."),
+    paragraph(`Supabase hosts the database where ${storedKinds(commerce, contact)} are stored.`),
     paragraph("Resend delivers the emails described above."),
     paragraph("PostHog receives the visit statistics described above, and only if you say yes to counting your visit."),
     paragraph(
@@ -164,6 +194,9 @@ function privacyText(commerce: boolean, channel: RemovalChannel): PortableConten
     ),
     ...whenSelling(commerce, () =>
       paragraph("Order requests are kept too, with their products, their history and their email delivery records; nothing deletes them automatically, and no period for keeping them has been set."),
+    ),
+    ...whenContactOpen(contact, () =>
+      paragraph("Contact messages are kept too, with their email delivery records; nothing deletes them automatically, and no period for keeping them has been set."),
     ),
     heading("Your rights"),
     paragraph(
@@ -212,25 +245,28 @@ function termsText(commerce: boolean, channel: RemovalChannel): PortableContent 
 type LegalFallback = { privacy: PortableContent; terms: PortableContent };
 
 /** The text while commerce is off (the default): nothing is sold on this website. */
-export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false, null), terms: termsText(false, null) });
+export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false, null, false), terms: termsText(false, null) });
 
 /** The text while commerce is on: what an order request stores, and how payment works. */
-export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true, null), terms: termsText(true, null) });
+export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true, null, false), terms: termsText(true, null) });
 
 /**
  * The fallback text for the site's commerce switch and removal channel (Ruling R125). Only a
  * literal `true` counts as commerce on. With no removal channel (no email sending, no contact
  * address) the text is the frozen no-channel text and promises nothing; otherwise the removal
- * sentences name the channel that exists. `env` is injectable for tests.
+ * sentences name the channel that exists. `contactOpen` (the page's `contactFormOpen()`, R196) adds
+ * what the contact form stores; it is false by default, so the frozen texts stay as they were.
+ * `env` is injectable for tests.
  */
 export function legalFallbackFor(
   settings: Partial<Pick<SiteSettings, "commerceEnabled" | "contactEmail">>,
   env: Readonly<Record<string, string | undefined>> = process.env,
+  contactOpen = false,
 ): LegalFallback {
   const commerce = isCommerceEnabled(settings);
   const channel = removalChannelFrom(settings, env);
-  if (channel === null) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
-  return { privacy: privacyText(commerce, channel), terms: termsText(commerce, channel) };
+  if (channel === null && !contactOpen) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
+  return { privacy: privacyText(commerce, channel, contactOpen), terms: termsText(commerce, channel) };
 }
 
 /** The privacy page's removal paragraph; with no channel it says signups are not open, and promises nothing. */

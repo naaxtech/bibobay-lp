@@ -4,11 +4,12 @@ import { evaluate, parse } from "groq-js";
 import { describe, expect, it, vi } from "vitest";
 
 import { friendArt } from "@/lib/content/brand-art";
-import { normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "@/lib/content/normalize";
+import { contactPageState } from "@/lib/contact/page-state";
+import { normalizeContactPage, normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "@/lib/content/normalize";
 import { cleanStega, stegaCleanText, stegaText } from "@/lib/content/stega";
 import type { Product } from "@/lib/content/types";
-import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
-import { homeMetadata, legalMetadata, manifestFor, productMetadata, seoEnvironment, shopMetadata, structuredData, thankYouMetadata } from "@/lib/seo/metadata";
+import { CONTACT_PAGE_QUERY, LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
+import { contactMetadata, homeMetadata, legalMetadata, manifestFor, productMetadata, seoEnvironment, shopMetadata, structuredData, thankYouMetadata } from "@/lib/seo/metadata";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
 import { encodeAllStrings, encodeString, STEGA_CHARACTER } from "@/tests/support/stega";
 
@@ -134,6 +135,31 @@ describe("the normalizer under Presentation stega (R160)", () => {
     expect(STEGA_CHARACTER.test(encoded.orderConsentCopy)).toBe(true);
   });
 
+  it("contact page: every decision is the same as for the plain read, and its text keeps its payload", async () => {
+    const raw = await read(CONTACT_PAGE_QUERY);
+    const plain = normalizeContactPage(raw);
+    // The fixture is the seeded document, not the repository fallback.
+    expect(plain.heading).toBe("Contact us");
+    const encoded = normalizeContactPage(encodeAllStrings(raw, { _id: "contactPage", _type: "contactPage" }));
+    expect(cleanStega(encoded)).toEqual(plain);
+    const { seo, heading, description, buttonLabel, successMessage, errorMessage, closedMessage, emailIntro } = encoded;
+    for (const text of [seo.title, seo.description, heading, description, buttonLabel, successMessage, errorMessage, closedMessage, emailIntro]) {
+      expect(STEGA_CHARACTER.test(text), text).toBe(true);
+    }
+  });
+
+  it.each([
+    ["claims delivery in its last word", "Thank you. Your message was sent", "Thank you. We have received your message."],
+    ["claims delivery mid-sentence", "We have emailed the team for you.", "Thank you. We have received your message."],
+    ["was emptied", "   ", "Thank you. We have received your message."],
+    ["only says it was received", "Got it, thank you.", "Got it, thank you."],
+  ])("contact page: a success message that %s is judged on its words, payload or not (C7)", async (_case, successMessage, shown) => {
+    const raw = { ...(await read(CONTACT_PAGE_QUERY)), successMessage };
+    expect(normalizeContactPage(raw).successMessage).toBe(shown);
+    const encoded = normalizeContactPage(encodeAllStrings(raw, { _id: "contactPage", _type: "contactPage" })).successMessage;
+    expect(stegaCleanText(encoded)).toBe(shown);
+  });
+
   it.each(["Lumi", "Tula the Turtle"])("a friend's portrait is found by an encoded name too (%s)", (name) => {
     const art = friendArt({ id: "character-x", name });
     expect(art).toBeDefined();
@@ -148,20 +174,24 @@ describe("head metadata and structured data never carry stega", () => {
   const encodedProduct: Product = { ...product, name: encodeString(product.name), description: encodeString(product.description), seo: { title: encodeString("Tula plush"), description: encodeString("A soft sea turtle.") } };
 
   it("each builder gives the same result for encoded content as for plain content", async () => {
-    const [landing, settingsRaw, legalRaw] = await Promise.all([richLanding(), richSettings(), richLegal()]);
-    const plain = { content: normalizeLandingContent(landing), settings: normalizeSiteSettings(settingsRaw), legal: normalizeLegalSettings(legalRaw) };
+    const [landing, settingsRaw, legalRaw, contactRaw] = await Promise.all([richLanding(), richSettings(), richLegal(), read(CONTACT_PAGE_QUERY)]);
+    const plain = { content: normalizeLandingContent(landing), settings: normalizeSiteSettings(settingsRaw), legal: normalizeLegalSettings(legalRaw), contact: normalizeContactPage(contactRaw) };
     const encoded = {
       content: normalizeLandingContent(encodeAllStrings(landing)),
       settings: normalizeSiteSettings(encodeAllStrings(settingsRaw, { _id: "siteSettings", _type: "siteSettings" })),
       legal: normalizeLegalSettings(encodeAllStrings(legalRaw, { _id: "legalSettings", _type: "legalSettings" })),
+      contact: normalizeContactPage(encodeAllStrings(contactRaw, { _id: "contactPage", _type: "contactPage" })),
     };
     expect(hasStega(encoded.content.seo) || hasStega(encoded.settings.title)).toBe(true);
+    expect(hasStega(encoded.contact.seo)).toBe(true);
     const build = (input: typeof plain, item: Product) => {
       const seo = seoEnvironment(input.settings, env);
       return {
         home: homeMetadata({ content: input.content, settings: input.settings, seo, draft: true, image: { url: "https://cdn.sanity.io/images/k82r18ol/production/a.png", alt: input.content.hero.title } }),
         privacy: legalMetadata({ kind: "privacy", legal: input.legal, settings: input.settings, seo, draft: true }),
         thanks: thankYouMetadata({ settings: input.settings, seo }),
+        // The address state: the settings carry a contact address, which the page then offers.
+        contact: contactMetadata({ copy: input.contact, settings: input.settings, seo, draft: true, state: contactPageState(false, input.settings) }),
         shop: shopMetadata({ settings: input.settings, seo, draft: true }),
         product: productMetadata({ product: item, settings: input.settings, seo, draft: true, image: { url: "https://cdn.sanity.io/images/k82r18ol/production/b.png", alt: item.name } }),
         jsonLd: structuredData(input.settings, seo),

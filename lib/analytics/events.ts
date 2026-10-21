@@ -20,6 +20,7 @@ export const ANALYTICS_EVENTS = {
   faq_opened: ["index", "section"],
   menu_opened: ["section"],
   lead_submitted: ["persisted", "acknowledgementQueued"],
+  contact_submitted: ["persisted", "topic"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AnalyticsEvent = keyof typeof ANALYTICS_EVENTS;

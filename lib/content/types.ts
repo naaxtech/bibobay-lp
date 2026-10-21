@@ -25,8 +25,10 @@ export interface SiteSettings {
   orderCountries: string[];
   contactEmail?: string; studioUrl?: string; socialLinks: SocialLink[];
   navigation: { links: Cta[]; primaryCta: Cta; commerceLabel: string };
-  footer: { text: string; legalLinks: Cta[]; contactLabel: string };
+  footer: { text: string; legalLinks: Cta[]; contactLabel: string; /** R190: the footer link to /contact, shown only while the form is open. */ contactPageLabel: string };
 }
+/** R190, R195: every CMS-controlled string of /contact and its form. Field labels and validation messages are repository chrome (components/forms/contact-copy.ts). */
+export interface ContactPageContent { seo: Seo; heading: string; description: string; buttonLabel: string; successMessage: string; errorMessage: string; closedMessage: string; emailIntro: string }
 export interface LandingPageContent {
   sections: SectionConfig[]; seo: Seo;
   hero: SectionIntro & { title: string; primaryCta: Cta; secondaryCta: Cta; artworkDescription: string };

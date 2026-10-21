@@ -17,7 +17,7 @@ SANITY_STUDIO_PROJECT_ID=<project id> SANITY_STUDIO_DATASET=production npm --pre
 - `SANITY_STUDIO_PREVIEW_URL` (optional, https or `http://localhost`) turns on the Presentation tool.
 - `npm --prefix studio run build` builds it; deploying it to Sanity hosting is done by the BIBO Bay
   owner account, not by CI.
-- `npm --prefix studio run seed -- --dry-run` lists the 32 claim-safe starter documents. Without
+- `npm --prefix studio run seed -- --dry-run` lists the 33 claim-safe starter documents. Without
   `--dry-run`, and with a server-only `SANITY_WRITE_TOKEN`, it creates the missing ones with
   `createIfNotExists`: it never overwrites an editor's changes.
 
@@ -44,13 +44,14 @@ asking, and turns on Sanity's auto-updates. The deploy also uploads the schema. 
 
 ## What is in the Studio
 
-Three singletons sit at the top of the desk (fixed IDs; a second copy cannot be created):
+Four singletons sit at the top of the desk (fixed IDs; a second copy cannot be created):
 
 | Document | ID | Holds |
 |---|---|---|
 | Site settings | `siteSettings` | Title, description, verified canonical URL, default SEO, feature toggles, contact email, Studio URL, social links, navigation, footer |
 | Landing page | `landingPage` | Section order and visibility, page SEO, the copy of every section, and references to the collections |
 | Legal and consent | `legalSettings` | Privacy text, terms text, their version dates, the consent-copy version, and the order form's consent sentence with its version |
+| Contact page | `contactPage` | The heading, intro, search title and description, button label, success, error and closed messages and the line above the contact email for `/contact` |
 
 Collections:
 
@@ -157,6 +158,40 @@ The Bay friends and Story ideas selectors stack every panel in the same place so
 never moves the page. The block is therefore as tall as the **tallest** panel: a very long
 description on one friend makes the box for every friend that tall. Keep descriptions of similar
 length.
+
+## Contact page
+
+The Contact page document (`contactPage`) holds the words of `/contact`. Field labels, hints, error
+texts under the fields and the topic names are fixed in the code, like the signup form's; everything
+below is yours to edit:
+
+- **Heading, intro, search title and description.** Write the intro for parents, carers and
+  professionals, and ask people to leave out details about a child.
+- **Button label, success message, error message.** The success message must say the message was
+  received. The Studio refuses one that says it was sent, emailed or delivered, or tells people to
+  check their inbox, because nothing is emailed to the sender; if such text gets published anyway, the
+  site shows the built-in text instead.
+- **Closed message.** Shown instead of the form when the form is not open and no contact email is set
+  (and if the form closes while someone is writing).
+- **Line above the contact email.** Shown, with the address from Site settings (Verified public contact
+  email) as a mailto link, when the form is not open but an address is set.
+- **Footer link label** (Site settings, footer: Contact page link label, `contactPageLabel`). Optional;
+  the fallback is "Contact us". The link appears in the footer only while the form is open.
+
+The form itself opens only when Supabase, email sending, the staff notification address and the
+address-hash secret are all configured ([deployment.md](deployment.md#contact-form)); editing this
+document never opens or closes it. The page is listed for search engines while it offers a way to reach
+the team (the open form or a contact email), unless its SEO is set to "no index".
+
+In **Presentation** (see [Live editing](#live-editing-presentation)) `/contact` opens beside this
+document: the heading, intro, button label, footer link and the closed message or the line above the
+address are click-to-edit like any other page text. The success and error messages appear only after
+someone submits the form, so edit them in the form fields. Do not submit test messages from the
+preview: it is the live site, so each one is stored and alerts the team.
+
+After a schema change, redeploy the Studio from `studio/` (see [The live project](#the-live-project)),
+then publish the document. `npm --prefix studio run seed` creates the document if it is missing
+and never overwrites an editor's changes.
 
 ## Legal text, consent version and indexing
 

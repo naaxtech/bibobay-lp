@@ -26,7 +26,7 @@ export interface CtaLinkProps {
  * Internal routes this site is known to serve (Task 9). Only these are prefetched; any other CMS
  * route may not exist yet, and a prefetch of a missing route is a 404 in production builds.
  */
-export const PREFETCHABLE_ROUTES: ReadonlySet<string> = new Set(["/", "/privacy", "/terms"]);
+export const PREFETCHABLE_ROUTES: ReadonlySet<string> = new Set(["/", "/privacy", "/terms", "/contact"]);
 
 /**
  * One CMS call to action. Page anchors stay plain links so the browser scrolls (and moves the

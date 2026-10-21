@@ -76,5 +76,6 @@ export const navigationSettings = defineType({ name: "navigationSettings", title
 export const footerSettings = defineType({ name: "footerSettings", title: "Footer", type: "object", fields: [
   defineField({ name: "text", type: "text" }), defineField({ name: "legalLinks", type: "array", of: [defineArrayMember({ type: "cta" })] }),
   defineField({ name: "contactLabel", type: "string" }),
+  defineField({ name: "contactPageLabel", title: "Contact page link label", type: "string", description: "The footer link to the Contact page. It shows only while the contact form is open. Leave empty for \"Contact us\"." }),
 ] });
 export const objectTypes = [imageWithAlt, cta, seo, socialLink, sectionTheme, portableContent, commerceNotice, sectionIntro, landingSection, heroSection, trustSection, promiseSection, episodesSectionIntro, offlineStep, offlineSection, leadSection, finalCtaSection, navigationSettings, footerSettings];

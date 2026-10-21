@@ -42,10 +42,10 @@ Stop the server afterwards. `E2E_PRODUCTION=1` turns on the checks that only hol
 build (no `'unsafe-eval'` in the CSP). The expected heading is the repository fallback's; against a
 deployment with Sanity content, use the published hero heading or leave the flag out.
 
-This keyless run skips the commerce-on, analytics and Sentry specs, which need a differently built
-server. CI runs them as two more jobs (`e2e-commerce` and `e2e-keyed`, ruling R130;
+This keyless run skips the commerce-on, analytics, Sentry and open-contact-form specs, which need a
+differently built or started server. CI runs them as three more jobs (`e2e-commerce`, `e2e-keyed` and `e2e-contact`, rulings R130 and R213;
 [deployment.md](deployment.md#continuous-integration)); run them by hand like this when you want them
-locally. Both use a free port in place of 3260 and 3261, and both need `npm ci` in the folder they build.
+locally. Each uses a free port in place of 3260, 3261 and 3262, and each needs `npm ci` in the folder it builds.
 
 **2a. Commerce switched on.** The fixture script works on a scratch COPY of the repository, outside any
 git work tree (it refuses the repository itself, a folder inside it and a copy with a `.git` entry):
@@ -85,9 +85,26 @@ fails, which is enough to see that it was sent):
 - In that window, open **Analytics choices** in the footer: it says "Visit statistics are on for this
   browser."; "Turn statistics off" stops every later request, also after moving to another page.
 
-**End-to-end tests never call the real `/api/leads`.** Every lead request in `e2e/` is answered by
+**2c. The contact form open (placeholders; every `/api/contact` call is answered by Playwright, nothing
+leaves the machine):** the suite above runs against a keyless build, where `/contact` shows the closed
+notice and no form. To run the contact specs against an open form, start the same build with the
+placeholder service environment set at `next start` time, and run only that directory:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef RESEND_API_KEY=re_fixture RESEND_FROM="BIBO Bay <hello@example.com>" STAFF_NOTIFICATION_EMAIL=staff@example.com npx next start -p 3262 -H 127.0.0.1 &
+E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3262 npx playwright test e2e/contact
+```
+
+Stop the server by its port afterwards, not by the job id. The placeholders reach nothing real. By hand
+on the same server, at 390 px and 1440 px: `/contact` shows the form with labelled fields and a privacy link
+under the button; an empty submit puts the focus on the error summary and sends nothing; the success
+message appears only after the server confirms the message was stored; the footer on `/` and `/privacy`
+links to `/contact`. On a keyless server `/contact` shows the closed notice (or the Studio contact
+address) and the footer has no "Contact us" link.
+
+**End-to-end tests never call the real `/api/leads` or `/api/contact`.** Every such request in `e2e/` is answered by
 `page.route`, and a context guard fails the test on any unrouted call. The deployment verifier also
-blocks `/api/leads`. Keep it that way: once Supabase is configured, a real call writes a real row and
+blocks both. Keep it that way: once Supabase is configured, a real call writes a real row and
 may send a real email.
 
 ## 3. Against the deployed preview, then production

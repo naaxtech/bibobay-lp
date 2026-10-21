@@ -13,7 +13,7 @@ import { CONFIGURED } from "./environment";
  * Both are never cached, answer HEAD, and refuse POST.
  */
 
-const READINESS_KEYS = ["email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
+const READINESS_KEYS = ["contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
 const READINESS_STATUS = CONFIGURED ? 200 : 503;
 
 test.describe("GET /api/health", () => {
@@ -63,6 +63,8 @@ test.describe("GET /api/readiness", () => {
     expect(body.supabase).toBe(CONFIGURED);
     expect(body.revalidation).toBe(CONFIGURED);
     expect(body.leadRemovalChannel).toBe(CONFIGURED);
+    if (CONFIGURED) expect(typeof body.contact).toBe("boolean");
+    else expect(body.contact).toBe(false);
   });
 
   test("answers HEAD with the same status and refuses POST", async ({ request }) => {

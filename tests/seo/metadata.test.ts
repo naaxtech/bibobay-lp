@@ -228,6 +228,14 @@ describe("sitemap.xml", () => {
     expect(on).toEqual(expect.arrayContaining(["https://bibobay.example/shop", "https://bibobay.example/shop/sea-friends-tote"]));
   });
 
+  it("lists /contact only when contactListed and the site is indexable (R190)", () => {
+    const listed = urls(sitemapFor({ seo, settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL, contactListed: true }));
+    expect(listed).toEqual(["https://bibobay.example/", "https://bibobay.example/contact"]);
+    expect(urls(sitemapFor({ seo, settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL, contactListed: false }))).toEqual(["https://bibobay.example/"]);
+    expect(urls(sitemapFor({ seo, settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL }))).toEqual(["https://bibobay.example/"]);
+    expect(sitemapFor({ seo: seoEnvironment(SAFE_FALLBACK_SETTINGS, PREVIEW), settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL, contactListed: true })).toEqual([]);
+  });
+
   it("refuses commerce routes that are not same-site shop paths", () => {
     const on = urls(sitemapFor({ seo, settings: siteSettings((s) => { s.commerceEnabled = true; }), legal: SAFE_FALLBACK_LEGAL, commerceRoutes: ["https://evil.example/shop", "//evil.example/shop", "/admin", "/shop/../admin"] }));
     expect(on).toEqual(["https://bibobay.example/"]);

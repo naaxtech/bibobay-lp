@@ -6,7 +6,8 @@ requests, their lines, audit trail and email outbox, order tracking and tracking
 (see [Orders](#orders-migrations-0002-to-0005)); `0006` adds the email outbox worker's claim and
 record functions for both outboxes (see [Email outbox](#email-outbox-migration-0006));
 `0007_staff_access.sql` adds staff accounts, staff reads under row level security and the staff
-functions (see [Staff access](#staff-access-migration-0007)).
+functions (see [Staff access](#staff-access-migration-0007)); `0008_contact_messages.sql` adds the contact
+form's messages and their own delivery outbox (see [Contact messages](#contact-messages-migration-0008)).
 
 ## Principles
 
@@ -67,13 +68,15 @@ Consequences for staff:
 ## Outbox states
 
 `pending` → `sending` → `sent`, or `sending` → `failed` → (retry) `sending`, or `skipped` (final:
-the claim refused to send it). Both outboxes use the same states.
+the claim refused to send it). The signup and order outboxes use these states; the contact outbox has no `skipped` (see
+[Contact messages](#contact-messages-migration-0008)).
 
 - Without Resend configured, rows stay `pending`. `acknowledgementQueued: true` in the API answer
   means the row exists, never that an email went out.
 - If the provider accepts an email but recording the result fails, the row
   stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. The shared key means the
-  provider does not deliver it twice.
+  provider does not deliver it twice. A contact staff alert is re-sent whatever its age, until its eighth attempt (R211); after a day the
+  provider has forgotten the key, so a retry made after that is a new send: at most one extra alert per such attempt, up to the eight-attempt cap.
 - The cron worker (`/api/cron/email-outbox`, Task 8a) sends due `pending` and `failed` rows and
   re-claims stale `sending` ones through the same claim functions as the sends made right after
   each answer, spends the per-kind send bucket of the row it sends (below), and uses the idempotency keys
@@ -85,7 +88,9 @@ the claim refused to send it). Both outboxes use the same states.
 | Limit | Key | Value |
 |---|---|---|
 | Signups per client | `lead:<HMAC of the client address>` | 5 per 10 minutes. IPv4 addresses are counted whole; IPv6 addresses per /64; an IPv4-mapped IPv6 address as IPv4; anything unreadable in one shared bucket. |
-| Emails sent straight away | `send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`, `send:quote` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) in each bucket; the outbox worker spends the bucket of the row's kind. A full bucket defers only its own kind. Over the cap the signup or order is still stored and the email waits `pending`. |
+| Contact messages per client | `contact:<HMAC of the client address>` | 3 per 10 minutes, keyed like the signup limit (IPv6 per /64). Checked first. |
+| Contact messages in all | `contact:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) from everyone together, the contact alert's own send cap (R212), so it caps intake at the alert's hourly send cap; a cron retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run. Checked second. |
+| Emails sent straight away | `send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`, `send:quote`, `send:contact_staff_alert` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) in each bucket; the outbox worker spends the bucket of the row's kind. A full bucket defers only its own kind. Over the cap the signup, order or contact message is still stored and the email waits `pending`. |
 
 The limiter is the database whenever Supabase is configured. If it is unavailable the signup fails
 closed with 503. The in-memory limiter in `lib/security/rate-limit.ts` is for tests only.
@@ -155,7 +160,8 @@ Claim rules:
 - **Unconfirmed sends** (`unconfirmed_since`): the provider keeps an idempotency key for 24 hours, so
   a send whose outcome is unknown is retried only within 23 hours. After that the claim parks it as
   `failed` with `stale_unconfirmed` and `next_attempt_at` = infinity, for a human to check; it is
-  counted as `expired`.
+  counted as `expired`. This is the signup and order outboxes' rule; the contact outbox has no such
+  window (R211, [Contact messages](#contact-messages-migration-0008)).
 - **At most 8 attempts.** The eighth failure, and a provider answer that the idempotency key was
   already used for another message (`invalid_idempotent_request`), are final: `failed` with
   `next_attempt_at` = infinity. Infinity is the terminal marker; no status value was added for it.
@@ -232,6 +238,47 @@ The email is normalised (trimmed, lower-case) and keyed with `LEAD_IP_HASH_SECRE
 address nor the email is stored. Without the service role key or that secret, sign-in answers 503
 rather than run unthrottled.
 
+## Contact messages (migration 0008)
+
+`0008_contact_messages.sql` (rulings R191, R201) stores what a grown-up writes through the contact form
+and gives its staff alert an outbox of its own. It needs `0001` to `0007` applied first (it checks for
+`outbox_failure_unconfirmed` from `0006` and `is_active_staff` from `0007`) and runs as a role that
+bypasses row level security. The lead outbox (`lead_delivery_events`), its constraints and its functions
+are not altered, and the file names none of them. Both tables have row level security enabled and
+forced, no policy, and no privilege for `anon`, `authenticated` or `service_role`; the three functions
+below (`submit_contact_message`, `claim_contact_deliveries` and `record_contact_delivery_attempt`) are
+the only way in.
+
+| Table | Holds | Notes |
+|---|---|---|
+| `contact_messages` | One row per message | `name` (1 to 80 characters, no `<` `>`, no control character), `email` (stored trimmed and in lower case, 3 to 254 characters), `topic` (`general`, `partnerships`, `press`, `shop-order`, `privacy`), `message` (10 to 3000 characters counted as characters; line breaks and tabs allowed, no other control character), `created_at`. No client address and no user agent is stored. An index on `created_at` (newest first) serves reading by SQL. |
+| `contact_message_deliveries` | The contact outbox: one row per message and kind | `message_id` (references `contact_messages`; the row is deleted with its message), `kind` (only `contact_staff_alert`), `status` (`pending`, `sending`, `sent`, `failed`), `attempts` (0 to 1000), `last_attempt_at`, `next_attempt_at` (`infinity` marks a parked row), `provider_message_id`, `last_error_code` (a short code, never a provider message), `unconfirmed_since`, `claimed_at`, timestamps. Unique on `(message_id, kind)`: one alert per message. |
+
+| Function | Does | Executable by |
+|---|---|---|
+| `submit_contact_message(name, email, topic, message)` → `(message_id, delivery_id)` | Re-validates every argument in SQL (errors `22023` name the field, never the value), trims the name, lower-cases the email, and in one transaction inserts the message and its one `pending` alert row. The server sends the message with line ends already turned into LF. | `service_role` only |
+| `claim_contact_deliveries(limit, message_id)` → JSON | Claims up to `limit` (1 to 50) due alerts, optionally of one message, `for update skip locked`. Each claimed row becomes `sending` with its attempt counted and is returned as `{id, kind, attempt, name, email, topic, message, receivedAt}`. Answers `{"claimed": [...], "skipped": 0, "expired": n}`. The table holds one kind, so the claim takes no kinds list. | `service_role` only |
+| `record_contact_delivery_attempt(delivery_id, status, provider_message_id, error_code)` → `boolean` | Records the result of a `sending` row: `sent` with the provider id, `failed` with a short code and backoff, or `deferred` (the send budget was spent: the claim is handed back with its earlier attempt count, still due). `false` when the row was no longer claimed. | `service_role` only |
+
+- The rules are those of the signup outbox (`0006`, [Email outbox](#email-outbox-migration-0006)) but
+  one: due means `pending` or `failed` with `next_attempt_at` reached, or `sending` for over 15
+  minutes; at most 8 attempts; backoff 2, 4, 8 … minutes capped at 6 hours; `invalid_idempotent_request`
+  is final. The exception: an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt (R211),
+  never parked after 23 hours. Once the provider has forgotten the key (24 hours) a retry is a new
+  send: at most one extra alert per such attempt, up to the eight-attempt cap; that is accepted, because a lost alert leaves a stored message
+  nobody reads. `unconfirmed_since` still records when a send became unconfirmed, so staff can see a
+  possible duplicate. A parked row (out of attempts, or `invalid_idempotent_request`; a lost eighth
+  attempt is `stale_unconfirmed`) has `next_attempt_at` = infinity and is reported as
+  `delivery_expired`.
+- There is no `skipped` status (a contact message cannot be withdrawn, R207), so the claim always
+  answers `"skipped": 0`.
+- The provider idempotency key is `contact-delivery/<row id>`, built in code (`lib/outbox/contact.ts`).
+- The send bucket is `send:contact_staff_alert`, capped by `LEAD_ACK_SEND_LIMIT_PER_HOUR`; the
+  overall message limit `contact:global` uses the same cap (R212, [Rate limits](#rate-limits)).
+- Nothing deletes a message or its alert row, and no retention period is set
+  ([data-protection.md](data-protection.md)). There is no inbox page (R200): read messages in the alert
+  email, or by SQL ([incident-runbook.md](incident-runbook.md#contact-messages)).
+
 ## Tests
 
 - `tests/leads/migration-policy.test.ts`: static checks of the SQL text (forced RLS, revokes,
@@ -254,6 +301,12 @@ rather than run unthrottled.
 - `tests/outbox/migration-policy.test.ts` pins the outbox statuses, kinds and limits in `0006` to
   `lib/outbox/constants.ts`; `supabase/tests/0004_email_outbox.sql` checks the outbox grants and
   every claim, skip, backoff and stale rule in PGlite.
+- `tests/contact/migration-policy.test.ts` pins `0008` as text (forced RLS, revokes, `search_path`,
+  grants, the topic list and bounds against `lib/contact/fields.ts`, the outbox limits against
+  `lib/outbox/constants.ts`, and that it names no lead object). `tests/orders/migration-database.test.ts`
+  also applies `0008` (twice, as it does every migration) and runs
+  `supabase/tests/0007_contact_messages.sql`: the grants, the validation, the claim, backoff, parking and
+  lease rules of the contact outbox, and that the lead outbox is as `0006` left it.
 
 ## Migration rules
 

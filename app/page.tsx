@@ -4,6 +4,7 @@ import { LeadForm } from "@/components/forms/LeadForm";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { PreviewNotice } from "@/components/preview/PreviewNotice";
 import { consentWithRemoval } from "@/lib/content/removal-copy";
+import { contactFormOpen } from "@/lib/contact/availability";
 import { removalChannelFrom } from "@/lib/leads/removal-channel";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
 import { getLandingPage, getSiteSettings } from "@/lib/sanity/fetch";
@@ -37,7 +38,7 @@ export default async function Home() {
       {preview ? <PreviewNotice /> : null}
       {/* src: node_modules/next/dist/docs/01-app/02-guides/json-ld.md · next 16.3.8 · 2026-10-13. Organization and WebSite only (ruling R35); a data block, never executed. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData(settings, seoEnvironment(settings))) }} />
-      <LandingPage content={content} settings={settings} leadForm={leadForm} />
+      <LandingPage content={content} settings={settings} leadForm={leadForm} contactOpen={contactFormOpen()} />
     </>
   );
 }

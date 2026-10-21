@@ -77,6 +77,7 @@ describe("server configuration and presentation routes", () => {
   });
   it("maps only known route types and slug-safe product paths", () => {
     expect(resolvePresentationUrl("legalSettings")).toBe("/privacy");
+    expect(resolvePresentationUrl("contactPage")).toBe("/contact");
     expect(resolvePresentationUrl("product", "paper-boat")).toBe("/shop/paper-boat");
     expect(resolvePresentationUrl("product", "../private")).toBeNull();
   });

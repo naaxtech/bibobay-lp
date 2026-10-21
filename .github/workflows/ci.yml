@@ -307,3 +307,67 @@ jobs:
             next-start.log
           if-no-files-found: ignore
           retention-days: 14
+
+  # Ruling R213: the contact specs that need an open form are skipped on a keyless server, so they run
+  # here against one started with the placeholder contact environment (docs/qa-checklist.md section 2c).
+  # Every /api/contact call is answered by Playwright, and the placeholders reach nothing real.
+  e2e-contact:
+    name: Playwright, contact form open (placeholders)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_PRODUCTION: "1"
+      E2E_CONTACT_OPEN: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3300
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (from the lockfile; root only)
+        run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Production build
+        run: npm run build
+      # Every page renders per request, so the contact form's open condition (R205) is read when the
+      # server starts, not at build time. Placeholders on reserved example domains; none is a secret.
+      - name: Start the production server with the placeholder contact environment and wait for /api/health
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://supabase.example.com
+          SUPABASE_SERVICE_ROLE_KEY: service-role-fixture-value
+          LEAD_IP_HASH_SECRET: e2e-placeholder-hash-secret-0123456789abcdef
+          RESEND_API_KEY: re_fixture
+          RESEND_FROM: "BIBO Bay <hello@example.com>"
+          STAFF_NOTIFICATION_EMAIL: staff@example.com
+        shell: bash
+        run: |
+          nohup npx next start -p 3300 -H 127.0.0.1 > next-start.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3300/api/health > /dev/null; then
+              echo "next start is healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "next start did not answer /api/health within 60s"
+          cat next-start.log
+          exit 1
+      - name: Playwright, contact specs against the open form (every /api/contact call is answered by Playwright)
+        run: npx playwright test e2e/contact --reporter=github,html
+      - name: Keep the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-contact
+          path: |
+            playwright-report/
+            test-results/
+            next-start.log
+          if-no-files-found: ignore
+          retention-days: 14

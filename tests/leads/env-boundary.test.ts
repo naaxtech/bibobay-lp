@@ -156,4 +156,20 @@ describe("the browser form's import graph", () => {
     }
     expect([...seen].some((file) => file.endsWith(resolve("lib/orders/fields.ts")))).toBe(true);
   });
+
+  it("the contact form's graph never reaches server-only, Supabase, zod, process.env or a secret, and includes the shared field rules", () => {
+    const seen = new Set<string>();
+    const queue = [resolve("components/forms/ContactForm.tsx")];
+    while (queue.length) {
+      const file = queue.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      expect(file, "client graph imports server-only").not.toBe("server-only");
+      if (file === "server-only") continue;
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(/@supabase\/|from ["']resend["']|from ["']zod["']|process\.env|SERVICE_ROLE|RESEND_API_KEY|LEAD_IP_HASH_SECRET/);
+      queue.push(...localImports(file));
+    }
+    expect([...seen].some((file) => file.endsWith(resolve("lib/contact/fields.ts")))).toBe(true);
+  });
 });

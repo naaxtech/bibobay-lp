@@ -1,8 +1,9 @@
 import { isCountryCode } from "../orders/countries";
 import { FREEBIE_PATH } from "./freebie";
-import { DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
+import { DELIVERY_CLAIM_PATTERN } from "./claims";
+import { DEFAULT_SECTION_IDS, SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "./fallback";
 import { plain, stegaText } from "./stega";
-import type { BrandPillar, Character, Cta, EcosystemEntry, EpisodePreview, FaqItem, ImageWithAlt, LandingPageContent, LegalSettings, PortableContent, SectionConfig, SectionId, SectionIntro, Seo, SiteSettings, SocialLink, Testimonial } from "./types";
+import type { BrandPillar, Character, ContactPageContent, Cta, EcosystemEntry, EpisodePreview, FaqItem, ImageWithAlt, LandingPageContent, LegalSettings, PortableContent, SectionConfig, SectionId, SectionIntro, Seo, SiteSettings, SocialLink, Testimonial } from "./types";
 
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue => value !== null && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
@@ -133,7 +134,22 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
     ...(optionalToken(v.contactEmail) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(token(v.contactEmail)) ? { contactEmail: token(v.contactEmail) } : {}),
     ...(validUrl(v.studioUrl) ? { studioUrl: validUrl(v.studioUrl) } : {}), socialLinks,
     navigation: { links: items(nav.links, f.navigation.links, (entry) => text(entry.label) && href(entry.href) ? cta(entry, f.navigation.primaryCta) : undefined), primaryCta: cta(nav.primaryCta, f.navigation.primaryCta), commerceLabel: text(nav.commerceLabel, f.navigation.commerceLabel) },
-    footer: { text: text(footer.text, f.footer.text), legalLinks: items(footer.legalLinks, f.footer.legalLinks, (entry) => text(entry.label) && href(entry.href) ? cta(entry, f.footer.legalLinks[0]!) : undefined), contactLabel: text(footer.contactLabel, f.footer.contactLabel) },
+    footer: { text: text(footer.text, f.footer.text), legalLinks: items(footer.legalLinks, f.footer.legalLinks, (entry) => text(entry.label) && href(entry.href) ? cta(entry, f.footer.legalLinks[0]!) : undefined), contactLabel: text(footer.contactLabel, f.footer.contactLabel), contactPageLabel: text(footer.contactPageLabel, f.footer.contactPageLabel) },
+  };
+}
+/**
+ * R190, R195: field by field over the repository copy; a success message that claims delivery is replaced (C7, R192).
+ * In a Studio preview each text keeps its click-to-edit payload, and `text` judges emptiness on the
+ * plain words and leaves the payload only at the end, so the claim check reads the editor's words.
+ */
+export function normalizeContactPage(raw: unknown): ContactPageContent {
+  const v = record(raw), f = SAFE_FALLBACK_CONTACT_PAGE;
+  if (!Object.keys(v).length) return f;
+  const success = text(v.successMessage, f.successMessage);
+  return {
+    seo: seo(v.seo, f.seo), heading: text(v.heading, f.heading), description: text(v.description, f.description), buttonLabel: text(v.buttonLabel, f.buttonLabel),
+    successMessage: DELIVERY_CLAIM_PATTERN.test(success) ? f.successMessage : success,
+    errorMessage: text(v.errorMessage, f.errorMessage), closedMessage: text(v.closedMessage, f.closedMessage), emailIntro: text(v.emailIntro, f.emailIntro),
   };
 }
 export function normalizeLegalSettings(raw: unknown): LegalSettings {

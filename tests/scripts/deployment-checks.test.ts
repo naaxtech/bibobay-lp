@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DeploymentNetworkError,
+  FORM_API_PATHS,
   GATED_PAYLOAD_PATHS,
   PAYLOAD_PATHS,
   analyzeHtml,
@@ -305,8 +306,8 @@ describe("runFetchChecks client payload scan", () => {
   function withPayloads(overrides: Record<string, Canned> = {}): Record<string, Canned> {
     const routes = healthyPage(origin);
     const page = routes[`${origin}/`]!;
-    for (const path of ["/privacy", "/terms", "/thank-you"]) routes[`${origin}${path}`] = { ...page };
-    for (const path of ["/", "/privacy", "/terms", "/thank-you"]) routes[`rsc:${origin}${path}`] = { status: 200, type: RSC_TYPE, body: '0:{"P":null,"b":"build"}\n1:["$","main",null,{}]\n' };
+    for (const path of ["/privacy", "/terms", "/thank-you", "/contact"]) routes[`${origin}${path}`] = { ...page };
+    for (const path of ["/", "/privacy", "/terms", "/thank-you", "/contact"]) routes[`rsc:${origin}${path}`] = { status: 200, type: RSC_TYPE, body: '0:{"P":null,"b":"build"}\n1:["$","main",null,{}]\n' };
     return { ...routes, ...overrides };
   }
 
@@ -325,13 +326,13 @@ describe("runFetchChecks client payload scan", () => {
     }) as typeof fetch;
   }
 
-  it("scans the HTML and the RSC payload of /, /privacy, /terms and /thank-you", async () => {
+  it("scans the HTML and the RSC payload of /, /privacy, /terms, /thank-you and /contact", async () => {
     const seen: string[] = [];
     const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(withPayloads(), seen), scanRules: rules });
     const scan = results.find((result) => result.name === "client payloads");
     expect(scan?.status).toBe("pass");
-    expect(scan?.detail).toContain("8 responses");
-    for (const path of ["/", "/privacy", "/terms", "/thank-you"]) expect(seen).toContain(`rsc:${origin}${path}`);
+    expect(scan?.detail).toContain("10 responses");
+    for (const path of ["/", "/privacy", "/terms", "/thank-you", "/contact"]) expect(seen).toContain(`rsc:${origin}${path}`);
     expect(exitCodeFor(results)).toBe(0);
   });
 
@@ -431,8 +432,12 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
   const scanOf = (results: CheckResult[]) => results.find((result) => result.name === "client payloads");
 
   it("keeps the always-on list as it was and lists the shop, order and tracking pages as switchable (Task 7c)", () => {
-    expect([...PAYLOAD_PATHS]).toEqual(["/", "/privacy", "/terms", "/thank-you"]);
+    expect([...PAYLOAD_PATHS]).toEqual(["/", "/privacy", "/terms", "/thank-you", "/contact"]);
     expect([...GATED_PAYLOAD_PATHS]).toEqual(["/shop", "/order", "/track"]);
+  });
+
+  it("pins the form API paths the browser verifier blocks (R199)", () => {
+    expect([...FORM_API_PATHS]).toEqual(["/api/leads", "/api/contact"]);
   });
 
   it("scans the order and tracking pages once they answer, and names a leak on either (Task 7c)", async () => {
@@ -461,7 +466,7 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
     const seen: string[] = [];
     const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith(), seen), scanRules: rules });
     expect(scanOf(results)?.status).toBe("pass");
-    expect(scanOf(results)?.detail).toContain("8 responses");
+    expect(scanOf(results)?.detail).toContain("10 responses");
     expect(scanOf(results)?.detail).toMatch(/\/shop answered 404/);
     expect(seen).toContain(`${origin}/shop`);
     expect(seen).not.toContain(`rsc:${origin}/shop`);
@@ -471,7 +476,7 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
     const seen: string[] = [];
     const results = await runFetchChecks(new URL(`${origin}/`), { fetch: rscAwareFetch(routesWith({ html: { status: 200, type: "text/html", body: "<html><body>shop</body></html>" }, rsc: RSC }), seen), scanRules: rules });
     expect(scanOf(results)?.status).toBe("pass");
-    expect(scanOf(results)?.detail).toContain("10 responses");
+    expect(scanOf(results)?.detail).toContain("12 responses");
     expect(scanOf(results)?.detail).toContain("/shop");
     expect(seen).toContain(`rsc:${origin}/shop`);
   });

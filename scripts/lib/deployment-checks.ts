@@ -294,7 +294,13 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 /** Pages whose server-rendered HTML and RSC payload are scanned for secrets (all are rendered per request). */
-export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you"] as const;
+export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you", "/contact"] as const;
+
+/**
+ * The form APIs the browser verifier must never call: each is blocked and reported (R199), so a
+ * verification run cannot store a signup or a contact message, or send an alert.
+ */
+export const FORM_API_PATHS = ["/api/leads", "/api/contact"] as const;
 
 /**
  * Pages that exist only while a CMS switch is on (Task 7b: the shop, while commerce is enabled;

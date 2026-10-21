@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { evaluate, parse } from "groq-js";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
-import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
-import { normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "@/lib/content/normalize";
+import { CONTACT_PAGE_QUERY, LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
+import { SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
+import { normalizeContactPage, normalizeLandingContent, normalizeLegalSettings, normalizeSiteSettings } from "@/lib/content/normalize";
 import { schemaTypes } from "@/studio/schemaTypes";
 
 // Models a tokenless published read: root-path documents are public, dotted IDs are not.
@@ -13,7 +13,7 @@ const publicRead = async (query: string) => (await evaluate(parse(query), { data
 describe("seeded tokenless published landing read", () => {
   it("gives all collection documents and their references public root-path IDs", () => {
     const documents = buildSeedDocuments();
-    expect(documents).toHaveLength(32);
+    expect(documents).toHaveLength(33);
     expect(documents.every((document) => !document._id.includes("."))).toBe(true);
     const landing = documents.find((document) => document._id === "landingPage")!;
     for (const key of ["characters", "episodes", "pillars", "ecosystem", "faqs"]) {
@@ -51,6 +51,12 @@ describe("seeded tokenless published landing read", () => {
     const bareIds = <T extends { id: string }>(entries: T[]) => entries.map((entry) => ({ ...entry, id: entry.id.replace(/^(?:character|episodePreview|brandPillar|ecosystemEntry|faqItem)-/, "") }));
     expect({ ...content, characters: bareIds(content.characters), episodes: bareIds(content.episodes), pillars: bareIds(content.pillars), ecosystem: bareIds(content.ecosystem), faqs: bareIds(content.faqs) }).toEqual(SAFE_FALLBACK_CONTENT);
     expect(settings).toEqual(SAFE_FALLBACK_SETTINGS);
+  });
+
+  it("publishes the repository's contact page copy through the real GROQ, with no fallback substitution (R195)", async () => {
+    const raw = await publicRead(CONTACT_PAGE_QUERY) as Record<string, unknown>;
+    expect(raw).toMatchObject({ _id: "contactPage", heading: "Contact us" });
+    expect(normalizeContactPage(raw)).toEqual(SAFE_FALLBACK_CONTACT_PAGE);
   });
 
   it("publishes the repository's legal settings, the order consent sentence and version included (R82)", async () => {

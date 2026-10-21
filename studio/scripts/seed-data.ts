@@ -72,7 +72,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     commerceEnabled: false, trackingEnabled: false, testimonialsEnabled: false, canonicalUrlVerified: false, orderCountries: [],
     socialLinks: [{ _type: "socialLink", _key: "youtube", platform: "youtube", url: CHANNEL, verified: true }],
     navigation: { _type: "navigationSettings", links: [cta("Meet the friends", "#characters"), cta("Watch", "#episodes"), cta("Free activity pack", "#lead")].map((item, index) => ({ ...item, _key: `navigation-${index}` })), primaryCta: subscribeOnYouTube(), commerceLabel: "Shop" },
-    footer: { _type: "footerSettings", text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [cta("Privacy", "/privacy"), cta("Terms", "/terms")].map((item, index) => ({ ...item, _key: `legal-${index}` })), contactLabel: "Contact" },
+    footer: { _type: "footerSettings", text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [cta("Privacy", "/privacy"), cta("Terms", "/terms")].map((item, index) => ({ ...item, _key: `legal-${index}` })), contactLabel: "Contact", contactPageLabel: "Contact us" },
   };
   const landingPage: SeedDocument = {
     _id: "landingPage", _type: "landingPage",
@@ -104,5 +104,17 @@ export function buildSeedDocuments(): SeedDocument[] {
     orderConsentCopy: "I am an adult, and I agree that BIBO Bay may use these details to answer this order request, send me a quote and deliver the order if I go ahead.",
     orderConsentCopyVersion: "order-1",
   };
-  return [...collections, siteSettings, landingPage, legalSettings];
+  // R190, R195: the same strings as SAFE_FALLBACK_CONTACT_PAGE (tests/content/studio-contract.test.ts).
+  const contactPage: SeedDocument = {
+    _id: "contactPage", _type: "contactPage",
+    seo: seo("Contact BIBO Bay", "Write to the BIBO Bay team with a question, a partnership idea or a press enquiry."),
+    heading: "Contact us",
+    description: "Questions, ideas and press enquiries from grown-ups are welcome. Please write as a parent, carer or professional, and leave out any details about a child.",
+    buttonLabel: "Send message",
+    successMessage: "Thank you. We have received your message.",
+    errorMessage: "We could not save your message. Please try again.",
+    closedMessage: "The contact form is not open yet, so no message can be saved from this page. Please check back soon.",
+    emailIntro: "The contact form is not open yet. You can write to us at:",
+  };
+  return [...collections, siteSettings, landingPage, legalSettings, contactPage];
 }

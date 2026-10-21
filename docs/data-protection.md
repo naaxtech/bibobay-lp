@@ -33,7 +33,8 @@ that tells visitors about it.
 |---|---|---|---|---|---|
 | Founding-family signup: email address (required), first name and broad age range (optional), the consent record (below), the page it was made on, the browser's language, campaign tags (`utm_*`), when it was made and when the address was submitted again | The signup form (`/api/leads`; fields in `lib/leads/fields.ts`) | Supabase, table `lead_submissions`, written by the server only | (a) consent while listed: the required consent tick; (f) legitimate interest for the kept withdrawal record (ruling R151) | As long as the list exists; nothing deletes it. A withdrawal marks the row withdrawn and keeps it (no delete path in the code). No period has been set | "What the founding-family form collects", "How long we keep your details" |
 | Signup emails: the acknowledgement with the activity-pack download link, to the person; the staff alert (email address, first name, age range), to `STAFF_NOTIFICATION_EMAIL` | The signup, through the email outbox | Resend (sending); the staff inbox; Supabase `lead_delivery_events` keeps a delivery record per email (kind, status, attempts, Resend's message reference, a short error code), never a copy of the email | (a) consent while listed; (f) legitimate interest for the delivery records kept with a withdrawn signup (ruling R151) | Delivery records live as long as their signup (they are deleted with it). Resend's own logs and the staff inbox keep what their settings keep | "Why we use your details", "Services that handle your details" |
-| Rate-limit counts: a keyed one-way code (HMAC with `LEAD_IP_HASH_SECRET`) of the network address, per kind of request, with a hit count and a time window | Every signup, order request, order lookup and staff sign-in | Supabase, table `rate_limit_buckets`; never joined to a signup or an order | (f) keeping the website working and safe | The length of its window (10 minutes for signups, an hour for order requests). `purge_expired_rate_limit_buckets()` deletes windows that ended over a day ago, once it is scheduled (below); until then the rows stay | "What we do not collect" |
+| Contact messages: name, email address, topic, the message and when it arrived. The form is for grown-ups and asks for nothing about a child | The contact form (`/api/contact`; fields in `lib/contact/fields.ts`), only while it is open | Supabase, table `contact_messages`, written by the server only; `contact_message_deliveries` keeps one alert record per message (status, attempts, Resend's message reference, a short error code), never a copy of the email. The alert goes to `STAFF_NOTIFICATION_EMAIL` through Resend with the sender's address as Reply-To; nothing is emailed to the sender | (f) legitimate interest in replying to people who write to us (to confirm in the legal review) | As long as the tables exist; nothing deletes them and no period has been set. An alert record goes with its message. Resend's own logs and the staff inbox keep what their settings keep | "What the contact form collects", "Why we use your details", "How long we keep your details" |
+| Rate-limit counts: a keyed one-way code (HMAC with `LEAD_IP_HASH_SECRET`) of the network address, per kind of request, with a hit count and a time window | Every signup, contact message, order request, order lookup and staff sign-in | Supabase, table `rate_limit_buckets`; never joined to a signup or an order | (f) keeping the website working and safe | The length of its window (10 minutes for signups and for each client's contact messages, an hour for order requests and for all contact messages together). `purge_expired_rate_limit_buckets()` deletes windows that ended over a day ago, once it is scheduled (below); until then the rows stay | "What we do not collect" |
 | Visit statistics: page views and page leaves, the clicks and sections listed in [observability.md](observability.md#what-is-counted), each with the trimmed page address, referring site, campaign tags, browser, operating system, device type, screen size, language and time zone | The visitor's browser, and only after a "yes" (below) | PostHog, at `NEXT_PUBLIC_POSTHOG_HOST`. In cookieless server hash mode PostHog counts visitors with a hash of the network address and browser details and a daily salt; its documentation says the address is then stripped from the event before further processing ([observability.md](observability.md#what-is-counted)) | (a) consent: the consent notice | The PostHog project's own retention (below). No email address, no name, no cookie, no profile (`identify` is never called) and no identifier that lasts beyond a day; each event carries a per-day hash with the user agent, screen size, language and time zone, which is pseudonymous data (see the questions for the legal review below) | "Visit statistics" |
 | Error reports: what failed and where, the page address without its query, the browser's user agent, the site's own short labels | The browser and the server, when `NEXT_PUBLIC_SENTRY_DSN` is set | Sentry. The scrubber (`lib/observability/sentry-config.ts`) removes the user, cookies, bodies, queries, email-shaped text and private order links; the site adds no network address | (f) keeping the website working | The Sentry project's own retention (below) | "Services that handle your details" |
 | Page requests, including the network address | Every visit | Vercel, which hosts the site and runs its code; Sanity's image service for pictures from Sanity | (f) delivering the pages | Each provider's own log retention (below) | "Services that handle your details" |
@@ -137,6 +138,11 @@ the repository fallback text, marked as not yet reviewed, and `/api/readiness` r
      rate-limit counts and the error reports … and for the requests the servers receive"; with
      commerce on, "Handling your order request is the step you asked us to take before any sale".
      Also the staff row of the table above.
+   - **The basis for contact messages** (ruling R206). Privacy page, "Why we use your details": "To
+     read and answer a message you send through the contact form. The legal basis for keeping it is our
+     legitimate interest in replying to people who write to us." (shown while the contact form is open).
+     Is that the right basis for a message from someone who cannot prove who they are, and should the
+     page say more about the staff inbox and Resend holding a copy of the alert?
    - **The basis for a withdrawn signup** (ruling R151, item 10). Privacy page, "How long we keep your
      details": "After you withdraw, we keep the record of your signup and of your withdrawal only so
      that we never email you again and can show that we respected your choice; the legal basis for
@@ -160,7 +166,7 @@ the repository fallback text, marked as not yet reviewed, and `/api/readiness` r
      exempt from consent as strictly necessary?
 9. **Retention.** Decide how long signups are kept (none is set; the code never deletes them),
    whether and how an erasure request is carried out (the code has no delete path, see below), how
-   long orders are kept (`retain_until`), and check the retention of PostHog, Sentry, Vercel and
+   long contact messages are kept (none is set; the code never deletes them), how long orders are kept (`retain_until`), and check the retention of PostHog, Sentry, Vercel and
    Resend. State the periods in the privacy text. Schedule the rate-limit purge
    (`purge_expired_rate_limit_buckets()`, with pg_cron, as the comment in migration 0001 shows).
 10. **Withdrawn signups** (ruling R151). Have the lawyer confirm the legal basis for keeping a
@@ -196,7 +202,8 @@ first month, with the reason (Article 12(3)).
   ([incident-runbook.md](incident-runbook.md#removal-requests)). Never paste a result holding a
   person's email address into a chat, a ticket or a document.
 - **Where the data is.** Supabase only, found by email address (stored trimmed and in lower case):
-  `lead_submissions` and its `lead_delivery_events` (by `lead_id`); while commerce is on, also
+  `lead_submissions` and its `lead_delivery_events` (by `lead_id`); `contact_messages` and its
+  `contact_message_deliveries` (by `message_id`), found by the address the person wrote from; while commerce is on, also
   `orders` and its `order_items`, `order_events` and `order_email_outbox` (by `order_id`). Copies of
   sent emails are in Resend's logs and, for staff alerts and order alerts, in the staff inbox.
   **PostHog and Sentry hold no email address, no name, no cookie and no identifier that lasts beyond
@@ -214,6 +221,13 @@ first month, with the reason (Article 12(3)).
   Add the delivery records (`select to_jsonb(event) from public.lead_delivery_events as event where event.lead_id = '<lead id>';`)
   and, while commerce is on, the person's orders the same way.
 - **Withdrawal.** For the email list, follow
+- **Contact messages.** The form never proves that the sender owns the address, so check who is asking
+  as above. Then read the person's messages with
+  `select to_jsonb(message) from public.contact_messages as message where message.email = lower(btrim('<address>'));`
+  and, if they ask for them to be deleted and you decide to,
+  `delete from public.contact_messages as message where message.email = lower(btrim('<address>'));`.
+  Their delivery rows cascade, so an alert that was still waiting is never sent. Resend's logs and the
+  staff inbox keep their copies of the alert, per their settings.
   [incident-runbook.md](incident-runbook.md#removal-requests): the lead is marked withdrawn, and no
   email is sent to it again. For visit statistics there is nothing to do on the server: the visitor
   turns them off in Analytics choices, and the events already counted carry nothing to find them by

@@ -2,7 +2,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { evaluate, parse } from "groq-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ContactForm } from "@/components/forms/ContactForm";
 import { LeadForm } from "@/components/forms/LeadForm";
+import { Footer } from "@/components/landing/Footer";
 import { Hero } from "@/components/landing/Hero";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { linkContext } from "@/components/landing/sections";
@@ -10,9 +12,9 @@ import { UI_COPY } from "@/components/landing/ui-copy";
 import { AddToOrder } from "@/components/shop/AddToOrder";
 import { OrderPadProvider } from "@/components/shop/OrderPadProvider";
 import { OrderPadSummary } from "@/components/shop/OrderPadSummary";
-import { normalizeLandingContent, normalizeSiteSettings } from "@/lib/content/normalize";
+import { normalizeContactPage, normalizeLandingContent, normalizeSiteSettings } from "@/lib/content/normalize";
 import { stegaCleanText } from "@/lib/content/stega";
-import { LANDING_PAGE_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
+import { CONTACT_PAGE_QUERY, LANDING_PAGE_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
 import { encodeAllStrings, encodeString, STEGA_CHARACTER } from "@/tests/support/stega";
 
@@ -106,6 +108,32 @@ describe("CMS text in attributes under Presentation stega (R167)", () => {
     const { container } = render(<Hero section={section} hero={content.hero} links={linkContext(content.sections, settings)} />);
     const art = container.querySelector(".hero-postcard__art[role='img']");
     expect(art?.getAttribute("aria-label")).toBe(stegaCleanText(content.hero.artworkDescription));
+    expect(leaks(container)).toEqual([]);
+  });
+
+  it("the contact form puts no payload in an attribute, and keeps it in its button text", async () => {
+    const { buttonLabel, successMessage, errorMessage, closedMessage } = normalizeContactPage(encodeAllStrings(await read(CONTACT_PAGE_QUERY), { _id: "contactPage", _type: "contactPage" }));
+    const { container } = render(<ContactForm copy={{ buttonLabel, successMessage, errorMessage, closedMessage }} />);
+
+    const button = container.querySelector("button[type='submit']");
+    expect(STEGA_CHARACTER.test(button?.textContent ?? "")).toBe(true);
+    expect(stegaCleanText(button?.textContent ?? "")).toBe("Send message");
+    // The outcome line's height reservations hold the plain messages.
+    const [outer, inner] = Array.from(container.querySelectorAll(".lead-form__outcome"));
+    expect(outer?.getAttribute("data-reserve-a")).toBe("Thank you. We have received your message.");
+    expect(outer?.getAttribute("data-reserve-b")).toBe("We could not save your message. Please try again.");
+    expect(inner?.getAttribute("data-reserve-a")).toBe("The contact form is not open yet, so no message can be saved from this page. Please check back soon.");
+
+    expect(leaks(container)).toEqual([]);
+  });
+
+  it("the footer's link to /contact keeps its label's payload in text only", async () => {
+    const { settings } = await encodedHome();
+    const { container } = render(<Footer settings={settings} contactOpen />);
+    // Found by its address: the accessible name folds the payload's U+FEFF characters into spaces.
+    const link = container.querySelector("a[href='/contact']");
+    expect(stegaCleanText(link?.textContent ?? "")).toBe("Contact us");
+    expect(STEGA_CHARACTER.test(link?.textContent ?? "")).toBe(true);
     expect(leaks(container)).toEqual([]);
   });
 

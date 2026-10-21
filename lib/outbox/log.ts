@@ -7,15 +7,15 @@ const WARNING_EVENT = /_(failed|unavailable|unconfigured|invalid)$/;
 
 /**
  * The outbox's structured operational log (Task 8a): one JSON line per event, naming the outbox
- * (`leads` or `orders`), with event names, message kinds, counts and short codes only; never an
- * address, a name, a reference or a row id.
+ * (`leads`, `orders` or `contact`, or `worker` for the cron run), with event names, message kinds,
+ * counts and short codes only; never an address, a name, a reference or a row id.
  *
  * Ruling R52: warnings, the send-cap hit and parked rows (`delivery_expired`: an unconfirmed send
  * outside the idempotency window, out of attempts, or refused as `invalid_idempotent_request`,
  * waiting for a human) also go to Sentry as warning messages tagged with the event, kind and code
  * only, plus (fix wave D-I1) the send budget a cap event concerns (`budget`, e.g. `quote`).
  */
-export function outboxLogger<K extends string>(channel: "leads" | "orders" | "worker") {
+export function outboxLogger<K extends string>(channel: "leads" | "orders" | "contact" | "worker") {
   return (entry: OutboxLogEvent<K>): void => {
     const line = JSON.stringify({ scope: "outbox", channel, ...entry });
     const warning = WARNING_EVENT.test(entry.event) || entry.event === "delivery_expired";

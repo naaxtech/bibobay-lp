@@ -13,6 +13,8 @@ export interface LandingPageProps {
   settings: SiteSettings;
   /** The founding-family form for the lead section; omitted, the section shows its CMS copy only. */
   leadForm?: ReactNode;
+  /** The contact form is open (R190); the footer then links to /contact. */
+  contactOpen?: boolean;
 }
 
 /** Header links: the CMS story anchors, plus the shop only while commerce is enabled. */
@@ -25,7 +27,7 @@ function navigationLinks(settings: SiteSettings): Cta[] {
 }
 
 /** The whole landing page: skip link, sticky header, CMS-ordered sections and footer, inside the motion layer. */
-export function LandingPage({ content, settings, leadForm }: LandingPageProps) {
+export function LandingPage({ content, settings, leadForm, contactOpen = false }: LandingPageProps) {
   const sections = renderableSections(content, settings);
   const links = linkContext(sections, settings);
   const primaryCta = isReachable(settings.navigation.primaryCta.href, links) ? settings.navigation.primaryCta : undefined;
@@ -41,7 +43,7 @@ export function LandingPage({ content, settings, leadForm }: LandingPageProps) {
         {heroShown ? null : <h1 className="sr-only">{settings.title}</h1>}
         <SectionRenderer content={content} settings={settings} leadForm={leadForm} />
       </main>
-      <Footer settings={settings} />
+      <Footer settings={settings} contactOpen={contactOpen} />
     </GsapProvider>
   );
 }

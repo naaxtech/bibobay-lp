@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { contactFormOpen } from "@/lib/contact/availability";
 import { getLegalSettings, getSiteSettings } from "@/lib/sanity/fetch";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
 import { legalMetadata, legalPageState, seoEnvironment, type LegalKind } from "@/lib/seo/metadata";
@@ -23,7 +24,7 @@ export async function LegalPage({ kind }: { kind: LegalKind }) {
   const { preview, legal, settings } = await load();
   return (
     <SimplePageShell settings={settings} title={LEGAL_PAGE_COPY[kind].title} preview={preview}>
-      <LegalDocument kind={kind} legal={legal} state={legalPageState(kind, legal)} settings={settings} />
+      <LegalDocument kind={kind} legal={legal} state={legalPageState(kind, legal)} settings={settings} contactOpen={contactFormOpen()} />
     </SimplePageShell>
   );
 }

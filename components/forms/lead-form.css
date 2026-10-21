@@ -76,6 +76,11 @@
     background-size: 1rem;
   }
 
+  .lead-form__textarea {
+    min-height: 10rem;
+    resize: vertical;
+  }
+
   .lead-form__check {
     display: grid;
     grid-template-columns: auto 1fr;
