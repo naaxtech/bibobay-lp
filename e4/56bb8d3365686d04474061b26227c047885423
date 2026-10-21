@@ -1,0 +1,23 @@
+components/forms/bot-check/useBotCheck.ts
+  s_37deb30b6489aa::t_dbf26d4d912575 57-58,72-76,104,127-131
+components/forms/bot-check/load-turnstile.ts
+  s_37deb30b6489aa::t_dbf26d4d912575 32,35-36,38-40,44,49,78
+tests/bot-check/client/useBotCheck.test.tsx
+  s_37deb30b6489aa::t_00ff3f4a566f9d 51,178,185-220,226,231-233,236,251,260-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e456bb8d3365686d04474061b26227c047885423",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
