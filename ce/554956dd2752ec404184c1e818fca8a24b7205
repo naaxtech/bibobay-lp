@@ -1,0 +1,43 @@
+app/contact/page.tsx
+  s_37deb30b6489aa::t_5ac184fad20476 5,51
+components/forms/ContactForm.tsx
+  s_37deb30b6489aa::t_4f9e2d59d3e241 21,23-24,39-40,81-82,146,159,161-169,184-185,197,216-222,224,347-348,367-375
+tests/leads/lead-form-bot-check.test.tsx
+  s_37deb30b6489aa::t_d2da480b1f4e38 1-189
+tests/leads/lead-copy.test.tsx
+  s_37deb30b6489aa::t_48270c9fcb21ea 7
+  s_37deb30b6489aa::t_b65ec6fb6afea8 318
+  s_37deb30b6489aa::t_b386f6d6719e7c 56
+tests/contact/contact-form-bot-check.test.tsx
+  s_37deb30b6489aa::t_4f9e2d59d3e241 1-173
+app/page.tsx
+  s_37deb30b6489aa::t_e7d714aa5784ab 6,36
+components/forms/LeadForm.tsx
+  s_37deb30b6489aa::t_8d71d638e3ce21 21-23,39-40,88,90,159,175,177-185,204-205,217-218,240,368-369,383-384,390-391
+tests/analytics/wiring.test.tsx
+  s_37deb30b6489aa::t_5248eba5e23217 115,127
+tests/contact/contact-form.test.tsx
+  s_37deb30b6489aa::t_8addfa43bd3582 62,71,102,109,119,126,133,140,156,163,170,181,196,205
+tests/landing/section-renderer.test.tsx
+  s_37deb30b6489aa::t_ba21c382ee1e74 83,90,263,287
+tests/landing/stega-attributes.test.tsx
+  s_37deb30b6489aa::t_46ee79542dbba8 92,116
+tests/leads/lead-form-download.test.tsx
+  s_37deb30b6489aa::t_423f6833a4f509 44,54,76,122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ce554956dd2752ec404184c1e818fca8a24b7205",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
