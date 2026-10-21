@@ -56,6 +56,33 @@ async function encodedHome() {
   return { content, settings };
 }
 
+describe("CMS text split for display under Presentation stega (R170)", () => {
+  // Visual Editing makes the element holding the payload's text node clickable. Split into lines,
+  // the payload sat in the last line only, so only "Big adventures." was clickable.
+  async function hero(title: string) {
+    const { content, settings } = await encodedHome();
+    const section = content.sections.find((entry) => entry.id === "hero");
+    if (!section) throw new Error("no hero section");
+    render(<Hero section={section} hero={{ ...content.hero, title }} links={linkContext(content.sections, settings)} />);
+    return screen.getByRole("heading", { level: 1 });
+  }
+
+  it("the hero title's edit link belongs to the whole heading, and no line carries it", async () => {
+    const h1 = await hero(encodeString("Bright minds. Kind hearts. Big adventures."));
+    const lines = Array.from(h1.querySelectorAll(".hero-title__line"));
+    expect(lines.map((line) => line.textContent)).toEqual(["Bright minds.", " Kind hearts.", " Big adventures."]);
+    const own = Array.from(h1.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent ?? "");
+    expect(own.some((text) => STEGA_CHARACTER.test(text))).toBe(true);
+    expect(stegaCleanText(h1.textContent ?? "")).toBe("Bright minds. Kind hearts. Big adventures.");
+  });
+
+  it("a published title renders exactly as before: lines only", async () => {
+    const h1 = await hero("Bright minds. Kind hearts. Big adventures.");
+    expect(Array.from(h1.childNodes).every((node) => node.nodeType === Node.ELEMENT_NODE)).toBe(true);
+    expect(h1.textContent).toBe("Bright minds. Kind hearts. Big adventures.");
+  });
+});
+
 describe("CMS text in attributes under Presentation stega (R167)", () => {
   it("the home page puts no payload in an attribute, and keeps it in text", async () => {
     const { content, settings } = await encodedHome();

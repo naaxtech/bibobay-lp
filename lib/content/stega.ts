@@ -51,3 +51,13 @@ export function stegaText(value: unknown, fallback = ""): string {
   const payload = value.startsWith(text) ? value.slice(text.length) : "";
   return trimmed + payload;
 }
+
+/**
+ * Text and its payload apart, for text the site splits for display (ruling R170): the pieces are
+ * cut from the clean text and the payload is rendered once, beside them, on the element that should
+ * be clickable as a whole.
+ */
+export function stegaSplit(value: string): { text: string; payload: string } {
+  const text = stegaCleanText(value);
+  return { text, payload: value.startsWith(text) ? value.slice(text.length) : "" };
+}

@@ -6,6 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { changePreviewPerspective } from "@/lib/sanity/preview-actions";
 import { createPreviewRefresher } from "./refresh";
+import { shareStyleNonce } from "./style-nonce";
+
+// R169: before styled-components makes its first style sheet, which the CSP admits only with the nonce.
+if (typeof document !== "undefined") shareStyleNonce(document);
 
 /*
  * Click-to-edit overlays and live refresh for the Studio's Presentation tool (ruling R158), loaded

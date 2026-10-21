@@ -31,7 +31,8 @@ export default defineConfig({
     structureTool({ structure }),
     // `previewMode.enable` is the site's draft-mode route (app/api/draft-mode/enable, ruling R33): Presentation opens it
     // with a one-time secret, and the site then serves drafts. Without it the preview would show published content.
-    // src: sanity/presentation PreviewUrlOption · sanity 6.17.0 · 2026-10-16
-    ...(previewUrl ? [presentationTool({ previewUrl: { origin: previewUrl, previewMode: { enable: DRAFT_MODE_ENABLE_PATH } }, resolve: { mainDocuments, locations } })] : []),
+    // `initial` replaces the deprecated `origin`; `previewMode.disable` is typed but "not yet implemented", so it is left out.
+    // src: sanity/presentation PreviewUrlResolverOptions · sanity 6.17.0 · 2026-10-21
+    ...(previewUrl ? [presentationTool({ previewUrl: { initial: previewUrl, previewMode: { enable: DRAFT_MODE_ENABLE_PATH } }, resolve: { mainDocuments, locations } })] : []),
   ],
 });

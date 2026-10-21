@@ -1,6 +1,6 @@
 import { BayBackdrop } from "@/components/brand/BayBackdrop";
 import { ReefBackdrop } from "@/components/brand/ReefBackdrop";
-import { stegaCleanText } from "@/lib/content/stega";
+import { stegaCleanText, stegaSplit } from "@/lib/content/stega";
 import type { LandingPageContent, SectionConfig } from "@/lib/content/types";
 import { ArtImage } from "./CmsArt";
 import { CtaLink } from "./CtaLink";
@@ -23,10 +23,12 @@ export interface HeroProps {
 /**
  * The headline split into its sentences, one per line in the logo's inks (teal, orange, purple),
  * like the channel's own tagline card. The words and spaces are the CMS title's, so the heading
- * reads exactly as written.
+ * reads exactly as written. In a Studio preview the title's edit link is rendered once, directly in
+ * the heading, so the whole heading is clickable rather than its last line (R170).
  */
 function HeroTitle({ title }: { title: string }) {
-  const sentences = title.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const { text, payload } = stegaSplit(title);
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
   if (sentences.length < 2) return <>{title}</>;
   return (
     <>
@@ -36,6 +38,7 @@ function HeroTitle({ title }: { title: string }) {
           {sentence}
         </span>
       ))}
+      {payload || null}
     </>
   );
 }

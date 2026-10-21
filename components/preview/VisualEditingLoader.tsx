@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
 
+import { PreviewBoundary } from "./PreviewBoundary";
 import { inPresentationNow, notInPresentationOnServer, subscribeNever } from "./presentation-context";
 
 /**
@@ -14,5 +15,10 @@ const VisualEditingClient = dynamic(() => import("./VisualEditingClient"), { ssr
 
 export function VisualEditingLoader() {
   const inStudio = useSyncExternalStore(subscribeNever, inPresentationNow, notInPresentationOnServer);
-  return inStudio ? <VisualEditingClient /> : null;
+  // R169: an overlay failure (or a chunk that will not load) leaves the page as it is.
+  return inStudio ? (
+    <PreviewBoundary>
+      <VisualEditingClient />
+    </PreviewBoundary>
+  ) : null;
 }

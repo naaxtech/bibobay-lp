@@ -201,7 +201,7 @@ editing form, showing your unpublished changes.
 `/api/draft-mode/enable` checks the Presentation tool's short-lived secret with the server-only
 `SANITY_API_READ_TOKEN` (Viewer role), then shows drafts with the "draft preview" notice and
 `noindex`; `/api/draft-mode/disable` exits. `presentationTool` in `studio/sanity.config.ts` uses
-`previewUrl: { origin, previewMode: { enable: "/api/draft-mode/enable" } }`, with the origin from
+`previewUrl: { initial, previewMode: { enable: "/api/draft-mode/enable" } }`, with the site URL from
 `SANITY_STUDIO_PREVIEW_URL`; the hosted Studio is built with `SANITY_STUDIO_PREVIEW_URL=https://www.bibobay.com`,
 and the site has `SANITY_API_READ_TOKEN` and `SANITY_STUDIO_ORIGIN=https://bibobay.sanity.studio`.
 Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no Presentation tool at all.
@@ -211,10 +211,16 @@ Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no Presentation tool at all.
   the Studio. The site cleans every value it decides with (ids, links, colours, versions) and
   everything it puts in `<head>`; text keeps the link (`lib/content/stega.ts`).
 - The overlay code (`@sanity/visual-editing`) is a separate download that only a draft page inside the
-  Studio requests; visitors never load it.
+  Studio requests; visitors never load it. Its styles carry the page's CSP nonce (copied in the browser
+  from Next's own scripts), and an error boundary keeps the page if the overlay ever fails.
+- The site never puts an edit link in an attribute (an `aria-label` would read it aloud); text the
+  site splits for display, such as the hero title's lines, carries it once on the whole element, so
+  the whole heading is clickable.
 - Each saved edit makes the page re-render on the server with the latest draft.
 - Inside the Studio's frame the draft cookies are set `Partitioned`, so browsers that block
   third-party cookies (Safari) keep the preview.
+- The hosted Studio opens inside the Sanity Dashboard (`https://www.sanity.io`), so the site's CSP
+  `frame-ancestors` lists both the Studio and the Dashboard.
 
 ## Publishing and when the site updates
 
