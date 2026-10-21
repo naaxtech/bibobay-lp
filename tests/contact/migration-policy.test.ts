@@ -172,14 +172,21 @@ describe("migration 0008: the contact outbox (R169, R175)", () => {
     expect(header).toMatch(/^\s*p_limit integer default 10, p_message_id uuid default null \) returns jsonb\b/);
     expect(body).toContain(`p_limit not between 1 and ${OUTBOX_LIMITS.maxClaim}`);
     expect(body).toContain(`now() - interval '${OUTBOX_LIMITS.staleSendingMinutes} minutes'`);
-    expect(body).toContain(`now() - interval '${OUTBOX_LIMITS.idempotencyWindowHours} hours'`);
-    expect(body).toContain(`r.attempts >= ${OUTBOX_LIMITS.maxAttempts}`);
     expect(body).toContain("'stale_unconfirmed'");
     expect(body).toContain("next_attempt_at = 'infinity'");
     expect(body).toContain("order by delivery.next_attempt_at, delivery.created_at, delivery.id");
     expect(body).toContain("for update of delivery skip locked");
-    // The provider keeps an idempotency key for 24 hours; the window must close before that.
-    expect(OUTBOX_LIMITS.idempotencyWindowHours).toBeLessThan(24);
+  });
+
+  it("parks a contact alert only at the attempt cap, never for the age of an unconfirmed send (R185)", () => {
+    const { body } = fn("claim_contact_deliveries");
+    // The one park rule: a duplicate staff alert is harmless, a lost one is not.
+    expect(body).toContain(`loop if r.attempts >= ${OUTBOX_LIMITS.maxAttempts} then update`);
+    expect(body).not.toMatch(/interval '\d+ hours'/);
+    expect(body).not.toMatch(/unconfirmed_since(?:, [\w.]+\))? <=/);
+    expect(body).not.toContain(`${OUTBOX_LIMITS.idempotencyWindowHours} hours`);
+    // The record function still marks a send of unknown outcome, so staff can see a possible duplicate.
+    expect(fn("record_contact_delivery_attempt").body).toContain("public.outbox_failure_unconfirmed(p_error_code)");
   });
 
   it("backs off as the other outboxes do, capped at 6 hours, and treats the final failure codes as final", () => {

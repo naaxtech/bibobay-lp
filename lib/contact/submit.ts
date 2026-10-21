@@ -1,6 +1,6 @@
 import "server-only";
 
-import { errorCodeOf } from "@/lib/leads/submit";
+import { ACK_SEND_LIMIT, errorCodeOf } from "@/lib/leads/submit";
 import { isHoneypotFilled } from "@/lib/leads/fields";
 import type { RateLimiter } from "@/lib/security/rate-limit";
 import type { ContactApiBody } from "./fields";
@@ -24,8 +24,12 @@ export const CONTACT_BODY_LIMIT_BYTES = 32 * 1024;
 
 /** Three messages per client per ten minutes, shared by every server instance (R171). */
 export const CONTACT_RATE_LIMIT = { scope: "contact", maxHits: 3, windowSeconds: 600 } as const;
-/** One hundred messages per hour from everyone together (R171). */
-export const CONTACT_GLOBAL_RATE_LIMIT = { key: "contact:global", maxHits: 100, windowSeconds: 3600 } as const;
+/**
+ * Every message from everyone together, per hour (R171). R186: its cap is the alert's own hourly send
+ * cap (`globalLimitPerHour`, from `LEAD_ACK_SEND_LIMIT_PER_HOUR`), over the same window, so the form
+ * never stores more messages in an hour than their staff alerts can announce.
+ */
+export const CONTACT_GLOBAL_RATE_LIMIT = { key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds } as const;
 
 /** Informational strings of the API; the form never shows them (it maps each status to its own copy). */
 export const CONTACT_API_MESSAGES = {
@@ -53,6 +57,11 @@ export interface ContactSubmissionDependencies {
   rateLimiter: RateLimiter | null;
   /** An opaque, keyed hash of the client address (lib/leads/http.ts); never the address itself. */
   clientKey: string;
+  /**
+   * R186: the cap of `contact:global` per hour, the same value the alert's send budget
+   * (`send:contact_staff_alert`) is capped at, so intake never outruns the alerts.
+   */
+  globalLimitPerHour: number;
   /** Structured, PII-free operational log. */
   log: (event: ContactLogEvent) => void;
   /**
@@ -87,7 +96,9 @@ export async function submitContactMessage(input: unknown, dependencies: Contact
 
   const validation = validateContactSubmission(input);
   if (!validation.ok) {
-    if (Object.keys(validation.fieldErrors).length === 0) return refused(400, CONTACT_API_MESSAGES.error);
+    // C5: a body that is not an object, or carries any key the form does not send, is refused as a
+    // whole, before (and instead of) any field problem it may also have.
+    if (validation.formError || Object.keys(validation.fieldErrors).length === 0) return refused(400, CONTACT_API_MESSAGES.error);
     const result = refused(400, CONTACT_API_MESSAGES.checkDetails);
     result.body.fieldErrors = validation.fieldErrors;
     return result;
@@ -104,7 +115,7 @@ export async function submitContactMessage(input: unknown, dependencies: Contact
 
   const limits = [
     { scope: "client" as const, key: `${CONTACT_RATE_LIMIT.scope}:${dependencies.clientKey}`, maxHits: CONTACT_RATE_LIMIT.maxHits, windowSeconds: CONTACT_RATE_LIMIT.windowSeconds },
-    { scope: "global" as const, ...CONTACT_GLOBAL_RATE_LIMIT },
+    { scope: "global" as const, key: CONTACT_GLOBAL_RATE_LIMIT.key, maxHits: dependencies.globalLimitPerHour, windowSeconds: CONTACT_GLOBAL_RATE_LIMIT.windowSeconds },
   ];
   for (const { scope, key, maxHits, windowSeconds } of limits) {
     try {

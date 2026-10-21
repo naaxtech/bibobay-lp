@@ -438,17 +438,20 @@ describe("contact form docs (R158-R177)", () => {
     }
     expect(database).toContain("`send:contact_staff_alert`");
     expect(database).toMatch(/\| Contact messages per client \| `contact:<HMAC of the client address>` \| 3 per 10 minutes/);
-    expect(database).toMatch(/\| Contact messages in all \| `contact:global` \| 100 per hour/);
+    expect(database).toMatch(/\| Contact messages in all \| `contact:global` \| `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\) from everyone together, the contact alert's own send cap \(R186\)/);
     expect(flat(database)).toMatch(/no `skipped` status[^.]*"skipped": 0/);
     expect(flat(database)).toMatch(/lead outbox[^.]*not altered/i);
     expect(read("supabase/migrations/0008_contact_messages.sql")).toContain("create table if not exists public.contact_message_deliveries");
   });
 
-  it("states the limits the code enforces (R171)", () => {
-    expect(read("lib/contact/submit.ts")).toContain('{ scope: "contact", maxHits: 3, windowSeconds: 600 }');
-    expect(read("lib/contact/submit.ts")).toContain('{ key: "contact:global", maxHits: 100, windowSeconds: 3600 }');
-    expect(read("lib/contact/submit.ts")).toContain("CONTACT_BODY_LIMIT_BYTES = 32 * 1024");
-    expect(flat(read("docs/architecture.md"))).toMatch(/3 per 10 minutes per hashed client[^|]*100 per hour in all/);
+  it("states the limits the code enforces (R171, R186)", () => {
+    const submit = read("lib/contact/submit.ts");
+    expect(submit).toContain('{ scope: "contact", maxHits: 3, windowSeconds: 600 }');
+    expect(submit).toContain('{ key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds }');
+    expect(submit).toContain("maxHits: dependencies.globalLimitPerHour");
+    expect(read("lib/contact/dependencies.ts")).toContain("globalLimitPerHour: sendLimitPerHour");
+    expect(submit).toContain("CONTACT_BODY_LIMIT_BYTES = 32 * 1024");
+    expect(flat(read("docs/architecture.md"))).toMatch(/3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR \(default 60, the alert's own send cap\) per hour in all/);
   });
 
   it("documents the contact events, the route failure and every contact warning that reaches Sentry (R166)", () => {
@@ -539,6 +542,52 @@ describe("contact form docs (R158-R177)", () => {
     expect(saying).toContain("docs/database-security.md");
     expect(sentence).toContain("`docs/deployment.md`");
     for (const file of saying) expect(sentence, file).toContain(`\`${file}\``);
+  });
+
+  it("says the overall contact limit is the alert's send cap, with no fixed number, everywhere it is described (R186)", () => {
+    for (const file of ["docs/deployment.md", "docs/database-security.md", "docs/observability.md", "docs/architecture.md", "CHANGELOG.md"]) {
+      expect(read(file), file).not.toMatch(/100 per hour|100 messages in an hour/);
+    }
+    expect(read("docs/superpowers/plans/2026-10-21-contact-form.md")).toMatch(/\*\*R171 Rate limits\.\*\*[^\n]*superseded by R186/);
+    expect(flat(read("docs/deployment.md"))).toMatch(/3 messages per 10 minutes per client and, in all, as many per hour as the alert's send cap \(`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R186\)/);
+    expect(read("docs/observability.md")).toMatch(/`global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\), the alert's own send cap, R186/);
+    // The privacy text names no number: the cap is an operator setting.
+    const legal = read("lib/content/legal-fallback.ts");
+    const paragraph = legal.slice(legal.indexOf("Messages sent through the contact form are counted"), legal.indexOf("Those counts are not linked to your message."));
+    expect(paragraph).toMatch(/all messages together by the hour/);
+    expect(paragraph.slice(paragraph.indexOf("all messages together"))).not.toMatch(/\d/);
+  });
+
+  it("says a contact alert is parked only at the attempt cap, never for the age of an unconfirmed send (R185)", () => {
+    expect(flat(read("docs/deployment.md"))).toMatch(/Contact staff alerts are the exception \(R185\): an unconfirmed contact alert is never parked for its age/);
+    const database = flat(section(read("docs/database-security.md"), "Contact messages (migration 0008)"));
+    expect(database).not.toMatch(/retried only within 23 hours/);
+    expect(database).toMatch(/an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt \(R185\)/);
+    const runbook = read("docs/incident-runbook.md");
+    expect(flat(section(runbook, "Parked emails"))).toMatch(/\*\*`stale_unconfirmed`\*\*: a signup or order email whose outcome is unknown/);
+    expect(flat(section(runbook, "Contact messages"))).toMatch(/A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` \(R185\)/);
+    const observability = flat(read("docs/observability.md"));
+    expect(observability).toMatch(/A `delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an `invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send \(R185\)/);
+    expect(observability).toMatch(/as a count, with the `outbox` whose claim parked them/);
+    for (const file of ["docs/observability.md", "docs/database-security.md"]) expect(flat(read(file)), file).toMatch(/A contact staff alert is re-sent whatever its age, until its eighth attempt \(R185\)/);
+    expect(read("CHANGELOG.md").slice(0, read("CHANGELOG.md").indexOf("## 2026-10-21 — Email cron back"))).toContain("R185");
+  });
+
+  it("documents the contact-open CI job with the workflow's own command and environment, and the same in the QA checklist (R187)", () => {
+    const workflow = parse(read(".github/workflows/ci.yml")) as { jobs: Record<string, { steps: Array<{ run?: string; env?: Record<string, string> }> }> };
+    const start = workflow.jobs["e2e-contact"]!.steps.find((step) => step.run?.includes("next start"))!.env!;
+    const row = lines("docs/deployment.md").find((line) => line.startsWith("| `e2e-contact` (after `verify`) |")) ?? "";
+    expect(row).not.toBe("");
+    const qa = read("docs/qa-checklist.md");
+    for (const [name, value] of Object.entries(start)) {
+      const pair = `${name}=${value.includes(" ") ? `"${value}"` : value}`;
+      expect(row, name).toContain(pair);
+      expect(qa, name).toContain(pair);
+    }
+    expect(row).toContain("E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact");
+    expect(qa).toContain("E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3262 npx playwright test e2e/contact");
+    expect(flat(read("docs/deployment.md"))).toMatch(/`e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in/);
+    expect(flat(qa)).toMatch(/CI runs them as three more jobs \(`e2e-commerce`, `e2e-keyed` and `e2e-contact`/);
   });
 
   it("keeps the daily-schedule words out of the files the restore sentence does not list", () => {

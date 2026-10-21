@@ -152,6 +152,13 @@ describe("browser checks", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("titles the summary with an h2, the next level under the /contact page's h1, as the order form does", async () => {
+    render(<ContactForm copy={CMS} />);
+    await submit();
+    const summary = screen.getByRole("group", { name: CONTACT_FORM_COPY.errorSummaryTitle });
+    expect(within(summary).getByRole("heading", { level: 2, name: CONTACT_FORM_COPY.errorSummaryTitle })).toBeTruthy();
+  });
+
   it("a summary link moves focus to its field", async () => {
     render(<ContactForm copy={CMS} />);
     await submit();

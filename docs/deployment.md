@@ -118,7 +118,11 @@ failure, the hourly send cap, or Resend not yet configured.
   still unconfirmed after that retry, or left unconfirmed by a daily run, is parked at the next run
   as `delivery_expired` for a human (nothing is claimed as sent; see
   [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change,
-  since every run claims only rows that are due.
+  since every run claims only rows that are due. Contact staff alerts are the exception (R185): an
+  unconfirmed contact alert is never parked for its age. It is retried at every run under the same
+  idempotency key (once the provider has forgotten the key, as a new send) until its eighth
+  attempt, because staff receiving an alert twice is harmless and a lost alert leaves a stored
+  message nobody reads.
 - Vercel Cron calls the route with `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET`
   (32+ characters) in the Production environment. The route answers 503 without it, 401 to any
   other caller, 503 while Supabase or Resend is unconfigured, and otherwise counts only:
@@ -137,9 +141,10 @@ failure, the hourly send cap, or Resend not yet configured.
   https://<site>/api/cron/email-outbox`, from a machine you trust, with the secret from the Vercel
   secret store; never paste the secret into a document or a chat.
 - A row the worker gave up on (8 attempts, a provider answer that the message's key was used for
-  another message, or an unconfirmed send older than 23 hours, ruling R91) stays `failed` with
-  `next_attempt_at` set to infinity, and is reported as `delivery_expired`
-  ([observability.md](observability.md)). See [database-security.md](database-security.md#outbox-states).
+  another message, or, for a signup or order email, an unconfirmed send older than 23 hours, ruling
+  R91) stays `failed` with `next_attempt_at` set to infinity, and is reported as `delivery_expired`
+  ([observability.md](observability.md)), with the `outbox` whose claim parked it. See
+  [database-security.md](database-security.md#outbox-states).
 
 ## Staff access (Task 8b)
 
@@ -214,12 +219,15 @@ It adds no environment name. `/api/readiness` reports the answer as `contact`; `
   shows `contact: false` and the form closes. Removing the Resend key does the same: the worker answers
   503 while Resend is unconfigured, so the alerts wait. Setting them again lets the next cron run send
   them ([Email outbox worker](#email-outbox-worker-task-8a)).
-- **Limits and budget.** 3 messages per 10 minutes per client and 100 per hour in all (the buckets
-  `contact:<hmac>` and `contact:global`); the alert spends `send:contact_staff_alert`, capped by
-  `LEAD_ACK_SEND_LIMIT_PER_HOUR`. The alert is attempted right after the answer; the cron worker is only
-  the retry net.
+- **Limits and budget.** 3 messages per 10 minutes per client and, in all, as many per hour as the
+  alert's send cap (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R186), in the buckets `contact:<hmac>`
+  and `contact:global`; the alert spends `send:contact_staff_alert`, capped by the same value, so the
+  form never stores more messages in an hour than their alerts can announce. The alert is attempted
+  right after the answer; the cron worker is only the retry net, and retries an unconfirmed alert
+  until its eighth attempt rather than parking it (R185).
 - **Reading a message.** In the alert email (Reply-To is the sender, labelled unverified), or by SQL when
-  an alert is parked ([incident-runbook.md](incident-runbook.md#contact-messages)).
+  an alert is parked, which happens only after its eighth attempt or on `invalid_idempotent_request`
+  (R185; [incident-runbook.md](incident-runbook.md#contact-messages)).
 
 ## Contact form: steps after merge
 
@@ -314,11 +322,12 @@ fails to build. CI has no secrets and checks names, strings and token shapes onl
 | `e2e` (after `verify`) | `npm ci` only, as Vercel installs (so it proves the site builds without the Studio: `next build` type-checks `tsconfig.build.json`, which leaves tests out), Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
 | `e2e-commerce` (after `verify`) | The commerce-on browser run (ruling R130): copies the checkout without `.git` and `node_modules` to `../commerce-copy`, `node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy` (the script refuses any folder inside a git work tree), then in the copy `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3100 -H 127.0.0.1` with a wait on `/api/health`, and `E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npx playwright test e2e/shop e2e/commerce`; the report is uploaded on failure as `playwright-report-commerce` |
 | `e2e-keyed` (after `verify`) | The analytics and Sentry browser run (ruling R130): `npm ci`, Playwright Chromium, `npm run build` with the placeholder `NEXT_PUBLIC_POSTHOG_KEY=phc_e2eplaceholder0000000000000000000000000`, `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` and `NEXT_PUBLIC_SENTRY_DSN=https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1`, `next start -p 3200 -H 127.0.0.1` with the placeholder `CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef`, and `E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability`; the report is uploaded on failure as `playwright-report-keyed` |
+| `e2e-contact` (after `verify`) | The contact form open (ruling R187), so the open-form contact specs never sit skipped: `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3300 -H 127.0.0.1` with the placeholder contact environment `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` (no secret; every page renders per request, so the form's open condition is read at start), and `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact`; every `/api/contact` call is answered by Playwright; the report is uploaded on failure as `playwright-report-contact` |
 
-The end-to-end tests never reach a real service: every lead and order request is mocked or
+The end-to-end tests never reach a real service: every lead, contact and order request is mocked or
 answered by the fixture, every PostHog and Sentry request goes to a reserved example domain that
 Playwright answers itself, and no configuration or secret is present in CI (the values above are
-placeholders). `e2e-commerce` and `e2e-keyed` run the commands in
+placeholders). `e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in
 [qa-checklist.md](qa-checklist.md#2-browser-tests-against-a-production-build) (the ports aside). They were
 written from the commands the controller ran by hand on Windows; the first push proves them on
 Linux, and a red first run is fixed forward.

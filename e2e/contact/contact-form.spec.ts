@@ -1,5 +1,7 @@
 import { expect, test, type BrowserContext, type Page, type Request, type Route } from "@playwright/test";
 
+import { CONTACT_FORM_COPY } from "@/components/forms/contact-copy";
+
 /*
  * The contact page and form in a real browser (R158, R161, R167).
  *
@@ -23,24 +25,25 @@ const VIEWPORTS = [
   { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
 ] as const;
 
-// Repository fallback copy (lib/content/fallback.ts, lib/contact chrome); the e2e server has no Sanity project.
+// The CMS copy is the repository fallback's (lib/content/fallback.ts; the e2e server has no Sanity
+// project). It stays literal here because that module imports a JSON manifest, which the specs read
+// from disk rather than import. The form's chrome is imported from the code that renders it (R184).
 const SUCCESS = "Thank you. We have received your message.";
 const ERROR = "We could not save your message. Please try again.";
 const CLOSED = "The contact form is not open yet, so no message can be saved from this page. Please check back soon.";
-const RATE_LIMITED = "Several messages have been sent from here just now. Please wait a few minutes and try again.";
-const SENDING = "Saving your message…";
+const HEADING = "Contact us";
 const BUTTON = "Send message";
-const SUMMARY_TITLE = "Please check the form";
 const FOOTER_LINK = "Contact us";
+const { errorSummaryTitle: SUMMARY_TITLE, sending: SENDING, outcome: { rateLimited: RATE_LIMITED }, errors } = CONTACT_FORM_COPY;
 
 /** Every key the form sends: the four fields and the empty honeypot. */
 const BODY_KEYS = ["email", "message", "name", "topic", "website"];
 
-const contactForm = (page: Page) => page.getByRole("form", { name: "Contact BIBO Bay" });
-const nameField = (page: Page) => contactForm(page).getByRole("textbox", { name: "Your name" });
-const emailField = (page: Page) => contactForm(page).getByRole("textbox", { name: "Your email" });
-const topicField = (page: Page) => contactForm(page).getByRole("combobox", { name: "What is it about?" });
-const messageField = (page: Page) => contactForm(page).getByRole("textbox", { name: "Your message" });
+const contactForm = (page: Page) => page.getByRole("form", { name: CONTACT_FORM_COPY.formLabel });
+const nameField = (page: Page) => contactForm(page).getByRole("textbox", { name: CONTACT_FORM_COPY.name.label });
+const emailField = (page: Page) => contactForm(page).getByRole("textbox", { name: CONTACT_FORM_COPY.email.label });
+const topicField = (page: Page) => contactForm(page).getByRole("combobox", { name: CONTACT_FORM_COPY.topic.label });
+const messageField = (page: Page) => contactForm(page).getByRole("textbox", { name: CONTACT_FORM_COPY.message.label });
 const submitButton = (page: Page) => contactForm(page).locator('button[type="submit"]');
 /** The consent notice has its own status line, so this is found inside the form only. */
 const statusLine = (page: Page) => contactForm(page).getByRole("status");
@@ -104,9 +107,9 @@ test.describe("keyless: the form is closed", () => {
 
   test("/contact shows the closed notice, no form and no Contact us footer link", async ({ page }) => {
     await page.goto("/contact");
-    await expect(page.getByRole("heading", { level: 1, name: "Contact us" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: HEADING })).toBeVisible();
     await expect(page.getByText(CLOSED)).toBeVisible();
-    await expect(page.getByRole("form", { name: "Contact BIBO Bay" })).toHaveCount(0);
+    await expect(page.getByRole("form", { name: CONTACT_FORM_COPY.formLabel })).toHaveCount(0);
     await expect(page.locator("main").getByRole("textbox")).toHaveCount(0);
     await expect(footerContactLink(page)).toHaveCount(0);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
@@ -149,14 +152,14 @@ for (const { name, use } of VIEWPORTS) {
 
     test("has labelled fields, the privacy link under the button and exactly one role=status", async ({ page }) => {
       await openForm(page);
-      await expect(page.getByRole("heading", { level: 1, name: "Contact us" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: HEADING })).toBeVisible();
       for (const field of [nameField(page), emailField(page), topicField(page), messageField(page)]) await expect(field).toBeVisible();
       await expect(emailField(page)).toHaveAttribute("type", "email");
-      await expect(emailField(page)).toHaveAccessibleDescription("We use it only to reply to you.");
+      await expect(emailField(page)).toHaveAccessibleDescription(CONTACT_FORM_COPY.email.hint);
       await expect(contactForm(page).getByRole("status")).toHaveCount(1);
       await expect(contactForm(page).locator('[role="status"]')).toHaveCount(1);
 
-      const privacy = contactForm(page).getByRole("link", { name: "How we handle your details" });
+      const privacy = contactForm(page).getByRole("link", { name: CONTACT_FORM_COPY.privacyLink });
       await expect(privacy).toHaveAttribute("href", "/privacy");
       const button = await submitButton(page).boundingBox();
       const link = await privacy.boundingBox();
@@ -171,11 +174,11 @@ for (const { name, use } of VIEWPORTS) {
       const summary = errorSummary(page);
       await expect(summary).toBeFocused();
       await expect(summary).toHaveAccessibleName(SUMMARY_TITLE);
-      await expect(summary.getByRole("link")).toHaveText(["Enter your name.", "Enter your email.", "Choose what your message is about.", "Write your message."]);
+      await expect(summary.getByRole("link")).toHaveText([errors.name.required, errors.email.required, errors.topic.required, errors.message.required]);
       await expect(nameField(page)).toHaveAttribute("aria-invalid", "true");
       await expect(messageField(page)).toHaveAccessibleDescription(/Write your message\./);
 
-      await summary.getByRole("link", { name: "Enter your email." }).click();
+      await summary.getByRole("link", { name: errors.email.required }).click();
       await expect(emailField(page)).toBeFocused();
       expect(requests).toEqual([]);
     });
@@ -317,7 +320,7 @@ for (const { name, use } of VIEWPORTS) {
       const trap = contactForm(page).locator('input[name="website"]');
       await expect(trap).toHaveAttribute("tabindex", "-1");
       await expect(trap).toHaveValue("");
-      await expect(contactForm(page).getByRole("textbox", { name: "Leave this field empty" })).toHaveCount(0);
+      await expect(contactForm(page).getByRole("textbox", { name: CONTACT_FORM_COPY.honeypotLabel })).toHaveCount(0);
 
       await nameField(page).focus();
       for (let step = 0; step < 8; step += 1) {

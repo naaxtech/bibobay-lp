@@ -70,8 +70,9 @@ export const OUTBOX_LIMITS = {
   /** A row still `sending` after this long is claimed again under the same idempotency key (R91). */
   staleSendingMinutes: 15,
   /**
-   * An unconfirmed send is retried only within this many hours of the attempt that made it
-   * unconfirmed: the provider keeps an idempotency key for 24 hours (R91).
+   * An unconfirmed send of the signup and order outboxes is retried only within this many hours of
+   * the attempt that made it unconfirmed: the provider keeps an idempotency key for 24 hours (R91).
+   * The contact outbox has no such window: its staff alert is retried until `maxAttempts` (R185).
    */
   idempotencyWindowHours: 23,
 } as const;

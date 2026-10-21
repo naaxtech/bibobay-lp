@@ -42,10 +42,10 @@ Stop the server afterwards. `E2E_PRODUCTION=1` turns on the checks that only hol
 build (no `'unsafe-eval'` in the CSP). The expected heading is the repository fallback's; against a
 deployment with Sanity content, use the published hero heading or leave the flag out.
 
-This keyless run skips the commerce-on, analytics and Sentry specs, which need a differently built
-server. CI runs them as two more jobs (`e2e-commerce` and `e2e-keyed`, ruling R130;
+This keyless run skips the commerce-on, analytics, Sentry and open-contact-form specs, which need a
+differently built or started server. CI runs them as three more jobs (`e2e-commerce`, `e2e-keyed` and `e2e-contact`, rulings R130 and R187;
 [deployment.md](deployment.md#continuous-integration)); run them by hand like this when you want them
-locally. Both use a free port in place of 3260 and 3261, and both need `npm ci` in the folder they build.
+locally. Each uses a free port in place of 3260, 3261 and 3262, and each needs `npm ci` in the folder it builds.
 
 **2a. Commerce switched on.** The fixture script works on a scratch COPY of the repository, outside any
 git work tree (it refuses the repository itself, a folder inside it and a copy with a `.git` entry):
@@ -91,8 +91,8 @@ notice and no form. To run the contact specs against an open form, start the sam
 placeholder service environment set at `next start` time, and run only that directory:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com SUPABASE_SERVICE_ROLE_KEY=e2e-placeholder-service-role-key LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef RESEND_API_KEY=re_e2e_placeholder RESEND_FROM="BIBO Bay <hello@example.com>" STAFF_NOTIFICATION_EMAIL=staff@example.com npx next start -p 3262 -H 127.0.0.1 &
-E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3262 npx playwright test e2e/contact
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef RESEND_API_KEY=re_fixture RESEND_FROM="BIBO Bay <hello@example.com>" STAFF_NOTIFICATION_EMAIL=staff@example.com npx next start -p 3262 -H 127.0.0.1 &
+E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3262 npx playwright test e2e/contact
 ```
 
 Stop the server by its port afterwards, not by the job id. The placeholders reach nothing real. By hand

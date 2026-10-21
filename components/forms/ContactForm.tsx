@@ -197,9 +197,10 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     <form id="contact-form" className="lead-form" aria-label={CONTACT_FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
       {listed.length > 0 ? (
         <div ref={summaryRef} role="group" className="lead-form__summary" tabIndex={-1} aria-labelledby={ids.summaryTitle}>
-          <h3 id={ids.summaryTitle} className="lead-form__summary-title">
+          {/* h2: the form sits under the /contact page's h1 with no h2 between (as OrderForm's summary). */}
+          <h2 id={ids.summaryTitle} className="lead-form__summary-title">
             {CONTACT_FORM_COPY.errorSummaryTitle}
-          </h3>
+          </h2>
           <ul className="lead-form__summary-list">
             {listed.map((field) => (
               <li key={field}>

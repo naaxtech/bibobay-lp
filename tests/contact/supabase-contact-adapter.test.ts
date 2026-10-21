@@ -95,6 +95,19 @@ describe("the contact adapter against the real migrations", () => {
     expect(await contact.recordDeliveryAttempt(deliveryId, { status: "failed", errorCode: "rate_limit_exceeded" })).toBe(true);
   });
 
+  it("claims an alert left unconfirmed for over a day again, under the same id: age never parks a contact alert (R185)", async () => {
+    const contact = createSupabaseContactRepository(client);
+    const { messageId, deliveryId } = await contact.submitMessage({ ...RECORD, email: "late@example.com" });
+    await contact.claimDeliveries({ ownerId: messageId, kinds: ["contact_staff_alert"], limit: 1 });
+    expect(await contact.recordDeliveryAttempt(deliveryId, { status: "failed", errorCode: "send_timeout" })).toBe(true);
+    await db.query(
+      "update public.contact_message_deliveries set unconfirmed_since = now() - interval '30 hours', next_attempt_at = now() - interval '1 second' where id = $1",
+      [deliveryId],
+    );
+    const again = await contact.claimDeliveries({ ownerId: messageId, kinds: ["contact_staff_alert"], limit: 1 });
+    expect(again).toEqual({ claimed: [expect.objectContaining({ id: deliveryId, attempt: 2 })], skipped: 0, expired: 0 });
+  });
+
   it("claims across every message when none is named (the worker)", async () => {
     const contact = createSupabaseContactRepository(client);
     const { deliveryId } = await contact.submitMessage({ ...RECORD, email: "worker@example.com" });

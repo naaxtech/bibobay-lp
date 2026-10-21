@@ -22,7 +22,10 @@ export interface ClaimBatch<T> {
    * for the contact outbox, whose messages cannot be withdrawn (R175).
    */
   skipped: number;
-  /** Rows parked for a human (R91: unconfirmed past the idempotency window, or out of attempts). */
+  /**
+   * Rows parked for a human (R91: out of attempts, or, in the signup and order outboxes, unconfirmed
+   * past the idempotency window; the contact outbox parks at the attempt cap only, R185).
+   */
   expired: number;
 }
 

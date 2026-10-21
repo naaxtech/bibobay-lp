@@ -60,7 +60,7 @@ const message = z
  * not send (a child's name, an age) rejects the whole request. The honeypot is only ever empty
  * here; a filled one is turned away before validation.
  */
-export const contactSubmissionSchema = z.strictObject({
+const contactSubmissionSchema = z.strictObject({
   name,
   email,
   topic,

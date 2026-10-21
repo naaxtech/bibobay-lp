@@ -116,7 +116,14 @@ describe("attemptNext", () => {
     const { ctx, events } = context();
     const step = await attemptNext(channel, { kinds: ["acknowledgement"] }, ctx);
     expect(step).toEqual({ outcome: "progress", tally: { sent: 0, failed: 1, skipped: 2, deferred: 0 } });
-    expect(events).toEqual(expect.arrayContaining([{ event: "delivery_skipped", count: 2 }, { event: "delivery_expired", count: 1 }]));
+    expect(events).toEqual(expect.arrayContaining([{ event: "delivery_skipped", count: 2 }, { event: "delivery_expired", count: 1, outbox: "leads" }]));
+  });
+
+  it("names the outbox whose claim parked rows, since the cron worker logs every outbox under one channel", async () => {
+    const { channel } = fakeChannel([], { name: "contact", claim: async () => ({ claimed: [], skipped: 0, expired: 2 }) });
+    const { ctx, events } = context();
+    await attemptNext(channel, { kinds: ["staff_alert"] }, ctx);
+    expect(events).toEqual([{ event: "delivery_expired", count: 2, outbox: "contact" }]);
   });
 
   it("stops on a failed claim with a code only", async () => {

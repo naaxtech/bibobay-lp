@@ -35,6 +35,7 @@ function setup(overrides: Partial<ContactSubmissionDependencies> = {}) {
     repository,
     rateLimiter,
     clientKey: "k",
+    globalLimitPerHour: 60,
     log: (event) => logs.push(event),
     sendAlert,
     runAfterResponse: (task) => void afterTasks.push(task),
@@ -72,6 +73,17 @@ describe("submitContactMessage", () => {
     }
   });
 
+  it("an unknown key rejects the whole body with the generic 400 first, even when fields are also invalid (C5)", async () => {
+    const { dependencies, stored, consumed } = setup();
+    for (const input of [{ name: "", email: "nope", topic: "other", message: "short", childName: "Sam" }, { ...VALID, message: "short", age: 4 }]) {
+      const result = await submitContactMessage(input, dependencies);
+      expect(result).toEqual({ status: 400, body: { ok: false, persisted: false, message: CONTACT_API_MESSAGES.error } });
+      expect(result.body).not.toHaveProperty("fieldErrors");
+    }
+    expect(stored).toEqual([]);
+    expect(consumed).toEqual([]);
+  });
+
   it("while closed it answers 503 with closed: true before any limiter or write", async () => {
     for (const overrides of [{ open: false }, { repository: null }]) {
       const { dependencies, stored, consumed, logs } = setup(overrides);
@@ -94,12 +106,16 @@ describe("submitContactMessage", () => {
     expect(CONTACT_RATE_LIMIT).toEqual({ scope: "contact", maxHits: 3, windowSeconds: 600 });
   });
 
-  it("caps all messages at 100 per hour under contact:global, checked after the client limit", async () => {
+  it("caps all messages per hour under contact:global at the alert's hourly send cap it is given, checked after the client limit (R186)", async () => {
     const { dependencies, consumed, stored } = setup();
     await submitContactMessage(VALID, dependencies);
     expect(consumed.map(([key]) => key)).toEqual(["contact:k", "contact:global"]);
-    expect(consumed[1]).toEqual(["contact:global", { maxHits: 100, windowSeconds: 3600 }]);
-    expect(CONTACT_GLOBAL_RATE_LIMIT).toEqual({ key: "contact:global", maxHits: 100, windowSeconds: 3600 });
+    expect(consumed[1]).toEqual(["contact:global", { maxHits: 60, windowSeconds: 3600 }]);
+    expect(CONTACT_GLOBAL_RATE_LIMIT).toEqual({ key: "contact:global", windowSeconds: 3600 });
+
+    const other = setup({ globalLimitPerHour: 7 });
+    await submitContactMessage(VALID, other.dependencies);
+    expect(other.consumed[1]).toEqual(["contact:global", { maxHits: 7, windowSeconds: 3600 }]);
 
     const spent = setup({ rateLimiter: { consume: async (key) => ({ allowed: key !== "contact:global", remaining: 0, retryAfterSeconds: key === "contact:global" ? 90 : 0 }) } });
     const result = await submitContactMessage(VALID, spent.dependencies);
@@ -107,6 +123,15 @@ describe("submitContactMessage", () => {
     expect(spent.stored).toEqual([]);
     expect(spent.logs).toEqual([{ event: "contact_rate_limited", scope: "global" }]);
     expect(stored).toHaveLength(1);
+  });
+
+  it("never stores more messages in an hour than the alert budget can announce (R186)", async () => {
+    const { dependencies, stored, logs } = setup({ globalLimitPerHour: 2 });
+    const answers = [];
+    for (const clientKey of ["a", "b", "c"]) answers.push((await submitContactMessage(VALID, { ...dependencies, clientKey })).status);
+    expect(answers).toEqual([200, 200, 429]);
+    expect(stored).toHaveLength(2);
+    expect(logs.at(-1)).toEqual({ event: "contact_rate_limited", scope: "global" });
   });
 
   it("fails closed with 503, not closed, when the limiter is missing or throws", async () => {

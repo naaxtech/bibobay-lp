@@ -10,16 +10,18 @@
 -- any API role; the three functions are security definers with an empty search_path, executable by
 -- service_role only; one submit stores one message and exactly one staff alert, and refuses every
 -- out-of-bounds field with 22023 while storing nothing; lengths count characters (code points), as
--- the form counts them; the claim, the 15-minute lease, the 23-hour parking, the backoff, the final
--- failures and the deferral follow the other outboxes (R169); there is no skipped status (R175);
--- deleting a message removes its alert; and the lead outbox is as migration 0006 left it.
+-- the form counts them; the claim, the 15-minute lease, the backoff, the final failures and the
+-- deferral follow the other outboxes (R169), except that an unconfirmed alert is never parked for its
+-- age, only by the attempt cap (R185: a duplicate staff alert is harmless, a lost one is not); there
+-- is no skipped status (R175); deleting a message removes its alert; and the lead outbox is as
+-- migration 0006 left it.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(110);
+select plan(113);
 
 -- ---------------------------------------------------------------------------
 -- Tables: RLS enabled and forced, no policies, no privileges for any API role
@@ -235,14 +237,16 @@ update public.contact_message_deliveries
 set local role service_role;
 create temp table claim_long3 on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_long)) as result;
 select ok(
-  (select jsonb_array_length(result -> 'claimed') = 0 and (result ->> 'expired')::integer = 1 from claim_long3),
-  'an unconfirmed failure is never retried after 23 hours, outside the provider''s idempotency window (R91)'
+  (select jsonb_array_length(result -> 'claimed') = 1 and (result ->> 'expired')::integer = 0 from claim_long3),
+  'an unconfirmed failure is still retried after 23 hours: a duplicate staff alert is harmless, a lost one is not (R185)'
 );
+select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_long3), 3, 'as its next attempt, under the same row id and so the same idempotency key');
+select is(public.record_contact_delivery_attempt((select delivery_id from sent_long), 'sent', 're_contact_2'), true, 'and its send is recorded');
 reset role;
 select ok(
-  (select d.status = 'failed' and d.last_error_code = 'stale_unconfirmed' and d.next_attempt_at = 'infinity'::timestamptz
+  (select d.status = 'sent' and d.attempts = 3 and d.unconfirmed_since = now() - interval '23 hours 1 minute'
      from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_long)),
-  'and is parked as failed with stale_unconfirmed, for a human to check'
+  'the sent alert keeps unconfirmed_since: staff can see it may have arrived twice'
 );
 
 -- Deferral: the send budget was spent, so the claim is handed back.
@@ -258,11 +262,14 @@ select results_eq(
   'a deferred row is pending again, uncounted, still due, and shows no attempt time'
 );
 
--- The attempt cap, and a key the provider says it has seen with another message.
-update public.contact_message_deliveries set attempts = 7, status = 'failed', last_error_code = 'rate_limit_exceeded' where id = (select delivery_id from sent_lf);
+-- The attempt cap, and a key the provider says it has seen with another message. Only the cap makes an
+-- unconfirmed contact alert final (R185): this one has been unconfirmed for 30 hours.
+update public.contact_message_deliveries
+   set attempts = 7, status = 'failed', last_error_code = 'send_timeout', unconfirmed_since = now() - interval '30 hours'
+ where id = (select delivery_id from sent_lf);
 set local role service_role;
 create temp table claim_lf on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_lf)) as result;
-select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_lf), 8, 'the eighth attempt is still claimed');
+select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_lf), 8, 'the eighth attempt is still claimed, 30 hours after the send became unconfirmed');
 select is(public.record_contact_delivery_attempt((select delivery_id from sent_lf), 'failed', null, 'rate_limit_exceeded'), true, 'and its failure recorded');
 reset role;
 select ok(
@@ -316,24 +323,26 @@ update public.contact_message_deliveries set claimed_at = now() - interval '25 h
 set local role service_role;
 create temp table claim_g on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_g)) as result;
 select ok(
-  (select jsonb_array_length(result -> 'claimed') = 0 and (result ->> 'expired')::integer = 1 from claim_g),
-  'a row stuck in sending for 25 hours is never sent again, and the claim reports it as expired (R91)'
+  (select jsonb_array_length(result -> 'claimed') = 1 and (result ->> 'expired')::integer = 0 from claim_g),
+  'a row stuck in sending for 25 hours is claimed again, not parked for its age (R185)'
 );
+select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_g), (select delivery_id from sent_g), 'under the same id, as its next attempt');
 reset role;
 select ok(
-  (select d.status = 'failed' and d.last_error_code = 'stale_unconfirmed' and d.next_attempt_at = 'infinity'::timestamptz
-          and d.last_attempt_at = now() - interval '25 hours' and d.unconfirmed_since = now() - interval '25 hours' and d.claimed_at is null
+  (select d.status = 'sending' and d.attempts = 2 and d.last_attempt_at = now() - interval '25 hours'
+          and d.unconfirmed_since = now() - interval '25 hours' and d.claimed_at = now()
      from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_g)),
-  'it is parked as failed with stale_unconfirmed, keeping the lost attempt''s time, with no claim left'
+  'the lost attempt keeps its time, and the alert counts as unconfirmed from when it was first claimed'
 );
 
 update public.contact_message_deliveries set attempts = 8, claimed_at = now() - interval '16 minutes' where id = (select delivery_id from sent_h);
 set local role service_role;
-select is((public.claim_contact_deliveries(1, (select message_id from sent_h)) ->> 'expired')::integer, 1, 'a lost eighth attempt is parked, never sent a ninth time');
+select is((public.claim_contact_deliveries(1, (select message_id from sent_h)) ->> 'expired')::integer, 1, 'a lost eighth attempt is parked, never sent a ninth time: only the attempt cap parks an unconfirmed contact alert');
 reset role;
 select ok(
-  (select d.status = 'failed' and d.attempts = 8 and d.next_attempt_at = 'infinity'::timestamptz from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_h)),
-  'as failed, never due again'
+  (select d.status = 'failed' and d.attempts = 8 and d.next_attempt_at = 'infinity'::timestamptz and d.last_error_code = 'stale_unconfirmed'
+     from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_h)),
+  'as failed with stale_unconfirmed, never due again'
 );
 
 -- ---------------------------------------------------------------------------

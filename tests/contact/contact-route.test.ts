@@ -182,11 +182,24 @@ describe("POST /api/contact storing a message", () => {
     expect(buckets[0]).toBe(buckets[1]);
   });
 
-  it("applies 3 per 10 minutes per client and 100 per hour overall", async () => {
+  it("applies 3 per 10 minutes per client, and overall the alert's own hourly send cap (60 by default; R186)", async () => {
     configure();
     await post(VALID);
     const limits = rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => [args.max_hits, args.window_seconds]);
-    expect(limits).toEqual([[3, 600], [100, 3600]]);
+    expect(limits).toEqual([[3, 600], [60, 3600]]);
+  });
+
+  it("takes the overall limit from LEAD_ACK_SEND_LIMIT_PER_HOUR, the value the alert's send budget spends, so intake never outruns the alerts (R186)", async () => {
+    configure();
+    vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "25");
+    await post(VALID);
+    await afterTasks[0]!();
+    const limits = rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => [args.bucket_key, args.max_hits, args.window_seconds]);
+    expect(limits).toEqual([
+      [expect.stringMatching(/^contact:[0-9a-f]{64}$/), 3, 600],
+      ["contact:global", 25, 3600],
+      ["send:contact_staff_alert", 25, 3600],
+    ]);
   });
 
   it("answers 429 with retry-after when a limit is spent, with no-store", async () => {

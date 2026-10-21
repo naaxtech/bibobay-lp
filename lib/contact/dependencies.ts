@@ -47,11 +47,14 @@ export function createContactDependencies(request: Request, env: Record<string, 
   const staffEmail = getStaffNotificationEmail(env);
   const repository = client ? createSupabaseContactRepository(client) : null;
   const rateLimiter = client ? createSupabaseRateLimiter(client) : null;
+  // R170, R186: one hourly cap for the alert's send budget AND for all messages together.
+  const sendLimitPerHour = ackSendLimitPerHour(env);
   return {
     open: contactFormOpen(env),
     repository,
     rateLimiter,
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    globalLimitPerHour: sendLimitPerHour,
     log: logContactEvent,
     // The alert is attempted after the answer through the outbox's claim, spending its own send
     // budget (R170); without storage, email or a staff address the row waits for the worker.
@@ -60,10 +63,10 @@ export function createContactDependencies(request: Request, env: Record<string, 
         ? createContactAlertSender(
             repository,
             { staffEmail },
-            budgetedSends<ContactDeliveryKind>({ rateLimiter, sendLimitPerHour: ackSendLimitPerHour(env), mailer: email.sender, log: outboxLogger("contact") }),
+            budgetedSends<ContactDeliveryKind>({ rateLimiter, sendLimitPerHour, mailer: email.sender, log: outboxLogger("contact") }),
           )
         : null,
-    // src: `after` from next/server · next 16.3.8 · 2026-10-21 (the call lib/leads/dependencies.ts already makes)
+    // src: https://nextjs.org/docs/app/api-reference/functions/after · next 16.3.8 · 2026-10-21
     runAfterResponse: (task) => after(task),
   };
 }

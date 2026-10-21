@@ -52,11 +52,13 @@ export type OutboxLogEvent<K extends string = string> =
   | { event: "delivery_message_invalid"; kind: K }
   | { event: "delivery_skipped"; count: number }
   /**
-   * Rows parked for a human: `count` at claim (unconfirmed past the idempotency window), or one row
-   * whose failure was final, with its kind and code (review I1: the last attempt, or a code that is
-   * final at any attempt).
+   * Rows parked for a human: `count` at claim (out of attempts, or, in the signup and order
+   * outboxes, unconfirmed past the idempotency window), with the `outbox` whose claim parked them,
+   * since the cron worker logs every outbox under one channel (R185); or one row whose failure was
+   * final, with its kind and code (review I1: the last attempt, or a code that is final at any
+   * attempt).
    */
-  | { event: "delivery_expired"; count: number; kind?: K; code?: string };
+  | { event: "delivery_expired"; count: number; kind?: K; code?: string; outbox?: OutboxName };
 
 export interface AttemptContext<K extends string = string> {
   /**
@@ -136,7 +138,7 @@ export async function attemptNext<K extends string, T extends ClaimedItem<K>>(
   tally.skipped += batch.skipped;
   tally.failed += batch.expired;
   if (batch.skipped > 0) context.log({ event: "delivery_skipped", count: batch.skipped });
-  if (batch.expired > 0) context.log({ event: "delivery_expired", count: batch.expired });
+  if (batch.expired > 0) context.log({ event: "delivery_expired", count: batch.expired, outbox: channel.name });
 
   const item = batch.claimed[0];
   if (!item) return { outcome: batch.skipped + batch.expired > 0 ? "progress" : "none", tally };

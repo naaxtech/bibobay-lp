@@ -178,7 +178,8 @@ ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
                                          1 honeypot filled  -> 400, nothing counted or stored
                                          2 Zod validation (strict object)  -> 400 with field codes
                                          3 form open (contactFormOpen)?  no -> 503 { closed: true }
-                                         4 rate limit (DB: 3 per 10 minutes per hashed client, then 100 per hour in all) -> 429 / 503 if the limiter fails
+                                         4 rate limit (DB: 3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR
+                                           (default 60, the alert's own send cap) per hour in all) -> 429 / 503 if the limiter fails
                                          5 submit_contact_message()  -> 500 if the write fails
                                            (the message and its outbox row, one transaction)
                                          6 200 { ok, persisted: true }
@@ -207,7 +208,12 @@ ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
   contact alerts, so a staff alert waits behind emails to buyers and parents when the run's time runs
   out. It claims no contact alert while `STAFF_NOTIFICATION_EMAIL` is unset: the rows wait and are never
   parked (R177). It needs no `LEAD_IP_HASH_SECRET` for them; only the form does. Retries wait for
-  the next cron run ([deployment.md](deployment.md#email-outbox-worker-task-8a)).
+  the next cron run ([deployment.md](deployment.md#email-outbox-worker-task-8a)). Unlike the other
+  outboxes, an alert whose send was unconfirmed is retried until its eighth attempt and never parked
+  for its age: a duplicate staff alert is harmless, a lost one is not (R185).
+- All messages together are capped per hour at the alert's own send cap
+  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`), so the form never stores more messages than their alerts can
+  announce (R186).
 - No raw IP address is stored. The rate-limit key is the same HMAC of the client address as for
   signups (IPv6 bucketed per /64).
 - A consent-gated visit-statistics event, `contact_submitted`, follows a stored answer only

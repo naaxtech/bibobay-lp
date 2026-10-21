@@ -10,16 +10,19 @@
 --   * contact_message_deliveries: the contact outbox (R169), a table of its own, not a kind of the
 --     signup outbox. It mirrors the outboxes of 0001 and 0006 column for column: attempts,
 --     next_attempt_at with the same capped backoff, the claimed_at / `sending` lease,
---     unconfirmed_since with parking outside the provider's 23-hour idempotency window, and the
---     final-failure codes. Its one kind is the staff alert (`contact_staff_alert`), one per message
+--     unconfirmed_since, and the final-failure codes. One rule differs (R185): an unconfirmed alert
+--     is retried until the attempt cap, never parked outside the provider's 23-hour idempotency
+--     window; unconfirmed_since still records that it may have reached staff twice. Its one kind is
+--     the staff alert (`contact_staff_alert`), one per message
 --     (unique (message_id, kind)); the row id is its idempotency key (`contact-delivery/<id>`,
 --     lib/outbox/contact.ts). There is no `skipped` status (R175): a contact message cannot be
 --     withdrawn, so nothing ever refuses its alert, and the claim always answers "skipped": 0.
 --   * submit_contact_message: stores the message AND queues its alert in one transaction, so the
 --     API never answers `persisted` for a message nobody will be told about.
 --   * claim_contact_deliveries and record_contact_delivery_attempt: the contact outbox's claim and
---     record functions, with the same due rule, lease, parking, backoff and deferral as 0006's
---     claim and record functions for the signup outbox. The claim takes no kinds array (the table
+--     record functions, with the same due rule, lease, backoff and deferral as 0006's claim and
+--     record functions for the signup outbox, and parking at the attempt cap only (R185). The
+--     claim takes no kinds array (the table
 --     holds one kind) and names one message or none (the cron worker). Each claimed entry:
 --       {id, kind, attempt, name, email, topic, message, receivedAt}
 --
@@ -179,10 +182,12 @@ grant execute on function public.submit_contact_message(text, text, text, text) 
 
 -- ---------------------------------------------------------------------------
 -- claim_contact_deliveries: claim up to p_limit (1-50) due contact alerts, optionally of one
--- message. The due rule, the 15-minute stale lease and the parking rule are 0006's:
+-- message. The due rule and the 15-minute stale lease are 0006's; the parking rule is not (R185):
 --   * due: `pending` or `failed` with next_attempt_at reached, or `sending` for over 15 minutes;
---   * parked (failed, next_attempt_at 'infinity', reported as expired): out of attempts, or an
---     unconfirmed send outside the 23-hour idempotency window (`stale_unconfirmed`);
+--   * parked (failed, next_attempt_at 'infinity', reported as expired): out of attempts only. An
+--     unconfirmed send is NOT parked outside the provider's 23-hour idempotency window, as the
+--     signup and order outboxes park theirs: with a once-a-day worker that would lose the alert of a
+--     stored message, while a retry can at worst alert staff twice;
 --   * otherwise claimed: `sending`, the attempt counted, claimed_at now.
 -- Nothing is ever skipped (R175).
 -- ---------------------------------------------------------------------------
@@ -220,13 +225,14 @@ begin
      limit p_limit
      for update of delivery skip locked
   loop
-    if r.attempts >= 8
-       or (r.status = 'sending' and coalesce(r.unconfirmed_since, r.claimed_at) <= now() - interval '23 hours')
-       or (r.status = 'failed' and r.unconfirmed_since is not null and r.unconfirmed_since <= now() - interval '23 hours') then
-      -- R91: outside the provider's idempotency window a send may repeat one already delivered.
+    if r.attempts >= 8 then
+      -- R185: only the attempt cap parks a contact alert. An unconfirmed send is retried at any age,
+      -- under the same key; once the provider has forgotten the key a retry is a new send, and a
+      -- duplicate staff alert is accepted where a lost one is not. A lost eighth attempt (a stale
+      -- `sending` row) is parked as `stale_unconfirmed`.
       update public.contact_message_deliveries as delivery
          set status = 'failed',
-             last_error_code = case when r.status = 'sending' or r.unconfirmed_since is not null then 'stale_unconfirmed' else delivery.last_error_code end,
+             last_error_code = case when r.status = 'sending' then 'stale_unconfirmed' else delivery.last_error_code end,
              unconfirmed_since = case when r.status = 'sending' then coalesce(r.unconfirmed_since, r.claimed_at) else delivery.unconfirmed_since end,
              next_attempt_at = 'infinity',
              last_attempt_at = case when r.status = 'sending' then r.claimed_at else delivery.last_attempt_at end,
@@ -271,7 +277,8 @@ grant execute on function public.claim_contact_deliveries(integer, uuid) to serv
 --   sent      the provider accepted it; its message id is kept.
 --   failed    a short error code (never a provider message); next attempt with exponential backoff
 --             (2^attempts minutes, at most six hours), or never after the eighth attempt or an
---             idempotency conflict. An unconfirmed failure starts the 23-hour window (R91).
+--             idempotency conflict. An unconfirmed failure sets unconfirmed_since (R91), which
+--             here marks a possible duplicate and parks nothing (R185).
 --   deferred  no attempt was made (the send budget was spent): the claim is handed back, so the
 --             row returns to its earlier status and attempt count and stays due.
 -- Returns false when the row was not `sending` (already recorded, parked, or never claimed).
