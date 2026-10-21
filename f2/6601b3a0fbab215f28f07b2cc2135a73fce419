@@ -1,0 +1,43 @@
+CHANGELOG.md
+  s_37deb30b6489aa::t_8fd1941c2f65e5 17-24,31
+components/landing/Hero.tsx
+  s_37deb30b6489aa::t_46e0d499afadf7 3,26-27,30-31,41
+components/preview/PreviewBoundary.tsx
+  s_37deb30b6489aa::t_6b83044e45f1d4 1-24
+components/preview/VisualEditingClient.tsx
+  s_37deb30b6489aa::t_fcc6ef42e521a9 9-12
+components/preview/VisualEditingLoader.tsx
+  s_37deb30b6489aa::t_0600de4a37d4e0 6,18-23
+components/preview/style-nonce.ts
+  s_37deb30b6489aa::t_9dc9077f815e87 1-30
+docs/cms-operations.md
+  s_37deb30b6489aa::t_95649b86ccd034 204,214-218,222-223
+e2e/landing/contrast.spec.ts
+  s_37deb30b6489aa::t_2c8bc9bc9adbb0 3-4,106-108
+studio/sanity.config.ts
+  s_37deb30b6489aa::t_92bce3137e6f44 34-36
+tests/content/studio-preview-config.test.ts
+  s_37deb30b6489aa::t_eb770c86e76a2b 14-16,18
+tests/landing/stega-attributes.test.tsx
+  s_37deb30b6489aa::t_ccb26ade4d23f4 59-85
+tests/security/preview-style-nonce.test.tsx
+  s_37deb30b6489aa::t_0787b7d6faea85 1-83
+lib/content/stega.ts
+  s_37deb30b6489aa::t_559f1203016022 54-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f26601b3a0fbab215f28f07b2cc2135a73fce419",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
