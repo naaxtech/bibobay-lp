@@ -1,0 +1,136 @@
+components/landing/FreebieCard.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 2,17,48
+.env.example
+  s_37deb30b6489aa::t_47553b643e8a93 22
+tests/security/headers.test.ts
+  s_37deb30b6489aa::t_47553b643e8a93 12,77,79-81
+lib/sanity/client.ts
+  s_37deb30b6489aa::t_47553b643e8a93 3,12-15,17-23
+studio/sanity.config.ts
+  s_37deb30b6489aa::t_47553b643e8a93 34-36
+app/api/draft-mode/enable/route.ts
+  s_37deb30b6489aa::t_47553b643e8a93 2,9-10,18-19
+components/preview/PreviewNotice.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 2-3,6-8,12-18
+components/preview/refresh.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-41
+components/preview/PreviewBoundary.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 1-24
+components/preview/presentation-context.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-19
+components/preview/VisualEditingClient.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 1-69
+components/shop/AddToOrder.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 6,43
+lib/content/brand-art.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1,113-114
+lib/sanity/draft-mode-paths.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-3
+CHANGELOG.md
+  s_37deb30b6489aa::t_369939fb06d799 25
+  s_37deb30b6489aa::t_47553b643e8a93 33-60
+docs/architecture.md
+  s_37deb30b6489aa::t_47553b643e8a93 330-336
+lib/sanity/fetch.ts
+  s_37deb30b6489aa::t_47553b643e8a93 5,7,20-21,23,67-71,74,83,91,96
+lib/sanity/perspective.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-45
+lib/security/headers.ts
+  s_37deb30b6489aa::t_47553b643e8a93 20-27,127-128
+tests/content/studio-preview-config.test.ts
+  s_37deb30b6489aa::t_47553b643e8a93 14-16,18
+tests/security/draft-mode.test.ts
+  s_37deb30b6489aa::t_47553b643e8a93 9-14
+tests/support/stega.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-43
+app/api/draft-mode/disable/route.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1,3-8,10-11
+components/landing/Hero.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 3,26-27,30-31,41,81
+tests/content/stega.test.ts
+  s_37deb30b6489aa::t_031971ac37f7ac 177-178,183,186
+  s_37deb30b6489aa::t_fe36a1c92feb41 7-8
+  s_37deb30b6489aa::t_61a85d6d847cd9 138-162
+  s_37deb30b6489aa::t_47553b643e8a93 1-6,9-10,13-137,163-176,179-182,184-185,187-192,195-205
+  s_37deb30b6489aa::t_66d2f44e403791 193-194
+  s_37deb30b6489aa::t_b0698dbc517ff8 11-12
+components/preview/VisualEditingLoader.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 1-24
+lib/sanity/draft-mode.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1,5-6,16,41-65,71-74,79,90-98,115-168
+lib/sanity/preview-actions.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-21
+lib/content/normalize.ts
+  s_37deb30b6489aa::t_44074432f8e4e5 140-144
+  s_37deb30b6489aa::t_47553b643e8a93 5,11-15,17-18,20,31,47,59-60,62-64,66-68,73-74,80-81,85,94,99,114,123,128,134,159,161
+package.json
+  s_37deb30b6489aa::t_47553b643e8a93 27,38
+docs/deployment.md
+  s_37deb30b6489aa::t_47553b643e8a93 37
+app/(commerce)/shop/[slug]/page.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 13,72
+e2e/security/visual-editing.spec.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-41
+tests/content/studio-contract.test.ts
+  s_37deb30b6489aa::t_f00aaa8fbef437 31
+  s_37deb30b6489aa::t_47553b643e8a93 28-30,32-36
+tests/security/live-preview.test.ts
+  s_37deb30b6489aa::t_f6f66041d565a2 82-97
+  s_37deb30b6489aa::t_47553b643e8a93 1-81,98-256
+components/shop/OrderPadSummary.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 7,83
+components/preview/style-nonce.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-30
+lib/seo/metadata.ts
+  s_37deb30b6489aa::t_47553b643e8a93 19-21,69-70,113-114,129-130,179-180,205-206,264-265,291-292
+  s_37deb30b6489aa::t_cd0aa5d8260f22 7
+  s_37deb30b6489aa::t_e60d0f3fdf41d7 154-155
+tests/landing/stega-attributes.test.tsx
+  s_37deb30b6489aa::t_0b0b8f296b26ef 114-132,137-139
+  s_37deb30b6489aa::t_4ebdbcfa998ebb 133-136
+  s_37deb30b6489aa::t_6bd0f58b3271cd 15,17
+  s_37deb30b6489aa::t_47553b643e8a93 1-4,6,8-14,16,18-113,140-158
+  s_37deb30b6489aa::t_86a789f719b621 5,7
+lib/content/stega.ts
+  s_37deb30b6489aa::t_47553b643e8a93 1-63
+tests/contact/contact-page.test.tsx
+  s_37deb30b6489aa::t_7acf6dc6431a12 105
+  s_37deb30b6489aa::t_d6028d9c5ca93a 2,8-9,12,14-15
+  s_37deb30b6489aa::t_28040a0bd1de3b 106-152
+studio/schemaTypes/documents/singletons.ts
+  s_37deb30b6489aa::t_47553b643e8a93 56-57,80
+  s_37deb30b6489aa::t_963c72ab31864d 97-98
+docs/cms-operations.md
+  s_37deb30b6489aa::t_df0d45a598f96d 186-188,191
+  s_37deb30b6489aa::t_47fce3589f144a 189-190
+  s_37deb30b6489aa::t_47553b643e8a93 215-258
+e2e/landing/contrast.spec.ts
+  s_37deb30b6489aa::t_47553b643e8a93 3-4,106-108
+components/forms/ContactForm.tsx
+  s_37deb30b6489aa::t_9c0e069a6ea3b3 20
+  s_37deb30b6489aa::t_41ae656c52916d 335,337-338
+components/preview/PreviewExitLink.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 1-22
+components/forms/LeadForm.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 20,359,376
+tests/security/preview-style-nonce.test.tsx
+  s_37deb30b6489aa::t_47553b643e8a93 1-83
+package-lock.json
+  s_37deb30b6489aa::t_383818e40ebbf0 14,25,572-586,1165-1202,1818-1826,3384-3452,3465-3546,3572-3618,3628-3721,4581-4601,4626-4631,4658-4663,5313-5318,5822-5830,5878-5907,5914-5922,5943-5952,5959-5964,6021-6040,6176-6211,7062-7076,7249-7271,7375-7389,7663-7692,7710-7715,7775-7780,7796-7819,7978-7987,8063-8072,8161-8172,8817-8828,8896-8904,8929-8940,8973-9009,9423-9447,9606-9611,9719-9728,9795-9825,9849-9864,10116-10135,10190-10198,10447-10456,10507-10515,10653-10688,10712-10717,10765-10773,10965-10976,11080,11150-11187,11267-11281,11295-11308,11988-11997
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e0c92bf9ed62f803634e8608619f3d6fe3042099",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
