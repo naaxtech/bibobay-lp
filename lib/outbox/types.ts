@@ -1,10 +1,12 @@
+import type { ContactTopic } from "@/lib/contact/fields";
 import type { AgeBand } from "@/lib/leads/fields";
-import type { LeadDeliveryKind, OrderEmailKind } from "./constants";
+import type { ContactDeliveryKind, LeadDeliveryKind, OrderEmailKind } from "./constants";
 
 /**
- * What the outbox claim functions of migration 0006 hand out (Task 8a). Each claimed row carries
- * only what its email needs; the Supabase adapters (lib/supabase/leads.ts, lib/supabase/outbox.ts)
- * rebuild these shapes key by key and refuse anything else.
+ * What the outbox claim functions of migration 0006 hand out (Task 8a), and those of migration 0008
+ * for the contact outbox (R169). Each claimed row carries only what its email needs; the Supabase
+ * adapters (lib/supabase/leads.ts, lib/supabase/outbox.ts, lib/supabase/contact.ts) rebuild these
+ * shapes key by key and refuse anything else.
  */
 
 /** The result of recording a claimed row. `deferred` hands the claim back without an attempt. */
@@ -15,13 +17,16 @@ export type OutboxOutcome =
 
 export interface ClaimBatch<T> {
   claimed: T[];
-  /** Rows the claim refused to send (a withdrawn lead, a superseded quote): now `skipped`. */
+  /**
+   * Rows the claim refused to send (a withdrawn lead, a superseded quote): now `skipped`. Always 0
+   * for the contact outbox, whose messages cannot be withdrawn (R175).
+   */
   skipped: number;
   /** Rows parked for a human (R91: unconfirmed past the idempotency window, or out of attempts). */
   expired: number;
 }
 
-/** Which rows one claim may take: one owner (a lead or an order) or any, and some kinds. */
+/** Which rows one claim may take: one owner (a lead, an order or a contact message) or any, and some kinds. */
 export interface ClaimOptions<K extends string> {
   ownerId?: string;
   kinds: readonly K[];
@@ -66,6 +71,18 @@ export interface ClaimedOrderEmail {
   quote: ClaimedQuote | null;
 }
 
+export interface ClaimedContactDelivery {
+  id: string;
+  kind: ContactDeliveryKind;
+  attempt: number;
+  name: string;
+  email: string;
+  topic: ContactTopic;
+  message: string;
+  /** The message's `created_at`, as the claim's JSON string. */
+  receivedAt: string;
+}
+
 /** The lead outbox through migration 0006's RPCs. */
 export interface LeadDeliveryOutbox {
   claimDeliveries(options: ClaimOptions<LeadDeliveryKind>): Promise<ClaimBatch<ClaimedLeadDelivery>>;
@@ -78,4 +95,11 @@ export interface OrderEmailOutbox {
   claimEmails(options: ClaimOptions<OrderEmailKind>): Promise<ClaimBatch<ClaimedOrderEmail>>;
   /** False when the row was no longer claimed (already recorded, or parked). */
   recordEmailAttempt(emailId: string, outcome: OutboxOutcome): Promise<boolean>;
+}
+
+/** The contact outbox through migration 0008's RPCs. */
+export interface ContactDeliveryOutbox {
+  claimDeliveries(options: ClaimOptions<ContactDeliveryKind>): Promise<ClaimBatch<ClaimedContactDelivery>>;
+  /** False when the row was no longer claimed (already recorded, or parked). */
+  recordDeliveryAttempt(deliveryId: string, outcome: OutboxOutcome): Promise<boolean>;
 }
