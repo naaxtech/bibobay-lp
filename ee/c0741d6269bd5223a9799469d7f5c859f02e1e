@@ -1,0 +1,30 @@
+tests/orders/order-form-bot-check.test.tsx
+  s_37deb30b6489aa::t_832bc28b9b379a 1-160
+components/shop/OrderRequest.tsx
+  s_37deb30b6489aa::t_a82da4b3770f8b 27-28,39,72
+components/forms/OrderForm.tsx
+  s_37deb30b6489aa::t_a82da4b3770f8b 7-8,10,45-46,102,129,131,220,230,232-240,268-269,326,442-443,456-457,461-462
+tests/orders/order-form.test.tsx
+  s_37deb30b6489aa::t_a82da4b3770f8b 57
+tests/shop/order-request.test.tsx
+  s_37deb30b6489aa::t_a82da4b3770f8b 24
+app/(commerce)/order/page.tsx
+  s_37deb30b6489aa::t_a82da4b3770f8b 67
+  s_37deb30b6489aa::t_d01b4c876d3451 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eec0741d6269bd5223a9799469d7f5c859f02e1e",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
