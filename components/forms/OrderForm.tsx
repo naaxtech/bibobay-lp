@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent } from "react";
 
+import { BotCheckSlot } from "@/components/forms/bot-check/BotCheckSlot";
+import { useBotCheck } from "@/components/forms/bot-check/useBotCheck";
 import { useOrderPad } from "@/components/shop/OrderPadProvider";
+import { BOT_CHECK_MESSAGES, BOT_CHECK_TOKEN_FIELD } from "@/lib/bot-check/fields";
 import type { CountryOption } from "@/lib/orders/countries";
 import {
   HONEYPOT_FIELD,
@@ -39,6 +42,8 @@ export interface OrderFormProps {
   onReceived: (receipt: OrderReceipt) => void;
   /** Where the order is posted; tests and the route share the default. */
   endpoint?: string;
+  /** The bot check's public site key, read on the server; null while the check is off. */
+  botCheckSiteKey: string | null;
 }
 
 type TextField = "contactName" | "email" | "phone" | "addressLine1" | "addressLine2" | "city" | "region" | "postalCode";
@@ -94,6 +99,7 @@ function receiptFrom(body: unknown): OrderReceipt | null {
 /** The message for every answer that is neither a stored order nor field problems. */
 function refusalMessage(status: number, body: unknown): string {
   if (status === 429) return ORDER_COPY.outcome.rateLimited;
+  if (status === 403) return BOT_CHECK_MESSAGES.refused;
   if (status === 503) return ORDER_COPY.outcome.busy;
   if (status === 404) return ORDER_COPY.outcome.unavailable;
   if (status === 400 && isRecord(body) && body.message === ORDER_COPY.outcome.productsUnavailable) return ORDER_COPY.outcome.productsUnavailable;
@@ -120,8 +126,9 @@ function refusalMessage(status: number, body: unknown): string {
  * polite status line whose height is reserved for every message it can show, and a submit button
  * disabled only while sending (and before hydration, so a native submit never posts the form).
  */
-export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpoint = "/api/orders" }: OrderFormProps) {
+export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpoint = "/api/orders", botCheckSiteKey }: OrderFormProps) {
   const pad = useOrderPad();
+  const bot = useBotCheck(botCheckSiteKey, "order");
   const id = useId();
   const fieldId = (field: OrderField) => `${id}-${field}`;
   const hintId = (field: OrderField) => `${id}-${field}-hint`;
@@ -210,7 +217,7 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
     // The server stores the email lower-cased, so letter case alone is not a change (R93).
     const sent = JSON.stringify({ ...content, email: content.email.toLowerCase() });
     if (keyRef.current?.content !== sent) keyRef.current = { key: newSubmissionKey(), content: sent };
-    const body = {
+    const body: Record<string, unknown> = {
       ...content,
       submissionKey: keyRef.current.key,
       // Sent as found: a person leaves it empty, and the server turns anything else away.
@@ -220,7 +227,17 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
     pendingRef.current = true;
     setPending(true);
     let returnFocus = true;
+    let carriedToken = false;
     try {
+      if (bot.enabled) {
+        const checked = await bot.token();
+        if ("problem" in checked) {
+          setOutcome(checked.problem === "interactive" ? BOT_CHECK_MESSAGES.interactive : BOT_CHECK_MESSAGES.notLoaded);
+          return;
+        }
+        body[BOT_CHECK_TOKEN_FIELD] = checked.token;
+        carriedToken = true;
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
@@ -248,6 +265,8 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
     } catch {
       setOutcome(ORDER_COPY.outcome.notConfirmed);
     } finally {
+      // R218: the token is single use, so every attempt that carried one gets a fresh one.
+      if (carriedToken) bot.reset();
       pendingRef.current = false;
       setPending(false);
       if (returnFocus) setButtonFocus((count) => count + 1);
@@ -304,7 +323,7 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
   };
 
   return (
-    <form className="lead-form order-form" aria-label={ORDER_COPY.form.label} method="post" noValidate onSubmit={handleSubmit}>
+    <form className="lead-form order-form" aria-label={ORDER_COPY.form.label} method="post" noValidate onSubmit={handleSubmit} onFocusCapture={bot.prepare} onPointerDownCapture={bot.prepare}>
       {listedErrors.length > 0 ? (
         // role="group": a generic <div> may not be named (ARIA 1.2), so its title might never be
         // announced when it takes focus.
@@ -420,6 +439,8 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
         <input id={`${id}-website`} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {ORDER_COPY.form.submit}
       </button>
@@ -432,9 +453,13 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
       <div className="lead-form__outcome" data-reserve-a={ORDER_COPY.form.sending} data-reserve-b={ORDER_COPY.outcome.rateLimited}>
         <div className="lead-form__outcome" data-reserve-a={ORDER_COPY.outcome.notConfirmed} data-reserve-b={ORDER_COPY.outcome.busy}>
           <div className="lead-form__outcome" data-reserve-a={ORDER_COPY.outcome.unavailable} data-reserve-b={ORDER_COPY.outcome.productsUnavailable}>
+            <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.refused} data-reserve-b={BOT_CHECK_MESSAGES.interactive}>
+              <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.notLoaded}>
             <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome ? "error" : undefined}>
               {pending ? ORDER_COPY.form.sending : (outcome ?? "")}
             </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

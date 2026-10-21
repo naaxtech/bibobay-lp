@@ -21,7 +21,7 @@ function mount(ids: string[]) {
   window.localStorage.setItem(ORDER_PAD_STORAGE_KEY, JSON.stringify({ lines: ids.map((productId) => ({ productId, quantity: 1 })) }));
   render(
     <OrderPadProvider>
-      <OrderRequest products={PRODUCTS} consentCopy="I agree." countries={[]} trackingEnabled={false} />
+      <OrderRequest products={PRODUCTS} consentCopy="I agree." countries={[]} trackingEnabled={false} botCheckSiteKey={null} />
     </OrderPadProvider>,
   );
 }

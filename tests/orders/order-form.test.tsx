@@ -54,7 +54,7 @@ function renderForm(listedIds: readonly string[] = ["product-tula", "product-bob
   const onReceived = vi.fn<(receipt: OrderReceipt) => void>();
   render(
     <OrderPadProvider>
-      <OrderForm consentCopy={CONSENT} countries={COUNTRIES} listedIds={listedIds} onReceived={onReceived} />
+      <OrderForm consentCopy={CONSENT} countries={COUNTRIES} listedIds={listedIds} onReceived={onReceived} botCheckSiteKey={null} />
     </OrderPadProvider>,
   );
   return onReceived;
