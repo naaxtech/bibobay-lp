@@ -1,0 +1,43 @@
+lib/bot-check/turnstile.ts
+  s_37deb30b6489aa::t_0742d6ef7074c3 47-48
+  s_37deb30b6489aa::t_cc1f253b07f8b7 26-27
+  s_37deb30b6489aa::t_2dae5dad74442e 75-76,79,82,85-100,102
+  s_37deb30b6489aa::t_17f1f4d6f90b58 134-137,139
+  s_37deb30b6489aa::t_a6f5a033930b3e 113,116
+  s_37deb30b6489aa::t_6fd999d40f7367 16
+lib/bot-check/gate.ts
+  s_37deb30b6489aa::t_66825825bc16a5 15
+  s_37deb30b6489aa::t_cf9da3e92881c8 39
+  s_37deb30b6489aa::t_9d4ff663a9d9f8 28
+  s_37deb30b6489aa::t_b33622add0f871 3
+tests/bot-check/turnstile.test.ts
+  s_37deb30b6489aa::t_0c1ab54dadd1ea 86-99
+  s_37deb30b6489aa::t_36e5ea1705a6dc 120-126
+  s_37deb30b6489aa::t_391e130cecf295 187-192,195-196,199-200,203,208-220
+  s_37deb30b6489aa::t_f670697e84f676 53,56-57
+  s_37deb30b6489aa::t_1ae0769f617c6d 144,147-149
+  s_37deb30b6489aa::t_399f33ff22c98a 153,156-158
+  s_37deb30b6489aa::t_aacd8ee22d57ef 40
+tests/bot-check/gate.test.ts
+  s_37deb30b6489aa::t_1d7dbd6d1b79ef 58,62-64
+  s_37deb30b6489aa::t_0051d80efd49dd 53
+  s_37deb30b6489aa::t_6a55679b1cc304 24
+  s_37deb30b6489aa::t_e045a6ff67165c 43
+  s_37deb30b6489aa::t_5edb183986a3a6 65-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "144845e20a08fafb188ace62e713675b941a93fe",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
