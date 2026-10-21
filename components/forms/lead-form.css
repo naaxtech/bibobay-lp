@@ -171,7 +171,7 @@
   }
 
   /*
-   * The outcome line: two nested grids whose ::before and ::after hold, invisibly, every message the
+   * The outcome line: nested grids whose ::before and ::after hold, invisibly, every message the
    * status can show (data-reserve-a/b on each wrapper). Pseudo-elements and the status share one
    * grid cell, so the line is always as tall as its longest message at the current width. They are
    * spacers, not content: no DOM text, not in the accessibility tree, never revealed. (Real hidden
@@ -267,5 +267,10 @@
   /* The bot check's slot (R217): no reserved height, since the widget is usually invisible. */
   .bot-check {
     max-inline-size: 100%;
+  }
+
+  /* The empty slot is still a grid item, so it would add a second 1.25rem gap above the button; this cancels it until the widget is shown. */
+  .lead-form > .bot-check:not([data-visible]) {
+    margin-block-start: -1.25rem;
   }
 }

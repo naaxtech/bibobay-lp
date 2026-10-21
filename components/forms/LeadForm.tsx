@@ -365,15 +365,15 @@ export function LeadForm({ copy, endpoint = "/api/leads", botCheckSiteKey }: Lea
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
-      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} visible={bot.visible} />
 
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}
       </button>
 
       {/*
-       * The outcome line never changes height (spec §13 "no layout jump"). Its two wrappers stack
-       * four invisible CSS pseudo-elements in the status's grid cell, one per message the line can
+       * The outcome line never changes height (spec §13 "no layout jump"). Its four wrappers stack
+       * eight invisible CSS pseudo-elements in the status's grid cell, one per message the line can
        * show (lead-form.css), so the cell is always as tall as the longest one at the current width.
        * The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
        * success message cannot be read or announced before the server reports the signup stored.

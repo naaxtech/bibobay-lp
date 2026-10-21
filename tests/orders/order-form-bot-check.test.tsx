@@ -18,7 +18,7 @@ let tokens: BotCheckTokenResult[] = [];
 const token = vi.fn(async (): Promise<BotCheckTokenResult> => tokens.shift() ?? { token: "t1" });
 let enabled = true;
 vi.mock("@/components/forms/bot-check/useBotCheck", () => ({
-  useBotCheck: (): BotCheckHandle => ({ enabled, containerRef: { current: null }, prepare, token, reset }),
+  useBotCheck: (): BotCheckHandle => ({ enabled, containerRef: { current: null }, visible: false, prepare, token, reset }),
 }));
 
 const CONSENT = "I am an adult and agree to the order terms.";

@@ -18,6 +18,7 @@ vi.mock("@/components/forms/bot-check/useBotCheck", () => ({
   useBotCheck: (siteKey: string | null) => ({
     enabled: siteKey !== null && bot.enabled,
     containerRef: { current: null },
+    visible: false,
     prepare: bot.prepare,
     token: bot.token,
     reset: bot.reset,

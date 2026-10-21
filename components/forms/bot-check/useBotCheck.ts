@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import type { BotCheckAction } from "@/lib/bot-check/fields";
 
@@ -11,6 +11,8 @@ export type BotCheckTokenResult = { token: string } | { problem: "interactive" |
 export interface BotCheckHandle {
   enabled: boolean;
   containerRef: RefObject<HTMLDivElement | null>;
+  /** True while Turnstile is showing its widget (a challenge or an error); layout only. */
+  visible: boolean;
   /** Idempotent: loads Cloudflare's script and renders the widget on the first call. */
   prepare(): void;
   /** The current token, or waits up to 15 s for one. */
@@ -39,6 +41,8 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
     waiters: new Set<(result: BotCheckTokenResult) => void>(),
   });
 
+  const [visible, setVisible] = useState(false);
+
   const settle = useCallback((result: BotCheckTokenResult) => {
     const waiters = Array.from(state.current.waiters);
     state.current.waiters.clear();
@@ -57,6 +61,7 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
       current.interactive = false;
       current.failed = false;
       current.token = null;
+      setVisible(false);
       settle({ problem: "unavailable" });
     };
   }, [settle]);
@@ -96,6 +101,7 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
           },
           "before-interactive-callback": () => {
             current.interactive = true;
+            setVisible(true);
             if (current.token === null) settle({ problem: "interactive" });
           },
           "after-interactive-callback": () => {
@@ -105,7 +111,9 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
           // Returning true tells Turnstile the error is handled, so it prints nothing to the console.
           "error-callback": () => {
             current.failed = true;
+            current.interactive = false;
             current.token = null;
+            setVisible(true);
             settle({ problem: "unavailable" });
             return true;
           },
@@ -147,11 +155,12 @@ export function useBotCheck(siteKey: string | null, action: BotCheckAction): Bot
     const current = state.current;
     current.token = null;
     current.interactive = false;
+    setVisible(false);
     if (current.api && current.widgetId !== null) current.api.reset(current.widgetId);
   }, []);
 
   return useMemo(
-    () => ({ enabled: siteKey !== null, containerRef, prepare, token, reset }),
-    [prepare, reset, siteKey, token],
+    () => ({ enabled: siteKey !== null, containerRef, visible, prepare, token, reset }),
+    [prepare, reset, siteKey, token, visible],
   );
 }

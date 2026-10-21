@@ -15,6 +15,9 @@ import { submitLead, type LeadApiBody } from "@/lib/leads/submit";
  * configured, answered with `LEAD_SIGNUPS_CLOSED_MESSAGE` (lib/leads/submit.ts) in the same shape.
  */
 export const runtime = "nodejs";
+// A siteverify timeout and its retry stay inside this budget; on Hobby without Fluid compute the default is shorter.
+// src: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/maxDuration.md · next 16.3.8 · 2026-10-22
+export const maxDuration = 30;
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 

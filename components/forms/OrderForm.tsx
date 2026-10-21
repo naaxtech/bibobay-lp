@@ -439,14 +439,14 @@ export function OrderForm({ consentCopy, countries, listedIds, onReceived, endpo
         <input id={`${id}-website`} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
-      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} visible={bot.visible} />
 
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {ORDER_COPY.form.submit}
       </button>
 
       {/*
-       * The status line never changes height: three wrappers stack six invisible pseudo-elements in
+       * The status line never changes height: five wrappers stack ten invisible pseudo-elements (nine carry a message) in
        * its grid cell, one per message it can show (lead-form.css), held in data attributes so no
        * message is read or announced before it applies.
        */}

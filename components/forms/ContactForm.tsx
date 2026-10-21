@@ -344,7 +344,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH, botCheckSiteKey
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
-      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} visible={bot.visible} />
 
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}

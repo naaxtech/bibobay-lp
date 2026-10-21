@@ -216,7 +216,7 @@ the scopes below, check that `wrangler whoami` shows the brand account (bibobay.
 widget, which is bound to `bibobay.com` (that covers `www`) and nothing else:
 
 ```bash
-npx wrangler@4.151.3 login --device --scopes account:read user:read challenge-widgets.write zone:read email_routing:write
+npx wrangler@4.151.3 login --device --scopes account:read user:read challenge-widgets.write
 npx wrangler@4.151.3 whoami
 npx wrangler@4.151.3 turnstile widget create "BIBO Bay forms" --domain bibobay.com --mode managed --json
 ```
@@ -227,18 +227,35 @@ Write the JSON to a temporary file outside the repository, pipe its `sitekey` in
 If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
 
 - **Production only.** Preview hostnames are not on the widget's domain list, so a preview with the keys
-  would fail every check. Previews run with both unset.
+  would fail every check. Previews run with both unset. A preview therefore runs with the check off, so it must never hold production storage or email secrets, or it must keep Vercel Deployment Protection on; otherwise a preview URL accepts tokenless signups.
 - **Test keys are refused in Vercel production.** Cloudflare's published test secret accepts any token
   (probed on 2026-10-22), so `botCheckConfig` reports the state misconfigured when `VERCEL_ENV=production`
   and a test key is set: forms answer 503, `*_bot_check_unconfigured` is reported, and
   `scripts/verify-env.ts` fails the build, naming the variables and never their values.
 - **Order of go-live.** Merge with the keys unset (a no-op live). Check `/privacy`: the repository
-  fallback names Cloudflare by itself; a Sanity privacy text must be edited to name it first. Then set both
+  fallback names Cloudflare by itself; a Sanity privacy text must be edited to name it first. Before
+  setting the keys, confirm `NEXT_PUBLIC_APP_URL` is exactly `https://www.bibobay.com` (or unset): the
+  hostname check compares against it, and the apex redirects to www. Then set both
   keys on Production, redeploy the CURRENT production deployment (R188), then check `/api/readiness` shows
-  `botCheck: true`, a `POST /api/contact` without a token answers 403 (this needs an open contact form and a
+  `botCheck: true`, and a `POST /api/contact` without a token answers 403 (this needs an open contact form and a
   valid body, with a topic one of the form's values, e.g. `press`; otherwise the 503 `closed` or a 400 comes
-  first), and a real browser on www loads the widget on first focus
-  inside the form with no CSP violation.
+  first). Assert that the JSON `message` equals the refused copy ("We couldn't confirm this came from a
+  person. Please try again."), not only the 403: a 403 from Cloudflare's edge or Vercel's would otherwise pass.
+  Then do one real browser submission on www, a signup or a contact message from an address the owner
+  controls. Require the success copy, then check the Vercel runtime logs for no `*_bot_check_*` lines. This
+  is the only check that sends a real token through siteverify, so it catches a wrong secret, a site key and
+  secret from two different widgets, or a hostname mismatch. Sentry is not configured yet, so the reported
+  warnings reach the Vercel logs only. Finally a real browser on www loads the widget on first focus inside
+  the form with no CSP violation. That check must ignore `/cdn-cgi/` requests, or run only after
+  Cloudflare's Email Address Obfuscation is off or the `@` and `www` records are DNS only: while the zone is
+  proxied, Cloudflare injects a blocked `email-decode.min.js`, which is not this slice's doing.
+- **Cloudflare proxy and WAF (layer 11).** The domain's DNS moved to Cloudflare on 2026-10-22, so the plan's
+  deferral trigger has fired. Pre-clearance and the Cloudflare WAF stay off. The recommended set-up is `@`
+  and `www` DNS only, because Vercel advises against a reverse proxy in front of it. Behind the proxy,
+  Vercel's `x-forwarded-for` is Cloudflare's address, so the per-visitor rate limits pool visitors. New
+  trigger to revisit: the owner decides to keep the proxy on. Then design the client address
+  (`CF-Connecting-IP` cannot be trusted on Hobby, because a direct request can forge it) and the WAF
+  together. (src: https://vercel.com/docs/headers/request-headers · 2026-10-22)
 - **Off-switch.** Remove both variables from Production and redeploy the CURRENT production deployment
   (never an older one: R188). See the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile).
   Code rollback is `git revert -m 1 <merge-sha>`.

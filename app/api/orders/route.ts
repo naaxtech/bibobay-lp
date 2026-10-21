@@ -21,6 +21,9 @@ import { getGateSettings } from "@/lib/sanity/fetch";
  * catalogue unavailable.
  */
 export const runtime = "nodejs";
+// A siteverify timeout and its retry stay inside this budget; on Hobby without Fluid compute the default is shorter.
+// src: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/maxDuration.md · next 16.3.8 · 2026-10-22
+export const maxDuration = 30;
 
 /** Largest order body read. Forty lines and a full address are well under 8 KB. */
 const ORDER_BODY_LIMIT_BYTES = 32 * 1024;

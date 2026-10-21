@@ -31,7 +31,7 @@ function options0() {
 function Host({ siteKey, onHandle }: { siteKey: string | null; onHandle: (h: BotCheckHandle) => void }) {
   const handle = useBotCheck(siteKey, "contact");
   onHandle(handle);
-  return <BotCheckSlot enabled={handle.enabled} containerRef={handle.containerRef} />;
+  return <BotCheckSlot enabled={handle.enabled} containerRef={handle.containerRef} visible={handle.visible} />;
 }
 
 function mount(siteKey: string | null = "site-key", width = 320) {
@@ -265,6 +265,22 @@ describe("token()", () => {
     await expect(pending).resolves.toEqual({ token: "t2" });
   });
 
+  it("an error during an interactive challenge clears interactive, so token() takes the recovery path", async () => {
+    const { handle } = mount();
+    act(() => handle().prepare());
+    await ready();
+    await act(async () => {
+      fire(options0(), "before-interactive-callback");
+      fire(options0(), "error-callback", "110200");
+    });
+    const pending = handle().token();
+    expect(fake.resets).toEqual(["w1"]);
+    await act(async () => {
+      fire(options0(), "callback", "t2");
+    });
+    await expect(pending).resolves.toEqual({ token: "t2" });
+  });
+
   it("a waiting submit is released at once when the widget errors", async () => {
     const { handle } = mount();
     act(() => handle().prepare());
@@ -314,6 +330,31 @@ describe("reset, unmount, disabled", () => {
   it("the slot renders nothing when the check is off", () => {
     const { view } = mount(null);
     expect(view.container.querySelector(".bot-check")).toBeNull();
+  });
+
+  it("visible is false at first, true on a challenge or an error, false again after reset", async () => {
+    const { handle } = mount();
+    expect(handle().visible).toBe(false);
+    act(() => handle().prepare());
+    await ready();
+    await act(async () => {
+      fire(options0(), "before-interactive-callback");
+    });
+    expect(handle().visible).toBe(true);
+    act(() => handle().reset());
+    expect(handle().visible).toBe(false);
+    await act(async () => {
+      fire(options0(), "error-callback", "110200");
+    });
+    expect(handle().visible).toBe(true);
+  });
+
+  it("the slot marks data-visible only while the widget is shown", () => {
+    const hidden = render(<BotCheckSlot enabled containerRef={{ current: null }} visible={false} />);
+    expect(hidden.container.querySelector(".bot-check")?.hasAttribute("data-visible")).toBe(false);
+    cleanup();
+    const shown = render(<BotCheckSlot enabled containerRef={{ current: null }} visible />);
+    expect(shown.container.querySelector(".bot-check")?.hasAttribute("data-visible")).toBe(true);
   });
 
   it("the slot has no live region", () => {

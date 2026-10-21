@@ -19,7 +19,7 @@ const bot = vi.hoisted(() => ({
 vi.mock("@/components/forms/bot-check/useBotCheck", () => ({
   useBotCheck: (siteKey: string | null) => {
     bot.siteKeys.push(siteKey);
-    return { enabled: siteKey !== null, containerRef: createRef<HTMLDivElement>(), prepare: bot.prepare, token: bot.token, reset: bot.reset };
+    return { enabled: siteKey !== null, containerRef: createRef<HTMLDivElement>(), visible: false, prepare: bot.prepare, token: bot.token, reset: bot.reset };
   },
 }));
 

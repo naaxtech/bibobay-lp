@@ -222,7 +222,7 @@ Environment names: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (public) and `TURNSTILE_SECR
 Both unset means no check: the forms behave as they did before it existed.
 
 **Symptoms.** A form answers "We couldn't confirm this came from a person. Please try again." to people
-who should pass, or "Our spam check isn't answering just now" (HTTP 503), or an order form says it is busy.
+who should pass, or "Our spam check isn't answering just now" (HTTP 503; the contact form shows the CMS error message on a 503 instead), or an order form says it is busy. A mismatched site key and secret pair shows the refused copy with NO warning, because it is a 403 logged at info level.
 
 **What to check, in this order.**
 
@@ -245,6 +245,17 @@ rate limits stay. Put the variables back, and redeploy again, when the cause is 
 that window set the new `TURNSTILE_SECRET_KEY` in Vercel Production and redeploy the CURRENT production
 deployment (R188). If the window passes first, every form answers 503 (`*_bot_check_unavailable`, reason
 `secret_rejected`) until the redeploy. (src: https://developers.cloudflare.com/api/resources/turnstile/subresources/widgets/methods/rotate_secret/ · Cloudflare API v4 · 2026-10-22)
+
+## hello@ stops receiving mail (DNS on Cloudflare)
+
+**Symptom.** A test message to hello@ bounces with `554 5.7.1 Relay access denied`. Namecheap's forwarding
+works only while Namecheap hosts the DNS, and the domain's DNS is on Cloudflare.
+
+**Fix.** Set up Cloudflare Email Routing for `hello@` to the brand Gmail, then click the destination
+verification link Cloudflare sends there. The Cloudflare login for this needs the scopes
+`zone:read email_routing:write`, in addition to `account:read user:read`.
+
+**Also check.** Resend's `send` and `rsend` CNAMEs must stay DNS only (not proxied).
 
 ## Secret rotation
 

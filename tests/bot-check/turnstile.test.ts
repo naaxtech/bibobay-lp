@@ -149,6 +149,14 @@ describe("createTurnstileVerifier", () => {
     expect(keysIssued()).toBe(1);
   });
 
+  it("issues a fresh key for each verify()", async () => {
+    const { v, calls } = verifier(REAL, reply(GOOD), reply(GOOD));
+    await v.verify("tok", "lead");
+    await v.verify("tok", "lead");
+    expect(bodyOf(calls[0]).idempotency_key).toBe("key-1");
+    expect(bodyOf(calls[1]).idempotency_key).toBe("key-2");
+  });
+
   it("retries once after a network error, with the same key", async () => {
     const { v, calls, keysIssued } = verifier(REAL, new TypeError("fetch failed"), reply(GOOD));
     expect(await v.verify("tok", "lead")).toEqual({ outcome: "passed" });
