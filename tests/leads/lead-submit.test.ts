@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FORM_COPY } from "@/components/forms/form-copy";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
-import { BOT_CHECK_MESSAGES, type BotCheckAction } from "@/lib/bot-check/fields";
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
 import type { BotCheck } from "@/lib/bot-check/gate";
-import type { BotCheckVerdict } from "@/lib/bot-check/turnstile";
+import type { BotCheckVerdict, BotCheckVerifier } from "@/lib/bot-check/turnstile";
 import type { EmailMessage, EmailSender, EmailSendResult } from "@/lib/email/client";
 import type { DeliveryKind, LeadRecordInput, LeadRepository } from "@/lib/leads/submit";
 import * as leadSubmitModule from "@/lib/leads/submit";
@@ -161,7 +161,7 @@ const VALID = { email: "Parent@Example.com", consent: true, firstName: "Ana", ag
 const TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
 function verifierReturning(verdict: BotCheckVerdict) {
-  const verify = vi.fn(async (_token: string | undefined, _action: BotCheckAction): Promise<BotCheckVerdict> => verdict);
+  const verify = vi.fn<BotCheckVerifier["verify"]>(async () => verdict);
   const botCheck: BotCheck = { state: "on", verifier: { verify } };
   return { verify, botCheck };
 }
@@ -227,7 +227,7 @@ describe("bot check (R215, R216, R219)", () => {
       order.push("consume");
       return { allowed: true, remaining: 4, retryAfterSeconds: 0 };
     });
-    const verify = vi.fn(async (_token: string | undefined, _action: BotCheckAction): Promise<BotCheckVerdict> => {
+    const verify = vi.fn<BotCheckVerifier["verify"]>(async () => {
       order.push("verify");
       return { outcome: "passed" };
     });
