@@ -34,7 +34,7 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `SANITY_API_READ_TOKEN` | server | for Studio draft preview | Sanity project (Viewer token) | Lets `/api/draft-mode/enable` check the preview secret and read drafts. Without it that route answers 503. |
 | `SANITY_WRITE_TOKEN` | server | only to run the Studio seed | Sanity project (Editor token) | Used by `npm --prefix studio run seed`, never by the website. Do not set it on Vercel. |
 | `SANITY_REVALIDATE_SECRET` | server | production (readiness requires it) | BIBO Bay owner (random) | Shared with the Sanity webhook that calls `/api/revalidate`. |
-| `SANITY_STUDIO_ORIGIN` | server | for Studio Presentation | Sanity project | Exact https origin of the deployed Studio, allowed to frame the site (CSP `frame-ancestors`). |
+| `SANITY_STUDIO_ORIGIN` | server | for Studio Presentation | Sanity project | Exact https origin of the deployed Studio, allowed to frame the site (CSP `frame-ancestors`, with the Sanity Dashboard `https://www.sanity.io`, where hosted Studios open). Also turns on the click-to-edit links in draft previews. |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | for lead storage | Supabase project | Calls the lead functions. Never public; a publishable key here is refused. |
 | `RESEND_API_KEY` | server | optional (email) | Resend account | Sends acknowledgements and staff alerts. Without it they wait in the outbox. |
 | `RESEND_FROM` | server | with `RESEND_API_KEY` | Resend account | Sender on a verified domain, e.g. `BIBO Bay <hello@example.com>`. No fallback sender. |

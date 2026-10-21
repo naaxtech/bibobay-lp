@@ -4,6 +4,7 @@ import { BIBO_LOGO_ASSETS } from "@/components/brand/BiboLogo";
 import { UI_COPY } from "@/components/landing/ui-copy";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
 import { brandTokens } from "@/lib/brand/tokens";
+import { cleanStega } from "@/lib/content/stega";
 import type { LandingPageContent, LegalSettings, Product, SiteSettings } from "@/lib/content/types";
 
 /*
@@ -13,6 +14,9 @@ import type { LandingPageContent, LegalSettings, Product, SiteSettings } from "@
  * src: node_modules/next/dist/docs/01-app/03-api-reference/04-functions/generate-metadata.md · next 16.3.8 · 2026-10-13
  * src: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/01-metadata/{robots,sitemap,manifest}.md · next 16.3.8 · 2026-10-13
  * src: node_modules/next/dist/docs/01-app/02-guides/json-ld.md · next 16.3.8 · 2026-10-13
+ *
+ * Ruling R160: in a Studio preview CMS text carries an invisible click-to-edit payload. Nothing in
+ * <head>, the manifest or JSON-LD may keep it, so every builder cleans its input first.
  */
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -60,7 +64,8 @@ export interface HomeMetadataInput {
 }
 
 /** The home page: landing SEO from the CMS (the repository fallback when Sanity is absent). */
-export function homeMetadata({ content, settings, seo, draft, image }: HomeMetadataInput): Metadata {
+export function homeMetadata(input: HomeMetadataInput): Metadata {
+  const { content, settings, seo, draft, image } = cleanStega(input);
   const { title, description } = content.seo;
   const indexable = seo.indexable && !draft;
   const cmsNoIndex = content.seo.noIndex === true || settings.seo.noIndex === true;
@@ -103,7 +108,8 @@ export function legalReviewed(legal: LegalSettings): boolean {
   return legalPageState("privacy", legal).indexable && legalPageState("terms", legal).indexable;
 }
 
-export function legalMetadata({ kind, legal, settings, seo, draft }: { kind: LegalKind; legal: LegalSettings; settings: SiteSettings; seo: SeoEnvironment; draft: boolean }): Metadata {
+export function legalMetadata(input: { kind: LegalKind; legal: LegalSettings; settings: SiteSettings; seo: SeoEnvironment; draft: boolean }): Metadata {
+  const { kind, legal, settings, seo, draft } = cleanStega(input);
   const copy = LEGAL_PAGE_COPY[kind];
   const title = `${copy.title} | ${settings.title}`;
   const indexable = seo.indexable && !draft && legalPageState(kind, legal).indexable;
@@ -118,7 +124,8 @@ export function legalMetadata({ kind, legal, settings, seo, draft }: { kind: Leg
 }
 
 /** Ruling R31: never indexed; a visit proves nothing about a signup. */
-export function thankYouMetadata({ settings, seo }: { settings: SiteSettings; seo: SeoEnvironment }): Metadata {
+export function thankYouMetadata(input: { settings: SiteSettings; seo: SeoEnvironment }): Metadata {
+  const { settings, seo } = cleanStega(input);
   return {
     title: `${THANK_YOU_COPY.title} | ${settings.title}`,
     description: THANK_YOU_COPY.description,
@@ -137,7 +144,8 @@ export interface ShopMetadataInput {
  * The catalogue (Task 7b), titled with the CMS shop label like the other pages. The page itself
  * exists only while commerce is on, so this is never asked for otherwise.
  */
-export function shopMetadata({ settings, seo, draft }: ShopMetadataInput): Metadata {
+export function shopMetadata(input: ShopMetadataInput): Metadata {
+  const { settings, seo, draft } = cleanStega(input);
   const title = `${settings.navigation.commerceLabel} | ${settings.title}`;
   const description = UI_COPY.shop.metaDescription;
   const indexable = seo.indexable && !draft;
@@ -162,7 +170,8 @@ export interface ProductMetadataInput extends ShopMetadataInput {
  * title appended. Never a price, an offer or Product structured data (spec §14). A sold-out product
  * keeps its page for shared links but stays out of search results, as the CMS can ask for any product.
  */
-export function productMetadata({ product, settings, seo, draft, image }: ProductMetadataInput): Metadata {
+export function productMetadata(input: ProductMetadataInput): Metadata {
+  const { product, settings, seo, draft, image } = cleanStega(input);
   const title = `${product.seo?.title ?? product.name} | ${settings.title}`;
   const description = product.seo?.description || product.description || UI_COPY.shop.metaDescription;
   const path = `/shop/${product.slug}`;
@@ -217,7 +226,8 @@ export function sitemapFor({ seo, settings, legal, commerceRoutes = [] }: Sitema
 }
 
 /** Organization and WebSite only. No Product, Offer or price, whatever commerce does (spec §14). */
-export function structuredData(settings: SiteSettings, seo: SeoEnvironment): Array<Record<string, unknown>> {
+export function structuredData(rawSettings: SiteSettings, seo: SeoEnvironment): Array<Record<string, unknown>> {
+  const settings = cleanStega(rawSettings);
   const url = seo.baseUrl?.href;
   const sameAs = settings.socialLinks.filter((link) => link.verified === true).map((link) => link.url);
   return [
@@ -243,7 +253,8 @@ export function serializeJsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
-export function manifestFor(settings: SiteSettings): MetadataRoute.Manifest {
+export function manifestFor(rawSettings: SiteSettings): MetadataRoute.Manifest {
+  const settings = cleanStega(rawSettings);
   return {
     name: settings.title,
     short_name: settings.title,

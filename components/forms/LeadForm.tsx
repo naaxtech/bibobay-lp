@@ -17,6 +17,7 @@ import {
 } from "@/lib/leads/fields";
 import { DownloadGlyph } from "@/components/landing/DownloadGlyph";
 import { UI_COPY } from "@/components/landing/ui-copy";
+import { stegaCleanText } from "@/lib/content/stega";
 import { acceptDownload, type AcceptedDownload } from "./download-link";
 import { FORM_COPY, fieldErrorMessage } from "./form-copy";
 
@@ -355,7 +356,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
        * The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
        * success message cannot be read or announced before the server reports the signup stored.
        */}
-      <div className="lead-form__outcome" data-reserve-a={copy.successMessage} data-reserve-b={copy.errorMessage}>
+      <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
         <div className="lead-form__outcome" data-reserve-a={FORM_COPY.outcome.rateLimited} data-reserve-b={FORM_COPY.sending}>
           {/* Never focused (Task 5 N4): a focused live region is read out as well as announced. */}
           <p ref={statusRef} role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
@@ -372,7 +373,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
             className="btn btn-primary lead-form__download"
             href={download.url}
             {...(download.sameOrigin ? { download: "" } : {})}
-            aria-label={`${UI_COPY.downloadFreebie}: ${download.title}`}
+            aria-label={`${UI_COPY.downloadFreebie}: ${stegaCleanText(download.title)}`}
           >
             <DownloadGlyph />
             {UI_COPY.downloadFreebie}

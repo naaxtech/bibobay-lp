@@ -9,6 +9,7 @@ import {
   createNonce,
   securityEnvironment,
   staticSecurityHeaders,
+  SANITY_DASHBOARD_ORIGIN,
   studioOriginFrom,
 } from "@/lib/security/headers";
 
@@ -73,9 +74,11 @@ describe("content security policy", () => {
     expect(directives(buildContentSecurityPolicy({ nonce: "n", environment: securityEnvironment(LOCAL_START) })).has("upgrade-insecure-requests")).toBe(false);
   });
 
-  it("lets the configured Studio origin frame the site for Presentation", () => {
+  it("lets the configured Studio origin, and the Sanity Dashboard that hosts it, frame the site for Presentation", () => {
     const environment = securityEnvironment({ ...PRODUCTION, SANITY_STUDIO_ORIGIN: "https://bibobay.sanity.studio/desk?x=1" });
-    expect(directives(buildContentSecurityPolicy({ nonce: "n", environment })).get("frame-ancestors")).toEqual(["'self'", "https://bibobay.sanity.studio"]);
+    // frame-ancestors checks every ancestor: a hosted Studio runs in an iframe of https://www.sanity.io (ruling R166).
+    expect(directives(buildContentSecurityPolicy({ nonce: "n", environment })).get("frame-ancestors")).toEqual(["'self'", "https://bibobay.sanity.studio", SANITY_DASHBOARD_ORIGIN]);
+    expect(SANITY_DASHBOARD_ORIGIN).toBe("https://www.sanity.io");
   });
 
   it.each([

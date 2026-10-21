@@ -2,6 +2,34 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-21 — Live editing in the Studio
+
+### Added
+
+- Live editing in the Studio's Presentation tool: hover any text on the previewed page to see the field it comes from, click to open it in the form, and watch the page follow each edit before publishing.
+- The Studio's address bar and the page stay in step, and Presentation's perspective switch (drafts, published, a release) changes what the page shows.
+
+### Changed
+
+- Draft cookies are set `Partitioned` inside the Studio's frame, so the preview keeps working in browsers that block third-party cookies.
+- The "Exit preview" link is hidden inside the Studio, where it would only break the preview; it still shows in a preview opened in its own tab.
+- Visitors are unaffected: the overlay code is downloaded only by a draft page inside the Studio, and published pages never carry the invisible edit links.
+- The whole hero heading is one click target, not just its last line.
+- The Studio names the landing page and the legal settings in its lists and pane titles.
+
+### Fixed (before release)
+
+- The overlay's styles carry the page's CSP nonce: without it the strict style policy blocked them and the preview fell over to the error page. An error boundary now keeps the page if the overlay ever fails.
+- The site's CSP lets the Sanity Dashboard frame the preview, since hosted Studios now open inside it.
+- No edit link ends up in an `aria-label` or `data-*` attribute.
+
+### Decisions recorded
+
+- R158: `@sanity/visual-editing` directly, not `next-sanity`, which would add the whole Studio to the site's dependencies.
+- R159-R161: edit links only in Studio previews; text keeps them, nothing the site decides with or puts in `<head>` does; the overlay code is its own download.
+- R162-R165: refresh twice after each burst of edits, honour the Studio's perspective, partitioned cookies in the frame, no exit link inside the Studio, no editing variants.
+- R166-R171: the Dashboard may frame the preview; no edit links in attributes; singleton titles; the overlay's style nonce and error boundary; split text keeps one edit link on the whole element; `previewUrl.initial` replaces the deprecated `origin`.
+
 ## 2026-10-21 — Email cron back to once a day (Hobby plan)
 
 ### Changed

@@ -52,7 +52,8 @@ export const landingPage = defineType({ name: "landingPage", title: "Landing pag
   defineField({ name: "faqIntro", type: "sectionIntro" }),
   defineField({ name: "faqs", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "faqItem" }] })] }),
   defineField({ name: "finalCta", type: "finalCtaSection" }),
-] });
+// No title field: without a preview the Studio would title it with its raw content.
+], preview: { prepare: () => ({ title: "Landing page" }) } });
 
 export const legalSettings = defineType({ name: "legalSettings", title: "Legal and consent", type: "document", fields: [
   defineField({ name: "privacy", type: "portableContent", description: "Requires counsel review before indexing." }),
@@ -75,6 +76,6 @@ export const legalSettings = defineType({ name: "legalSettings", title: "Legal a
     validation: (rule) =>
       rule.custom((value, context) => orderConsentVersionProblem(value, (context.document as { orderConsentCopy?: unknown } | undefined)?.orderConsentCopy)),
   }),
-] });
+], preview: { prepare: () => ({ title: "Legal and consent" }) } });
 
 export const singletonTypes = [siteSettings, landingPage, legalSettings];
