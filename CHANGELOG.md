@@ -15,6 +15,7 @@ All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](
 - The Contact page document `contactPage` and the footer label `contactPageLabel` in the Studio (R195); the Studio seed now has 33 documents. A success message that claims delivery is refused by the Studio and replaced by the built-in text on the site.
 - One consent-gated visit-statistics event, `contact_submitted` (`persisted`, `topic`), after a stored answer only (R198).
 - The privacy fallback text names contact messages while the form is open, gives legitimate interest as the basis and states no retention period (R196, R206).
+- A rollback path: revert the merge for a normal rollback; `supabase/downs/0008_contact_messages_down.sql` for an emergency schema rollback (it deletes stored messages), tested up, down and up again in the embedded database; a 13-layer walk in the plan.
 
 ### Changed
 

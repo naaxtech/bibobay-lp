@@ -605,6 +605,46 @@ describe("contact form docs (R190-R209)", () => {
     expect(flat(qa)).toMatch(/CI runs them as three more jobs \(`e2e-commerce`, `e2e-keyed` and `e2e-contact`/);
   });
 
+  it("documents the contact form's rollback: a revert of the PR #8 merge, and the emergency down script that deletes the messages (production layers 3 and 13)", () => {
+    const down = "npx supabase@2.121.0 db query --linked -f supabase/downs/0008_contact_messages_down.sql";
+    const repair = "npx supabase@2.121.0 migration repair 0008 --status reverted --linked";
+    const deployment = read("docs/deployment.md");
+    expect(deployment).toMatch(/^## Contact form: rollback$/m);
+    const rollback = flat(section(deployment, "Contact form: rollback"));
+    expect(rollback).toContain("git revert -m 1 <merge-sha>");
+    expect(rollback).toMatch(/merge commit of PR #8 on `main`/);
+    expect(rollback).toMatch(/next deployment closes the form and removes `\/contact`/);
+    expect(rollback).toMatch(/The tables stay, unused/);
+    expect(rollback).toMatch(/alert that is not `sent` is never sent/);
+    expect(rollback).toContain(down);
+    expect(rollback).toMatch(/deletes every stored contact message/i);
+    expect(rollback).toContain(repair);
+    const script = read("supabase/downs/0008_contact_messages_down.sql");
+    expect(script).toContain(down);
+    expect(script).toContain(repair);
+    expect(script).toContain('docs/deployment.md, "Contact form: rollback"');
+    const runbook = flat(section(read("docs/incident-runbook.md"), "Rollback"));
+    expect(runbook).toMatch(/\*\*The contact form\*\*[^.]*down script[^.]*emergencies only[^.]*\(\[deployment\.md\]\(deployment\.md#contact-form-rollback\)\)/);
+    expect(runbook).toMatch(/forward-only/);
+  });
+
+  it("walks all 13 production layers for the contact slice, each specified or deferred with a trigger", () => {
+    const plan = read("docs/superpowers/plans/2026-10-21-contact-form.md");
+    expect(plan).toMatch(/^## 13-layer walk$/m);
+    const rows = section(plan, "13-layer walk").split(/\r?\n/).filter((line) => /^\| \d+ \|/.test(line));
+    expect(rows.map((row) => Number(/^\| (\d+) \|/.exec(row)![1]))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    for (const row of rows) {
+      const ruling = row.split("|")[3]!.trim();
+      expect(ruling, row).toMatch(/^(Specified|N\/A|Deferred)\b/);
+      if (ruling.startsWith("Deferred") || /\bdeferred\b/i.test(row)) expect(row, row).toMatch(/\btrigger\b/i);
+    }
+    const walk = flat(section(plan, "13-layer walk"));
+    expect(walk).toContain("supabase/downs/0008_contact_messages_down.sql");
+    expect(walk).toContain("contact_message_deliveries_message_kind_key");
+    expect(walk).toMatch(/R200[^|]*more than 20 messages arrive in a week/);
+    expect(walk).toMatch(/`contact_submitted`[^|]*trigger: the owner provides the PostHog key/i);
+  });
+
   it("keeps the daily-schedule words out of the files the restore sentence does not list", () => {
     const changelog = read("CHANGELOG.md");
     const entry = changelog.slice(changelog.indexOf("## 2026-10-21 — Contact form"), changelog.indexOf("## 2026-10-21 — Email cron back"));

@@ -250,6 +250,60 @@ It adds no environment name. `/api/readiness` reports the answer as `contact`; `
    ([data-protection.md](data-protection.md#handling-a-request-from-a-person)); its delivery row goes
    with it.
 
+## Contact form: rollback
+
+**Normal rollback: revert the code.** Revert the merge commit of PR #8 on `main`, then push:
+
+```bash
+git revert -m 1 <merge-sha>
+git push origin main
+```
+
+The next deployment closes the form and removes `/contact`, `/api/contact` and the footer link. The
+tables stay, unused: migration 0008 only adds objects, and nothing reads or writes `contact_messages`
+or `contact_message_deliveries` without the reverted code. That includes the worker: once the revert is
+live, an alert that is not `sent` is never sent. Before reverting, list those messages and reply by
+hand ([incident-runbook.md](incident-runbook.md#contact-messages)); never paste a result into a chat, a
+ticket or a document:
+
+```sql
+select message.created_at, message.topic, message.name, message.email, message.message
+from public.contact_messages as message
+join public.contact_message_deliveries as delivery on delivery.message_id = message.id
+where delivery.status in ('pending', 'sending', 'failed')
+order by message.created_at;
+```
+
+To stop new messages before the revert is deployed, use **Instant Rollback** to the last production
+deployment before the merge ([incident-runbook.md](incident-runbook.md#rollback)); the next deployment
+from `main` brings the form back until the revert lands. Afterwards, verify the site as after any
+rollback.
+
+**Emergency schema rollback: the down script.** Only when the schema itself has to go, for example if
+the legal review rules that contact messages must not be stored. It deletes every stored contact
+message and every alert row, for good: nothing but a database backup brings them back. Revert the code
+first, so nothing writes to the tables while they are dropped. Then, from the repository root, with
+the Supabase CLI linked to the project, as the project owner:
+
+```bash
+npx supabase@2.121.0 db query --linked -f supabase/downs/0008_contact_messages_down.sql
+```
+
+It drops the three contact functions, then `contact_message_deliveries`, then `contact_messages`, in
+one transaction, and nothing else: no lead, order, staff or rate-limit object. No drop cascades, so if
+anything else depends on a contact table it drops nothing at all. It is not a migration:
+`supabase db push` reads only `supabase/migrations/`, never `supabase/downs/`. The migration history
+still lists 0008 afterwards, so to apply it again later, mark it reverted and push:
+
+```bash
+npx supabase@2.121.0 migration repair 0008 --status reverted --linked
+npx supabase@2.121.0 db push --linked
+```
+
+`tests/contact/migration-rollback.test.ts` runs 0001-0007, 0008, the down script and 0008 again in an
+embedded Postgres: the down script leaves the schema exactly as 0001-0007 left it, every earlier pgTAP
+file stays green, a second run changes nothing, and 0008 applies cleanly again.
+
 ## Verifying a deployment
 
 ```bash

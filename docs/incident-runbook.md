@@ -209,6 +209,9 @@ Staff keep access to `/admin/orders` while commerce is off, so you can still wor
   that, every change is a new numbered file in `supabase/migrations/` (ruling R124), never an edit of
   an applied one and never an edit made by hand in the dashboard. A bad migration is repaired by a new
   migration that fixes it.
+- **The contact form** is rolled back by reverting the PR #8 merge; migration 0008 also has a down
+  script, for emergencies only, which deletes every stored contact message
+  ([deployment.md](deployment.md#contact-form-rollback)).
 - **After any rollback**, run `npm run verify:deployment -- https://<site> --browser --require-ready`
   ([qa-checklist.md](qa-checklist.md#3-against-the-deployed-preview-then-production)) and look at the
   alerts in Sentry.
