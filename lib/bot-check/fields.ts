@@ -23,5 +23,5 @@ export const BOT_CHECK_MESSAGES = {
   refused: "We couldn't confirm this came from a person. Please try again.",
   unavailable: "Our spam check isn't answering just now. Please try again in a few minutes.",
   interactive: "Please complete the quick check just above the button, then press it again.",
-  notLoaded: "The spam check didn't load. Please check your connection, reload the page and try again.",
+  notLoaded: "The spam check didn't load. Please check your connection and try again.",
 } as const;
