@@ -1,0 +1,59 @@
+app/api/contact/route.ts
+  s_37deb30b6489aa::t_0f51976dd595f0 1-53
+lib/ops/readiness.ts
+  s_37deb30b6489aa::t_6d9dafa465938e 4,34-38,55,57
+lib/outbox/worker.ts
+  s_37deb30b6489aa::t_6d9dafa465938e 2-3,6,11-12,27-30,36,50-51
+lib/outbox/dependencies.ts
+  s_37deb30b6489aa::t_6d9dafa465938e 8,13,24-25,35,54
+e2e/ops/health.spec.ts
+  s_37deb30b6489aa::t_cc84f38d4a25ba 16,66-67
+lib/outbox/contact.ts
+  s_37deb30b6489aa::t_e9722b4f35ab3e 1-50
+tests/outbox/worker.test.ts
+  s_37deb30b6489aa::t_5cce0b61b91d64 10,73-81,95,117,129,145,161,175,184-243,252
+lib/email/contact-emails.ts
+  s_37deb30b6489aa::t_a7ae64ec1a3a30 1-49
+lib/contact/schema.ts
+  s_37deb30b6489aa::t_d55a37f79d943c 1-105
+tests/ops/health-readiness.test.ts
+  s_37deb30b6489aa::t_cc84f38d4a25ba 3,60,64,83-94,108,121
+tests/contact/contact-schema.test.ts
+  s_37deb30b6489aa::t_4e43f16c2b7c8d 1-41
+tests/contact/contact-route.test.ts
+  s_37deb30b6489aa::t_8cf6efb693d9e8 1-274
+lib/contact/submit.ts
+  s_37deb30b6489aa::t_4978f7f5c97c71 1-148
+app/api/readiness/route.ts
+  s_37deb30b6489aa::t_6d9dafa465938e 31-33
+tests/contact/contact-submit.test.ts
+  s_37deb30b6489aa::t_bd6c3a0f213938 1-184
+lib/contact/dependencies.ts
+  s_37deb30b6489aa::t_69ac1d7b5d777b 1-65,67-69
+  s_37deb30b6489aa::t_663ccfc4c4ebf7 66
+tests/contact/contact-channel.test.ts
+  s_37deb30b6489aa::t_2f9166b4eb41a0 1-113
+lib/outbox/log.ts
+  s_37deb30b6489aa::t_6d5b01d826e81f 18
+  s_37deb30b6489aa::t_92a982d1fce4ee 10-11
+tests/outbox/cron-route.test.ts
+  s_37deb30b6489aa::t_cc84f38d4a25ba 151-173
+tests/contact/contact-emails.test.ts
+  s_37deb30b6489aa::t_a7e838a38e2c56 1-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fa5093b0162b708f7fed9c4588b4f5c29e293298",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
