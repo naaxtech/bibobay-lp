@@ -1,13 +1,15 @@
 import { addTally, drainChannel, type AttemptContext, type OutboxTally } from "./attempt";
-import { WORKER_LIMITS, type LeadDeliveryKind, type OrderEmailKind } from "./constants";
+import { WORKER_LIMITS, type ContactDeliveryKind, type LeadDeliveryKind, type OrderEmailKind } from "./constants";
+import { contactAlertChannel, contactKindsFor, type ContactChannelSettings } from "./contact";
 import { leadDeliveryChannel, leadKindsFor, type LeadChannelSettings } from "./leads";
 import { orderEmailChannel, orderKindsFor, type OrderChannelSettings } from "./orders";
-import type { LeadDeliveryOutbox, OrderEmailOutbox } from "./types";
+import type { ContactDeliveryOutbox, LeadDeliveryOutbox, OrderEmailOutbox } from "./types";
 
 /**
  * One pass of the email outbox worker (Task 8a, R88: the retry net behind the sends made right
  * after each answer). It drains the order outbox first (a buyer waits on it), quotes first (staff
- * sent them, and the buyer's payment link is in them), then the signup outbox, one kind at a time
+ * sent them, and the buyer's payment link is in them), then the signup outbox, then the contact
+ * outbox (R169: a staff alert waits behind the emails to buyers and parents), one kind at a time
  * and one row per claim through the same claim functions the immediate sends use, so no row is
  * ever sent by both. Each row is: claimed (attempt counted) → built → one unit of the send budget
  * of its own kind (fix wave D-I1, `send:<budget>`, lib/outbox/constants.ts) → sent under the row's
@@ -22,14 +24,16 @@ const ORDER_DRAIN_ORDER: readonly OrderEmailKind[] = ["quote", "acknowledgement"
 export interface OutboxWorkerInput {
   leads: { outbox: LeadDeliveryOutbox; settings: LeadChannelSettings };
   orders: { outbox: OrderEmailOutbox; settings: OrderChannelSettings };
-  /** Per-kind budgets, bounded send and log, shared by both outboxes (lib/outbox/send.ts). */
-  context: AttemptContext<LeadDeliveryKind | OrderEmailKind>;
+  /** The contact form's staff alerts (R169); claims nothing without a staff address (R177). */
+  contact: { outbox: ContactDeliveryOutbox; settings: ContactChannelSettings };
+  /** Per-kind budgets, bounded send and log, shared by the three outboxes (lib/outbox/send.ts). */
+  context: AttemptContext<LeadDeliveryKind | OrderEmailKind | ContactDeliveryKind>;
   now?: () => number;
   /** When the request started (review M6): the run's time counts from there, setup included. */
   startedAt?: number;
 }
 
-export async function runOutboxWorker({ leads, orders, context, now = Date.now, startedAt }: OutboxWorkerInput): Promise<OutboxTally> {
+export async function runOutboxWorker({ leads, orders, contact, context, now = Date.now, startedAt }: OutboxWorkerInput): Promise<OutboxTally> {
   const deadline = (startedAt ?? now()) + WORKER_LIMITS.runMs;
   const limits = { deadline, maxRows: WORKER_LIMITS.maxRowsPerChannel, now };
 
@@ -43,5 +47,6 @@ export async function runOutboxWorker({ leads, orders, context, now = Date.now, 
   // Fix wave D-I1: a spent budget closes only its own kind (drainChannel), so the signup outbox is
   // always drained too; the run used to stop here at the first spent budget, when one bucket was shared.
   const leadTally = await drainChannel(leadDeliveryChannel(leads.outbox, leads.settings), leadKindsFor(leads.settings.staffEmail), context, limits);
-  return addTally(orderTally, leadTally);
+  const contactTally = await drainChannel(contactAlertChannel(contact.outbox, contact.settings), contactKindsFor(contact.settings.staffEmail), context, limits);
+  return addTally(addTally(orderTally, leadTally), contactTally);
 }

@@ -7,7 +7,7 @@ import { cronSecretFrom, isCronAuthorized, orderTrackingForEmail } from "@/lib/o
 import { WORKER_LIMITS } from "@/lib/outbox/constants";
 import { runOutboxWorker } from "@/lib/outbox/worker";
 import type { AttemptContext } from "@/lib/outbox/attempt";
-import type { ClaimedLeadDelivery, ClaimedOrderEmail, ClaimOptions, LeadDeliveryOutbox, OrderEmailOutbox, OutboxOutcome } from "@/lib/outbox/types";
+import type { ClaimedContactDelivery, ClaimedLeadDelivery, ClaimedOrderEmail, ClaimOptions, ContactDeliveryOutbox, LeadDeliveryOutbox, OrderEmailOutbox, OutboxOutcome } from "@/lib/outbox/types";
 import { SERVER_SECRET_MIN_LENGTH } from "@/lib/security/secrets";
 
 /*
@@ -70,6 +70,15 @@ function context(overrides: Partial<AttemptContext<string>> = {}): AttemptContex
   return { reserve: async () => true, deliver: async () => ({ status: "sent", providerMessageId: "re_1" }), log: () => {}, ...overrides };
 }
 
+const contactRow = (id: string): ClaimedContactDelivery => ({ id, kind: "contact_staff_alert", attempt: 1, name: "Ada", email: "ada@example.com", topic: "press", message: "Hello from a parent.", receivedAt: "2026-10-21T09:30:12.345+00:00" });
+
+/** The contact outbox over a queue, with a staff address or without one. */
+const contactOf = (queued: ReturnType<typeof queue>, staffEmail: string | null) => ({
+  outbox: { claimDeliveries: queued.take, recordDeliveryAttempt: queued.record } as ContactDeliveryOutbox,
+  settings: { staffEmail },
+});
+const emptyContact = () => contactOf(queue<ClaimedContactDelivery>([]), null);
+
 const SETTINGS = {
   leads: { staffEmail: "team@bibobay.example", replyTo: null, leadMagnet: null, fromOutbox: true },
   orders: { staffEmail: null, replyTo: null, tracking: null },
@@ -83,6 +92,7 @@ describe("runOutboxWorker", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ deliver: async (message) => (sendOrder.push(message.idempotencyKey ?? ""), { status: "sent", providerMessageId: "re_1" }) }),
     });
     expect(result).toEqual({ sent: 4, failed: 0, skipped: 0, deferred: 0 });
@@ -104,6 +114,7 @@ describe("runOutboxWorker", () => {
     await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ reserve: async (kind, outbox) => (asked.push(`${outbox}:${kind}`), true) }),
     });
     expect(asked).toEqual(["orders:quote", "orders:acknowledgement", "leads:acknowledgement", "leads:staff_alert"]);
@@ -115,6 +126,7 @@ describe("runOutboxWorker", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ reserve: async (kind, outbox) => !(outbox === "leads" && kind === "acknowledgement") }),
     });
     expect(result).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 1 });
@@ -130,6 +142,7 @@ describe("runOutboxWorker", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ deliver: async () => ((clock += WORKER_LIMITS.runMs), { status: "sent", providerMessageId: "re_1" }) }),
       now: () => clock,
     });
@@ -145,6 +158,7 @@ describe("runOutboxWorker", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ reserve: async () => false }),
     });
     expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 2 });
@@ -158,11 +172,72 @@ describe("runOutboxWorker", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context(),
     });
     expect(result.sent).toBe(WORKER_LIMITS.maxRowsPerChannel + 1);
     // Review M6: 40 s from the request leaves a last send (at most its timeout) inside maxDuration 60.
     expect(WORKER_LIMITS).toEqual({ runMs: 40_000, maxRowsPerChannel: 100 });
+  });
+});
+
+describe("the contact outbox (R169)", () => {
+  const STAFF = "team@bibobay.example";
+
+  it("drains orders (quotes first), then signups, then contact alerts", async () => {
+    const leads = queue([lead("l1")]);
+    const orders = queue([order("o1"), order("q1", "quote")]);
+    const contact = queue([contactRow("c1")]);
+    const sent: string[] = [];
+    const result = await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: contactOf(contact, STAFF),
+      context: context({ deliver: async (message) => (sent.push(message.idempotencyKey ?? ""), { status: "sent", providerMessageId: "re_1" }) }),
+    });
+    expect(result).toEqual({ sent: 4, failed: 0, skipped: 0, deferred: 0 });
+    expect(sent).toEqual(["order-email/q1", "order-email/o1", "lead-delivery/l1", "contact-delivery/c1"]);
+    expect(contact.claims).toEqual([{ kinds: ["contact_staff_alert"], limit: 1 }, { kinds: ["contact_staff_alert"], limit: 1 }]);
+  });
+
+  it("claims no contact row while no staff address is set", async () => {
+    const contact = queue([contactRow("c1")]);
+    const result = await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: queue([]).take, recordDeliveryAttempt: queue([]).record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: queue([]).take, recordEmailAttempt: queue([]).record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: contactOf(contact, null),
+      context: context(),
+    });
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, deferred: 0 });
+    expect(contact.claims).toEqual([]);
+    expect(contact.records).toEqual([]);
+  });
+
+  it("spends the contact budget for a contact row", async () => {
+    const asked: string[] = [];
+    await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: queue([]).take, recordDeliveryAttempt: queue([]).record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: queue([]).take, recordEmailAttempt: queue([]).record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: contactOf(queue([contactRow("c1")]), STAFF),
+      context: context({ reserve: async (kind, outbox) => (asked.push(`${outbox}:${kind}`), true) }),
+    });
+    expect(asked).toEqual(["contact:contact_staff_alert"]);
+  });
+
+  it("a spent contact budget hands back that row and holds up no other outbox", async () => {
+    const leads = queue([lead("l1")]);
+    const orders = queue([order("o1")]);
+    const contact = queue([contactRow("c1"), contactRow("c2")]);
+    const result = await runOutboxWorker({
+      leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
+      orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: contactOf(contact, STAFF),
+      context: context({ reserve: async (_kind, outbox) => outbox !== "contact" }),
+    });
+    expect(result).toEqual({ sent: 2, failed: 0, skipped: 0, deferred: 1 });
+    expect(orders.records.map(([id, outcome]) => [id, outcome.status])).toEqual([["o1", "sent"]]);
+    expect(leads.records.map(([id, outcome]) => [id, outcome.status])).toEqual([["l1", "sent"]]);
+    expect(contact.records).toEqual([["c1", { status: "deferred" }]]);
   });
 });
 
@@ -174,6 +249,7 @@ describe("the run's clock (Task 8a review M6)", () => {
     const result = await runOutboxWorker({
       leads: { outbox: { claimDeliveries: leads.take, recordDeliveryAttempt: leads.record } as LeadDeliveryOutbox, settings: SETTINGS.leads },
       orders: { outbox: { claimEmails: orders.take, recordEmailAttempt: orders.record } as OrderEmailOutbox, settings: SETTINGS.orders },
+      contact: emptyContact(),
       context: context({ deliver: async () => ((clock += 4_000), { status: "sent", providerMessageId: "re_1" }) }),
       now: () => clock,
       // The setup (CMS reads, clients) took 34 s of the run's 40.

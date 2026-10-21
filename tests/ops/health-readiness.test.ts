@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { contactFormOpen } from "@/lib/contact/availability";
 import { readinessChecks } from "@/lib/ops/readiness";
 
 vi.mock("server-only", () => ({}));
@@ -56,11 +57,11 @@ describe("GET /api/health", () => {
 
 describe("readiness checks", () => {
   it("is all false with nothing configured", () => {
-    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, revalidation: false, legalReviewed: false });
+    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, contact: false, revalidation: false, legalReviewed: false });
   });
 
   it("is ready with Sanity, Supabase lead storage, the revalidation secret and a removal channel, even without email or reviewed legal text", () => {
-    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, revalidation: true, legalReviewed: false });
+    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: false });
   });
 
   it("counts a way to ask for removal toward readiness (P-I1, Ruling R125): email sending or a contact address", () => {
@@ -79,6 +80,18 @@ describe("readiness checks", () => {
     expect(readinessChecks({ ...CONFIGURED, LEAD_IP_HASH_SECRET: "short" }, { legalReviewed: true, settings: CONTACT }).supabase).toBe(false);
   });
 
+  it("reports contact only when contactFormOpen is, and never lets it change ready", () => {
+    const open = { ...CONFIGURED, ...EMAIL, STAFF_NOTIFICATION_EMAIL: "staff@bibobay.example" };
+    expect(readinessChecks(open, { legalReviewed: false, settings: CONTACT })).toMatchObject({ contact: true, ready: true });
+    expect(contactFormOpen(open)).toBe(true);
+    for (const missing of ["STAFF_NOTIFICATION_EMAIL", "RESEND_API_KEY", "RESEND_FROM", "SUPABASE_SERVICE_ROLE_KEY", "LEAD_IP_HASH_SECRET"]) {
+      const env = { ...open, [missing]: "" };
+      expect(readinessChecks(env, { legalReviewed: false, settings: CONTACT }).contact, missing).toBe(contactFormOpen(env));
+      expect(readinessChecks(env, { legalReviewed: false, settings: CONTACT }).contact, missing).toBe(false);
+    }
+    expect(readinessChecks({ ...open, STAFF_NOTIFICATION_EMAIL: "" }, { legalReviewed: false, settings: CONTACT }).ready).toBe(true);
+  });
+
   it("reports email when Resend has a key and a valid sender", () => {
     expect(readinessChecks({ ...CONFIGURED, ...EMAIL }, { legalReviewed: false, settings: {} }).email).toBe(true);
   });
@@ -92,7 +105,7 @@ describe("GET /api/readiness", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(Object.keys(body).sort()).toEqual(["email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
+    expect(Object.keys(body).sort()).toEqual(["contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
     for (const value of Object.values(body)) expect(typeof value).toBe("boolean");
     expect(body.ready).toBe(false);
   });
@@ -105,7 +118,7 @@ describe("GET /api/readiness", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, revalidation: true, legalReviewed: true });
+    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: true });
     for (const value of [...Object.values(CONFIGURED), CONTACT.contactEmail]) expect(text).not.toContain(value);
   });
 

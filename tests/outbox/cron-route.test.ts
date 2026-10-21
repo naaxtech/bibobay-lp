@@ -148,6 +148,29 @@ describe("GET /api/cron/email-outbox", () => {
     ]);
   });
 
+  it("with a staff address, drains the contact outbox last and counts it", async () => {
+    configure();
+    vi.stubEnv("STAFF_NOTIFICATION_EMAIL", "staff@example.com");
+    oneDueRowEach();
+    const CONTACT_ID = "5b2d6c3e-1f4a-4d8b-9a7c-3e2f1a0b9c8d";
+    let contactRows = [{ id: CONTACT_ID, kind: "contact_staff_alert", attempt: 1, name: "Ada", email: "ada@sender.example", topic: "press", message: "Hello from a parent.", receivedAt: "2026-10-21T09:30:12.345+00:00" }];
+    rpcAnswers.claim_contact_deliveries = () => {
+      const claimed = contactRows;
+      contactRows = [];
+      return { data: { claimed, skipped: 0, expired: 0 }, error: null };
+    };
+    rpcAnswers.record_contact_delivery_attempt = () => ({ data: true, error: null });
+    // The order and signup rows are acknowledgements; the staff alerts of those outboxes have nothing due.
+    const response = await get(`Bearer ${SECRET}`);
+    expect(await response.json()).toEqual({ sent: 3, failed: 0, skipped: 1, deferred: 0 });
+    expect(rpcCalls.filter(([fn]) => fn === "claim_contact_deliveries")[0]).toEqual(["claim_contact_deliveries", { p_limit: 1, p_message_id: null }]);
+    const last = resendSend.mock.calls.at(-1)!;
+    expect(last[1]).toMatchObject({ idempotencyKey: `contact-delivery/${CONTACT_ID}` });
+    expect(last[0]).toMatchObject({ to: ["staff@example.com"], replyTo: "ada@sender.example" });
+    expect(rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => args.bucket_key).at(-1)).toBe("send:contact_staff_alert");
+    expect(rpcCalls.filter(([fn]) => fn === "record_contact_delivery_attempt").map(([, args]) => args.p_status)).toEqual(["sent"]);
+  });
+
   it("sends nothing past each kind's send budget and hands each capped row back (D-I1)", async () => {
     configure();
     oneDueRowEach();

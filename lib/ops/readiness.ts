@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SiteSettings } from "@/lib/content/types";
+import { contactFormOpen } from "@/lib/contact/availability";
 import { getEmailEnvironment } from "@/lib/email/client";
 import { leadStorageConfigured } from "@/lib/leads/dependencies";
 import { removalChannelFrom } from "@/lib/leads/removal-channel";
@@ -30,6 +31,11 @@ export interface Readiness {
    * refuses every signup with 503.
    */
   leadRemovalChannel: boolean;
+  /**
+   * The contact form is open (R173): lead storage, email sending, a staff address and the hash
+   * secret. Reported; not required, so `ready` is unchanged.
+   */
+  contact: boolean;
   /** SANITY_REVALIDATE_SECRET (published edits reach the site). */
   revalidation: boolean;
   /** Both legal pages carry versioned Sanity text (reported; not required, ruling R30). */
@@ -46,6 +52,7 @@ export function readinessChecks(
   const supabase = leadStorageConfigured(env);
   const email = getEmailEnvironment(env) !== null;
   const leadRemovalChannel = removalChannelFrom(settings, env) !== null;
+  const contact = contactFormOpen(env);
   const revalidation = Boolean(env.SANITY_REVALIDATE_SECRET?.trim());
-  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, revalidation, legalReviewed };
+  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, contact, revalidation, legalReviewed };
 }
