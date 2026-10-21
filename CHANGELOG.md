@@ -2,6 +2,25 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-21 — Live editing in the Studio
+
+### Added
+
+- Live editing in the Studio's Presentation tool: hover any text on the previewed page to see the field it comes from, click to open it in the form, and watch the page follow each edit before publishing.
+- The Studio's address bar and the page stay in step, and Presentation's perspective switch (drafts, published, a release) changes what the page shows.
+
+### Changed
+
+- Draft cookies are set `Partitioned` inside the Studio's frame, so the preview keeps working in browsers that block third-party cookies.
+- The "Exit preview" link is hidden inside the Studio, where it would only break the preview; it still shows in a preview opened in its own tab.
+- Visitors are unaffected: the overlay code is downloaded only by a draft page inside the Studio, and published pages never carry the invisible edit links.
+
+### Decisions recorded
+
+- R158: `@sanity/visual-editing` directly, not `next-sanity`, which would add the whole Studio to the site's dependencies.
+- R159-R161: edit links only in Studio previews; text keeps them, nothing the site decides with or puts in `<head>` does; the overlay code is its own download.
+- R162-R165: refresh twice after each burst of edits, honour the Studio's perspective, partitioned cookies in the frame, no exit link inside the Studio, no editing variants.
+
 ## 2026-10-21 — Sanity CMS live
 
 ### Added
