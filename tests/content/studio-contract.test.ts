@@ -47,7 +47,7 @@ describe("Studio content model", () => {
     covers("ecosystemEntry", ["name", "tagline", "description", "status", "image", "cta"]);
     covers("testimonial", ["quote", "attribution", "verified"]);
     covers("faqItem", ["question", "answer"]);
-    covers("leadMagnet", ["title", "description", "fileUrl", "available"]);
+    covers("leadMagnet", ["title", "description", "fileUrl", "available", "comingSoon", "comingSoonNote", "comingSoonDescription", "comingSoonButtonLabel"]);
     covers("productCategory", ["name", "slug", "description", "image", "order"]);
     // R80: SKU, variant and pack are what an order snapshots (spec §10 step 5).
     covers("product", ["name", "slug", "description", "details", "images", "category", "status", "order", "seo", "commerceNotice", "sku", "variant", "pack"]);

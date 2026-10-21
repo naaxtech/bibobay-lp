@@ -11,6 +11,17 @@ import type { Character, ContactPageContent, EpisodePreview, LandingPageContent,
  * page. No counts, ratings or endorsements are stated.
  */
 
+/**
+ * Ruling R240: what the signup section says while the download is "Coming soon" and the CMS wording is
+ * left empty. No word promises the file. The Studio shows the same words as placeholders
+ * (studio/schemaTypes/lead-magnet.ts COMING_SOON_DEFAULTS; a test pins the two copies together).
+ */
+export const COMING_SOON_FALLBACK = {
+  note: "We are putting the finishing touches on it. Join the list to hear about it first.",
+  description: "Sign up with your email to hear first about new adventures in the Bay. Our free activity pack is coming soon.",
+  buttonLabel: "Join the list",
+} as const;
+
 /** The channel this site belongs to; the only social link, confirmed by the owner on 2026-10-15. */
 export const BIBO_YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@bibobay-tv";
 
@@ -99,7 +110,7 @@ export const SAFE_FALLBACK_CONTENT: LandingPageContent = {
     { id: "what", question: "What is BIBO Bay?", answer: "BIBO Bay is a gentle underwater world of mindful content for curious little learners ages 2–6: songs, stories and playful adventures with Tula, Bob and Lumi." },
     { id: "episodes", question: "Where can we watch?", answer: "On the Bibo Bay YouTube channel, @bibobay-tv. Every video on this page opens there." },
     { id: "ages", question: "Who is it for?", answer: "Little learners ages 2–6, and the grown-ups watching with them." },
-    { id: "signup", question: "What happens when I join?", answer: "Your request to join the founding-family list is recorded when the signup service accepts it. Once it is stored, the page shows the download button for the activity pack. A confirmation email is not guaranteed." },
+    { id: "signup", question: "What happens when I join?", answer: "Your request to join the founding-family list is recorded when the signup service accepts it. Once it is stored, the page shows the download button for the activity pack whenever the pack is available. A confirmation email is not guaranteed." },
   ],
   finalCta: { eyebrow: "Come say hello", heading: "Dive into Bibo Bay.", description: "New adventures are coming soon. Subscribe on YouTube to join us from the very beginning.", cta: subscribeOnYouTube },
 };

@@ -135,6 +135,28 @@ not an address a browser can open; opening it directly answers 404. For that fil
 shows renders of its pages and its real size; any other file shows its title and description only.
 Removing the reference from the signup section removes the card.
 
+### Coming soon
+
+Each download has a **Coming soon** switch (open it from **Downloads**, or click the card in
+Presentation). Turn it on and publish:
+
+- The card shows a yellow **Coming soon** badge, the download's title and description, the repository
+  pack's page previews (for that file only) and a short note, with no button, no "Free for everyone on
+  the list" line and no file size.
+- Nobody is given the file: the page shows no download after a signup and the acknowledgement email
+  leaves it out. The switch wins over **File exists and may be offered**, and needs no file.
+- The signup section's description and button label, the two sentences that promise the file, switch
+  to the coming-soon wording. While the switch is on, three fields appear under it: the note on the
+  card, the section description and the button label. Leave them empty to use the wording shown in
+  grey in each field.
+- Check the FAQ answers: one that mentions the download should not promise it either. The seeded
+  answer to "What happens when I join?" says the page shows the button "whenever the pack is
+  available".
+
+Turn it off and publish to offer the pack again. Signed links handed out before the switch went on
+keep working until they expire (24 hours on the page, 30 days by email): the email promised them.
+The Studio will not publish a coming-soon download without a title.
+
 A dataset seeded before 2026-10-16 keeps the old lead description and button label ("...with no
 sign-up", "Join the list"), because seeding creates only missing documents; edit the lead section by hand.
 

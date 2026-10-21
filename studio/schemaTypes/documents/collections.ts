@@ -1,5 +1,7 @@
 import { defineArrayMember, defineField, defineType } from "sanity";
 
+import { COMING_SOON_DEFAULTS, comingSoonProblem } from "../lead-magnet";
+
 const stringArray = (name: string, title: string) => defineField({ name, title, type: "array", of: [defineArrayMember({ type: "string" })] });
 const art = () => defineField({ name: "image", title: "Artwork (when verified)", type: "imageWithAlt" });
 
@@ -40,6 +42,18 @@ export const faqItem = defineType({ name: "faqItem", title: "Question and answer
 ] });
 export const leadMagnet = defineType({ name: "leadMagnet", title: "Download (only when real)", type: "document", fields: [
   defineField({ name: "title", type: "string" }), defineField({ name: "description", type: "text" }),
+  // R240: the switch an editor flips; its wording fields appear while it is on. Empty wording shows the placeholder.
+  defineField({
+    name: "comingSoon",
+    title: "Coming soon",
+    type: "boolean",
+    initialValue: false,
+    description: "On: the page shows this download as coming soon, nobody gets the file (not after signing up, not by email), and the signup section uses the coming-soon wording below. Off: the download is offered after signup, when \"File exists and may be offered\" is on. Also check the FAQ answers if one mentions the download.",
+    validation: (rule) => rule.custom((value, context) => comingSoonProblem(value, context.document?.title)),
+  }),
+  defineField({ name: "comingSoonNote", title: "Coming soon: note on the card", type: "text", rows: 2, placeholder: COMING_SOON_DEFAULTS.note, hidden: ({ document }) => document?.comingSoon !== true }),
+  defineField({ name: "comingSoonDescription", title: "Coming soon: signup section description", description: "Replaces the signup section's description while the download is coming soon, so the page never promises the file.", type: "text", rows: 3, placeholder: COMING_SOON_DEFAULTS.description, hidden: ({ document }) => document?.comingSoon !== true }),
+  defineField({ name: "comingSoonButtonLabel", title: "Coming soon: signup button label", description: "Replaces the signup button's label while the download is coming soon.", type: "string", placeholder: COMING_SOON_DEFAULTS.buttonLabel, hidden: ({ document }) => document?.comingSoon !== true }),
   defineField({
     name: "fileUrl",
     title: "Verified download URL",
@@ -47,7 +61,7 @@ export const leadMagnet = defineType({ name: "leadMagnet", title: "Download (onl
     description: "An https file (public at its own address), or a repository PDF named /freebies/<name>.pdf, which lives in content/freebies and is offered only through the signed download after a signup (the activity pack is /freebies/bibo-bay-activity-pack.pdf).",
     validation: (rule) => rule.uri({ scheme: ["https"], allowRelative: true }).custom((value) => !value || /^https:\/\//.test(value) || /^\/freebies\/[a-z0-9][a-z0-9-]*\.pdf$/.test(value) || "Use an https URL or a /freebies/<name>.pdf path"),
   }),
-  defineField({ name: "available", title: "File exists and may be offered", type: "boolean", initialValue: false, validation: (rule) => rule.custom((value, context) => value !== true || !!(context.document?.fileUrl) || "A real verified file URL is required before enabling this download") }),
+  defineField({ name: "available", title: "File exists and may be offered", description: "Ignored while \"Coming soon\" is on.", type: "boolean", initialValue: false, validation: (rule) => rule.custom((value, context) => value !== true || !!(context.document?.fileUrl) || "A real verified file URL is required before enabling this download") }),
 ] });
 export const productCategory = defineType({ name: "productCategory", title: "Product category", type: "document", fields: [
   defineField({ name: "name", type: "string", validation: (rule) => rule.required() }),
