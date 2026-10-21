@@ -1,0 +1,24 @@
+CHANGELOG.md
+  h_0549c11fec2ab0 5-18
+README.md
+  h_0549c11fec2ab0 31-32
+docs/architecture.md
+  h_0549c11fec2ab0 272
+docs/cms-operations.md
+  h_0549c11fec2ab0 19-20,24-44,185-189,195-198
+docs/deployment.md
+  h_0549c11fec2ab0 3-8,141-142,150-151
+studio/sanity.cli.ts
+  h_0549c11fec2ab0 8-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3aebf3cf4cb15ac4d8c69e025e93461152abe971",
+  "prompts": {},
+  "humans": {
+    "h_0549c11fec2ab0": {
+      "author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
