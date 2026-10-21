@@ -2,6 +2,22 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-22 — Bot check (Cloudflare Turnstile)
+
+### Added
+
+- A spam check on the signup, contact and order forms (R214-R223): Cloudflare Turnstile in managed mode, off until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are both set. With both unset the CSP, every request body, every answer and the privacy text are unchanged.
+- Server (R215, R216, R218, R219): `botCheckConfig` (off, misconfigured or on; one key alone, a malformed key or Cloudflare's test keys in Vercel production fail closed with 503 and fail the production build), a siteverify call with a 5 s timeout and one retry that sends Cloudflare no visitor address, and a gate that runs after the honeypot, validation and availability checks and before any rate-limit counter. Statuses: 403 refused, 503 unavailable or unconfigured.
+- Client (R217): Cloudflare's script loads only on the first focus or press inside a form, with an interaction-only widget; the token is reset after every request that carried one.
+- CSP (R220): `frame-src https://challenges.cloudflare.com`, only while the check is on. `/api/readiness` reports `botCheck`, not part of `ready` (R221).
+- Events: `lead_bot_check_*`, `contact_bot_check_*` and `order_bot_check_*`; `_refused` is info and never reaches Sentry, `_unavailable` and `_unconfigured` are warnings and do.
+- The privacy fallback text names Cloudflare Turnstile, what it receives, that it never receives what is typed, the legitimate-interest basis and the Turnstile Privacy Addendum link, but only while the check is on (R222, C7).
+- Docs: provisioning with wrangler on the brand Cloudflare account, the off-switch, a runbook entry, the pipeline diagrams, the CSP, data-protection (Cloudflare as a processor, legal review owed) and the new CI job `e2e-bot-check` on Cloudflare's test keys (R223).
+
+### Decisions recorded
+
+- R214: Turnstile over hCaptcha (hCaptcha's free plan always shows a challenge). R223: test keys in one CI job only; keys are never chosen per request.
+
 ## 2026-10-21 — Contact form
 
 ### Added

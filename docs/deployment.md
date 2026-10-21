@@ -31,6 +31,8 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `SENTRY_ORG` | server | with `SENTRY_AUTH_TOKEN` | Sentry organisation | Organisation slug for the upload. |
 | `SENTRY_PROJECT` | server | with `SENTRY_AUTH_TOKEN` | Sentry project | Project slug for the upload. |
 | `NEXT_PUBLIC_POSTHOG_HOST` | public | optional | PostHog project | Exact https origin events go to; default `https://us.i.posthog.com` (EU: `https://eu.i.posthog.com`, the one to use where EU or UK visitors are expected: see `docs/data-protection.md`). Added to CSP `connect-src` only. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | public | Production only, with the secret | Cloudflare Turnstile widget "BIBO Bay forms" (brand account) | The widget's site key. Public by design. Set it together with `TURNSTILE_SECRET_KEY`; both unset means no spam check. Not on Preview: preview hostnames are not on the widget's domain list. See [Bot check](#bot-check-cloudflare-turnstile). |
+| `TURNSTILE_SECRET_KEY` | server | Production only, with the site key | Cloudflare Turnstile widget "BIBO Bay forms" (brand account) | The widget's secret, used only by the server to check a form's token. Sensitive: add it with `--sensitive`, never print it. One key without the other, a malformed key, or Cloudflare's test keys in Vercel production make every form answer 503 and fail the production build. |
 | `SANITY_API_READ_TOKEN` | server | for Studio draft preview | Sanity project (Viewer token) | Lets `/api/draft-mode/enable` check the preview secret and read drafts. Without it that route answers 503. |
 | `SANITY_WRITE_TOKEN` | server | only to run the Studio seed | Sanity project (Editor token) | Used by `npm --prefix studio run seed`, never by the website. Do not set it on Vercel. |
 | `SANITY_REVALIDATE_SECRET` | server | production (readiness requires it) | BIBO Bay owner (random) | Shared with the Sanity webhook that calls `/api/revalidate`. |
@@ -188,7 +190,7 @@ The per-request CSP and the other headers are described in
 | Route | Answers | Use |
 |---|---|---|
 | `GET /api/health` | Always `200 {"status":"ok","version":"<commit sha or local>","time":"…"}`, `no-store`. No configuration detail, no dependency call. | Uptime checks. |
-| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret), revalidation and a signup removal channel (below) are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`, `leadRemovalChannel`, `contact`. | Release gate. `email`, `contact` and `legalReviewed` are reported, not required; `leadRemovalChannel` is required (see below). |
+| `GET /api/readiness` | `200` when Sanity, lead storage (Supabase URL, service-role key, a 32+ character hash secret), revalidation and a signup removal channel (below) are configured, else `503`. Body: booleans only: `ready`, `sanity`, `supabase`, `email`, `revalidation`, `legalReviewed`, `leadRemovalChannel`, `contact`, `botCheck`. | Release gate. `email`, `contact`, `botCheck` and `legalReviewed` are reported, not required; `leadRemovalChannel` is required (see below). |
 
 Neither route ever returns a configuration value.
 
@@ -200,6 +202,48 @@ exists, and readiness is 503 without it. The consent sentence, the privacy and t
 exists ("reply to the acknowledgement email", or "write to <the contact address>") and promise nothing
 when there is none; the signup form then shows the 503 message. Set one of the two before launch.
 Handling a request: [incident-runbook.md](incident-runbook.md#removal-requests).
+
+## Bot check (Cloudflare Turnstile)
+
+The signup, contact and order forms ask Cloudflare Turnstile whether a person is filling them in
+(R214-R223). It is off until both `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are set; with
+both unset the CSP, every request and answer and the privacy text are exactly as before. The script loads
+only once someone starts filling in a form, and the widget is usually invisible.
+
+**Provisioning (brand Cloudflare account only, wrangler 4.151.3).** Log in with the three scopes the widget
+needs, then create the widget, which is bound to `bibobay.com` (that covers `www`) and nothing else:
+
+```bash
+npx wrangler@4.151.3 login --device --scopes account:read user:read challenge-widgets.write
+npx wrangler@4.151.3 whoami
+npx wrangler@4.151.3 turnstile widget create "BIBO Bay forms" --domain bibobay.com --mode managed --json
+```
+
+Write the JSON to a temporary file outside the repository, pipe its `sitekey` into
+`vercel env add NEXT_PUBLIC_TURNSTILE_SITE_KEY production` and its `secret` into
+`vercel env add TURNSTILE_SECRET_KEY production --sensitive`, then delete the file. Print neither value.
+If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
+
+- **Production only.** Preview hostnames are not on the widget's domain list, so a preview with the keys
+  would fail every check. Previews run with both unset.
+- **Test keys are refused in Vercel production.** Cloudflare's published test secret accepts any token
+  (probed on 2026-10-22), so `botCheckConfig` reports the state misconfigured when `VERCEL_ENV=production`
+  and a test key is set: forms answer 503, `*_bot_check_unconfigured` is reported, and
+  `scripts/verify-env.ts` fails the build, naming the variables and never their values.
+- **Order of go-live.** Merge with the keys unset (a no-op live), set both on Production, redeploy the
+  CURRENT production deployment (R188), then check `/api/readiness` shows `botCheck: true`, a `POST
+  /api/contact` without a token answers 403, and a real browser on www loads the widget on first focus
+  inside the form with no CSP violation.
+- **Off-switch.** Remove both variables from Production and redeploy the CURRENT production deployment
+  (never an older one: R188). See the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile).
+  Code rollback is `git revert -m 1 <merge-sha>`.
+- **CSP.** Only while the check is on, the page policy gains `frame-src https://challenges.cloudflare.com`.
+  `connect-src` is unchanged ([architecture.md](architecture.md#security-headers-and-why-pages-are-dynamic)).
+- **CI.** The job `e2e-bot-check` (name "Playwright, bot check (Cloudflare test keys)", port 3400) builds
+  and starts with `NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA`,
+  `TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA` and `E2E_BOT_CHECK=1` (the same values at build
+  and at start, plus the contact job's placeholders) and runs `npx playwright test e2e/bot-check` against
+  the real Cloudflare script. Every other job keeps both keys unset, and keys are never chosen per request.
 
 ## Contact form
 
@@ -385,7 +429,7 @@ Playwright answers itself, and no configuration or secret is present in CI (the 
 placeholders). `e2e-commerce`, `e2e-keyed` and `e2e-contact` run the commands in
 [qa-checklist.md](qa-checklist.md#2-browser-tests-against-a-production-build) (the ports aside). They were
 written from the commands the controller ran by hand on Windows; the first push proves them on
-Linux, and a red first run is fixed forward.
+Linux, and a red first run is fixed forward. A fifth browser job, `e2e-bot-check`, runs the spam check on Cloudflare's test keys; it is described under [Bot check](#bot-check-cloudflare-turnstile), and its commands are in qa-checklist.md section 2b-bis.
 
 Pinned actions (full commit SHA, version in a comment), checked on 2026-10-13 with
 `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` (each tag points directly at the commit) and

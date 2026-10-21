@@ -44,6 +44,16 @@ import type { PortableContent, SiteSettings } from "./types";
  * legitimate-interest basis and, as for orders, no retention period. Closed, the text is exactly
  * what it was.
  *
+ * Bot check (R222, C7): while the check is on (`botCheckConfig(process.env).state === "on"`, passed in
+ * by the page as `botCheck` so this file never reads the environment), the text also names
+ * Cloudflare Turnstile as a service (what it receives, that it loads only once a form is started,
+ * that it never sees what is typed, the addendum link), adds the spam check to the legitimate
+ * interest in keeping the website working and safe, and says the website sets no cookie for it
+ * (components/forms/bot-check loads Cloudflare's script and frame only on the first interaction
+ * with a form; lib/bot-check/turnstile.ts sends Cloudflare no visitor address). It claims nothing
+ * about what Cloudflare stores inside its own frame beyond the addendum. Off, the text is exactly
+ * what it was.
+ *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
  * default, which tells pages that Sanity has no text) stays unchanged.
  */
@@ -58,13 +68,16 @@ const whenSelling = (commerce: boolean, ...blocks: Array<() => PortableContent[n
 /** Blocks that appear only while the contact form is open (R196). */
 const whenContactOpen = whenSelling;
 
+/** Blocks that appear only while the bot check is on (R222). */
+const whenBotCheckOn = whenSelling;
+
 /** What the database stores, for the sentence naming Supabase. */
 function storedKinds(commerce: boolean, contact: boolean): string {
   const kinds = ["signups", ...(commerce ? ["order requests"] : []), ...(contact ? ["contact messages"] : [])];
   return kinds.length === 1 ? kinds[0]! : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`;
 }
 
-function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolean): PortableContent {
+function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolean, botCheck: boolean): PortableContent {
   return [
     paragraph(
       "BIBO Bay is a story world in development. This page explains what happens to the details you share through this website, in plain words.",
@@ -145,6 +158,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
       "Your answer to the notice is kept as one entry in this browser's storage on your device, so you are not asked again; a change you make under Analytics choices replaces it. It holds only yes or no, and it stays until you clear this website's data. If your browser blocks that storage, your answer lasts only until this page is reloaded or closed.",
     ),
     ...whenSelling(commerce, () => paragraph("The order list described above is kept in this browser's storage as well.")),
+    ...whenBotCheckOn(botCheck, () => paragraph("The spam check runs inside a frame served by Cloudflare; this website sets no cookie for it.")),
     heading("Why we use your details"),
     paragraph(
       "To send you updates about BIBO Bay, which is what you agree to when you join, and to send you the download link for the free activity pack. Once email sending is set up, you receive one email confirming that you joined, and the BIBO Bay team may receive a short note with your email address, first name and age range so they know someone signed up.",
@@ -164,7 +178,9 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
       paragraph("To read and answer a message you send through the contact form. The legal basis for keeping it is our legitimate interest in replying to people who write to us."),
     ),
     paragraph(
-      "Our legitimate interest in keeping the website working and safe is the legal basis for the rate-limit counts and the error reports described on this page, and for the requests the servers receive in order to send pages back.",
+      botCheck
+        ? "Our legitimate interest in keeping the website working and safe, which includes checking that forms are sent by people and not by automated programs, is the legal basis for the rate-limit counts, the spam check and the error reports described on this page, and for the requests the servers receive in order to send pages back."
+        : "Our legitimate interest in keeping the website working and safe is the legal basis for the rate-limit counts and the error reports described on this page, and for the requests the servers receive in order to send pages back.",
     ),
     paragraph("We make no decisions about you by automated means."),
     paragraph("We do not sell your details or share them with advertisers."),
@@ -175,6 +191,11 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
     paragraph("PostHog receives the visit statistics described above, and only if you say yes to counting your visit."),
     paragraph(
       "Sentry receives error reports, only when error reporting is switched on for this website: what went wrong and where in the code, the page address without anything after a question mark, your browser type, and the website's own short labels for the problem. Error reports carry no form details and no cookies, and the website does not add your network address to them.",
+    ),
+    ...whenBotCheckOn(botCheck, () =>
+      paragraph(
+        "Cloudflare Turnstile checks that a form is sent by a person and not by an automated program. It loads only once you start filling in a form. Cloudflare then receives your network address, your browser's user-agent string and technical details of its connection, and the address of the page; it does not receive anything you type into the form. Cloudflare describes how it handles this information in its Turnstile Privacy Addendum: https://www.cloudflare.com/turnstile-privacy-policy/",
+      ),
     ),
     paragraph(
       "For each email, the database keeps a delivery record: which email it was, whether it was sent, how many attempts were made and when, the email service's message reference, and a short error code if sending failed. It does not keep a copy of the email.",
@@ -245,28 +266,29 @@ function termsText(commerce: boolean, channel: RemovalChannel): PortableContent 
 type LegalFallback = { privacy: PortableContent; terms: PortableContent };
 
 /** The text while commerce is off (the default): nothing is sold on this website. */
-export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false, null, false), terms: termsText(false, null) });
+export const LEGAL_FALLBACK: LegalFallback = Object.freeze({ privacy: privacyText(false, null, false, false), terms: termsText(false, null) });
 
 /** The text while commerce is on: what an order request stores, and how payment works. */
-export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true, null, false), terms: termsText(true, null) });
+export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ privacy: privacyText(true, null, false, false), terms: termsText(true, null) });
 
 /**
  * The fallback text for the site's commerce switch and removal channel (Ruling R125). Only a
  * literal `true` counts as commerce on. With no removal channel (no email sending, no contact
  * address) the text is the frozen no-channel text and promises nothing; otherwise the removal
  * sentences name the channel that exists. `contactOpen` (the page's `contactFormOpen()`, R196) adds
- * what the contact form stores; it is false by default, so the frozen texts stay as they were.
+ * what the contact form stores and `botCheck` (the bot check is on, R222) names Cloudflare Turnstile; both are false by default, so the frozen texts stay as they were.
  * `env` is injectable for tests.
  */
 export function legalFallbackFor(
   settings: Partial<Pick<SiteSettings, "commerceEnabled" | "contactEmail">>,
   env: Readonly<Record<string, string | undefined>> = process.env,
   contactOpen = false,
+  botCheck = false,
 ): LegalFallback {
   const commerce = isCommerceEnabled(settings);
   const channel = removalChannelFrom(settings, env);
-  if (channel === null && !contactOpen) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
-  return { privacy: privacyText(commerce, channel, contactOpen), terms: termsText(commerce, channel) };
+  if (channel === null && !contactOpen && !botCheck) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
+  return { privacy: privacyText(commerce, channel, contactOpen, botCheck), terms: termsText(commerce, channel) };
 }
 
 /** The privacy page's removal paragraph; with no channel it says signups are not open, and promises nothing. */

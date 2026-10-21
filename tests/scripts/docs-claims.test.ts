@@ -458,7 +458,7 @@ describe("contact form docs (R190-R209)", () => {
     const observability = read("docs/observability.md");
     const warning = /_(failed|unavailable|unconfigured|invalid)$/;
     const reported = [...read("lib/contact/submit.ts").matchAll(/\{ event: "(\w+)"/g)].map((match) => match[1]!).filter((event) => warning.test(event));
-    expect([...new Set(reported)].sort()).toEqual(["contact_rate_limit_unavailable", "contact_store_failed", "contact_unconfigured"]);
+    expect([...new Set(reported)].sort()).toEqual(["contact_bot_check_unavailable", "contact_bot_check_unconfigured", "contact_rate_limit_unavailable", "contact_store_failed", "contact_unconfigured"]);
     for (const event of ["contact_submitted", "contact_route_failed", "contact_stored", "contact_rate_limited", "contact_honeypot", ...reported]) expect(observability, event).toContain(`\`${event}\``);
     expect(read("app/api/contact/route.ts")).toContain('event: "contact_route_failed"');
     expect(read("lib/analytics/events.ts")).toContain('contact_submitted: ["persisted", "topic"]');

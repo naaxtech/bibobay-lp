@@ -501,3 +501,48 @@ describe("while the contact form is open (R196)", () => {
     expect(screen.getByRole("heading", { name: "What the contact form collects" })).toBeTruthy();
   });
 });
+
+describe("while the bot check is on (R222, C7)", () => {
+  const off = textOf(legalFallbackFor({}, {}, false, false).privacy);
+  const on = textOf(legalFallbackFor({}, {}, false, true).privacy);
+  const ON_ENV = { NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA", TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA" };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("changes nothing while the check is off", () => {
+    expect(legalFallbackFor({}, {}, false, false)).toBe(LEGAL_FALLBACK);
+    expect(textOf(legalFallbackFor({}, {}).privacy)).toBe(off);
+    expect(off).not.toMatch(/Cloudflare|Turnstile|spam check/i);
+  });
+
+  it("names Cloudflare Turnstile, what it receives, the addendum and that typing is never sent", () => {
+    expect(on).toMatch(/Cloudflare Turnstile checks that a form is sent by a person and not by an automated program\. It loads only once you start filling in a form\./);
+    expect(on).toMatch(/Cloudflare then receives your network address, your browser's user-agent string and technical details of its connection, and the address of the page/);
+    expect(on).toContain("https://www.cloudflare.com/turnstile-privacy-policy/");
+    expect(on).toContain("does not receive anything you type");
+  });
+
+  it("adds the spam check to the legitimate interest and says the website sets no cookie for it", () => {
+    expect(on).toMatch(/keeping the website working and safe, which includes checking that forms are sent by people and not by automated programs, is the legal basis for the rate-limit counts, the spam check and the error reports/);
+    expect(on).toContain("The spam check runs inside a frame served by Cloudflare; this website sets no cookie for it.");
+  });
+
+  it("leaves the terms alone, and the vendor denylist admits Cloudflare only when on", () => {
+    expect(textOf(legalFallbackFor({}, {}, false, true).terms)).toBe(textOf(LEGAL_FALLBACK.terms));
+    const denied = /Cloudflare/;
+    expect(off).not.toMatch(denied);
+    expect(on).toMatch(denied);
+  });
+
+  it("/privacy names Cloudflare exactly when both keys are set", async () => {
+    const { default: PrivacyPage } = await import("@/app/privacy/page");
+    render(await PrivacyPage());
+    expect(screen.queryByText(/Cloudflare Turnstile/)).toBeNull();
+    cleanup();
+    for (const [name, value] of Object.entries(ON_ENV)) vi.stubEnv(name, value);
+    render(await PrivacyPage());
+    expect(screen.getByText(/Cloudflare Turnstile checks that a form/)).toBeTruthy();
+  });
+});

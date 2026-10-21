@@ -85,6 +85,17 @@ fails, which is enough to see that it was sent):
 - In that window, open **Analytics choices** in the footer: it says "Visit statistics are on for this
   browser."; "Turn statistics off" stops every later request, also after moving to another page.
 
+**2b-bis. The spam check on (Cloudflare's published test keys; they reach the real Cloudflare script, nothing
+else):** build and start with the same three values set both times, on a free port (CI uses 3400), plus the
+placeholder contact environment of 2c:
+
+```bash
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA E2E_BOT_CHECK=1 npm run build
+E2E_PRODUCTION=1 E2E_BOT_CHECK=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3400 npx playwright test e2e/bot-check
+```
+
+The test keys are refused when `VERCEL_ENV=production`, so this never runs against a Vercel build.
+
 **2c. The contact form open (placeholders; every `/api/contact` call is answered by Playwright, nothing
 leaves the machine):** the suite above runs against a keyless build, where `/contact` shows the closed
 notice and no form. To run the contact specs against an open form, start the same build with the

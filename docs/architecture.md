@@ -145,6 +145,8 @@ LeadForm (browser)  --POST JSON-->  /api/leads  ->  lib/leads/submit.ts
                                       1 honeypot filled  -> 400, nothing counted or stored
                                       2 Zod validation   -> 400 with field codes
                                       3 storage configured?  no -> 503
+                                      3b removal channel exists?  no -> 503
+                                      3c bot check (only when on) -> 403 refused / 503 unavailable or unconfigured
                                       4 rate limit (DB, 5 per 10 min per hashed client) -> 429 / 503 if the limiter fails
                                       5 submit_lead()    -> 500 if the write fails
                                       6 outbox rows (acknowledgement, staff alert), unclaimed
@@ -178,6 +180,8 @@ ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
                                          1 honeypot filled  -> 400, nothing counted or stored
                                          2 Zod validation (strict object)  -> 400 with field codes
                                          3 form open (contactFormOpen)?  no -> 503 { closed: true }
+                                         3b rate limiter available?  no -> 503
+                                         3c bot check (only when on) -> 403 refused / 503 unavailable or unconfigured
                                          4 rate limit (DB: 3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR
                                            (default 60, the alert's own send cap) per hour in all) -> 429 / 503 if the limiter fails
                                          5 submit_contact_message()  -> 500 if the write fails
@@ -220,6 +224,28 @@ ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
   ([observability.md](observability.md#what-is-counted)).
 - The database side is in [database-security.md](database-security.md#contact-messages-migration-0008).
   An admin inbox page is deferred (R200); until then staff read messages in the alert email, or by SQL.
+
+## Bot check
+
+Cloudflare Turnstile (R214-R223) sits in front of the three public forms. `botCheckConfig(env)`
+(`lib/bot-check/config.ts`) is the one definition of its state: **off** (both variables unset or blank:
+nothing changes), **misconfigured** (fails closed with 503 and a production build fails) or **on**.
+The CSP, `scripts/verify-env.ts`, `/api/readiness` and the three pipelines all read that one function.
+
+- **Position (R216).** The gate (`lib/bot-check/gate.ts`) runs after the honeypot, validation and
+  availability checks and before any rate-limit counter: leads after the removal-channel check and before the
+  rate limit; contact after the limiter-available check and before both limits; orders after storage and
+  limiter availability and before the rate limit and the catalogue. A visitor's field errors therefore never
+  spend a token, and a bot without one cannot use up a family's count or the contact form's hourly cap.
+- **Server.** `lib/bot-check/turnstile.ts` calls Cloudflare's siteverify with the secret, the token and an
+  idempotency key only, never the visitor's address, with a 5 s timeout and one retry after 500 ms on a
+  network error, a timeout, HTTP 5xx or `internal-error`. With real keys the hostname must match and the
+  action (`lead`, `contact` or `order`) must be the form's own. The token is never stored, logged or echoed.
+- **Client.** `components/forms/bot-check/` loads Cloudflare's script only on the first focus or press
+  inside a form, renders an interaction-only widget, and resets it after every request that carried a token.
+- **Answers.** 403 with the refused copy (info event, not reported); 503 with the unavailable copy (orders
+  reuse their "busy" copy) and a reported warning. Events are in
+  [observability.md](observability.md#alerts-from-the-spam-check-cloudflare-turnstile).
 
 ## Staff flow (Task 8b)
 
@@ -286,12 +312,16 @@ connect-src 'self';
 object-src 'none';
 base-uri 'self';
 form-action 'self';
+frame-src https://challenges.cloudflare.com;   (only while the bot check is on)
 frame-ancestors 'self' [SANITY_STUDIO_ORIGIN when set];
 upgrade-insecure-requests            (Vercel deployments only)
 ```
 
 - `next dev` adds `'unsafe-eval'` (React's debugging aids) and a plain `style-src`; a production
   build never sends `'unsafe-eval'` (tested, and checked by `npm run verify:deployment`).
+- `frame-src` is sent only while the bot check is on (R220); with it off the policy is byte-identical to
+  the one before the check existed. Cloudflare's script is trusted through the nonce and `'strict-dynamic'`
+  (the loader copies the page nonce onto its script tag), so `script-src` and `connect-src` do not change.
 - API routes get `default-src 'none'; frame-ancestors 'none'` (`next.config.ts`).
 - Every response also carries `Referrer-Policy: strict-origin-when-cross-origin`,
   `X-Content-Type-Options: nosniff`, a restrictive `Permissions-Policy`,
