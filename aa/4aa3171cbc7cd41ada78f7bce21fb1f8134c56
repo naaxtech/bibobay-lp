@@ -1,0 +1,50 @@
+lib/outbox/types.ts
+  s_37deb30b6489aa::t_75a01d81dad1e4 1,3,6-9
+  s_37deb30b6489aa::t_87023c2280f7c2 74-85
+  s_37deb30b6489aa::t_7669b9f248783e 29
+  s_37deb30b6489aa::t_89be6e992ae502 99-105
+  s_37deb30b6489aa::t_9fed9601d8fa27 20-23
+lib/contact/types.ts
+  s_37deb30b6489aa::t_e8c005044c7d30 1-9,11-21
+  s_37deb30b6489aa::t_267597acc8e6c4 10
+tests/contact/outbox-vocabulary.test.ts
+  s_37deb30b6489aa::t_8964538cd667c9 1-30
+tests/contact/field-cases.ts
+  s_37deb30b6489aa::t_b4fa38dfd90d9d 45
+  s_37deb30b6489aa::t_977be9e2fb66ec 1-44,46
+lib/contact/availability.ts
+  s_37deb30b6489aa::t_f56a5f8dd211f5 1-21
+lib/contact/fields.ts
+  s_37deb30b6489aa::t_196d9e9bd2d991 80
+  s_37deb30b6489aa::t_96e632c9178862 75
+  s_37deb30b6489aa::t_a4a9869adf4bbb 2-38,41-74,76-79,81-118
+  s_37deb30b6489aa::t_ec7f8bd3fcd810 1
+  s_37deb30b6489aa::t_ec67787e2c5a68 39-40
+tests/contact/availability.test.ts
+  s_37deb30b6489aa::t_0ec44c823c38b7 2-18,23-46
+  s_37deb30b6489aa::t_77fdbddb9f48ff 1,19-22
+tests/contact/contact-fields.test.ts
+  s_37deb30b6489aa::t_6c262308d14c08 1-35
+lib/outbox/constants.ts
+  s_37deb30b6489aa::t_b9d3e5f7413cc7 113
+  s_37deb30b6489aa::t_2674425c7a812d 50
+  s_37deb30b6489aa::t_2bbbbab8ac6669 3-4
+  s_37deb30b6489aa::t_b6bfc2479dcdb8 39,42-44,49,51-54
+  s_37deb30b6489aa::t_d16f8e870cfddd 19-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aa4aa3171cbc7cd41ada78f7bce21fb1f8134c56",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
