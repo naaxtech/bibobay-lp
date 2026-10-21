@@ -2,6 +2,15 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-21 — Email cron back to once a day (Hobby plan)
+
+### Changed
+
+- `vercel.json` runs the email outbox cron once a day (`0 6 * * *`, fires between 06:00 and 06:59 UTC) again, because the site stays on Vercel's Hobby plan (owner ruling R180). This supersedes R134's every-15-minutes schedule, which needs Pro.
+- The deployment, observability, architecture and runbook docs and the README say what that means: every email is still attempted right after the API answer; a failed send is retried at the next daily run; a send of unknown outcome may only be retried within 23 hours of the first attempt that left it unconfirmed, so on a daily schedule it gets at most one retry before it is parked as `delivery_expired` for a person. Repeat-signup rows are never sent straight away, and deferred emails drain at most `LEAD_ACK_SEND_LIMIT_PER_HOUR` per kind per day.
+- Vercel's Hobby plan is restricted to non-commercial personal use, and its fair-use guidelines count advertising a product sale as commercial. By owner decision R180 the site stays on Hobby for now; a Pro plan is required at the latest before commerce is switched on. The Studio field `commerceEnabled` now says so. Upgrading means restoring `*/15 * * * *` in `vercel.json`, the docs, `lib/outbox/constants.ts`, the Studio field text and the tests in `tests/scripts` (the full list is in `docs/deployment.md`).
+- A stuck `sending` row is no longer re-sent after 15 minutes: the next cron run re-sends it if it is within 23 hours of the stuck claim, otherwise it is parked as `stale_unconfirmed`.
+
 ## 2026-10-21 — Sanity CMS live
 
 ### Added

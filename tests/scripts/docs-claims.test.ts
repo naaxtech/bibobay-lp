@@ -106,7 +106,7 @@ describe("email outbox worker docs (Task 8a)", () => {
     expect(readme.find((line) => line.startsWith("| Staff order administration pages")) ?? "", "README staff pages row").toMatch(/\| built \(Task 8c/);
   });
 
-  it("documents CRON_SECRET as used, its 32-character minimum, and the once-a-day schedule with how to raise it (R88)", () => {
+  it("documents CRON_SECRET as used, its 32-character minimum, and the once-a-day schedule (R88, restored by R180) with how to raise it", () => {
     const deployment = read("docs/deployment.md");
     const row = deployment.split(/\r?\n/).find((line) => line.startsWith("| `CRON_SECRET` |")) ?? "";
     expect(row).not.toMatch(/not used yet|Nothing reads it/);
@@ -116,6 +116,8 @@ describe("email outbox worker docs (Task 8a)", () => {
     expect(deployment).toContain(`\`${vercel.crons[0]!.path}\``);
     expect(deployment).toMatch(/Hobby/);
     expect(deployment).toMatch(/Pro/);
+    expect(vercel.crons[0]!.schedule).toBe("0 6 * * *");
+    expect(deployment.replace(/\s+/g, " ")).toMatch(/once a day/);
     const example = read(".env.example").split(/\r?\n/);
     const index = example.indexOf("CRON_SECRET=");
     expect(example[index - 1]).toMatch(/^# .*32/);
@@ -226,15 +228,47 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
     expect(read("README.md")).not.toMatch(/Node\.js 26 \(the version/);
   });
 
-  it("requires a Pro plan, because Hobby is non-commercial, and runs the cron every 15 minutes (O-I2, R134)", () => {
+  it("stays on Hobby by owner ruling R180 (2026-10-21), runs the cron once a day, and requires Pro before commerce is switched on (supersedes R134)", () => {
     const vercel = JSON.parse(read("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
-    expect(vercel.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "*/15 * * * *" }]);
-    expect(deployment()).toMatch(/\*\*A Vercel Pro plan is required\*\*/);
-    expect(deployment().replace(/\s+/g, " ")).toMatch(/Hobby plan is restricted to non-commercial personal use/);
-    expect(deployment()).not.toMatch(/once a day, 06:00 UTC|accepts at most one run a day, so a failed email can wait/);
-    expect(read("README.md")).toMatch(/Vercel needs a Pro plan, because Hobby is for non-commercial use only/);
-    expect(read("docs/observability.md")).toMatch(/every 15 minutes/);
-    for (const file of ["README.md", "docs/architecture.md", "docs/observability.md"]) expect(read(file), file).not.toMatch(/once a day|daily Vercel cron/i);
+    expect(vercel.crons).toEqual([{ path: "/api/cron/email-outbox", schedule: "0 6 * * *" }]);
+    const flat = (text: string) => text.replace(/\s+/g, " ");
+    expect(flat(deployment())).toMatch(/runs on the Hobby plan by owner decision \(ruling R180, 2026-10-21\)/);
+    expect(flat(deployment())).toMatch(/Hobby plan is restricted to non-commercial personal use; its fair-use guidelines \(https:\/\/vercel\.com\/docs\/limits\/fair-use-guidelines\) count advertising the sale of a product as commercial/);
+    expect(flat(deployment())).toMatch(/a Pro plan is required at the latest before commerce is switched on \(`commerceEnabled`\)/);
+    expect(flat(deployment())).toMatch(/restore `\*\/15 \* \* \* \*` \(R134\) in `vercel\.json` together with the tests and docs: change every file that says once a day, which are `vercel\.json`, `README\.md`, `docs\/deployment\.md`, `docs\/architecture\.md`, `docs\/observability\.md`, `docs\/incident-runbook\.md`, `lib\/outbox\/constants\.ts`, `studio\/schemaTypes\/documents\/singletons\.ts` and the tests in `tests\/scripts`/);
+    expect(flat(deployment())).toMatch(/fires between 06:00 and 06:59 UTC/);
+    expect(flat(deployment())).toMatch(/retried at the next daily run/);
+    expect(flat(deployment())).toMatch(/leaves at most one retry[\s\S]{0,500}parked at the next run as `delivery_expired`/);
+    expect(flat(deployment())).toMatch(/emails deferred by the hourly per-kind cap, and repeat-signup rows that are never sent straight away, drain at most `LEAD_ACK_SEND_LIMIT_PER_HOUR` \(default 60\) per kind per day \(and at most 100 rows per outbox per run\)/);
+    expect(flat(deployment())).toMatch(/every email is still attempted right after the API answer \(R88\), except repeat-signup rows/);
+    expect(deployment()).not.toMatch(/retried within about 15 minutes|leaves many tries/);
+    for (const file of ["docs/deployment.md", "docs/observability.md", "docs/incident-runbook.md", "CHANGELOG.md"]) {
+      expect(read(file), file).not.toMatch(/usually misses/);
+    }
+    expect(flat(read("docs/observability.md"))).toMatch(/at most one retry before it is parked/);
+    expect(flat(read("docs/incident-runbook.md"))).toMatch(/at most one retry before it is parked/);
+    expect(flat(read("docs/incident-runbook.md"))).toMatch(/attempted up to 8 times in all \(right after the answer, then once per daily run\)/);
+    expect(flat(read("CHANGELOG.md"))).toMatch(/at most one retry before it is parked/);
+    for (const file of ["docs/observability.md", "docs/database-security.md"]) {
+      expect(read(file), file).not.toMatch(/re-sent after\s+15\s+minutes|after\s+15\s+minutes a claim takes it again/);
+      expect(flat(read(file)), file).toMatch(/stays `sending`; the next cron run \(once a day on Hobby, and never before 15 minutes\) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`/);
+    }
+    expect(flat(read("docs/incident-runbook.md"))).toMatch(/The next cron run sends it \(once a day, 06:00–06:59 UTC on Hobby; to send it now, call the worker by hand as in \[deployment\.md\]\(deployment\.md#email-outbox-worker-task-8a\)\)/);
+    expect(read("docs/deployment.md")).toMatch(/^## Email outbox worker \(Task 8a\)$/m);
+    expect(read("docs/deployment.md")).toMatch(/curl -H "Authorization: Bearer <secret>"/);
+    for (const file of ["README.md", "docs/architecture.md"]) {
+      expect(read(file), file).not.toMatch(/non-commercial only|non-commercial use only/);
+      expect(flat(read(file)), file).toMatch(/restricted to non-commercial personal use[\s\S]{0,300}fair-use guidelines[\s\S]{0,300}Pro plan is required at the latest before commerce is switched on/);
+    }
+    expect(flat(read("docs/architecture.md"))).toMatch(/scheduled 06:00 UTC \(Hobby fires it between 06:00 and 06:59\)/);
+    const singletons = read("studio/schemaTypes/documents/singletons.ts");
+    expect(singletons).toContain("Before switching this on, a Vercel Pro plan and the 15-minute email schedule must be in place (docs/deployment.md).");
+    expect(deployment()).not.toMatch(/\*\*A Vercel Pro plan is required\*\*|\*\/15 \* \* \* \*` \(every 15 minutes\)/);
+    expect(read("README.md")).toMatch(/Vercel stays on Hobby \(R180, 2026-10-21\)/);
+    expect(flat(read("docs/observability.md"))).toMatch(/runs once a day[\s\S]{0,700}at most one retry[\s\S]{0,200}`delivery_expired`/);
+    for (const file of ["README.md", "docs/architecture.md", "docs/observability.md", "docs/incident-runbook.md", "lib/outbox/constants.ts"]) {
+      expect(read(file), file).not.toMatch(/every 15 minutes|every-15-minutes|needs a Pro plan|cron worker \(every 15/i);
+    }
   });
 
   it("documents every order, tracking and staff-page event that reaches Sentry (O-I5)", () => {

@@ -71,8 +71,8 @@ the claim refused to send it). Both outboxes use the same states.
 
 - Without Resend configured, rows stay `pending`. `acknowledgementQueued: true` in the API answer
   means the row exists, never that an email went out.
-- If the provider accepts an email but recording the result fails, the row stays `sending`; after
-  15 minutes a claim takes it again and re-sends it under the same provider idempotency key, so the
+- If the provider accepts an email but recording the result fails, the row
+  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. The shared key means the
   provider does not deliver it twice.
 - The cron worker (`/api/cron/email-outbox`, Task 8a) sends due `pending` and `failed` rows and
   re-claims stale `sending` ones through the same claim functions as the sends made right after
