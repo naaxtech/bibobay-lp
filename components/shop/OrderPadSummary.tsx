@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { UI_COPY } from "@/components/landing/ui-copy";
+import { stegaCleanText } from "@/lib/content/stega";
 import { ORDER_PAD_MAX_QUANTITY } from "@/lib/orders/constants";
 import { ORDER_PAD_ANNOUNCE } from "./order-pad-copy";
 import { useOrderPad } from "./OrderPadProvider";
@@ -79,7 +80,7 @@ export function OrderPadSummary({ listed, reviewLink = true }: { listed: readonl
                       else removeButtons.current.delete(line.productId);
                     }}
                     onClick={() => remove(index, name)}
-                    aria-label={`${UI_COPY.orderPad.remove}: ${name}`}
+                    aria-label={`${UI_COPY.orderPad.remove}: ${stegaCleanText(name)}`}
                   >
                     {UI_COPY.orderPad.remove}
                   </button>

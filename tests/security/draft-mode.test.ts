@@ -6,9 +6,12 @@ import { DRAFT_DISABLE_PATH, handleDraftModeEnable, safeRedirectPath } from "@/l
 
 vi.mock("server-only", () => ({}));
 
-/** Next's draft-mode store, as a route handler or page sees it. */
-const { draft } = vi.hoisted(() => ({ draft: { isEnabled: false, enable: vi.fn(), disable: vi.fn() } }));
-vi.mock("next/headers", () => ({ draftMode: async () => draft }));
+/** Next's draft-mode store and cookies, as a route handler or page sees them. */
+const { draft, cookieJar } = vi.hoisted(() => ({
+  draft: { isEnabled: false, enable: vi.fn(), disable: vi.fn() },
+  cookieJar: { get: vi.fn(), has: vi.fn(() => false), set: vi.fn(), delete: vi.fn() },
+}));
+vi.mock("next/headers", () => ({ draftMode: async () => draft, cookies: async () => cookieJar }));
 
 /** The Sanity reads, so the test sees which perspective each page asked for. */
 const { getLandingPage, getSiteSettings, getLegalSettings } = vi.hoisted(() => ({

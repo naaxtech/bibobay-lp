@@ -1,3 +1,4 @@
+import { stegaCleanText } from "./stega";
 import type { BrandPillar, Character, SectionId } from "./types";
 
 /*
@@ -109,7 +110,8 @@ const bareId = (id: string, type: string) => (id.startsWith(`${type}-`) ? id.sli
  * the drawn placeholder) rather than another friend's face.
  */
 export function friendArt(friend: Pick<Character, "id" | "name">): BrandArt | undefined {
-  const firstName = friend.name.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  // In a Studio preview the name carries a click-to-edit payload (R160); the lookup reads the plain name.
+  const firstName = stegaCleanText(friend.name).trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   return own(FRIENDS, firstName);
 }
 

@@ -53,7 +53,8 @@ export const landingPage = defineType({ name: "landingPage", title: "Landing pag
   defineField({ name: "faqIntro", type: "sectionIntro" }),
   defineField({ name: "faqs", type: "array", of: [defineArrayMember({ type: "reference", to: [{ type: "faqItem" }] })] }),
   defineField({ name: "finalCta", type: "finalCtaSection" }),
-] });
+// No title field: without a preview the Studio would title it with its raw content.
+], preview: { prepare: () => ({ title: "Landing page" }) } });
 
 export const legalSettings = defineType({ name: "legalSettings", title: "Legal and consent", type: "document", fields: [
   defineField({ name: "privacy", type: "portableContent", description: "Requires counsel review before indexing." }),
@@ -76,7 +77,7 @@ export const legalSettings = defineType({ name: "legalSettings", title: "Legal a
     validation: (rule) =>
       rule.custom((value, context) => orderConsentVersionProblem(value, (context.document as { orderConsentCopy?: unknown } | undefined)?.orderConsentCopy)),
   }),
-] });
+], preview: { prepare: () => ({ title: "Legal and consent" }) } });
 
 export const contactPage = defineType({ name: "contactPage", title: "Contact page", type: "document", fields: [
   defineField({ name: "seo", type: "seo", description: "The search and sharing title and description of the Contact page. The page is listed for search engines only while the contact form is open or a contact email is set." }),
@@ -93,6 +94,7 @@ export const contactPage = defineType({ name: "contactPage", title: "Contact pag
   defineField({ name: "errorMessage", type: "text", rows: 2, description: "Shown under the form when a message could not be saved." }),
   defineField({ name: "closedMessage", type: "text", rows: 2, description: "Shown on the Contact page, instead of the form, when the form is not open and no contact email is set. Also shown if the form closes while someone is writing." }),
   defineField({ name: "emailIntro", type: "string", description: "The line above the contact email when the form is not open. The address comes from Site settings, Verified public contact email." }),
-] });
+// Named like the other singletons, not after whatever its heading says.
+], preview: { prepare: () => ({ title: "Contact page" }) } });
 
 export const singletonTypes = [siteSettings, landingPage, legalSettings, contactPage];

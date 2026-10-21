@@ -327,6 +327,13 @@ upgrade-insecure-requests            (Vercel deployments only)
   become `noindex`. `/api/draft-mode/disable` turns it off. The Studio side is wired:
   `presentationTool` in `studio/sanity.config.ts` passes `previewMode.enable: "/api/draft-mode/enable"`
   with the origin from `SANITY_STUDIO_PREVIEW_URL`. It is configured on the live Sanity project (2026-10-21).
+- **Live editing:** inside Presentation, draft reads carry stega (content source maps as invisible
+  characters, `lib/sanity/client.ts`), `components/preview/VisualEditingLoader.tsx` loads
+  `@sanity/visual-editing` as a separate chunk only in the Studio's frame, and each saved edit
+  refreshes the page (`components/preview/refresh.ts`). The normalizer keeps the payload in text and
+  cleans every value it decides with (`lib/content/stega.ts`); metadata and JSON-LD are cleaned.
+  Presentation's perspective switch is stored in `sanity-preview-perspective` by a server action
+  (`lib/sanity/preview-actions.ts`), and draft cookies are `Partitioned` in the cross-site frame.
 
 ## Metadata and indexing
 

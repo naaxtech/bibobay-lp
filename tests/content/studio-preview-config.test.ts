@@ -11,9 +11,11 @@ const config = readFileSync("studio/sanity.config.ts", "utf8");
 const readme = readFileSync("studio/README.md", "utf8");
 
 describe("Studio Presentation preview wiring (P-I3)", () => {
-  it("passes the origin and previewMode.enable, not a bare preview string", () => {
-    expect(config).toMatch(/presentationTool\(\{ previewUrl: \{ origin: previewUrl, previewMode: \{ enable: DRAFT_MODE_ENABLE_PATH \} \}/);
+  it("passes the initial URL and previewMode.enable, not a bare preview string or the deprecated origin", () => {
+    // `origin` is deprecated in Sanity 6 in favour of `initial` (sanity/lib/types PreviewUrlResolverOptions · sanity 6.17.0).
+    expect(config).toMatch(/presentationTool\(\{ previewUrl: \{ initial: previewUrl, previewMode: \{ enable: DRAFT_MODE_ENABLE_PATH \} \}/);
     expect(config).not.toMatch(/presentationTool\(\{ previewUrl,/);
+    expect(config).not.toMatch(/previewUrl: \{ origin:/);
   });
 
   it("points at the draft-mode route the site really serves", () => {

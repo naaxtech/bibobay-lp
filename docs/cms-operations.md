@@ -183,6 +183,12 @@ address-hash secret are all configured ([deployment.md](deployment.md#contact-fo
 document never opens or closes it. The page is listed for search engines while it offers a way to reach
 the team (the open form or a contact email), unless its SEO is set to "no index".
 
+In **Presentation** (see [Live editing](#live-editing-presentation)) `/contact` opens beside this
+document: the heading, intro, button label, footer link and the closed message or the line above the
+address are click-to-edit like any other page text. The success and error messages appear only after
+someone submits the form, so edit them in the form fields. Do not submit test messages from the
+preview: it is the live site, so each one is stored and alerts the team.
+
 After a schema change, redeploy the Studio from `studio/` (see [The live project](#the-live-project)),
 then publish the document. `npm --prefix studio run seed` creates the document if it is missing
 and never overwrites an editor's changes.
@@ -206,16 +212,50 @@ and never overwrites an editor's changes.
 
 ## Preview (draft mode)
 
-The site side is built: `/api/draft-mode/enable` checks the Presentation tool's short-lived secret
-with the server-only `SANITY_API_READ_TOKEN` (Viewer role), then shows drafts with a "draft
-preview" notice and `noindex`; `/api/draft-mode/disable` exits. The Studio side is wired too:
-`presentationTool` in `studio/sanity.config.ts` uses
-`previewUrl: { origin, previewMode: { enable: "/api/draft-mode/enable" } }`, with the origin from
-`SANITY_STUDIO_PREVIEW_URL`. On the live project this is configured: the hosted Studio is built with
-`SANITY_STUDIO_PREVIEW_URL=https://www.bibobay.com`, and the site has `SANITY_API_READ_TOKEN` and
-`SANITY_STUDIO_ORIGIN=https://bibobay.sanity.studio`. Open **Presentation** in the Studio to edit
-with the page beside you. Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no Presentation tool
-at all.
+### Live editing (Presentation)
+
+Open **Presentation** in the Studio (https://bibobay.sanity.studio): the site appears beside the
+editing form, showing your unpublished changes.
+
+- **Click to edit.** Hover any text on the page: an outline names the field it comes from. Click it
+  and the Studio opens that document at that field.
+- **Live.** Type in the form and the page follows within a second or two, before you publish.
+  Visitors keep seeing the published site until you press **Publish**.
+- **Navigate either way.** Follow a link on the page and the Studio's address bar follows; type a
+  path in the address bar (`/privacy`) and the page goes there. The **Documents on this page** list
+  shows what the page is built from.
+- **Perspective.** The switch at the top of Presentation shows drafts (the default), the published
+  site, or a release with its drafts.
+- Images, switches (section visibility, colour themes) and links have no outline: edit them in the
+  form; the page still updates live.
+- The "draft preview" notice stays at the top of the page; its "Exit preview" link is hidden inside
+  the Studio and shown when the preview is opened in its own tab.
+
+### How it works
+
+`/api/draft-mode/enable` checks the Presentation tool's short-lived secret with the server-only
+`SANITY_API_READ_TOKEN` (Viewer role), then shows drafts with the "draft preview" notice and
+`noindex`; `/api/draft-mode/disable` exits. `presentationTool` in `studio/sanity.config.ts` uses
+`previewUrl: { initial, previewMode: { enable: "/api/draft-mode/enable" } }`, with the site URL from
+`SANITY_STUDIO_PREVIEW_URL`; the hosted Studio is built with `SANITY_STUDIO_PREVIEW_URL=https://www.bibobay.com`,
+and the site has `SANITY_API_READ_TOKEN` and `SANITY_STUDIO_ORIGIN=https://bibobay.sanity.studio`.
+Without `SANITY_STUDIO_PREVIEW_URL` the Studio has no Presentation tool at all.
+
+- Draft reads ask Sanity for content source maps, which hide the click-to-edit link in each text as
+  invisible characters. Only draft-mode requests do this, and only when `SANITY_STUDIO_ORIGIN` names
+  the Studio. The site cleans every value it decides with (ids, links, colours, versions) and
+  everything it puts in `<head>`; text keeps the link (`lib/content/stega.ts`).
+- The overlay code (`@sanity/visual-editing`) is a separate download that only a draft page inside the
+  Studio requests; visitors never load it. Its styles carry the page's CSP nonce (copied in the browser
+  from Next's own scripts), and an error boundary keeps the page if the overlay ever fails.
+- The site never puts an edit link in an attribute (an `aria-label` would read it aloud); text the
+  site splits for display, such as the hero title's lines, carries it once on the whole element, so
+  the whole heading is clickable.
+- Each saved edit makes the page re-render on the server with the latest draft.
+- Inside the Studio's frame the draft cookies are set `Partitioned`, so browsers that block
+  third-party cookies (Safari) keep the preview.
+- The hosted Studio opens inside the Sanity Dashboard (`https://www.sanity.io`), so the site's CSP
+  `frame-ancestors` lists both the Studio and the Dashboard.
 
 ## Publishing and when the site updates
 

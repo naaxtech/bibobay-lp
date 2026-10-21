@@ -17,6 +17,7 @@ import {
   type ContactFieldErrorCode,
   type ContactFieldErrors,
 } from "@/lib/contact/fields";
+import { stegaCleanText } from "@/lib/content/stega";
 import { normalizeEmail } from "@/lib/leads/fields";
 import { CONTACT_FORM_COPY, contactFieldErrorMessage } from "./contact-copy";
 
@@ -331,9 +332,10 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
        * pseudo-elements in the status's grid cell (lead-form.css), one per long message the line can
        * show. The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
        * success message cannot be read or announced before the server reports the message stored.
+       * In a Studio preview they are cleaned of their click-to-edit payload: no edit link in an attribute.
        */}
-      <div className="lead-form__outcome" data-reserve-a={copy.successMessage} data-reserve-b={copy.errorMessage}>
-        <div className="lead-form__outcome" data-reserve-a={copy.closedMessage} data-reserve-b={CONTACT_FORM_COPY.outcome.rateLimited}>
+      <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
+        <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.closedMessage)} data-reserve-b={CONTACT_FORM_COPY.outcome.rateLimited}>
           {/* The form's only role="status" (R167); never focused, as a focused live region is read out as well as announced. */}
           <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
             {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}

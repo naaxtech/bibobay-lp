@@ -10,6 +10,7 @@ import { PRODUCT_ART_WIDTH, productArt } from "@/components/shop/product-art";
 import { ProductPicture } from "@/components/shop/ProductPicture";
 import { ShopFrame } from "@/components/shop/ShopFrame";
 import { isCommerceEnabled } from "@/lib/commerce/gate";
+import { stegaCleanText } from "@/lib/content/stega";
 import type { Product } from "@/lib/content/types";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
 import { getProductBySlug, getGateSettings } from "@/lib/sanity/fetch";
@@ -68,7 +69,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="product-page__gallery">
             <ProductPicture art={productArt(first, PRODUCT_ART_WIDTH.hero)} name={product.name} sizes="(min-width: 64rem) 36rem, 92vw" priority className="product-print--hero" />
             {thumbs.length > 0 ? (
-              <ul className="product-page__thumbs" aria-label={UI_COPY.shop.morePictures(product.name)}>
+              <ul className="product-page__thumbs" aria-label={UI_COPY.shop.morePictures(stegaCleanText(product.name))}>
                 {thumbs.map(({ key, art }) => (
                   <li key={key}>
                     <ProductPicture art={art} name={product.name} sizes="7rem" className="product-print--thumb" />

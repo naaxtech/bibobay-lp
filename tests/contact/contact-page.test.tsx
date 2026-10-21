@@ -1,12 +1,18 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { evaluate, parse } from "groq-js";
 import type { Metadata } from "next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ContactPage, { generateMetadata } from "@/app/contact/page";
 import { SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
+import { normalizeContactPage, normalizeSiteSettings } from "@/lib/content/normalize";
+import { stegaCleanText } from "@/lib/content/stega";
 import type { ContactPageContent } from "@/lib/content/types";
 import { contactPageState } from "@/lib/contact/page-state";
+import { CONTACT_PAGE_QUERY, SITE_SETTINGS_QUERY } from "@/lib/sanity/queries";
 import { contactMetadata, seoEnvironment } from "@/lib/seo/metadata";
+import { buildSeedDocuments } from "@/studio/scripts/seed-data";
+import { encodeAllStrings, STEGA_CHARACTER } from "@/tests/support/stega";
 import { siteSettings } from "../landing/fixtures";
 
 vi.mock("server-only", () => ({}));
@@ -93,6 +99,54 @@ describe("the /contact page", () => {
     render(await ContactPage());
     expect(getContactPage).toHaveBeenCalledWith({ preview: true });
     expect(getSiteSettings).toHaveBeenCalledWith({ preview: true });
+  });
+});
+
+describe("the /contact page in a Studio preview (live editing: text keeps its edit link, attributes and metadata never do)", () => {
+  const read = async (query: string) => structuredClone(await (await evaluate(parse(query), { dataset: buildSeedDocuments() })).get()) as Record<string, unknown>;
+
+  /** The seeded documents as Presentation serves them: every string encoded, then normalized like fetch.ts. */
+  async function encodedReads() {
+    const copy = normalizeContactPage(encodeAllStrings(await read(CONTACT_PAGE_QUERY), { _id: "contactPage", _type: "contactPage" }));
+    const settings = normalizeSiteSettings(encodeAllStrings({ ...(await read(SITE_SETTINGS_QUERY)), contactEmail: "hello@example.com" }, { _id: "siteSettings", _type: "siteSettings" }));
+    getContactPage.mockResolvedValue(copy);
+    getSiteSettings.mockResolvedValue(settings);
+  }
+
+  /** Every attribute carrying a payload (Visual Editing reads it only in img alt, time datetime and svg aria-label). */
+  const leaks = (root: Element) =>
+    [root, ...root.querySelectorAll("*")].flatMap((element) =>
+      Array.from(element.attributes).filter((attribute) => STEGA_CHARACTER.test(attribute.value)).map((attribute) => `<${element.tagName.toLowerCase()} ${attribute.name}>`));
+
+  beforeEach(() => {
+    draft.isEnabled = true;
+  });
+
+  it("keeps the heading clickable and the mailto link clean, with no payload in an attribute", async () => {
+    await encodedReads();
+    const { container } = render(await ContactPage());
+    const heading = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+    expect(STEGA_CHARACTER.test(heading)).toBe(true);
+    expect(stegaCleanText(heading)).toBe("Contact us");
+    const mail = within(screen.getByRole("main")).getByRole("link", { name: "hello@example.com" });
+    expect(mail.getAttribute("href")).toBe("mailto:hello@example.com");
+    expect(leaks(container)).toEqual([]);
+  });
+
+  it("keeps the payload out of the open form's attributes", async () => {
+    await encodedReads();
+    openForm();
+    const { container } = render(await ContactPage());
+    expect(screen.getByRole("form", { name: "Contact BIBO Bay" })).toBeTruthy();
+    expect(leaks(container)).toEqual([]);
+  });
+
+  it("puts no payload in the page's metadata", async () => {
+    await encodedReads();
+    const metadata = await generateMetadata();
+    expect(metadata.title).toBe("Contact BIBO Bay");
+    expect(metadata.description).toBe("Write to the BIBO Bay team with a question, a partnership idea or a press enquiry.");
+    expect(STEGA_CHARACTER.test(JSON.stringify(metadata))).toBe(false);
   });
 });
 

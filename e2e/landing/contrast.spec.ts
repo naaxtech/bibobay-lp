@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { hydrated } from "../shop/shop-helpers";
+
 const VIEWPORTS = [
   { name: "mobile", use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
@@ -101,6 +103,9 @@ for (const { name, use } of VIEWPORTS) {
 
     test("light surfaces keep light-ground ink when an editor puts their section in the deep sea (rebrand review I1)", async ({ page }) => {
       await page.goto("/");
+      // Edit the DOM only once React owns it: hydration would otherwise redraw the panels and drop the stamp.
+      await hydrated(page.locator("#episodes [role='tabpanel']:not([inert]) .storybook__cover").first());
+      await hydrated(page.locator("#characters .friend-stage:not([inert])").first());
       // What the CMS can produce: the friends section on the navy ground, and a story kept as a concept.
       await page.evaluate(() => {
         const friends = document.getElementById("characters")!;

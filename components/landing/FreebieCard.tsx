@@ -1,4 +1,5 @@
 import { ACTIVITY_PACK, activityPackPreviews, isRepositoryPack } from "@/lib/content/freebie";
+import { stegaCleanText } from "@/lib/content/stega";
 import type { LeadMagnet } from "@/lib/content/types";
 import { DownloadGlyph } from "./DownloadGlyph";
 import { UI_COPY } from "./ui-copy";
@@ -13,6 +14,7 @@ import { UI_COPY } from "./ui-copy";
  */
 export function FreebieCard({ magnet, anchor }: { magnet: LeadMagnet & { fileUrl: string }; anchor: string }) {
   const ours = isRepositoryPack(magnet.fileUrl);
+  // R167: an edit link belongs in text, never in an attribute (a screen reader would read it).
   const previews = ours ? activityPackPreviews().slice(0, 3) : [];
   return (
     <div className={`freebie-card${previews.length > 0 ? " freebie-card--pages" : ""}`} data-freebie>
@@ -43,7 +45,7 @@ export function FreebieCard({ magnet, anchor }: { magnet: LeadMagnet & { fileUrl
         <h3 className="freebie-card__title">{magnet.title}</h3>
         {magnet.description ? <p className="freebie-card__description">{magnet.description}</p> : null}
         {/* One label, starting with the visible words: a hidden span would be block-level, and Chromium then names it "… : <title>". */}
-        <a href={anchor} className="btn btn-primary freebie-card__download" aria-label={`${UI_COPY.getFreebie}: ${magnet.title}`}>
+        <a href={anchor} className="btn btn-primary freebie-card__download" aria-label={`${UI_COPY.getFreebie}: ${stegaCleanText(magnet.title)}`}>
           <DownloadGlyph />
           {UI_COPY.getFreebie}
         </a>

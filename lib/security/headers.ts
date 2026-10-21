@@ -17,6 +17,14 @@ import { ORDER_LINK_SOURCE } from "../privacy/private-links";
 
 export const NONCE_HEADER = "x-nonce";
 
+/**
+ * Ruling R166: the Sanity Dashboard. A hosted Studio (https://<host>.sanity.studio) now opens inside
+ * it, in an iframe of this origin, and CSP `frame-ancestors` checks every ancestor of the preview, not
+ * just its parent; so Presentation can frame the site only if the Dashboard may too. Sanity's own
+ * example policy lists it (sanity.io/docs/visual-editing/visual-editing-with-react-native, CSP section).
+ */
+export const SANITY_DASHBOARD_ORIGIN = "https://www.sanity.io";
+
 export interface SecurityEnvironment {
   /** `next dev`: React needs eval for its debugging aids and the dev overlay injects style elements. */
   development: boolean;
@@ -116,8 +124,8 @@ export function buildContentSecurityPolicy({ nonce, environment, extraConnectSou
     ["object-src", "'none'"],
     ["base-uri", "'self'"],
     ["form-action", "'self'"],
-    // Sanity Presentation shows the site in an iframe inside the Studio.
-    ["frame-ancestors", "'self'", ...(environment.studioOrigin ? [environment.studioOrigin] : [])],
+    // Sanity Presentation shows the site in an iframe inside the Studio, itself inside the Dashboard (R166).
+    ["frame-ancestors", "'self'", ...(environment.studioOrigin ? [environment.studioOrigin, SANITY_DASHBOARD_ORIGIN] : [])],
   );
   // A local `next start` is served over plain http; upgrading its requests would break it.
   if (environment.vercelDeployment && !environment.development) directives.push(["upgrade-insecure-requests"]);

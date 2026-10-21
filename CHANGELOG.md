@@ -22,12 +22,41 @@ All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](
 - CI gains a fourth browser job, `e2e-contact` (R187): the open-form contact specs run against `next start` with placeholder contact settings, so they no longer sit skipped. The browser spec imports the form's chrome copy instead of copying it, and the rate-limited message no longer speaks of the visitor's own connection, since the 429 may come from the overall limit (R184). The form's error summary heading is an `h2`, under the page's `h1`.
 - The restore sentence in `docs/deployment.md` now also lists `docs/database-security.md`, and a test pins the list against every doc that names the daily schedule (R176).
 - The architecture, database, deployment, observability, CMS, data-protection, runbook and QA docs and the README describe the contact form.
+- `/contact` works with live editing in the Studio (merged after it): its text is click-to-edit in Presentation, its draft read honours the Studio's perspective, its metadata and the form's reserved outcome texts carry no edit link, and the Studio names the document "Contact page".
 
 ### Decisions recorded
 
 - R168: an admin inbox page for messages is deferred. Trigger: the owner asks, or more than 20 messages arrive in a week. Until then staff read each message in its alert email, or by SQL when an alert is parked (`docs/incident-runbook.md`).
 - R174: legitimate interest is the basis for contact messages, no retention period is stated (the legal review owns it), and the retry of an alert is the next cron run.
 - Owner steps after merge (Studio deploy, the Contact page document, migration `0008`, Resend and the staff address, the legal review, one live check) are in `docs/deployment.md`.
+
+## 2026-10-21 — Live editing in the Studio
+
+### Added
+
+- Live editing in the Studio's Presentation tool: hover any text on the previewed page to see the field it comes from, click to open it in the form, and watch the page follow each edit before publishing.
+- The Studio's address bar and the page stay in step, and Presentation's perspective switch (drafts, published, a release) changes what the page shows.
+
+### Changed
+
+- Draft cookies are set `Partitioned` inside the Studio's frame, so the preview keeps working in browsers that block third-party cookies.
+- The "Exit preview" link is hidden inside the Studio, where it would only break the preview; it still shows in a preview opened in its own tab.
+- Visitors are unaffected: the overlay code is downloaded only by a draft page inside the Studio, and published pages never carry the invisible edit links.
+- The whole hero heading is one click target, not just its last line.
+- The Studio names the landing page and the legal settings in its lists and pane titles.
+
+### Fixed (before release)
+
+- The overlay's styles carry the page's CSP nonce: without it the strict style policy blocked them and the preview fell over to the error page. An error boundary now keeps the page if the overlay ever fails.
+- The site's CSP lets the Sanity Dashboard frame the preview, since hosted Studios now open inside it.
+- No edit link ends up in an `aria-label` or `data-*` attribute.
+
+### Decisions recorded
+
+- R158: `@sanity/visual-editing` directly, not `next-sanity`, which would add the whole Studio to the site's dependencies.
+- R159-R161: edit links only in Studio previews; text keeps them, nothing the site decides with or puts in `<head>` does; the overlay code is its own download.
+- R162-R165: refresh twice after each burst of edits, honour the Studio's perspective, partitioned cookies in the frame, no exit link inside the Studio, no editing variants.
+- R166-R171: the Dashboard may frame the preview; no edit links in attributes; singleton titles; the overlay's style nonce and error boundary; split text keeps one edit link on the whole element; `previewUrl.initial` replaces the deprecated `origin`.
 
 ## 2026-10-21 — Email cron back to once a day (Hobby plan)
 
