@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { deriveSecretRules } from "./lib/bundle-secrets";
-import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
+import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, FORM_API_PATHS, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
 import { bypassFetch, bypassSecretFrom, carriesBypass } from "./lib/protection-bypass";
 import { ALLOWED_PUBLIC_NAMES, isAllowedPublicName } from "./verify-env";
 
@@ -57,8 +57,8 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
         (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": secret } }),
       );
     }
-    // Verification must never write a lead: block and record any request to the lead route.
-    await context.route((url) => url.pathname.replace(/\/+$/, "") === "/api/leads", async (route) => {
+    // Verification must never write a lead or a contact message: block and record any request to a form route.
+    await context.route((url) => FORM_API_PATHS.some((path) => url.pathname.replace(/\/+$/, "") === path), async (route) => {
       observation.leadRequests.push(`${route.request().method()} ${displayUrl(new URL(route.request().url()))}`);
       await route.abort("blockedbyclient");
     });

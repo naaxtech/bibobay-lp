@@ -3,6 +3,7 @@ import { BiboLogo } from "@/components/brand/BiboLogo";
 import { analyticsConfig } from "@/lib/analytics/config";
 import { YouTubeMark, isYouTubeHref } from "@/components/brand/YouTubeMark";
 import { ORDER_COPY } from "@/components/forms/order-copy";
+import { CONTACT_PATH } from "@/lib/contact/fields";
 import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import type { Cta, SiteSettings } from "@/lib/content/types";
 import { CtaLink } from "./CtaLink";
@@ -11,6 +12,8 @@ import { UI_COPY } from "./ui-copy";
 
 export interface FooterProps {
   settings: SiteSettings;
+  /** The contact form is open (R158, `contactFormOpen()`); only then does the footer link to /contact. */
+  contactOpen?: boolean;
 }
 
 /** The tracking page (Task 7c); it exists only while commerce and tracking are both on. */
@@ -19,15 +22,16 @@ const TRACK_PATH = "/track";
 /**
  * Navy band with the canonical logo, the CMS footer copy and legal links, led by the shop link while
  * commerce is on (spec §10, Task 7b) and the tracking link while tracking is also on (Task 7c).
- * Social links come only from verified settings, and contact appears only when an address is
- * configured.
+ * then the contact page link while its form is open (R158), before the legal links. Social links come
+ * only from verified settings, and the contact address appears only when one is configured.
  */
-export function Footer({ settings }: FooterProps) {
+export function Footer({ settings, contactOpen = false }: FooterProps) {
   const { footer, socialLinks, contactEmail } = settings;
   const analytics = analyticsConfig();
   const shop: Cta[] = isCommerceEnabled(settings) && !footer.legalLinks.some((link) => link.href === SHOP_PATH) ? [{ label: settings.navigation.commerceLabel, href: SHOP_PATH }] : [];
   const track: Cta[] = isTrackingEnabled(settings) && !footer.legalLinks.some((link) => link.href === TRACK_PATH) ? [{ label: ORDER_COPY.track.title, href: TRACK_PATH }] : [];
-  const links = [...shop, ...track, ...footer.legalLinks];
+  const contact: Cta[] = contactOpen && !footer.legalLinks.some((link) => link.href === CONTACT_PATH) ? [{ label: footer.contactPageLabel, href: CONTACT_PATH }] : [];
+  const links = [...shop, ...track, ...contact, ...footer.legalLinks];
   return (
     <footer className="site-footer" data-surface="navy">
       <div className="landing-container grid gap-x-12 gap-y-10 py-14 sm:py-16 lg:grid-cols-12">

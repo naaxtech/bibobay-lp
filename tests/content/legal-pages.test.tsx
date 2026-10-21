@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { LegalSettings, PortableContent } from "@/lib/content/types";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
+import { CONTACT_GLOBAL_RATE_LIMIT, CONTACT_RATE_LIMIT } from "@/lib/contact/submit";
 import { LEAD_RATE_LIMIT } from "@/lib/leads/submit";
 import { ORDER_RATE_LIMIT } from "@/lib/orders/submit";
 import { ORDER_TRACK_RATE_LIMIT } from "@/lib/orders/track";
@@ -432,5 +433,71 @@ describe("the page for a missing address (review I2)", () => {
     const { metadata } = await import("@/app/not-found");
     const { NOT_FOUND_COPY } = await import("@/components/legal/legal-copy");
     expect(metadata.title).toBe(`${NOT_FOUND_COPY.title} | ${SAFE_FALLBACK_SETTINGS.title}`);
+  });
+});
+
+describe("while the contact form is open (R164)", () => {
+  /** What migration 0008 and lib/contact/submit.ts do; the text may claim no more than this. */
+  const OPEN_ENV = {
+    NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example.com",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role-fixture-value",
+    LEAD_IP_HASH_SECRET: "x".repeat(32),
+    RESEND_API_KEY: "re_fixture",
+    RESEND_FROM: "BIBO Bay <hello@example.com>",
+    STAFF_NOTIFICATION_EMAIL: "staff@example.com",
+  };
+  const closed = textOf(legalFallbackFor({}, {}).privacy);
+  const open = textOf(legalFallbackFor({}, {}, true).privacy);
+  const openWithCommerce = textOf(legalFallbackFor({ commerceEnabled: true }, {}, true).privacy);
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("says what a message stores: name, email address, topic, message and when it was sent", () => {
+    expect(open).toMatch(/What the contact form collects/);
+    expect(open).toMatch(/the website stores your name, your email address, the topic you chose, your message and when you sent it/);
+    expect(open).toMatch(/Please do not include details about a child\./);
+  });
+
+  it("says the team receives it by email with the sender's address to reply to, and that the website does not email the sender (R172)", () => {
+    expect(open).toMatch(/The BIBO Bay team receives your message by email, with your email address as the address to reply to, so they can answer you\./);
+    expect(open).toMatch(/The website does not email you when you send a message\./);
+  });
+
+  it("names contact messages among what Supabase stores", () => {
+    expect(open).toMatch(/Supabase hosts the database where signups and contact messages are stored\./);
+    expect(openWithCommerce).toMatch(/Supabase hosts the database where signups, order requests and contact messages are stored\./);
+  });
+
+  it("counts messages against the keyed code, by the hour in total, never storing the address (R171)", () => {
+    expect(CONTACT_RATE_LIMIT.windowSeconds).toBe(600);
+    expect(CONTACT_GLOBAL_RATE_LIMIT.windowSeconds).toBe(3600);
+    expect(open).toMatch(/Messages sent through the contact form are counted the same way: against the keyed code in 10-minute windows, and all messages together by the hour\. Those counts are not linked to your message\./);
+  });
+
+  it("states no retention period: nothing deletes them automatically and none has been set (R174)", () => {
+    expect(open).toMatch(/Contact messages are kept too, with their email delivery records; nothing deletes them automatically, and no period for keeping them has been set\./);
+    expect(open).not.toMatch(/\b\d+\s*(days|months|years)\b/i);
+  });
+
+  it("gives the basis: a legitimate interest in replying to people who write to us (R174)", () => {
+    expect(open).toMatch(/To read and answer a message you send through the contact form\. The legal basis for keeping it is our legitimate interest in replying to people who write to us\./);
+  });
+
+  it("changes nothing while the form is closed, and leaves the terms alone", () => {
+    expect(closed).not.toMatch(/contact form|contact message/i);
+    expect(legalFallbackFor({}, {}, false)).toBe(LEGAL_FALLBACK);
+    expect(textOf(legalFallbackFor({}, {}, true).terms)).toBe(textOf(LEGAL_FALLBACK.terms));
+  });
+
+  it("/privacy shows the contact text exactly when the environment opens the form", async () => {
+    const { default: PrivacyPage } = await import("@/app/privacy/page");
+    render(await PrivacyPage());
+    expect(screen.queryByRole("heading", { name: "What the contact form collects" })).toBeNull();
+    cleanup();
+    for (const [name, value] of Object.entries(OPEN_ENV)) vi.stubEnv(name, value);
+    render(await PrivacyPage());
+    expect(screen.getByRole("heading", { name: "What the contact form collects" })).toBeTruthy();
   });
 });

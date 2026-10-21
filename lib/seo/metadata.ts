@@ -4,7 +4,9 @@ import { BIBO_LOGO_ASSETS } from "@/components/brand/BiboLogo";
 import { UI_COPY } from "@/components/landing/ui-copy";
 import { LEGAL_PAGE_COPY, THANK_YOU_COPY } from "@/components/legal/legal-copy";
 import { brandTokens } from "@/lib/brand/tokens";
-import type { LandingPageContent, LegalSettings, Product, SiteSettings } from "@/lib/content/types";
+import type { ContactPageContent, LandingPageContent, LegalSettings, Product, SiteSettings } from "@/lib/content/types";
+import { CONTACT_PATH } from "@/lib/contact/fields";
+import type { ContactPageState } from "@/lib/contact/page-state";
 
 /*
  * Metadata, robots, sitemap, manifest and structured data (Task 9 rulings R35, R36), as pure
@@ -127,6 +129,35 @@ export function thankYouMetadata({ settings, seo }: { settings: SiteSettings; se
   };
 }
 
+export interface ContactMetadataInput {
+  copy: ContactPageContent;
+  settings: SiteSettings;
+  seo: SeoEnvironment;
+  draft: boolean;
+  /** What the page shows (R158); a page with no way to reach the team stays out of search results. */
+  state: ContactPageState;
+}
+
+/**
+ * The contact page (R158): the CMS SEO. It is indexable only in production, outside draft mode, with
+ * a way to reach the team (the form or a contact address) and no CMS noIndex; the canonical URL goes
+ * with it. Otherwise it is noindex but its links are followed, like the other short pages.
+ * `state` is a parameter so this file never imports the server-only availability check.
+ */
+export function contactMetadata({ copy, settings, seo, draft, state }: ContactMetadataInput): Metadata {
+  const { title, description } = copy.seo;
+  const indexable = seo.indexable && !draft && state.kind !== "closed" && copy.seo.noIndex !== true;
+  const canonical = indexable && seo.baseUrl !== null;
+  return {
+    title,
+    description,
+    ...(seo.baseUrl ? { metadataBase: seo.baseUrl } : {}),
+    ...(canonical ? { alternates: { canonical: CONTACT_PATH } } : {}),
+    robots: indexable ? INDEX : NOINDEX_FOLLOW,
+    openGraph: { type: "website", title, description, siteName: settings.title, ...(canonical ? { url: CONTACT_PATH } : {}) },
+  };
+}
+
 export interface ShopMetadataInput {
   settings: SiteSettings;
   seo: SeoEnvironment;
@@ -205,13 +236,16 @@ export interface SitemapInput {
   legal: LegalSettings;
   /** Typed hook for Task 7: shop and product paths, listed only while commerce is enabled. */
   commerceRoutes?: readonly string[];
+  /** R158: /contact has a way to reach the team and no CMS noIndex, so search engines may list it. */
+  contactListed?: boolean;
 }
 
-export function sitemapFor({ seo, settings, legal, commerceRoutes = [] }: SitemapInput): MetadataRoute.Sitemap {
+export function sitemapFor({ seo, settings, legal, commerceRoutes = [], contactListed = false }: SitemapInput): MetadataRoute.Sitemap {
   const base = seo.baseUrl;
   if (!seo.indexable || !base) return [];
   const paths = ["/"];
   for (const kind of ["privacy", "terms"] as const) if (legalPageState(kind, legal).indexable) paths.push(`/${kind}`);
+  if (contactListed) paths.push(CONTACT_PATH);
   if (settings.commerceEnabled) for (const route of commerceRoutes) if (COMMERCE_ROUTE.test(route) && !paths.includes(route)) paths.push(route);
   return paths.map((path) => ({ url: new URL(path, base).href }));
 }

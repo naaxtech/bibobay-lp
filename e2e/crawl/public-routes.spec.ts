@@ -41,6 +41,7 @@ export const PAGE_ROUTES: PageRoute[] = [
   { path: "/privacy", status: 200, why: "legal route with a safe repository fallback" },
   { path: "/terms", status: 200, why: "legal route with a safe repository fallback" },
   { path: "/thank-you", status: 200, why: "confirmed-signup page" },
+  { path: "/contact", status: 200, why: "contact page: the closed notice keyless, the form when contact is configured" },
   { path: "/track", status: 404, why: "tracking is a commerce route; commerce is off", commerceOffOnly: true },
   { path: "/shop", status: 404, why: "catalogue is a commerce route; commerce is off", commerceOffOnly: true },
   { path: "/shop/x", status: 404, why: "product page is a commerce route; commerce is off", commerceOffOnly: true },
