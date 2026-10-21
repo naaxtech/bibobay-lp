@@ -4,6 +4,7 @@ export const mainDocuments = defineDocuments([
   { route: "/", filter: '_id == "landingPage"' },
   { route: "/privacy", filter: '_id == "legalSettings"' },
   { route: "/terms", filter: '_id == "legalSettings"' },
+  { route: "/contact", filter: '_id == "contactPage"' },
   { route: "/shop", type: "siteSettings" },
   { route: "/shop/:slug", filter: '_type == "product" && slug.current == $slug' },
 ]);
@@ -13,6 +14,7 @@ export const locations = {
   landingPage: home,
   siteSettings: defineLocations({ locations: [{ title: "Site", href: "/" }, { title: "Shop (when enabled)", href: "/shop" }] }),
   legalSettings: defineLocations({ locations: [{ title: "Privacy", href: "/privacy" }, { title: "Terms", href: "/terms" }] }),
+  contactPage: defineLocations({ locations: [{ title: "Contact page", href: "/contact" }] }),
   character: home, episodePreview: home, brandPillar: home, ecosystemEntry: home,
   testimonial: home, faqItem: home, leadMagnet: home,
   productCategory: defineLocations({ locations: [{ title: "Shop (when enabled)", href: "/shop" }] }),

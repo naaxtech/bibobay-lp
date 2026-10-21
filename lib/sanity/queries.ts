@@ -1,6 +1,7 @@
 // Fixed singleton IDs; never query the first document by _type alone.
 export const SITE_SETTINGS_QUERY = '*[_id == "siteSettings"][0]{...}';
 export const LEGAL_SETTINGS_QUERY = '*[_id == "legalSettings"][0]{...}';
+export const CONTACT_PAGE_QUERY = '*[_id == "contactPage"][0]{...}';
 export const LANDING_PAGE_QUERY = `*[_id == "landingPage"][0]{
   ...,
   "characters": characters[]->,

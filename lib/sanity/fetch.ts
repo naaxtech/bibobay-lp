@@ -1,9 +1,9 @@
 import "server-only";
-import { SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "../content/fallback";
-import { normalizeImage, normalizeLandingContent, normalizeLegalSettings, normalizePortableContent, normalizeSiteSettings } from "../content/normalize";
+import { SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_CONTENT, SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "../content/fallback";
+import { normalizeContactPage, normalizeImage, normalizeLandingContent, normalizeLegalSettings, normalizePortableContent, normalizeSiteSettings } from "../content/normalize";
 import type { ImageWithAlt, Product, ProductCategory } from "../content/types";
 import { getSanityClient } from "./client";
-import { LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, ORDER_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY, SITE_SETTINGS_QUERY } from "./queries";
+import { CONTACT_PAGE_QUERY, LANDING_PAGE_QUERY, LEGAL_SETTINGS_QUERY, LISTED_PRODUCTS_QUERY, ORDER_PRODUCTS_QUERY, PRODUCT_BY_SLUG_QUERY, SITE_SETTINGS_QUERY } from "./queries";
 
 export interface ContentOptions { preview?: boolean }
 
@@ -49,6 +49,11 @@ export async function getLandingPage(options: ContentOptions = {}) {
   const settings = await getSiteSettings(options);
   const raw = await query<unknown>(LANDING_PAGE_QUERY, {}, ["landingPage", "character", "episodePreview", "brandPillar", "ecosystemEntry", "testimonial", "faqItem"], options);
   return raw === null ? SAFE_FALLBACK_CONTENT : normalizeLandingContent(raw, { testimonialsEnabled: settings.testimonialsEnabled });
+}
+/** R158, R163: the /contact copy; the repository fallback when Sanity is absent, unreadable or has no document. */
+export async function getContactPage(options: ContentOptions = {}) {
+  const raw = await query<unknown>(CONTACT_PAGE_QUERY, {}, ["contactPage"], options);
+  return raw === null ? SAFE_FALLBACK_CONTACT_PAGE : normalizeContactPage(raw);
 }
 export async function getLegalSettings(options: ContentOptions = {}) {
   const raw = await query<unknown>(LEGAL_SETTINGS_QUERY, {}, ["legalSettings"], options);

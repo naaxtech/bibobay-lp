@@ -102,6 +102,7 @@ describe("document type to cache tag mapping", () => {
       testimonial: ["testimonial"],
       faqItem: ["faqItem"],
       legalSettings: ["legalSettings"],
+      contactPage: ["contactPage"],
       product: ["product"],
       productCategory: ["productCategory"],
       // Not fetched on its own: the landing query dereferences it (`lead.leadMagnet->`), so a change
@@ -120,6 +121,8 @@ describe("document type to cache tag mapping", () => {
     for (const type of documentTypes) {
       expect(tagsForDocumentType(type), `document type ${type}`).not.toEqual([]);
     }
+    expect(documentTypes).toContain("contactPage");
+    expect(tagsForDocumentType("contactPage")).toEqual(["contactPage"]);
   });
 
   it("covers every document the published queries dereference", () => {

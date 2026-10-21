@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { schemaTypes } from "@/studio/schemaTypes";
 import { buildSeedDocuments } from "@/studio/scripts/seed-data";
 import { LANDING_PAGE_QUERY } from "@/lib/sanity/queries";
-import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
+import { SAFE_FALLBACK_CONTACT_PAGE, SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
+import { DELIVERY_CLAIM_PATTERN } from "@/lib/content/claims";
+import { normalizeContactPage } from "@/lib/content/normalize";
+import { DELIVERY_CLAIM_PATTERN as STUDIO_DELIVERY_CLAIM_PATTERN, deliveryClaimProblem } from "@/studio/schemaTypes/contact";
+import { SINGLETON_IDS } from "@/studio/structure";
+import { mainDocuments, locations } from "@/studio/presentation/resolve";
 import { ISO_COUNTRY_CODES } from "@/lib/orders/countries";
 import { ORDER_COUNTRY_CODES, orderCountriesProblem } from "@/studio/schemaTypes/countries";
 import { CONSENT_VERSION as STUDIO_CONSENT_VERSION, orderConsentVersionProblem } from "@/studio/schemaTypes/consent";
@@ -50,7 +55,11 @@ describe("Studio content model", () => {
     covers("promiseSection", ["eyebrow", "heading", "description", "image", "quote", "body"]);
     covers("leadSection", ["eyebrow", "heading", "description", "image", "buttonLabel", "consentCopy", "successMessage", "errorMessage", "leadMagnet"]);
     covers("navigationSettings", ["links", "primaryCta", "commerceLabel"]);
-    covers("footerSettings", ["text", "legalLinks", "contactLabel"]);
+    covers("footerSettings", ["text", "legalLinks", "contactLabel", "contactPageLabel"]);
+    // R158, R163: the contact page's copy, one editable field per visible string.
+    covers("contactPage", ["seo", "heading", "description", "buttonLabel", "successMessage", "errorMessage", "closedMessage", "emailIntro"]);
+    expect(types.get("contactPage")?.type).toBe("document");
+    expect(fields("contactPage").get("seo")?.type).toBe("seo");
     expect(fields("product").has("price")).toBe(false);
     expect(fields("product").has("currency")).toBe(false);
     for (const flag of ["commerceEnabled", "trackingEnabled", "testimonialsEnabled"]) expect(fields("siteSettings").get(flag)?.initialValue).toBe(false);
@@ -161,5 +170,48 @@ describe("the order consent version check (Task 7c review M5a, M5b)", () => {
   it("uses the same token pattern as the site (no drift from lib/leads/dependencies.ts)", () => {
     expect(STUDIO_CONSENT_VERSION.source).toBe(CONSENT_VERSION_PATTERN.source);
     expect(STUDIO_CONSENT_VERSION.flags).toBe(CONSENT_VERSION_PATTERN.flags);
+  });
+});
+
+describe("the contact page in the Studio (R158, R163)", () => {
+  it("is a singleton the structure, the Presentation tool and the seed all know", () => {
+    expect([...SINGLETON_IDS]).toContain("contactPage");
+    const docs = buildSeedDocuments();
+    expect(docs.filter((d) => d._id === "contactPage")).toHaveLength(1);
+    expect(docs.find((d) => d._id === "contactPage")?._type).toBe("contactPage");
+    expect(JSON.stringify(mainDocuments)).toContain("/contact");
+    expect(JSON.stringify(mainDocuments)).toContain("contactPage");
+    expect(Object.keys(locations)).toContain("contactPage");
+  });
+
+  it("seeds exactly the repository fallback copy and the footer's page label", () => {
+    const docs = buildSeedDocuments();
+    const seeded = docs.find((d) => d._id === "contactPage")!;
+    expect(normalizeContactPage(seeded)).toEqual(SAFE_FALLBACK_CONTACT_PAGE);
+    expect(seeded.heading).toBe(SAFE_FALLBACK_CONTACT_PAGE.heading);
+    expect(seeded.successMessage).toBe(SAFE_FALLBACK_CONTACT_PAGE.successMessage);
+    expect((docs.find((d) => d._id === "siteSettings")!.footer as Record<string, unknown>).contactPageLabel).toBe("Contact us");
+  });
+
+  it("runs the delivery-claim check on the success message", () => {
+    const field = (types.get("contactPage")?.fields as Array<Field & { validation?: unknown }> | undefined)?.find((f) => f.name === "successMessage");
+    expect(String(field?.validation)).toContain("deliveryClaimProblem");
+  });
+
+  it("refuses a success message that claims delivery and accepts the fallback", () => {
+    expect(deliveryClaimProblem("We emailed the team")).toMatch(/received/i);
+    expect(deliveryClaimProblem("Your message was sent")).not.toBe(true);
+    expect(deliveryClaimProblem(SAFE_FALLBACK_CONTACT_PAGE.successMessage)).toBe(true);
+    expect(deliveryClaimProblem(undefined)).toBe(true);
+    expect(deliveryClaimProblem("")).toBe(true);
+  });
+
+  it("uses the same claim pattern as the site (no drift from lib/content/claims.ts)", () => {
+    expect(STUDIO_DELIVERY_CLAIM_PATTERN.source).toBe(DELIVERY_CLAIM_PATTERN.source);
+    expect(STUDIO_DELIVERY_CLAIM_PATTERN.flags).toBe(DELIVERY_CLAIM_PATTERN.flags);
+  });
+
+  it("explains where each field shows on the page", () => {
+    for (const field of fields("contactPage").values()) expect((field as Field & { description?: string }).description, `contactPage.${field.name}`).toBeTruthy();
   });
 });

@@ -42,6 +42,7 @@ export const REVALIDATION_TAGS: Readonly<Record<string, readonly string[]>> = Ob
   testimonial: ["testimonial"],
   faqItem: ["faqItem"],
   legalSettings: ["legalSettings"],
+  contactPage: ["contactPage"],
   product: ["product"],
   productCategory: ["productCategory"],
   // A download has no read of its own: the landing query dereferences it (`lead.leadMagnet->` in

@@ -1,5 +1,5 @@
 // Route map for Studio Presentation (the Studio itself belongs to Task 2B).
-const singletonRoutes: Record<string, string> = { landingPage: "/", siteSettings: "/", legalSettings: "/privacy" };
+const singletonRoutes: Record<string, string> = { landingPage: "/", siteSettings: "/", legalSettings: "/privacy", contactPage: "/contact" };
 export function resolvePresentationUrl(type: string, slug?: string): string | null {
   if (Object.hasOwn(singletonRoutes, type)) return singletonRoutes[type]!;
   if (type === "productCategory") return "/shop";

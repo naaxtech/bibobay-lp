@@ -1,5 +1,5 @@
 import { ACTIVITY_PACK } from "./freebie";
-import type { Character, EpisodePreview, LandingPageContent, LegalSettings, SiteSettings, SectionId } from "./types";
+import type { Character, ContactPageContent, EpisodePreview, LandingPageContent, LegalSettings, SiteSettings, SectionId } from "./types";
 
 /*
  * Safe repository content, used whenever Sanity is unconfigured or unreachable; the Studio seed
@@ -111,7 +111,18 @@ export const SAFE_FALLBACK_SETTINGS: SiteSettings = {
   orderCountries: [],
   socialLinks: [{ platform: "youtube", url: BIBO_YOUTUBE_CHANNEL_URL, verified: true }],
   navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Free activity pack", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
-  footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact" },
+  footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact", contactPageLabel: "Contact us" },
+};
+/** R158, R163, C7: the contact page when Sanity is unconfigured, unreachable or has no document. The Studio seed holds the same copy. */
+export const SAFE_FALLBACK_CONTACT_PAGE: ContactPageContent = {
+  seo: { title: "Contact BIBO Bay", description: "Write to the BIBO Bay team with a question, a partnership idea or a press enquiry." },
+  heading: "Contact us",
+  description: "Questions, ideas and press enquiries from grown-ups are welcome. Please write as a parent, carer or professional, and leave out any details about a child.",
+  buttonLabel: "Send message",
+  successMessage: "Thank you. We have received your message.",
+  errorMessage: "We could not save your message. Please try again.",
+  closedMessage: "The contact form is not open yet, so no message can be saved from this page. Please check back soon.",
+  emailIntro: "The contact form is not open yet. You can write to us at:",
 };
 export const SAFE_FALLBACK_LEGAL: LegalSettings = {
   privacy: [], terms: [], consentCopyVersion: "1",

@@ -1,6 +1,7 @@
 import { defineArrayMember, defineField, defineType } from "sanity";
 
 import { orderConsentVersionProblem } from "../consent";
+import { deliveryClaimProblem } from "../contact";
 import { orderCountriesProblem } from "../countries";
 
 export const siteSettings = defineType({ name: "siteSettings", title: "Site settings", type: "document", fields: [
@@ -77,4 +78,21 @@ export const legalSettings = defineType({ name: "legalSettings", title: "Legal a
   }),
 ] });
 
-export const singletonTypes = [siteSettings, landingPage, legalSettings];
+export const contactPage = defineType({ name: "contactPage", title: "Contact page", type: "document", fields: [
+  defineField({ name: "seo", type: "seo", description: "The search and sharing title and description of the Contact page. The page is listed for search engines only while the contact form is open or a contact email is set." }),
+  defineField({ name: "heading", type: "string", description: "The main heading at the top of the Contact page.", validation: (rule) => rule.required() }),
+  defineField({ name: "description", type: "text", rows: 3, description: "The paragraph under the heading. Write it for parents, carers and professionals, and ask people to leave out details about a child." }),
+  defineField({ name: "buttonLabel", type: "string", description: "The text on the form's submit button." }),
+  defineField({
+    name: "successMessage",
+    type: "text",
+    rows: 2,
+    description: "Shown under the form after a message was saved. Say it was received. Do not say it was sent, emailed or delivered: nothing is emailed to the sender.",
+    validation: (rule) => rule.custom((value) => deliveryClaimProblem(value)),
+  }),
+  defineField({ name: "errorMessage", type: "text", rows: 2, description: "Shown under the form when a message could not be saved." }),
+  defineField({ name: "closedMessage", type: "text", rows: 2, description: "Shown on the Contact page, instead of the form, when the form is not open and no contact email is set. Also shown if the form closes while someone is writing." }),
+  defineField({ name: "emailIntro", type: "string", description: "The line above the contact email when the form is not open. The address comes from Site settings, Verified public contact email." }),
+] });
+
+export const singletonTypes = [siteSettings, landingPage, legalSettings, contactPage];
