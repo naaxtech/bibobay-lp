@@ -38,4 +38,19 @@ describe("validateContactSubmission", () => {
     const result = validateContactSubmission({ name: " Ada ", email: "Ada@Example.com", topic: "press", message: "a\r\nbcdefghijk", website: "" });
     expect(result).toEqual({ ok: true, data: { name: "Ada", email: "ada@example.com", topic: "press", message: "a\nbcdefghijk" } });
   });
+
+  it("accepts a 2048-character bot-check token and keeps it out of the record", () => {
+    const result = validateContactSubmission({ name: "Ada", email: "ada@example.com", topic: "press", message: "Hello from a parent.", botCheckToken: "t".repeat(2048) });
+    expect(result).toEqual({ ok: true, data: { name: "Ada", email: "ada@example.com", topic: "press", message: "Hello from a parent." }, botCheckToken: "t".repeat(2048) });
+  });
+
+  it("exposes no token when none was sent", () => {
+    const result = validateContactSubmission({ name: "Ada", email: "ada@example.com", topic: "press", message: "Hello from a parent." });
+    expect(result.ok && result.botCheckToken).toBeUndefined();
+  });
+
+  it.each([["2049 characters", "t".repeat(2049)], ["an empty string", ""], ["a number", 123]])("treats %s as metadata: the generic 400 with no field errors", (_label, token) => {
+    const result = validateContactSubmission({ name: "Ada", email: "ada@example.com", topic: "press", message: "Hello from a parent.", botCheckToken: token });
+    expect(result).toEqual({ ok: false, fieldErrors: {}, formError: "unexpected_fields" });
+  });
 });

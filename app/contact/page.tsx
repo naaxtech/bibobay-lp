@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ContactForm } from "@/components/forms/ContactForm";
 import { SimplePageShell } from "@/components/legal/SimplePageShell";
+import { botCheckSiteKey } from "@/lib/bot-check/config";
 import { contactFormOpen } from "@/lib/contact/availability";
 import { contactPageState } from "@/lib/contact/page-state";
 import { isDraftMode } from "@/lib/sanity/draft-mode";
@@ -47,7 +48,7 @@ export default async function ContactPage() {
       )}
       {state.kind === "form" ? (
         <div className="simple-page__prose">
-          <ContactForm copy={{ buttonLabel: copy.buttonLabel, successMessage: copy.successMessage, errorMessage: copy.errorMessage, closedMessage: copy.closedMessage }} />
+          <ContactForm copy={{ buttonLabel: copy.buttonLabel, successMessage: copy.successMessage, errorMessage: copy.errorMessage, closedMessage: copy.closedMessage }} botCheckSiteKey={botCheckSiteKey(process.env)} />
         </div>
       ) : null}
     </SimplePageShell>

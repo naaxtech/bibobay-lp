@@ -62,6 +62,19 @@ describe("operational warnings (ruling R52)", () => {
     expect(console.warn).toHaveBeenCalledTimes(2);
   });
 
+  it("reports an unavailable or unconfigured bot check, but not a refusal", () => {
+    logLeadEvent({ event: "lead_bot_check_refused", reason: "rejected" });
+    expect(reported.events).toEqual([]);
+    logLeadEvent({ event: "lead_bot_check_unavailable", reason: "timeout" });
+    logLeadEvent({ event: "lead_bot_check_unconfigured", reason: "misconfigured" });
+    expect(reported.events).toEqual([
+      ["lead_bot_check_unavailable", {}],
+      ["lead_bot_check_unconfigured", {}],
+    ]);
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(console.info).toHaveBeenCalledTimes(1);
+  });
+
   it("does not report routine events", () => {
     logLeadEvent({ event: "lead_stored", created: true });
     logLeadEvent({ event: "lead_rate_limited" });

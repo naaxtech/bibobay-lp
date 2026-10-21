@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { BOT_CHECK_TOKEN_FIELD, BOT_CHECK_TOKEN_MAX_LENGTH } from "@/lib/bot-check/fields";
 import { EMAIL_PATTERN, isSafeFirstName, normalizeEmail } from "@/lib/leads/fields";
 import type { ContactRecordInput } from "./types";
 import {
@@ -66,13 +67,14 @@ const contactSubmissionSchema = z.strictObject({
   topic,
   message,
   [HONEYPOT_FIELD]: z.literal("").optional(),
+  [BOT_CHECK_TOKEN_FIELD]: z.string().min(1).max(BOT_CHECK_TOKEN_MAX_LENGTH).optional(),
 });
 
 /** Why a body was refused as a whole rather than field by field. */
 export type ContactFormError = "invalid_body" | "unexpected_fields";
 
 export type ContactValidationResult =
-  | { ok: true; data: ContactRecordInput }
+  | { ok: true; data: ContactRecordInput; botCheckToken?: string }
   | { ok: false; fieldErrors: ContactFieldErrors; formError?: ContactFormError };
 
 const FIELD_CODES = new Set<ContactFieldErrorCode>(["required", "invalid", "too_short", "too_long"]);
@@ -83,7 +85,10 @@ export function validateContactSubmission(input: unknown): ContactValidationResu
   const parsed = contactSubmissionSchema.safeParse(input);
   if (parsed.success) {
     const { name: validName, email: validEmail, topic: validTopic, message: validMessage } = parsed.data;
-    return { ok: true, data: { name: validName, email: validEmail, topic: validTopic, message: validMessage } };
+    // The record carries exactly the four fields; the token travels beside it, never inside it.
+    const record = { name: validName, email: validEmail, topic: validTopic, message: validMessage };
+    const token = parsed.data[BOT_CHECK_TOKEN_FIELD];
+    return token === undefined ? { ok: true, data: record } : { ok: true, data: record, botCheckToken: token };
   }
 
   const found: ContactFieldErrors = {};

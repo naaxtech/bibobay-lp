@@ -18,7 +18,10 @@ import {
   type ContactFieldErrors,
 } from "@/lib/contact/fields";
 import { stegaCleanText } from "@/lib/content/stega";
+import { BOT_CHECK_MESSAGES, BOT_CHECK_TOKEN_FIELD } from "@/lib/bot-check/fields";
 import { normalizeEmail } from "@/lib/leads/fields";
+import { BotCheckSlot } from "./bot-check/BotCheckSlot";
+import { useBotCheck } from "./bot-check/useBotCheck";
 import { CONTACT_FORM_COPY, contactFieldErrorMessage } from "./contact-copy";
 
 /** The CMS copy the form shows (R190, R195): the button label and the three messages. */
@@ -33,6 +36,8 @@ export interface ContactFormProps {
   copy: ContactFormCopy;
   /** Where the message is posted; tests and the route share the default. */
   endpoint?: string;
+  /** The public bot-check site key, computed on the server; null while the check is off. */
+  botCheckSiteKey: string | null;
 }
 
 type Outcome = { tone: "success" | "error"; text: string } | null;
@@ -73,7 +78,8 @@ function serverFieldErrors(body: unknown): ContactFieldErrors {
  * outcome line that keeps its height (its reserve holds the four long messages; the saving line is
  * the shortest). Before hydration the button stays disabled.
  */
-export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormProps) {
+export function ContactForm({ copy, endpoint = CONTACT_API_PATH, botCheckSiteKey }: ContactFormProps) {
+  const bot = useBotCheck(botCheckSiteKey, "contact");
   const id = useId();
   const fieldId: Record<ContactField, string> = {
     name: `${id}-name`,
@@ -137,7 +143,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     }
     setErrors({});
 
-    const body = {
+    const body: Record<string, string> = {
       name: values.name.trim(),
       email: normalizeEmail(values.email),
       topic,
@@ -150,7 +156,17 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     setPending(true);
     // Field errors move focus to the summary instead; every other outcome returns it to the button.
     let returnFocus = true;
+    let carriedToken = false;
     try {
+      if (bot.enabled) {
+        const checked = await bot.token();
+        if ("problem" in checked) {
+          setOutcome({ tone: "error", text: checked.problem === "interactive" ? BOT_CHECK_MESSAGES.interactive : BOT_CHECK_MESSAGES.notLoaded });
+          return;
+        }
+        body[BOT_CHECK_TOKEN_FIELD] = checked.token;
+        carriedToken = true;
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
@@ -165,6 +181,8 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
         form.reset();
       } else if (response.status === 503 && isRecord(answer) && answer.closed === true) {
         setOutcome({ tone: "error", text: copy.closedMessage });
+      } else if (response.status === 403) {
+        setOutcome({ tone: "error", text: BOT_CHECK_MESSAGES.refused });
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: CONTACT_FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
@@ -176,6 +194,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     } catch {
       setOutcome({ tone: "error", text: copy.errorMessage });
     } finally {
+      if (carriedToken) bot.reset();
       pendingRef.current = false;
       setPending(false);
       if (returnFocus) setFocusReturn((count) => count + 1);
@@ -194,8 +213,15 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
   };
   const listed = CONTACT_FIELD_ORDER.filter((field) => errors[field]);
 
+  // The form's only role="status" (R199); never focused, as a focused live region is read out as well as announced.
+  const statusLine = (
+    <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
+      {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}
+    </p>
+  );
+
   return (
-    <form id="contact-form" className="lead-form" aria-label={CONTACT_FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
+    <form id="contact-form" className="lead-form" aria-label={CONTACT_FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit} onFocusCapture={() => bot.prepare()} onPointerDownCapture={() => bot.prepare()}>
       {listed.length > 0 ? (
         <div ref={summaryRef} role="group" className="lead-form__summary" tabIndex={-1} aria-labelledby={ids.summaryTitle}>
           {/* h2: the form sits under the /contact page's h1 with no h2 between (as OrderForm's summary). */}
@@ -318,6 +344,8 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} visible={bot.visible} />
+
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}
       </button>
@@ -328,18 +356,24 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
       </Link>
 
       {/*
-       * The outcome line never changes height. Its two wrappers stack four invisible CSS
-       * pseudo-elements in the status's grid cell (lead-form.css), one per long message the line can
-       * show. The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
+       * The outcome line never changes height. Nested wrappers stack invisible CSS
+       * pseudo-elements (a ::before and an ::after each) in the status's grid cell (lead-form.css), one per
+       * long message the line can show: two wrappers and four pseudo-elements with the bot check off, four
+       * wrappers and eight with it on. The texts sit in data attributes, not in the DOM text or the accessibility tree, so the
        * success message cannot be read or announced before the server reports the message stored.
        * In a Studio preview they are cleaned of their click-to-edit payload: no edit link in an attribute.
        */}
       <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
         <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.closedMessage)} data-reserve-b={CONTACT_FORM_COPY.outcome.rateLimited}>
-          {/* The form's only role="status" (R199); never focused, as a focused live region is read out as well as announced. */}
-          <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
-            {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}
-          </p>
+          {bot.enabled ? (
+            <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.refused} data-reserve-b={BOT_CHECK_MESSAGES.interactive}>
+              <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.notLoaded}>
+                {statusLine}
+              </div>
+            </div>
+          ) : (
+            statusLine
+          )}
         </div>
       </div>
 

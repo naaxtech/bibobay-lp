@@ -108,7 +108,7 @@ describe("the coming-soon card (R240)", () => {
   function renderLead(next: LandingPageContent["lead"]) {
     const content: LandingPageContent = { ...structuredClone(SAFE_FALLBACK_CONTENT), lead: next };
     const { buttonLabel, consentCopy, successMessage, errorMessage } = next;
-    render(<LandingPage content={content} settings={siteSettings()} leadForm={<LeadForm copy={{ buttonLabel, consentCopy, successMessage, errorMessage }} />} />);
+    render(<LandingPage content={content} settings={siteSettings()} leadForm={<LeadForm copy={{ buttonLabel, consentCopy, successMessage, errorMessage }} botCheckSiteKey={null} />} />);
     const section = document.getElementById("lead");
     if (!section) throw new Error("no lead section");
     return section;

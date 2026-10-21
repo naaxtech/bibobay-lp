@@ -24,6 +24,8 @@ export interface OrderRequestProps {
   trackingEnabled: boolean;
   /** Shown beside the form, under the order (how paying works). */
   aside?: ReactNode;
+  /** The bot check's public site key, read on the server; null while the check is off. */
+  botCheckSiteKey: string | null;
 }
 
 /**
@@ -34,7 +36,7 @@ export interface OrderRequestProps {
  * empty one may mean it could not be read, so the pad is kept and no form is offered. An empty pad
  * gets an honest empty state with the way back to the shop.
  */
-export function OrderRequest({ products, consentCopy, countries, trackingEnabled, aside }: OrderRequestProps) {
+export function OrderRequest({ products, consentCopy, countries, trackingEnabled, aside, botCheckSiteKey }: OrderRequestProps) {
   const pad = useOrderPad();
   const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
   const ids = useMemo(() => products.map((product) => product.id), [products]);
@@ -67,7 +69,7 @@ export function OrderRequest({ products, consentCopy, countries, trackingEnabled
       </div>
       {padEmpty ? null : (
         <div className="order-layout__form">
-          <OrderForm consentCopy={consentCopy} countries={countries} listedIds={ids} onReceived={setReceipt} />
+          <OrderForm consentCopy={consentCopy} countries={countries} listedIds={ids} onReceived={setReceipt} botCheckSiteKey={botCheckSiteKey} />
         </div>
       )}
     </div>

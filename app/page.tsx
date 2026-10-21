@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { LeadForm } from "@/components/forms/LeadForm";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { PreviewNotice } from "@/components/preview/PreviewNotice";
+import { botCheckSiteKey } from "@/lib/bot-check/config";
 import { consentWithRemoval } from "@/lib/content/removal-copy";
 import { contactFormOpen } from "@/lib/contact/availability";
 import { removalChannelFrom } from "@/lib/leads/removal-channel";
@@ -32,7 +33,7 @@ export default async function Home() {
   const { buttonLabel, consentCopy, successMessage, errorMessage } = content.lead;
   // The consent sentence names the removal channel that exists (Ruling R125). The form always renders. Without Supabase the route answers 503 and the form shows the CMS
   // error message; success appears only once the server reports the signup stored.
-  const leadForm = <LeadForm copy={{ buttonLabel, consentCopy: consentWithRemoval(consentCopy, removalChannelFrom(settings)), successMessage, errorMessage }} />;
+  const leadForm = <LeadForm copy={{ buttonLabel, consentCopy: consentWithRemoval(consentCopy, removalChannelFrom(settings)), successMessage, errorMessage }} botCheckSiteKey={botCheckSiteKey(process.env)} />;
   return (
     <>
       {preview ? <PreviewNotice /> : null}

@@ -36,7 +36,7 @@ const token = (...parts: string[]) => parts.join("");
 describe("secret names are derived, not hard-coded", () => {
   it("reads every server-only name from .env.example", () => {
     const names = serverNamesFromEnvExample(ENV_EXAMPLE);
-    for (const name of ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "LEAD_IP_HASH_SECRET", "SANITY_REVALIDATE_SECRET", "SANITY_API_READ_TOKEN", "STAFF_NOTIFICATION_EMAIL", "CRON_SECRET"]) {
+    for (const name of ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "LEAD_IP_HASH_SECRET", "SANITY_REVALIDATE_SECRET", "SANITY_API_READ_TOKEN", "STAFF_NOTIFICATION_EMAIL", "CRON_SECRET", "TURNSTILE_SECRET_KEY"]) {
       expect(names, name).toContain(name);
     }
     expect(names.some((name) => name.startsWith("NEXT_PUBLIC_"))).toBe(false);
@@ -82,6 +82,7 @@ describe("secret values from the environment", () => {
         LEAD_ACK_SEND_LIMIT_PER_HOUR: "60",
         SANITY_STUDIO_ORIGIN: "https://studio.example.com",
         CRON_SECRET: "short",
+        TURNSTILE_SECRET_KEY: "turnstile-secret-fixture-value",
         NEXT_PUBLIC_APP_URL: "https://site.example.com",
       },
       serverNames,
@@ -91,6 +92,7 @@ describe("secret values from the environment", () => {
       { name: "RESEND_FROM", value: "sender@example.com" },
       { name: "STAFF_NOTIFICATION_EMAIL", value: "staff@example.com" },
       { name: "SUPABASE_SERVICE_ROLE_KEY", value: "service-role-value-fixture" },
+      { name: "TURNSTILE_SECRET_KEY", value: "turnstile-secret-fixture-value" },
     ]);
   });
 });

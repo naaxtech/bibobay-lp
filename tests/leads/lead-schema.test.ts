@@ -156,6 +156,35 @@ describe("no child data and no unexpected input", () => {
   });
 });
 
+describe("bot check token", () => {
+  it("accepts a token of up to 2048 characters and exposes it apart from the record", () => {
+    const result = validateLeadSubmission({ ...VALID, botCheckToken: "t".repeat(2048) });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.botCheckToken).toBe("t".repeat(2048));
+  });
+
+  it("is optional", () => {
+    const result = validateLeadSubmission(VALID);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.botCheckToken).toBeUndefined();
+  });
+
+  it("never appears in the validated data", () => {
+    const result = validateLeadSubmission({ ...VALID, botCheckToken: "abc" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(Object.keys(result.data)).not.toContain("botCheckToken");
+  });
+
+  it.each([["a 2049-character token", "t".repeat(2049)], ["an empty token", ""], ["a number", 123]])("gives the generic 400 with no field errors for %s", (_label, token) => {
+    const result = validateLeadSubmission({ ...VALID, botCheckToken: token });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fieldErrors).toEqual({});
+      expect(result.formError).toBe("invalid_metadata");
+    }
+  });
+});
+
 describe("honeypot", () => {
   it("names the field bots fill", () => {
     expect(HONEYPOT_FIELD).toBe("website");

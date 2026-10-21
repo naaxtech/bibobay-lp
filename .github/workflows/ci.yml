@@ -371,3 +371,73 @@ jobs:
             next-start.log
           if-no-files-found: ignore
           retention-days: 14
+
+  # Ruling R223: the bot check (Cloudflare Turnstile) runs here only, with Cloudflare's published always-pass
+  # test keys. No other job sets either key, so the check stays off everywhere else. The site key is inlined
+  # at build and the secret is read at start, so both are set on both steps. Cloudflare does not support
+  # automated browsers on production challenges, which is why a test key pair is the only option here.
+  # Every /api/contact and /api/leads call is answered by Playwright; the server-side spec calls Cloudflare's
+  # real siteverify with the test secret, so this job needs network.
+  e2e-bot-check:
+    name: Playwright, bot check (Cloudflare test keys)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_PRODUCTION: "1"
+      E2E_BOT_CHECK: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3400
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (from the lockfile; root only)
+        run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Production build with the Turnstile test site key
+        env:
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+        run: npm run build
+      - name: Start the production server with the placeholder contact environment and the Turnstile test keys, and wait for /api/health
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://supabase.example.com
+          SUPABASE_SERVICE_ROLE_KEY: service-role-fixture-value
+          LEAD_IP_HASH_SECRET: e2e-placeholder-hash-secret-0123456789abcdef
+          RESEND_API_KEY: re_fixture
+          RESEND_FROM: "BIBO Bay <hello@example.com>"
+          STAFF_NOTIFICATION_EMAIL: staff@example.com
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+        shell: bash
+        run: |
+          nohup npx next start -p 3400 -H 127.0.0.1 > next-start.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3400/api/health > /dev/null; then
+              echo "next start is healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "next start did not answer /api/health within 60s"
+          cat next-start.log
+          exit 1
+      - name: Playwright, bot check specs (form requests are answered by Playwright)
+        run: npx playwright test e2e/bot-check --reporter=github,html
+      - name: Keep the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-bot-check
+          path: |
+            playwright-report/
+            test-results/
+            next-start.log
+          if-no-files-found: ignore
+          retention-days: 14

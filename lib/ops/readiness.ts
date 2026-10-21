@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SiteSettings } from "@/lib/content/types";
+import { botCheckConfig } from "@/lib/bot-check/config";
 import { contactFormOpen } from "@/lib/contact/availability";
 import { getEmailEnvironment } from "@/lib/email/client";
 import { leadStorageConfigured } from "@/lib/leads/dependencies";
@@ -40,6 +41,8 @@ export interface Readiness {
   revalidation: boolean;
   /** Both legal pages carry versioned Sanity text (reported; not required, ruling R30). */
   legalReviewed: boolean;
+  /** The spam check on the forms is on (both Turnstile keys set and valid). Reported; not required, so `ready` is unchanged. */
+  botCheck: boolean;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -54,5 +57,5 @@ export function readinessChecks(
   const leadRemovalChannel = removalChannelFrom(settings, env) !== null;
   const contact = contactFormOpen(env);
   const revalidation = Boolean(env.SANITY_REVALIDATE_SECRET?.trim());
-  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, contact, revalidation, legalReviewed };
+  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, contact, revalidation, legalReviewed, botCheck: botCheckConfig(env).state === "on" };
 }

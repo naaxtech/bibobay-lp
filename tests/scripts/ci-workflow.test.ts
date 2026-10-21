@@ -130,12 +130,12 @@ describe("CI workflow", () => {
     expect(engines).toMatch(new RegExp(`(?:\\^${major}\\.|>=\\s*(?:${major}|${major - 2}|${major - 4})\\.)`));
   });
 
-  it("has the verify, studio and four browser jobs, each browser job after verify", () => {
-    expect(Object.keys(workflow().jobs).sort()).toEqual(["e2e", "e2e-commerce", "e2e-contact", "e2e-keyed", "studio", "verify"]);
-    for (const id of ["e2e", "e2e-commerce", "e2e-keyed", "e2e-contact"]) expect([job(id).needs].flat(), id).toEqual(["verify"]);
+  it("has the verify, studio and five browser jobs, each browser job after verify", () => {
+    expect(Object.keys(workflow().jobs).sort()).toEqual(["e2e", "e2e-bot-check", "e2e-commerce", "e2e-contact", "e2e-keyed", "studio", "verify"]);
+    for (const id of ["e2e", "e2e-commerce", "e2e-keyed", "e2e-contact", "e2e-bot-check"]) expect([job(id).needs].flat(), id).toEqual(["verify"]);
     expect(job("verify").needs).toBeUndefined();
     expect(job("studio").needs).toBeUndefined();
-    for (const id of ["verify", "studio", "e2e", "e2e-commerce", "e2e-keyed", "e2e-contact"]) {
+    for (const id of ["verify", "studio", "e2e", "e2e-commerce", "e2e-keyed", "e2e-contact", "e2e-bot-check"]) {
       expect(job(id)["runs-on"], id).toBe("ubuntu-latest");
       expect(job(id)["timeout-minutes"], id).toBeGreaterThan(0);
     }
@@ -262,6 +262,36 @@ describe("CI workflow", () => {
     expect(upload?.with?.name).toBe("playwright-report-contact");
     // The keyless job keeps running the closed-form specs.
     expect(job("e2e").env).not.toHaveProperty("E2E_CONTACT_OPEN");
+  });
+
+  it("e2e-bot-check runs only the bot-check specs against a build and server holding Cloudflare's published Turnstile test keys, and no other job has them (R223)", () => {
+    const botCheck = job("e2e-bot-check");
+    expect(botCheck.name).toBe("Playwright, bot check (Cloudflare test keys)");
+    expect(botCheck.env).toMatchObject({ E2E_PRODUCTION: "1", E2E_BOT_CHECK: "1", PLAYWRIGHT_BASE_URL: "http://127.0.0.1:3400" });
+    expect(botCheck.env).not.toHaveProperty("E2E_CONTACT_OPEN");
+    // The always-pass pair from Cloudflare's testing page: the site key is inlined at build, the secret is read at start.
+    const keys = { NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA", TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA" };
+    expect(stepRunning("e2e-bot-check", "npm run build")?.env).toEqual(keys);
+    const start = stepRunning("e2e-bot-check", "next start");
+    expect(start?.env).toEqual({ ...CONTACT_PLACEHOLDERS, ...keys });
+    expect(start?.run).toContain("next start -p 3400 -H 127.0.0.1");
+    expect(start?.run).toContain("http://127.0.0.1:3400/api/health");
+    const commands = runs("e2e-bot-check");
+    const order = ["npm ci", "npx playwright install --with-deps chromium", "npm run build", "next start", "npx playwright test e2e/bot-check"].map((command) => commands.findIndex((run) => run.includes(command)));
+    expect(order.every((index) => index >= 0), String(order)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(commands.filter((run) => run.includes("playwright test"))).toEqual([expect.stringMatching(/^npx playwright test e2e\/bot-check(?!\S)/)]);
+    const upload = botCheck.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+    expect(upload?.if).toBe("failure()");
+    expect(upload?.with?.name).toBe("playwright-report-bot-check");
+    // Every other job keeps both keys unset, so the check stays off there.
+    for (const id of Object.keys(workflow().jobs).filter((other) => other !== "e2e-bot-check")) {
+      const definition = job(id);
+      for (const env of [workflow().env, definition.env, ...definition.steps.map((step) => step.env)]) {
+        expect(Object.keys(env ?? {}), id).not.toContain("NEXT_PUBLIC_TURNSTILE_SITE_KEY");
+        expect(Object.keys(env ?? {}), id).not.toContain("TURNSTILE_SECRET_KEY");
+      }
+    }
   });
 
   it("only calls npm scripts that exist, and never bun", () => {

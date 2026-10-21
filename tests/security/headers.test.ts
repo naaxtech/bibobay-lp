@@ -109,6 +109,20 @@ describe("content security policy", () => {
     expect(directives(policy).get("script-src")).toEqual(["'self'", "'nonce-n'", "'strict-dynamic'"]);
   });
 
+  it("adds frame-src only for configured frame sources, right after connect-src", () => {
+    const base = { nonce: "n", environment: securityEnvironment(PRODUCTION) };
+    const policy = buildContentSecurityPolicy({ ...base, extraFrameSources: ["https://challenges.cloudflare.com"] });
+    expect(directives(policy).get("frame-src")).toEqual(["https://challenges.cloudflare.com"]);
+    const names = [...directives(policy).keys()];
+    expect(names.indexOf("frame-src")).toBe(names.indexOf("connect-src") + 1);
+    const plain = buildContentSecurityPolicy(base);
+    expect(buildContentSecurityPolicy({ ...base, extraFrameSources: [] })).toBe(plain);
+    expect(buildContentSecurityPolicy({ ...base, extraFrameSources: ["http://x", "*", "https://*.evil.test", "https://x.test; script-src *"] })).toBe(plain);
+    // Like connect-src, exactOrigin keeps only the origin of a URL with a path.
+    expect(directives(buildContentSecurityPolicy({ ...base, extraFrameSources: ["https://a.com/path"] })).get("frame-src")).toEqual(["https://a.com"]);
+    expect(directives(plain).has("frame-src")).toBe(false);
+  });
+
   it("refuses a nonce that could break out of the header", () => {
     expect(() => buildContentSecurityPolicy({ nonce: "a'; script-src *", environment: securityEnvironment(PRODUCTION) })).toThrow();
   });
@@ -176,6 +190,16 @@ describe("next.config.ts headers()", () => {
 describe("proxy.ts", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("adds the bot-check frame source only when both Turnstile test keys are set", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const off = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
+    expect(off).not.toContain("frame-src");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
+    const on = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
+    expect(directives(on).get("frame-src")).toEqual(["https://challenges.cloudflare.com"]);
   });
 
   it("puts a fresh nonce in the response policy and hands the same policy to the renderer", async () => {

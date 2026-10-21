@@ -40,7 +40,15 @@ describe("lead environment names", () => {
       "NEXT_PUBLIC_SENTRY_DSN",
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_SUPABASE_URL",
+      // Bot check (Cloudflare Turnstile): a site key is public by design; its secret stays a server name.
+      "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
     ]);
+  });
+
+  it("documents TURNSTILE_SECRET_KEY as a server name and refuses a public copy", () => {
+    expect(envExampleNames()).toContain("TURNSTILE_SECRET_KEY");
+    expect(envExampleNames()).not.toContain("NEXT_PUBLIC_TURNSTILE_SECRET_KEY");
+    expect(verifyEnvironment({ NEXT_PUBLIC_TURNSTILE_SECRET_KEY: "value" }, "production").forbiddenPublic).toContain("NEXT_PUBLIC_TURNSTILE_SECRET_KEY");
   });
 
   it.each(["NEXT_PUBLIC_LEAD_IP_HASH_SECRET", "NEXT_PUBLIC_RESEND_FROM", "NEXT_PUBLIC_STAFF_NOTIFICATION_EMAIL"])("refuses %s", (name) => {

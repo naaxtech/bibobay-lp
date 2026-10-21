@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 import { LeadForm, type LeadFormCopy } from "@/components/forms/LeadForm";
 import { FORM_COPY } from "@/components/forms/form-copy";
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
 import { SAFE_FALLBACK_CONTENT } from "@/lib/content/fallback";
 
 vi.mock("server-only", () => ({}));
@@ -52,7 +53,7 @@ afterEach(() => {
 });
 
 function renderForm(copy: LeadFormCopy = CMS) {
-  return render(<LeadForm copy={copy} />);
+  return render(<LeadForm copy={copy} botCheckSiteKey={null} />);
 }
 
 const form = () => screen.getByRole("form", { name: FORM_COPY.formLabel });
@@ -314,7 +315,7 @@ describe("submission outcomes", () => {
     // The height spacers carry them as attributes only, outside the accessibility tree.
     const spacers = Array.from(form().querySelectorAll<HTMLElement>(".lead-form__outcome"));
     expect(spacers.flatMap((element) => [element.dataset.reserveA, element.dataset.reserveB]).sort()).toEqual(
-      [CMS.successMessage, CMS.errorMessage, FORM_COPY.outcome.rateLimited, FORM_COPY.sending].sort(),
+      [CMS.successMessage, CMS.errorMessage, FORM_COPY.outcome.rateLimited, FORM_COPY.sending, ...Object.values(BOT_CHECK_MESSAGES)].sort(),
     );
   });
 });

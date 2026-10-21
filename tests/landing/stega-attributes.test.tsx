@@ -89,7 +89,7 @@ describe("CMS text in attributes under Presentation stega (R167)", () => {
   it("the home page puts no payload in an attribute, and keeps it in text", async () => {
     const { content, settings } = await encodedHome();
     const { successMessage, errorMessage, buttonLabel, consentCopy } = content.lead;
-    const { container } = render(<LandingPage content={content} settings={settings} leadForm={<LeadForm copy={{ buttonLabel, consentCopy, successMessage, errorMessage }} />} />);
+    const { container } = render(<LandingPage content={content} settings={settings} leadForm={<LeadForm copy={{ buttonLabel, consentCopy, successMessage, errorMessage }} botCheckSiteKey={null} />} />);
 
     // The fixture really is encoded where it matters: the hero title stays clickable.
     expect(STEGA_CHARACTER.test(screen.getByRole("heading", { level: 1 }).textContent ?? "")).toBe(true);
@@ -113,7 +113,7 @@ describe("CMS text in attributes under Presentation stega (R167)", () => {
 
   it("the contact form puts no payload in an attribute, and keeps it in its button text", async () => {
     const { buttonLabel, successMessage, errorMessage, closedMessage } = normalizeContactPage(encodeAllStrings(await read(CONTACT_PAGE_QUERY), { _id: "contactPage", _type: "contactPage" }));
-    const { container } = render(<ContactForm copy={{ buttonLabel, successMessage, errorMessage, closedMessage }} />);
+    const { container } = render(<ContactForm copy={{ buttonLabel, successMessage, errorMessage, closedMessage }} botCheckSiteKey={null} />);
 
     const button = container.querySelector("button[type='submit']");
     expect(STEGA_CHARACTER.test(button?.textContent ?? "")).toBe(true);

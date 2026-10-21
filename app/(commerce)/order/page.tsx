@@ -7,6 +7,7 @@ import { UI_COPY } from "@/components/landing/ui-copy";
 import { SiteFrame } from "@/components/legal/SiteFrame";
 import { SHOP_PATH } from "@/components/shop/catalogue";
 import { OrderRequest } from "@/components/shop/OrderRequest";
+import { botCheckSiteKey } from "@/lib/bot-check/config";
 import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import { countryOptions, orderCountryCodes } from "@/lib/orders/countries";
 import { orderConsentFrom } from "@/lib/orders/dependencies";
@@ -63,6 +64,7 @@ export default async function OrderPage() {
           consentCopy={consent.copy}
           countries={countries}
           trackingEnabled={isTrackingEnabled(settings)}
+          botCheckSiteKey={botCheckSiteKey(process.env)}
           aside={
             <section className="order-payment" aria-labelledby="order-payment-title">
               <h2 id="order-payment-title" className="order-payment__title">

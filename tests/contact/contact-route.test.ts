@@ -285,3 +285,26 @@ describe("POST /api/contact failure and privacy", () => {
     expect(logged).not.toMatch(/Zelda|zelda|private|Fitzgerald/);
   });
 });
+
+describe("POST /api/contact bot check", () => {
+  it("passes a 403 through with no-store and touches no storage", async () => {
+    configure();
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
+    const fetchSpy = vi.fn(async () => Response.json({ success: false, "error-codes": ["invalid-input-response"] }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const response = await post({ ...VALID, botCheckToken: "XXXX.DUMMY.TOKEN.XXXX" });
+    vi.unstubAllGlobals();
+    expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ ok: false, persisted: false, message: "We couldn't confirm this came from a person. Please try again." });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("with both keys unset a body without a token is stored as before", async () => {
+    configure();
+    const response = await post(VALID);
+    expect(response.status).toBe(200);
+  });
+});

@@ -92,11 +92,15 @@ export interface PolicyOptions {
   environment: SecurityEnvironment;
   /** Extra exact https origins for `connect-src` (Task 10M: Sentry, PostHog), only when configured. */
   extraConnectSources?: readonly string[];
+  /** Extra exact https origins for `frame-src` (bot check, R220), only when configured. Absent or empty: no `frame-src` directive. */
+  extraFrameSources?: readonly string[];
 }
 
-export function buildContentSecurityPolicy({ nonce, environment, extraConnectSources = [] }: PolicyOptions): string {
+export function buildContentSecurityPolicy({ nonce, environment, extraConnectSources = [], extraFrameSources = [] }: PolicyOptions): string {
   if (!NONCE.test(nonce)) throw new Error("Invalid CSP nonce");
   const connect = [...new Set(extraConnectSources.map((source) => exactOrigin(source, { allowLocalHttp: false })).filter((origin): origin is string => origin !== null))];
+
+  const frames = [...new Set(extraFrameSources.map((source) => exactOrigin(source, { allowLocalHttp: false })).filter((origin): origin is string => origin !== null))];
 
   const directives: Array<[string, ...string[]]> = [
     ["default-src", "'self'"],
@@ -121,6 +125,7 @@ export function buildContentSecurityPolicy({ nonce, environment, extraConnectSou
     ["font-src", "'self'"],
     // The lead form posts to /api/leads on this origin; the browser never talks to Supabase or Resend.
     ["connect-src", "'self'", ...connect],
+    ...(frames.length > 0 ? [["frame-src", ...frames] as [string, ...string[]]] : []),
     ["object-src", "'none'"],
     ["base-uri", "'self'"],
     ["form-action", "'self'"],

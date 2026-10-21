@@ -233,6 +233,9 @@ sent to Sentry as a warning, tagged with the event and a code only; the others a
 | `contact_store_failed` | A message passed every check but could not be stored (code: the database's); the visitor was told it was not saved. | Check Supabase status and the database logs now; messages are being lost. Set a Sentry alert on this one. |
 | `contact_rate_limit_unavailable` | The shared limiter is missing (code `missing`) or failed; the API answered 503 and stored nothing. | Check Supabase; the form fails closed without its limiter. |
 | `contact_unconfigured` | A message arrived while the form is not open (see `contact` in `/api/readiness`); the API answered 503 with `closed: true` and stored nothing. | Expected if you closed the form on purpose; otherwise fix the environment ([deployment.md](deployment.md#contact-form)). |
+| `contact_bot_check_refused` | The spam check refused a message (403): no token, Cloudflare did not accept it, or the token was made for another form (an action mismatch). Routine, info level, not reported. Nothing was counted or stored. | Nothing. |
+| `contact_bot_check_unavailable` | Cloudflare did not answer in time, answered with an error, refused the site's secret, or the token's hostname does not match `NEXT_PUBLIC_APP_URL` (reason in the server's log line, not in the Sentry event: `timeout`, `network`, `http`, `malformed_reply`, `secret_rejected`, `bad_request`, `internal_error` or `hostname_mismatch`); the API answered 503 and stored nothing. | See Bot check in the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile). |
+| `contact_bot_check_unconfigured` | A message arrived while the bot-check variables are set wrongly (one without the other, a malformed key, or Cloudflare's test keys in Vercel production); the API answered 503 and stored nothing. | Fix the two variables in Vercel, or remove both; see the runbook. |
 | `contact_route_failed` | An unexpected failure of the contact route itself (also reported as an error, area `contact`); answered with the generic error. | Read the Sentry event; an unhandled code path. Set an alert. |
 
 The staff alert is sent through the same attempt step as the other outboxes, so its `delivery_*` lines
@@ -310,6 +313,23 @@ Routine lines, not reported: `admin_request_refused` (with `cross_site`, `signed
 `staff_sign_in_rate_limited` lines means someone is guessing passwords.
 
 Set a Sentry alert on `admin_auth_unavailable` and `admin_action_failed`.
+
+### Alerts from the spam check (Cloudflare Turnstile)
+
+The same three kinds of event exist for each form, with the prefix of the flow: `lead_bot_check_*`,
+`contact_bot_check_*` and `order_bot_check_*`. They are logged by the signup, contact and order
+pipelines when the check is on or misconfigured (`lib/bot-check/gate.ts`); the token and the secret
+are never in an event, and neither is anything the visitor typed.
+
+| Event | Level | Reported to Sentry | Meaning |
+|---|---|---|---|
+| `lead_bot_check_refused`, `contact_bot_check_refused`, `order_bot_check_refused` | info | No | The form had no token, Cloudflare did not accept it, or the token was made for another form (403). Expected noise from automated programs: do not alert on it. |
+| `lead_bot_check_unavailable`, `contact_bot_check_unavailable`, `order_bot_check_unavailable` | warning | Yes | Cloudflare did not answer (after one retry), refused the site's secret, or the token's hostname does not match `NEXT_PUBLIC_APP_URL` (503). Real visitors are being turned away: check Cloudflare's status, then `botCheck` in `/api/readiness`. |
+| `lead_bot_check_unconfigured`, `contact_bot_check_unconfigured`, `order_bot_check_unconfigured` | warning | Yes | The two variables are set wrongly (503). A production build fails for the same reason, so this appears only if the variables changed after the build. |
+
+Each log line carries a short `reason`; the Sentry event does not (`reportEvent` forwards only `code`), so the `reason` is in the server's log line (Vercel runtime logs), not in the Sentry event. `/api/readiness` reports `botCheck` (true when the check is on); it is
+not part of `ready`. The Cloudflare dashboard shows the last seven days of solve analytics for the widget (Free plan; src: https://developers.cloudflare.com/turnstile/plans/).
+What to do is in the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile).
 
 ### Alerts from the order and tracking routes (final review O-I5)
 

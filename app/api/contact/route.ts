@@ -10,10 +10,13 @@ import { reportError } from "@/lib/observability/report";
  * Answers `{ ok, persisted, message }` (plus `fieldErrors` on a 400 with field problems, and
  * `closed: true` on the 503 of a form that is not open). `persisted: true` only after the database
  * confirmed the message and its outbox row; the message never says an email was sent. Statuses:
- * 200 stored · 400 invalid or honeypot · 413 too large · 415 not JSON · 429 rate limited ·
- * 500 write failed · 503 closed (R205), or the limiter is down.
+ * 200 stored · 400 invalid or honeypot · 403 spam check refused · 413 too large · 415 not JSON · 429 rate limited ·
+ * 500 write failed · 503 closed (R205), the limiter is down, or the spam check is unavailable.
  */
 export const runtime = "nodejs";
+// A siteverify timeout and its retry stay inside this budget; on Hobby without Fluid compute the default is shorter.
+// src: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/maxDuration.md · next 16.3.8 · 2026-10-22
+export const maxDuration = 30;
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 

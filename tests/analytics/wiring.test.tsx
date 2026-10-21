@@ -112,7 +112,7 @@ describe("signup outcome", () => {
   it("counts a stored signup with its outcome only, never the details typed", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, persisted: true, acknowledgementQueued: true }), { status: 200, headers: { "content-type": "application/json" } })));
     const { lead } = SAFE_FALLBACK_CONTENT;
-    render(<LeadForm copy={{ buttonLabel: lead.buttonLabel, consentCopy: lead.consentCopy, successMessage: lead.successMessage, errorMessage: lead.errorMessage }} />);
+    render(<LeadForm copy={{ buttonLabel: lead.buttonLabel, consentCopy: lead.consentCopy, successMessage: lead.successMessage, errorMessage: lead.errorMessage }} botCheckSiteKey={null} />);
     fireEvent.change(screen.getByLabelText(FORM_COPY.email.label), { target: { value: "parent@example.com" } });
     fireEvent.click(screen.getByRole("checkbox", { name: lead.consentCopy }));
     await act(async () => {
@@ -124,7 +124,7 @@ describe("signup outcome", () => {
   it("counts nothing when the signup was not stored", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: false }), { status: 503, headers: { "content-type": "application/json" } })));
     const { lead } = SAFE_FALLBACK_CONTENT;
-    render(<LeadForm copy={{ buttonLabel: lead.buttonLabel, consentCopy: lead.consentCopy, successMessage: lead.successMessage, errorMessage: lead.errorMessage }} />);
+    render(<LeadForm copy={{ buttonLabel: lead.buttonLabel, consentCopy: lead.consentCopy, successMessage: lead.successMessage, errorMessage: lead.errorMessage }} botCheckSiteKey={null} />);
     fireEvent.change(screen.getByLabelText(FORM_COPY.email.label), { target: { value: "parent@example.com" } });
     fireEvent.click(screen.getByRole("checkbox", { name: lead.consentCopy }));
     await act(async () => {

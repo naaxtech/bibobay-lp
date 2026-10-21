@@ -85,6 +85,19 @@ fails, which is enough to see that it was sent):
 - In that window, open **Analytics choices** in the footer: it says "Visit statistics are on for this
   browser."; "Turn statistics off" stops every later request, also after moving to another page.
 
+**2b-bis. The spam check on (Cloudflare's published test keys; the page loads Cloudflare's real script and the server calls Cloudflare's siteverify with the published test
+secret; nothing else leaves the machine):** build and start on a free port (CI uses 3400), plus the
+placeholder contact environment of 2c. The two keys go on the build and on the start; `E2E_BOT_CHECK=1` goes only on the Playwright line:
+
+```bash
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA npm run build
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef RESEND_API_KEY=re_fixture RESEND_FROM="BIBO Bay <hello@example.com>" STAFF_NOTIFICATION_EMAIL=staff@example.com npx next start -p 3400 -H 127.0.0.1 &
+E2E_PRODUCTION=1 E2E_BOT_CHECK=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3400 npx playwright test e2e/bot-check
+```
+
+Stop the server by its port afterwards (check the port is free first, and kill by port, not by the job id).
+The test keys are refused when `VERCEL_ENV=production`, so this never runs against the Vercel Production build.
+
 **2c. The contact form open (placeholders; every `/api/contact` call is answered by Playwright, nothing
 leaves the machine):** the suite above runs against a keyless build, where `/contact` shows the closed
 notice and no form. To run the contact specs against an open form, start the same build with the
