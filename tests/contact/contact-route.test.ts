@@ -173,7 +173,7 @@ describe("POST /api/contact storing a message", () => {
     expect(options).toMatchObject({ idempotencyKey: `contact-delivery/${DELIVERY_ID}` });
   });
 
-  it("shares one contact bucket between two IPv6 addresses in one /64 (R171)", async () => {
+  it("shares one contact bucket between two IPv6 addresses in one /64 (R203)", async () => {
     configure();
     await post(VALID, { "x-forwarded-for": "2001:db8:1:2:aaaa::1" });
     await post(VALID, { "x-forwarded-for": "2001:db8:1:2:bbbb::9" });
@@ -182,14 +182,14 @@ describe("POST /api/contact storing a message", () => {
     expect(buckets[0]).toBe(buckets[1]);
   });
 
-  it("applies 3 per 10 minutes per client, and overall the alert's own hourly send cap (60 by default; R186)", async () => {
+  it("applies 3 per 10 minutes per client, and overall the alert's own hourly send cap (60 by default; R212)", async () => {
     configure();
     await post(VALID);
     const limits = rpcCalls.filter(([fn]) => fn === "consume_rate_limit").map(([, args]) => [args.max_hits, args.window_seconds]);
     expect(limits).toEqual([[3, 600], [60, 3600]]);
   });
 
-  it("takes the overall limit from LEAD_ACK_SEND_LIMIT_PER_HOUR, the value the alert's send budget spends, so intake never outruns the alerts (R186)", async () => {
+  it("takes the overall limit from LEAD_ACK_SEND_LIMIT_PER_HOUR, the value the alert's send budget spends, so intake never outruns the alerts (R212)", async () => {
     configure();
     vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "25");
     await post(VALID);
@@ -230,7 +230,7 @@ describe("POST /api/contact storing a message", () => {
   });
 });
 
-describe("POST /api/contact while the form is closed (R173)", () => {
+describe("POST /api/contact while the form is closed (R205)", () => {
   const CLOSED = { ok: false, persisted: false, closed: true, message: "The contact form is not open, so nothing was saved." };
 
   it("answers 503 closed while STAFF_NOTIFICATION_EMAIL is unset, though storage and email are configured", async () => {

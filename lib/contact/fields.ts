@@ -1,20 +1,20 @@
 import { EMAIL_PATTERN, LEAD_LIMITS, isSafeFirstName, normalizeEmail } from "@/lib/leads/fields";
 
 /**
- * The contact form's field rules, shared by the browser form and the server (rulings R158-R162).
+ * The contact form's field rules, shared by the browser form and the server (rulings R190-R194).
  *
  * Deliberately free of Zod, like lib/leads/fields.ts: the form imports this module. The server
  * validates independently with the Zod schema in ./schema.ts, built from these same constants, and
  * tests/contact/field-cases.ts holds the one table of cases both must agree on.
  *
- * Grown-ups only (R162): a name, an email address, a topic and a message. Nothing here may grow an
+ * Grown-ups only (R194): a name, an email address, a topic and a message. Nothing here may grow an
  * age field, a child's name or any other child detail.
  */
 
 export const CONTACT_PATH = "/contact";
 export const CONTACT_API_PATH = "/api/contact";
 
-/** What a message is about (R162). The order is the order of the form's list. */
+/** What a message is about (R194). The order is the order of the form's list. */
 export const CONTACT_TOPICS = ["general", "partnerships", "press", "shop-order", "privacy"] as const;
 export type ContactTopic = (typeof CONTACT_TOPICS)[number];
 
@@ -54,7 +54,7 @@ export interface ContactFieldValues {
   message: string;
 }
 
-/** The JSON body POST /api/contact answers with; `closed` only while the form is not open (R161). */
+/** The JSON body POST /api/contact answers with; `closed` only while the form is not open (R193). */
 export interface ContactApiBody {
   ok: boolean;
   persisted: boolean;

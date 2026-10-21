@@ -10,7 +10,7 @@ export interface LegalDocumentProps {
   legal: LegalSettings;
   state: LegalPageState;
   settings: SiteSettings;
-  /** The contact form is open (R164): the fallback privacy text then says what a message stores. */
+  /** The contact form is open (R196): the fallback privacy text then says what a message stores. */
   contactOpen?: boolean;
 }
 

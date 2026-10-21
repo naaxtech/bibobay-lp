@@ -1,5 +1,5 @@
--- BIBO Bay migration 0008: the contact form's messages and their own outbox (rulings R159,
--- R169-R175).
+-- BIBO Bay migration 0008: the contact form's messages and their own outbox (rulings R191,
+-- R201-R207).
 --
 -- What this adds:
 --
@@ -7,27 +7,27 @@
 --     a name, an email address (trimmed and lower-cased, as for a signup), a topic from a fixed
 --     list, the message, and when it arrived. No raw client address is stored (the rate limit is
 --     keyed by the server's HMAC, as for signups and orders), no user agent, and no child data.
---   * contact_message_deliveries: the contact outbox (R169), a table of its own, not a kind of the
+--   * contact_message_deliveries: the contact outbox (R201), a table of its own, not a kind of the
 --     signup outbox. It mirrors the outboxes of 0001 and 0006 column for column: attempts,
 --     next_attempt_at with the same capped backoff, the claimed_at / `sending` lease,
---     unconfirmed_since, and the final-failure codes. One rule differs (R185): an unconfirmed alert
+--     unconfirmed_since, and the final-failure codes. One rule differs (R211): an unconfirmed alert
 --     is retried until the attempt cap, never parked outside the provider's 23-hour idempotency
 --     window; unconfirmed_since still records that it may have reached staff twice. Its one kind is
 --     the staff alert (`contact_staff_alert`), one per message
 --     (unique (message_id, kind)); the row id is its idempotency key (`contact-delivery/<id>`,
---     lib/outbox/contact.ts). There is no `skipped` status (R175): a contact message cannot be
+--     lib/outbox/contact.ts). There is no `skipped` status (R207): a contact message cannot be
 --     withdrawn, so nothing ever refuses its alert, and the claim always answers "skipped": 0.
 --   * submit_contact_message: stores the message AND queues its alert in one transaction, so the
 --     API never answers `persisted` for a message nobody will be told about.
 --   * claim_contact_deliveries and record_contact_delivery_attempt: the contact outbox's claim and
 --     record functions, with the same due rule, lease, backoff and deferral as 0006's claim and
---     record functions for the signup outbox, and parking at the attempt cap only (R185). The
+--     record functions for the signup outbox, and parking at the attempt cap only (R211). The
 --     claim takes no kinds array (the table
 --     holds one kind) and names one message or none (the cron worker). Each claimed entry:
 --       {id, kind, attempt, name, email, topic, message, receivedAt}
 --
 -- Nothing here touches the signup outbox, the signup table, their constraints or their functions
--- (R169). The record function calls 0006's outbox_failure_unconfirmed, which stays executable by
+-- (R201). The record function calls 0006's outbox_failure_unconfirmed, which stays executable by
 -- its owner only.
 --
 -- Security model (the same as 0001-0007): both tables have row level security enabled AND forced,
@@ -77,10 +77,10 @@ create table if not exists public.contact_messages (
   constraint contact_messages_message_bounds check (char_length(message) between 10 and 3000 and message !~ '[\x01-\x08\x0b-\x1f\x7f]')
 );
 
--- Staff read messages newest first, by SQL, while there is no inbox page (R168).
+-- Staff read messages newest first, by SQL, while there is no inbox page (R200).
 create index if not exists contact_messages_created_at_idx on public.contact_messages (created_at desc);
 
--- The contact outbox (R169). 'infinity' in next_attempt_at is the parked marker, as in 0006.
+-- The contact outbox (R201). 'infinity' in next_attempt_at is the parked marker, as in 0006.
 create table if not exists public.contact_message_deliveries (
   id                   uuid primary key default gen_random_uuid(),
   message_id           uuid not null references public.contact_messages (id) on delete cascade,
@@ -182,14 +182,14 @@ grant execute on function public.submit_contact_message(text, text, text, text) 
 
 -- ---------------------------------------------------------------------------
 -- claim_contact_deliveries: claim up to p_limit (1-50) due contact alerts, optionally of one
--- message. The due rule and the 15-minute stale lease are 0006's; the parking rule is not (R185):
+-- message. The due rule and the 15-minute stale lease are 0006's; the parking rule is not (R211):
 --   * due: `pending` or `failed` with next_attempt_at reached, or `sending` for over 15 minutes;
 --   * parked (failed, next_attempt_at 'infinity', reported as expired): out of attempts only. An
 --     unconfirmed send is NOT parked outside the provider's 23-hour idempotency window, as the
 --     signup and order outboxes park theirs: with a once-a-day worker that would lose the alert of a
 --     stored message, while a retry can at worst alert staff twice;
 --   * otherwise claimed: `sending`, the attempt counted, claimed_at now.
--- Nothing is ever skipped (R175).
+-- Nothing is ever skipped (R207).
 -- ---------------------------------------------------------------------------
 
 create or replace function public.claim_contact_deliveries(
@@ -226,7 +226,7 @@ begin
      for update of delivery skip locked
   loop
     if r.attempts >= 8 then
-      -- R185: only the attempt cap parks a contact alert. An unconfirmed send is retried at any age,
+      -- R211: only the attempt cap parks a contact alert. An unconfirmed send is retried at any age,
       -- under the same key; once the provider has forgotten the key a retry is a new send, and a
       -- duplicate staff alert is accepted where a lost one is not. A lost eighth attempt (a stale
       -- `sending` row) is parked as `stale_unconfirmed`.
@@ -278,7 +278,7 @@ grant execute on function public.claim_contact_deliveries(integer, uuid) to serv
 --   failed    a short error code (never a provider message); next attempt with exponential backoff
 --             (2^attempts minutes, at most six hours), or never after the eighth attempt or an
 --             idempotency conflict. An unconfirmed failure sets unconfirmed_since (R91), which
---             here marks a possible duplicate and parks nothing (R185).
+--             here marks a possible duplicate and parks nothing (R211).
 --   deferred  no attempt was made (the send budget was spent): the claim is handed back, so the
 --             row returns to its earlier status and attempt count and stays due.
 -- Returns false when the row was not `sending` (already recorded, parked, or never claimed).

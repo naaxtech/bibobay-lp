@@ -113,7 +113,7 @@ export const SAFE_FALLBACK_SETTINGS: SiteSettings = {
   navigation: { links: [{ label: "Meet the friends", href: "#characters" }, { label: "Watch", href: "#episodes" }, { label: "Free activity pack", href: "#lead" }], primaryCta: subscribeOnYouTube, commerceLabel: "Shop" },
   footer: { text: "BIBO Bay: mindful content for little learners. Screen time is part of childhood. Let’s make it count.", legalLinks: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }], contactLabel: "Contact", contactPageLabel: "Contact us" },
 };
-/** R158, R163, C7: the contact page when Sanity is unconfigured, unreachable or has no document. The Studio seed holds the same copy. */
+/** R190, R195, C7: the contact page when Sanity is unconfigured, unreachable or has no document. The Studio seed holds the same copy. */
 export const SAFE_FALLBACK_CONTACT_PAGE: ContactPageContent = {
   seo: { title: "Contact BIBO Bay", description: "Write to the BIBO Bay team with a question, a partnership idea or a press enquiry." },
   heading: "Contact us",

@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("contactFormOpen", () => {
-  it("opens only with storage, email sending, a staff address and the hash secret (R173)", () => {
+  it("opens only with storage, email sending, a staff address and the hash secret (R205)", () => {
     expect(contactFormOpen(OPEN)).toBe(true);
   });
 

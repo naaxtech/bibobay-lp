@@ -11,7 +11,7 @@ import { reportError } from "@/lib/observability/report";
  * `closed: true` on the 503 of a form that is not open). `persisted: true` only after the database
  * confirmed the message and its outbox row; the message never says an email was sent. Statuses:
  * 200 stored · 400 invalid or honeypot · 413 too large · 415 not JSON · 429 rate limited ·
- * 500 write failed · 503 closed (R173), or the limiter is down.
+ * 500 write failed · 503 closed (R205), or the limiter is down.
  */
 export const runtime = "nodejs";
 

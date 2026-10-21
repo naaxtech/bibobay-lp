@@ -10,7 +10,7 @@ import { pgliteRpc } from "@/tests/support/pglite-rpc";
 import { applyMigrations, createSupabaseStandIn, migrationFiles } from "@/tests/support/supabase-db";
 
 /*
- * The contact adapter against the real migrations (rulings R159, R169): migration 0008's submit,
+ * The contact adapter against the real migrations (rulings R191, R201): migration 0008's submit,
  * claim and record RPCs are called as PostgREST calls them (named arguments, as service_role), so a
  * renamed argument or a changed answer shape fails here. A fixture-only test would pass anyway.
  */
@@ -95,7 +95,7 @@ describe("the contact adapter against the real migrations", () => {
     expect(await contact.recordDeliveryAttempt(deliveryId, { status: "failed", errorCode: "rate_limit_exceeded" })).toBe(true);
   });
 
-  it("claims an alert left unconfirmed for over a day again, under the same id: age never parks a contact alert (R185)", async () => {
+  it("claims an alert left unconfirmed for over a day again, under the same id: age never parks a contact alert (R211)", async () => {
     const contact = createSupabaseContactRepository(client);
     const { messageId, deliveryId } = await contact.submitMessage({ ...RECORD, email: "late@example.com" });
     await contact.claimDeliveries({ ownerId: messageId, kinds: ["contact_staff_alert"], limit: 1 });

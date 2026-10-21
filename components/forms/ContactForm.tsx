@@ -21,7 +21,7 @@ import { stegaCleanText } from "@/lib/content/stega";
 import { normalizeEmail } from "@/lib/leads/fields";
 import { CONTACT_FORM_COPY, contactFieldErrorMessage } from "./contact-copy";
 
-/** The CMS copy the form shows (R158, R163): the button label and the three messages. */
+/** The CMS copy the form shows (R190, R195): the button label and the three messages. */
 export interface ContactFormCopy {
   buttonLabel: string;
   successMessage: string;
@@ -57,7 +57,7 @@ function serverFieldErrors(body: unknown): ContactFieldErrors {
 }
 
 /**
- * The contact form (R158-R167). Grown-ups only: a name, an email address, a topic and a message;
+ * The contact form (R190-R199). Grown-ups only: a name, an email address, a topic and a message;
  * nothing about a child, and the hint says to leave child details out.
  *
  * Truthful outcomes: the CMS success message appears only when the server answers
@@ -160,7 +160,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
       const answer: unknown = await response.json().catch(() => null);
       if (response.ok && isRecord(answer) && answer.ok === true && answer.persisted === true) {
         setOutcome({ tone: "success", text: copy.successMessage });
-        // R166: the outcome and the topic only; nothing the visitor typed.
+        // R198: the outcome and the topic only; nothing the visitor typed.
         track("contact_submitted", { persisted: true, topic });
         form.reset();
       } else if (response.status === 503 && isRecord(answer) && answer.closed === true) {
@@ -336,7 +336,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
        */}
       <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
         <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.closedMessage)} data-reserve-b={CONTACT_FORM_COPY.outcome.rateLimited}>
-          {/* The form's only role="status" (R167); never focused, as a focused live region is read out as well as announced. */}
+          {/* The form's only role="status" (R199); never focused, as a focused live region is read out as well as announced. */}
           <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
             {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}
           </p>

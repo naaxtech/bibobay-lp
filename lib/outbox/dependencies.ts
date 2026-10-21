@@ -22,7 +22,7 @@ import { runOutboxWorker } from "./worker";
  * acknowledgement (R140), so it needs `LEAD_IP_HASH_SECRET` for that; without it the email simply
  * omits the pack. The emails it builds are the ones the request paths build (same lead magnet, R140; same tracking
  * line, R89; same staff address and reply-to). The contact outbox needs no `LEAD_IP_HASH_SECRET`
- * here (R177) and, like the others, claims nothing without a staff address.
+ * here (R209) and, like the others, claims nothing without a staff address.
  */
 export async function createOutboxWorker(env: Record<string, string | undefined> = process.env): Promise<{ run(startedAt?: number): Promise<OutboxTally> } | null> {
   const admin = getSupabaseAdminEnvironment(env);

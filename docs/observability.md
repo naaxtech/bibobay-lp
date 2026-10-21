@@ -218,7 +218,7 @@ failure of `/api/leads` is reported as `lead_route_failed` and answered with the
 
 Set a Sentry alert on `delivery_send_capped` and `lead_store_failed`.
 
-### Alerts from the contact form (rulings R160-R173)
+### Alerts from the contact form (rulings R192-R205)
 
 `logContactEvent` (`lib/contact/dependencies.ts`) writes the contact route's log lines under
 `scope: "contact"`: an event name and at most a scope or a short code, never a name, an address, a
@@ -228,7 +228,7 @@ sent to Sentry as a warning, tagged with the event and a code only; the others a
 | Event | Meaning | What to do |
 |---|---|---|
 | `contact_stored` | A message and its alert row were stored in one transaction. Routine, not reported. | Nothing. |
-| `contact_rate_limited` | A message was refused with 429 (`scope` is `client` for the 3 per 10 minutes limit or `global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), the alert's own send cap, R186). Routine, not reported. | A burst of `global` means the hour's whole alert budget was reached: look at the traffic. |
+| `contact_rate_limited` | A message was refused with 429 (`scope` is `client` for the 3 per 10 minutes limit or `global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60), the alert's own send cap, R212). Routine, not reported. | A burst of `global` means the hour's whole alert budget was reached: look at the traffic. |
 | `contact_honeypot` | The hidden field was filled; the generic 400 was answered and nothing was counted or stored. Routine, not reported. | Nothing. |
 | `contact_store_failed` | A message passed every check but could not be stored (code: the database's); the visitor was told it was not saved. | Check Supabase status and the database logs now; messages are being lost. Set a Sentry alert on this one. |
 | `contact_rate_limit_unavailable` | The shared limiter is missing (code `missing`) or failed; the API answered 503 and stored nothing. | Check Supabase; the form fails closed without its limiter. |
@@ -239,7 +239,7 @@ The staff alert is sent through the same attempt step as the other outboxes, so 
 (`delivery_attempted`, `delivery_send_capped`, `delivery_expired` and the rest, below) carry `channel`
 `contact` and the kind `contact_staff_alert`. Its send bucket is `send:contact_staff_alert`. A
 `delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an
-`invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send (R185)
+`invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send (R211)
 ([incident-runbook.md](incident-runbook.md#contact-messages)). From the cron run, where every line
 says `channel` `worker`, a claim's `delivery_expired` carries `outbox` `contact`.
 
@@ -258,7 +258,7 @@ also sent to Sentry as warnings, tagged with the event, kind and code only:
   staff alert with no staff address, or a quote with a non-https payment link); it is recorded as
   `failed` with `message_invalid`.
 - `delivery_record_failed`: the outcome could not be recorded; the row
-  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. A contact staff alert is re-sent whatever its age, until its eighth attempt (R185).
+  stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. A contact staff alert is re-sent whatever its age, until its eighth attempt (R211).
 - `delivery_expired`: rows parked for a human: a final failure (the eighth attempt, or
   `invalid_idempotent_request`), tagged with its kind and code, or rows a claim parked (signup and
   order sends unconfirmed for over 23 hours, or a lost eighth attempt, `stale_unconfirmed`), as a
@@ -279,7 +279,7 @@ only be retried within 23 hours of the claim of the first attempt that left it u
 schedule such a row gets at most one retry before it is parked as `delivery_expired` for a person. A `delivery_expired`
 alert therefore means a person has to act, and on this schedule it will be more common than on a
 15-minute one: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
-Contact staff alerts are the exception (R185): an unconfirmed one is retried at every run until its
+Contact staff alerts are the exception (R211): an unconfirmed one is retried at every run until its
 eighth attempt, so staff may now and then get an alert twice, and never lose one to the 23-hour window.
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.

@@ -52,7 +52,7 @@ const job = (id: string) => workflow().jobs[id]!;
 const runs = (id: string) => job(id).steps.filter((step) => step.run).map((step) => step.run!.trim());
 const stepRunning = (id: string, command: string) => job(id).steps.find((step) => step.run?.includes(command));
 
-/** R187: what the e2e-contact job starts `next start` with. Placeholders on reserved domains only; no secret. */
+/** R213: what the e2e-contact job starts `next start` with. Placeholders on reserved domains only; no secret. */
 const CONTACT_PLACEHOLDERS = {
   NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example.com",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-fixture-value",
@@ -241,7 +241,7 @@ describe("CI workflow", () => {
     expect(String(upload?.with?.path)).toContain("playwright-report");
   });
 
-  it("e2e-contact runs the open-form contact specs against next start with the placeholder contact environment, so they never sit skipped (R187)", () => {
+  it("e2e-contact runs the open-form contact specs against next start with the placeholder contact environment, so they never sit skipped (R213)", () => {
     const contact = job("e2e-contact");
     expect(contact.name).toBe("Playwright, contact form open (placeholders)");
     expect(contact.env).toMatchObject({ E2E_PRODUCTION: "1", E2E_CONTACT_OPEN: "1", PLAYWRIGHT_BASE_URL: "http://127.0.0.1:3300" });
@@ -249,7 +249,7 @@ describe("CI workflow", () => {
     expect(start?.env).toEqual(CONTACT_PLACEHOLDERS);
     expect(start?.run).toContain("next start -p 3300 -H 127.0.0.1");
     expect(start?.run).toContain("http://127.0.0.1:3300/api/health");
-    // The placeholders must open the form (R173), or every open-form spec would be skipped or fail.
+    // The placeholders must open the form (R205), or every open-form spec would be skipped or fail.
     expect(contactFormOpen({ ...CONTACT_PLACEHOLDERS })).toBe(true);
     // The build needs none of them: every page renders per request, so `next start` decides.
     expect(stepRunning("e2e-contact", "npm run build")?.env).toBeUndefined();

@@ -2,7 +2,7 @@ import type { ContactDeliveryOutbox } from "@/lib/outbox/types";
 import type { ContactTopic } from "./fields";
 
 /**
- * The server side of the contact form (rulings R159, R169): what the route stores and the one
+ * The server side of the contact form (rulings R191, R201): what the route stores and the one
  * repository that stores it. The Supabase adapter (lib/supabase/contact.ts) implements it over
  * migration 0008's RPCs; tests pass a fake.
  */

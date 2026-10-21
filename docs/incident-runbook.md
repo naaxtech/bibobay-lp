@@ -67,7 +67,7 @@ to infinity:
 - **`stale_unconfirmed`**: a signup or order email whose outcome is unknown (a timeout, a provider server error) was
   not confirmed within the 23-hour window (on a daily schedule such a row gets at most one retry before it is parked). The provider remembers an idempotency key for 24 hours,
   so past that point a retry could deliver a second copy of an email that did arrive. Contact staff
-  alerts are not parked for this (R185): they are retried until their eighth attempt, because a
+  alerts are not parked for this (R211): they are retried until their eighth attempt, because a
   second copy of a staff alert is harmless ([Contact messages](#contact-messages)).
 - **A final failure code**: the eighth failed attempt, or `invalid_idempotent_request` (the provider
   already holds this key with different content).
@@ -130,11 +130,11 @@ Nothing is claimed as sent for a parked row. Work through them like this.
 ## Contact messages
 
 Each message from the contact form is a row in `public.contact_messages`, with one alert row in
-`public.contact_message_deliveries`. There is no inbox page (R168): staff read a message in its alert
+`public.contact_message_deliveries`. There is no inbox page (R200): staff read a message in its alert
 email, whose Reply-To is the sender's address (labelled unverified, because nothing on the form proves
 the sender owns it). When the alert is parked, read the message by SQL and reply by hand.
 
-A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` (R185). A
+A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` (R211). A
 send whose outcome is unknown is not parked after 23 hours as signup and order emails are: it is
 retried at every cron run, under the same idempotency key and, once the provider has forgotten that
 key, as a new send. So an alert may now and then reach the staff inbox twice; `unconfirmed_since` on

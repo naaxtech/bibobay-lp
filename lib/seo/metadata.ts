@@ -141,12 +141,12 @@ export interface ContactMetadataInput {
   settings: SiteSettings;
   seo: SeoEnvironment;
   draft: boolean;
-  /** What the page shows (R158); a page with no way to reach the team stays out of search results. */
+  /** What the page shows (R190); a page with no way to reach the team stays out of search results. */
   state: ContactPageState;
 }
 
 /**
- * The contact page (R158): the CMS SEO. It is indexable only in production, outside draft mode, with
+ * The contact page (R190): the CMS SEO. It is indexable only in production, outside draft mode, with
  * a way to reach the team (the form or a contact address) and no CMS noIndex; the canonical URL goes
  * with it. Otherwise it is noindex but its links are followed, like the other short pages.
  * `state` is a parameter so this file never imports the server-only availability check.
@@ -246,7 +246,7 @@ export interface SitemapInput {
   legal: LegalSettings;
   /** Typed hook for Task 7: shop and product paths, listed only while commerce is enabled. */
   commerceRoutes?: readonly string[];
-  /** R158: /contact has a way to reach the team and no CMS noIndex, so search engines may list it. */
+  /** R190: /contact has a way to reach the team and no CMS noIndex, so search engines may list it. */
   contactListed?: boolean;
 }
 

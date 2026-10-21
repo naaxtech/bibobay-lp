@@ -53,7 +53,7 @@ export async function getLandingPage(options: ContentOptions = {}) {
   const raw = await query<unknown>(LANDING_PAGE_QUERY, {}, ["landingPage", "character", "episodePreview", "brandPillar", "ecosystemEntry", "testimonial", "faqItem"], options);
   return raw === null ? SAFE_FALLBACK_CONTENT : normalizeLandingContent(raw, { testimonialsEnabled: settings.testimonialsEnabled });
 }
-/** R158, R163: the /contact copy; the repository fallback when Sanity is absent, unreadable or has no document. */
+/** R190, R195: the /contact copy; the repository fallback when Sanity is absent, unreadable or has no document. */
 export async function getContactPage(options: ContentOptions = {}) {
   const raw = await query<unknown>(CONTACT_PAGE_QUERY, {}, ["contactPage"], options);
   return raw === null ? SAFE_FALLBACK_CONTACT_PAGE : normalizeContactPage(raw);

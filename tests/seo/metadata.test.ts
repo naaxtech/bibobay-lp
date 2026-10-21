@@ -228,7 +228,7 @@ describe("sitemap.xml", () => {
     expect(on).toEqual(expect.arrayContaining(["https://bibobay.example/shop", "https://bibobay.example/shop/sea-friends-tote"]));
   });
 
-  it("lists /contact only when contactListed and the site is indexable (R158)", () => {
+  it("lists /contact only when contactListed and the site is indexable (R190)", () => {
     const listed = urls(sitemapFor({ seo, settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL, contactListed: true }));
     expect(listed).toEqual(["https://bibobay.example/", "https://bibobay.example/contact"]);
     expect(urls(sitemapFor({ seo, settings: SAFE_FALLBACK_SETTINGS, legal: SAFE_FALLBACK_LEGAL, contactListed: false }))).toEqual(["https://bibobay.example/"]);

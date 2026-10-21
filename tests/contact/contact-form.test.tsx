@@ -98,7 +98,7 @@ describe("the contact form's structure", () => {
     expect(name.getAttribute("aria-describedby")!.split(" ")).toHaveLength(1);
   });
 
-  it("keeps exactly one role=status element in the form (R167)", async () => {
+  it("keeps exactly one role=status element in the form (R199)", async () => {
     render(<ContactForm copy={CMS} />);
     expect(within(form()).getAllByRole("status")).toHaveLength(1);
     await submit();

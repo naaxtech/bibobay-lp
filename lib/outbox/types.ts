@@ -4,7 +4,7 @@ import type { ContactDeliveryKind, LeadDeliveryKind, OrderEmailKind } from "./co
 
 /**
  * What the outbox claim functions of migration 0006 hand out (Task 8a), and those of migration 0008
- * for the contact outbox (R169). Each claimed row carries only what its email needs; the Supabase
+ * for the contact outbox (R201). Each claimed row carries only what its email needs; the Supabase
  * adapters (lib/supabase/leads.ts, lib/supabase/outbox.ts, lib/supabase/contact.ts) rebuild these
  * shapes key by key and refuse anything else.
  */
@@ -19,12 +19,12 @@ export interface ClaimBatch<T> {
   claimed: T[];
   /**
    * Rows the claim refused to send (a withdrawn lead, a superseded quote): now `skipped`. Always 0
-   * for the contact outbox, whose messages cannot be withdrawn (R175).
+   * for the contact outbox, whose messages cannot be withdrawn (R207).
    */
   skipped: number;
   /**
    * Rows parked for a human (R91: out of attempts, or, in the signup and order outboxes, unconfirmed
-   * past the idempotency window; the contact outbox parks at the attempt cap only, R185).
+   * past the idempotency window; the contact outbox parks at the attempt cap only, R211).
    */
   expired: number;
 }

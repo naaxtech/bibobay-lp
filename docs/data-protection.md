@@ -138,7 +138,7 @@ the repository fallback text, marked as not yet reviewed, and `/api/readiness` r
      rate-limit counts and the error reports … and for the requests the servers receive"; with
      commerce on, "Handling your order request is the step you asked us to take before any sale".
      Also the staff row of the table above.
-   - **The basis for contact messages** (ruling R174). Privacy page, "Why we use your details": "To
+   - **The basis for contact messages** (ruling R206). Privacy page, "Why we use your details": "To
      read and answer a message you send through the contact form. The legal basis for keeping it is our
      legitimate interest in replying to people who write to us." (shown while the contact form is open).
      Is that the right basis for a message from someone who cannot prove who they are, and should the

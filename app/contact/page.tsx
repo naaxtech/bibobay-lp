@@ -15,14 +15,14 @@ async function load() {
   return { preview, copy, settings, state: contactPageState(contactFormOpen(), settings) };
 }
 
-/** R158: the CMS SEO; indexable only while the page offers a way to reach the team (R161). */
+/** R190: the CMS SEO; indexable only while the page offers a way to reach the team (R193). */
 export async function generateMetadata(): Promise<Metadata> {
   const { preview, copy, settings, state } = await load();
   return contactMetadata({ copy, settings, seo: seoEnvironment(settings), draft: preview, state });
 }
 
 /**
- * R158, R161: the form while it is open (Supabase and email sending are both configured, R173);
+ * R190, R193: the form while it is open (Supabase and email sending are both configured, R205);
  * otherwise the CMS contact address as a mailto link, or a plain closed notice. Every string is CMS
  * copy with a repository fallback.
  */

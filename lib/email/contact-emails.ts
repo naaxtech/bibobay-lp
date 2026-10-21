@@ -2,7 +2,7 @@ import { CONTACT_TOPIC_LABELS, type ContactTopic } from "@/lib/contact/fields";
 import { escapeHtml, paragraph, shell, type RenderedEmail } from "./lead-emails";
 
 /**
- * The contact form's one email (rulings R160, R172): an alert to the BIBO Bay staff inbox. Its
+ * The contact form's one email (rulings R192, R204): an alert to the BIBO Bay staff inbox. Its
  * subject carries only the topic label, so no name, address or message text sits in inbox previews
  * and logs. The sender's address is labelled unverified, and unlike the signup alert this one sets
  * the sender as reply-to (lib/outbox/contact.ts), because answering them is the point.

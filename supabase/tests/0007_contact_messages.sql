@@ -1,5 +1,5 @@
 -- pgTAP checks for migration 0008: the contact form's messages and their own outbox (rulings
--- R159, R169, R175).
+-- R191, R201, R207).
 --
 -- Runs in one transaction and rolls back, so it leaves nothing behind. Run against a Supabase
 -- project with `supabase test db` (Task 11); tests/orders/migration-database.test.ts runs it in an
@@ -11,9 +11,9 @@
 -- service_role only; one submit stores one message and exactly one staff alert, and refuses every
 -- out-of-bounds field with 22023 while storing nothing; lengths count characters (code points), as
 -- the form counts them; the claim, the 15-minute lease, the backoff, the final failures and the
--- deferral follow the other outboxes (R169), except that an unconfirmed alert is never parked for its
--- age, only by the attempt cap (R185: a duplicate staff alert is harmless, a lost one is not); there
--- is no skipped status (R175); deleting a message removes its alert; and the lead outbox is as
+-- deferral follow the other outboxes (R201), except that an unconfirmed alert is never parked for its
+-- age, only by the attempt cap (R211: a duplicate staff alert is harmless, a lost one is not); there
+-- is no skipped status (R207); deleting a message removes its alert; and the lead outbox is as
 -- migration 0006 left it.
 
 begin;
@@ -56,7 +56,7 @@ select columns_are(
 select columns_are(
   'public', 'contact_message_deliveries',
   array['id', 'message_id', 'kind', 'status', 'attempts', 'last_attempt_at', 'next_attempt_at', 'provider_message_id', 'last_error_code', 'unconfirmed_since', 'claimed_at', 'created_at', 'updated_at'],
-  'the contact outbox has the lead outbox''s columns, keyed by message (R169)'
+  'the contact outbox has the lead outbox''s columns, keyed by message (R201)'
 );
 
 -- ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ select is(
   'with the stored message and the attempt number'
 );
 select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_a), (select delivery_id from sent_a), 'under the delivery id, which keys its idempotency (contact-delivery/<id>)');
-select is((select result -> 'skipped' from claim_a), '0'::jsonb, 'the claim reports skipped 0: a contact message cannot be withdrawn (R175)');
+select is((select result -> 'skipped' from claim_a), '0'::jsonb, 'the claim reports skipped 0: a contact message cannot be withdrawn (R207)');
 select is((select (result ->> 'expired')::integer from claim_a), 0, 'nothing has expired');
 
 reset role;
@@ -238,7 +238,7 @@ set local role service_role;
 create temp table claim_long3 on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_long)) as result;
 select ok(
   (select jsonb_array_length(result -> 'claimed') = 1 and (result ->> 'expired')::integer = 0 from claim_long3),
-  'an unconfirmed failure is still retried after 23 hours: a duplicate staff alert is harmless, a lost one is not (R185)'
+  'an unconfirmed failure is still retried after 23 hours: a duplicate staff alert is harmless, a lost one is not (R211)'
 );
 select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_long3), 3, 'as its next attempt, under the same row id and so the same idempotency key');
 select is(public.record_contact_delivery_attempt((select delivery_id from sent_long), 'sent', 're_contact_2'), true, 'and its send is recorded');
@@ -263,7 +263,7 @@ select results_eq(
 );
 
 -- The attempt cap, and a key the provider says it has seen with another message. Only the cap makes an
--- unconfirmed contact alert final (R185): this one has been unconfirmed for 30 hours.
+-- unconfirmed contact alert final (R211): this one has been unconfirmed for 30 hours.
 update public.contact_message_deliveries
    set attempts = 7, status = 'failed', last_error_code = 'send_timeout', unconfirmed_since = now() - interval '30 hours'
  where id = (select delivery_id from sent_lf);
@@ -324,7 +324,7 @@ set local role service_role;
 create temp table claim_g on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_g)) as result;
 select ok(
   (select jsonb_array_length(result -> 'claimed') = 1 and (result ->> 'expired')::integer = 0 from claim_g),
-  'a row stuck in sending for 25 hours is claimed again, not parked for its age (R185)'
+  'a row stuck in sending for 25 hours is claimed again, not parked for its age (R211)'
 );
 select is((select (result -> 'claimed' -> 0 ->> 'id')::uuid from claim_g), (select delivery_id from sent_g), 'under the same id, as its next attempt');
 reset role;
@@ -350,7 +350,7 @@ select ok(
 -- ---------------------------------------------------------------------------
 
 set local role service_role;
-select throws_ok($$ select public.record_contact_delivery_attempt(gen_random_uuid(), 'skipped') $$, '22023', 'delivery status is invalid', 'a contact alert is never recorded as skipped (R175)');
+select throws_ok($$ select public.record_contact_delivery_attempt(gen_random_uuid(), 'skipped') $$, '22023', 'delivery status is invalid', 'a contact alert is never recorded as skipped (R207)');
 select throws_ok($$ select public.record_contact_delivery_attempt(gen_random_uuid(), 'sent') $$, '22023', 'provider message id is invalid', 'an accepted send needs the provider''s message id');
 select throws_ok($$ select public.record_contact_delivery_attempt(gen_random_uuid(), 'failed', null, 'reason with spaces and ada@example.com') $$, '22023', 'error code is invalid', 'only short error codes are stored, never provider messages');
 select is(public.record_contact_delivery_attempt(gen_random_uuid(), 'sent', 're_unknown'), false, 'an unknown row records nothing');
@@ -370,7 +370,7 @@ select throws_ok(
 );
 select throws_ok(
   format($$ update public.contact_message_deliveries set status = 'skipped' where id = %L $$, (select delivery_id from sent_h)),
-  '23514', null, 'skipped is not a status of the contact outbox (R175)'
+  '23514', null, 'skipped is not a status of the contact outbox (R207)'
 );
 select throws_ok(
   $$ insert into public.contact_messages (name, email, topic, message) values ('Ada', 'Ada@Example.com', 'press', 'Hello from a parent.') $$,
@@ -393,7 +393,7 @@ delete from public.contact_messages where id = (select message_id from sent_h);
 select is((select count(*)::integer from public.contact_message_deliveries where id = (select delivery_id from sent_h)), 0, 'deleting a message removes its alert');
 
 -- ---------------------------------------------------------------------------
--- The lead outbox is as migration 0006 left it (R169)
+-- The lead outbox is as migration 0006 left it (R201)
 -- ---------------------------------------------------------------------------
 
 select col_not_null('public', 'lead_delivery_events', 'lead_id', 'every lead outbox row still names its lead');

@@ -106,7 +106,7 @@ describe("submitContactMessage", () => {
     expect(CONTACT_RATE_LIMIT).toEqual({ scope: "contact", maxHits: 3, windowSeconds: 600 });
   });
 
-  it("caps all messages per hour under contact:global at the alert's hourly send cap it is given, checked after the client limit (R186)", async () => {
+  it("caps all messages per hour under contact:global at the alert's hourly send cap it is given, checked after the client limit (R212)", async () => {
     const { dependencies, consumed, stored } = setup();
     await submitContactMessage(VALID, dependencies);
     expect(consumed.map(([key]) => key)).toEqual(["contact:k", "contact:global"]);
@@ -125,7 +125,7 @@ describe("submitContactMessage", () => {
     expect(stored).toHaveLength(1);
   });
 
-  it("never stores more messages in an hour than the alert budget can announce (R186)", async () => {
+  it("never stores more messages in an hour than the alert budget can announce (R212)", async () => {
     const { dependencies, stored, logs } = setup({ globalLimitPerHour: 2 });
     const answers = [];
     for (const clientKey of ["a", "b", "c"]) answers.push((await submitContactMessage(VALID, { ...dependencies, clientKey })).status);

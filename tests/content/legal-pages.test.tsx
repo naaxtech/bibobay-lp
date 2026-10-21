@@ -436,7 +436,7 @@ describe("the page for a missing address (review I2)", () => {
   });
 });
 
-describe("while the contact form is open (R164)", () => {
+describe("while the contact form is open (R196)", () => {
   /** What migration 0008 and lib/contact/submit.ts do; the text may claim no more than this. */
   const OPEN_ENV = {
     NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example.com",
@@ -460,7 +460,7 @@ describe("while the contact form is open (R164)", () => {
     expect(open).toMatch(/Please do not include details about a child\./);
   });
 
-  it("says the team receives it by email with the sender's address to reply to, and that the website does not email the sender (R172)", () => {
+  it("says the team receives it by email with the sender's address to reply to, and that the website does not email the sender (R204)", () => {
     expect(open).toMatch(/The BIBO Bay team receives your message by email, with your email address as the address to reply to, so they can answer you\./);
     expect(open).toMatch(/The website does not email you when you send a message\./);
   });
@@ -470,18 +470,18 @@ describe("while the contact form is open (R164)", () => {
     expect(openWithCommerce).toMatch(/Supabase hosts the database where signups, order requests and contact messages are stored\./);
   });
 
-  it("counts messages against the keyed code, by the hour in total, never storing the address (R171)", () => {
+  it("counts messages against the keyed code, by the hour in total, never storing the address (R203)", () => {
     expect(CONTACT_RATE_LIMIT.windowSeconds).toBe(600);
     expect(CONTACT_GLOBAL_RATE_LIMIT.windowSeconds).toBe(3600);
     expect(open).toMatch(/Messages sent through the contact form are counted the same way: against the keyed code in 10-minute windows, and all messages together by the hour\. Those counts are not linked to your message\./);
   });
 
-  it("states no retention period: nothing deletes them automatically and none has been set (R174)", () => {
+  it("states no retention period: nothing deletes them automatically and none has been set (R206)", () => {
     expect(open).toMatch(/Contact messages are kept too, with their email delivery records; nothing deletes them automatically, and no period for keeping them has been set\./);
     expect(open).not.toMatch(/\b\d+\s*(days|months|years)\b/i);
   });
 
-  it("gives the basis: a legitimate interest in replying to people who write to us (R174)", () => {
+  it("gives the basis: a legitimate interest in replying to people who write to us (R206)", () => {
     expect(open).toMatch(/To read and answer a message you send through the contact form\. The legal basis for keeping it is our legitimate interest in replying to people who write to us\./);
   });
 

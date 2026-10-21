@@ -45,7 +45,7 @@ export const CONTACT_FORM_COPY = {
   } satisfies Record<ContactField, Partial<Record<ContactFieldErrorCode, string>>>,
   outcome: {
     /**
-     * Shown for HTTP 429, in place of the server's informational text. R184: the 429 may come from
+     * Shown for HTTP 429, in place of the server's informational text. R210: the 429 may come from
      * the per-client or the global bucket, so it says nothing about the visitor's own connection.
      */
     rateLimited: "A lot of messages are arriving just now. Please wait a few minutes and try again.",

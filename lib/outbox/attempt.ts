@@ -54,7 +54,7 @@ export type OutboxLogEvent<K extends string = string> =
   /**
    * Rows parked for a human: `count` at claim (out of attempts, or, in the signup and order
    * outboxes, unconfirmed past the idempotency window), with the `outbox` whose claim parked them,
-   * since the cron worker logs every outbox under one channel (R185); or one row whose failure was
+   * since the cron worker logs every outbox under one channel (R211); or one row whose failure was
    * final, with its kind and code (review I1: the last attempt, or a code that is final at any
    * attempt).
    */

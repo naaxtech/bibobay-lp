@@ -24,7 +24,7 @@ const strings = (page: typeof SAFE_FALLBACK_CONTACT_PAGE): string[] => [page.seo
 
 beforeEach(() => { vi.mocked(getSanityClient).mockReturnValue(null); });
 
-describe("the contact page content (R158, R163)", () => {
+describe("the contact page content (R190, R195)", () => {
   it("normalises a full document, trimming text", () => {
     expect(normalizeContactPage(FULL)).toEqual({
       seo: { title: "Write to us", description: "A short description." },

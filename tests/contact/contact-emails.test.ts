@@ -26,7 +26,7 @@ describe("buildStaffContactAlert", () => {
     expect(html).toContain("overflow-wrap:anywhere");
   });
 
-  it("labels the address unverified and explains the reply (R172)", () => {
+  it("labels the address unverified and explains the reply (R204)", () => {
     const { html, text } = buildStaffContactAlert(ALERT);
     for (const part of [html, text]) {
       expect(part).toContain("Email (unverified)");

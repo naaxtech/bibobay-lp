@@ -6,11 +6,11 @@ import { CONTACT_LIMITS, CONTACT_TOPICS } from "@/lib/contact/fields";
 import { CONTACT_DELIVERY_KINDS, OUTBOX_FINAL_FAILURE_CODES, OUTBOX_LIMITS, OUTBOX_STATUSES } from "@/lib/outbox/constants";
 
 /*
- * Static policy gate for migration 0008 (the contact form; rulings R159, R169, R175), like the
+ * Static policy gate for migration 0008 (the contact form; rulings R191, R201, R207), like the
  * 0001-0007 gates: it reads the SQL as text, so it runs anywhere without a database. The behaviour
  * is proved by supabase/tests/0007_contact_messages.sql in tests/orders/migration-database.test.ts.
  * This file pins what the TypeScript side relies on to the SQL: the topics, the bounds, the kind,
- * the statuses and the outbox limits, and that the lead outbox is not touched (R169).
+ * the statuses and the outbox limits, and that the lead outbox is not touched (R201).
  */
 const RAW = readFileSync(resolve("supabase/migrations/0008_contact_messages.sql"), "utf8").replaceAll("\r\n", "\n");
 const SQL = RAW.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").toLowerCase();
@@ -97,7 +97,7 @@ describe("migration 0008: tables", () => {
     expect(SQL).toContain("create index if not exists contact_message_deliveries_due_idx on public.contact_message_deliveries (next_attempt_at) where status in ('pending', 'sending', 'failed')");
   });
 
-  it("stores no raw IP address, no user agent and no child data (R159, R162)", () => {
+  it("stores no raw IP address, no user agent and no child data (R191, R194)", () => {
     expect(SQL).not.toMatch(/\b(ip|ip_address|client_ip|remote_addr|inet|user_agent)\b/);
     expect(SQL).not.toMatch(/age_band|child|birth|school/);
   });
@@ -143,13 +143,13 @@ describe("migration 0008: the values the form and the alert rely on", () => {
   });
 });
 
-describe("migration 0008: the contact outbox (R169, R175)", () => {
+describe("migration 0008: the contact outbox (R201, R207)", () => {
   it("lists exactly the contact outbox's kind, by a positive list, and never branches on a kind by elimination", () => {
     expect(listIn(SQL, /constraint contact_message_deliveries_kind_values check \(kind in \(([^)]*)\)\)/)).toEqual([...CONTACT_DELIVERY_KINDS]);
     expect(RAW).not.toMatch(/kind\s*(<>|!=|not in)\s*\(?'/i);
   });
 
-  it("has every outbox status but skipped, which a contact message never needs (R175)", () => {
+  it("has every outbox status but skipped, which a contact message never needs (R207)", () => {
     const statuses = listIn(SQL, /constraint contact_message_deliveries_status_values check \(status in \(([^)]*)\)\)/);
     expect(statuses).toEqual(["pending", "sending", "sent", "failed"]);
     for (const status of statuses) expect(OUTBOX_STATUSES as readonly string[]).toContain(status);
@@ -178,7 +178,7 @@ describe("migration 0008: the contact outbox (R169, R175)", () => {
     expect(body).toContain("for update of delivery skip locked");
   });
 
-  it("parks a contact alert only at the attempt cap, never for the age of an unconfirmed send (R185)", () => {
+  it("parks a contact alert only at the attempt cap, never for the age of an unconfirmed send (R211)", () => {
     const { body } = fn("claim_contact_deliveries");
     // The one park rule: a duplicate staff alert is harmless, a lost one is not.
     expect(body).toContain(`loop if r.attempts >= ${OUTBOX_LIMITS.maxAttempts} then update`);
@@ -233,7 +233,7 @@ describe("migration 0008: functions", () => {
   });
 });
 
-describe("migration 0008 leaves the lead outbox alone (R169)", () => {
+describe("migration 0008 leaves the lead outbox alone (R201)", () => {
   it("never names a lead object", () => {
     expect(RAW).not.toMatch(/\blead_delivery_events\b|\blead_submissions\b|\benqueue_lead_delivery\b|\bclaim_lead_deliveries\b|\brecord_lead_delivery_attempt\b|\bsubmit_lead\b/);
   });

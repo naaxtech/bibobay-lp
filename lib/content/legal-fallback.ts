@@ -35,7 +35,7 @@ import type { PortableContent, SiteSettings } from "./types";
  * a payment link sent later by email, never card details. No retention period is stated: none is
  * set (`orders.retain_until` is inert). tests/content/legal-pages.test.tsx asserts every claim.
  *
- * Contact form (R164, R174): while the form is open (`contactFormOpen()`, passed in by the page so
+ * Contact form (R196, R206): while the form is open (`contactFormOpen()`, passed in by the page so
  * this file never reaches the server-only availability check) the text also says what a message
  * stores (supabase/migrations/0008_contact_messages.sql: `contact_messages`, with its delivery
  * records in `contact_message_deliveries`; the fields in lib/contact/fields.ts), that the team
@@ -55,7 +55,7 @@ const paragraph = (text: string): PortableContent[number] => ({ _type: "block", 
 /** Blocks that appear only while commerce is on. */
 const whenSelling = (commerce: boolean, ...blocks: Array<() => PortableContent[number]>): PortableContent => (commerce ? blocks.map((block) => block()) : []);
 
-/** Blocks that appear only while the contact form is open (R164). */
+/** Blocks that appear only while the contact form is open (R196). */
 const whenContactOpen = whenSelling;
 
 /** What the database stores, for the sentence naming Supabase. */
@@ -254,7 +254,7 @@ export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ priva
  * The fallback text for the site's commerce switch and removal channel (Ruling R125). Only a
  * literal `true` counts as commerce on. With no removal channel (no email sending, no contact
  * address) the text is the frozen no-channel text and promises nothing; otherwise the removal
- * sentences name the channel that exists. `contactOpen` (the page's `contactFormOpen()`, R164) adds
+ * sentences name the channel that exists. `contactOpen` (the page's `contactFormOpen()`, R196) adds
  * what the contact form stores; it is false by default, so the frozen texts stay as they were.
  * `env` is injectable for tests.
  */

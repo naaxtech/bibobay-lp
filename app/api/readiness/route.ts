@@ -29,7 +29,7 @@ const contactSettings = (): Promise<Pick<SiteSettings, "contactEmail">> =>
  * Readiness (ruling R37): 200 when Sanity, lead storage, revalidation and (P-I1, Ruling R125) a way
  * to ask for removal (email sending or the CMS contact address) are configured, else 503. The body is
  * booleans only (`leadRemovalChannel` is the removal channel; `contact` is whether the contact
- * form is open, R173). Email on its own, the contact form and reviewed legal text are reported but
+ * form is open, R205). Email on its own, the contact form and reviewed legal text are reported but
  * not required.
  */
 export async function GET() {

@@ -23,7 +23,7 @@ import type { ContactLogEvent, ContactSubmissionDependencies } from "./submit";
  *
  * Storage counts as configured only with the Supabase URL, the server key AND the secret that
  * hashes client addresses for the shared rate limit (`LEAD_IP_HASH_SECRET`, at least 32
- * characters), as for signups. The form is open only when `contactFormOpen` holds (R173); the
+ * characters), as for signups. The form is open only when `contactFormOpen` holds (R205); the
  * alert is attempted after the answer only with storage, email sending and a staff address.
  */
 
@@ -47,7 +47,7 @@ export function createContactDependencies(request: Request, env: Record<string, 
   const staffEmail = getStaffNotificationEmail(env);
   const repository = client ? createSupabaseContactRepository(client) : null;
   const rateLimiter = client ? createSupabaseRateLimiter(client) : null;
-  // R170, R186: one hourly cap for the alert's send budget AND for all messages together.
+  // R202, R212: one hourly cap for the alert's send budget AND for all messages together.
   const sendLimitPerHour = ackSendLimitPerHour(env);
   return {
     open: contactFormOpen(env),
@@ -57,7 +57,7 @@ export function createContactDependencies(request: Request, env: Record<string, 
     globalLimitPerHour: sendLimitPerHour,
     log: logContactEvent,
     // The alert is attempted after the answer through the outbox's claim, spending its own send
-    // budget (R170); without storage, email or a staff address the row waits for the worker.
+    // budget (R202); without storage, email or a staff address the row waits for the worker.
     sendAlert:
       repository && rateLimiter && email && staffEmail
         ? createContactAlertSender(

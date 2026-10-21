@@ -53,7 +53,7 @@ describe("seeded tokenless published landing read", () => {
     expect(settings).toEqual(SAFE_FALLBACK_SETTINGS);
   });
 
-  it("publishes the repository's contact page copy through the real GROQ, with no fallback substitution (R163)", async () => {
+  it("publishes the repository's contact page copy through the real GROQ, with no fallback substitution (R195)", async () => {
     const raw = await publicRead(CONTACT_PAGE_QUERY) as Record<string, unknown>;
     expect(raw).toMatchObject({ _id: "contactPage", heading: "Contact us" });
     expect(normalizeContactPage(raw)).toEqual(SAFE_FALLBACK_CONTACT_PAGE);

@@ -38,8 +38,8 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `SUPABASE_SERVICE_ROLE_KEY` | server | for lead storage | Supabase project | Calls the lead functions. Never public; a publishable key here is refused. |
 | `RESEND_API_KEY` | server | optional (email) | Resend account | Sends acknowledgements and staff alerts. Without it they wait in the outbox. |
 | `RESEND_FROM` | server | with `RESEND_API_KEY` | Resend account | Sender on a verified domain, e.g. `BIBO Bay <hello@example.com>`. No fallback sender. |
-| `RESEND_REPLY_TO` | server | optional | BIBO Bay owner | Where replies (removal requests) go; default: the sender. The contact staff alert ignores it: its Reply-To is the sender's address (R172). |
-| `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up) and for each contact message's alert. It also opens the contact form: without it the form is closed (R173). |
+| `RESEND_REPLY_TO` | server | optional | BIBO Bay owner | Where replies (removal requests) go; default: the sender. The contact staff alert ignores it: its Reply-To is the sender's address (R204). |
+| `STAFF_NOTIFICATION_EMAIL` | server | optional | BIBO Bay owner | Inbox for new-signup alerts (queued even before Resend is set up) and for each contact message's alert. It also opens the contact form: without it the form is closed (R205). |
 | `LEAD_IP_HASH_SECRET` | server | for lead storage | BIBO Bay owner (random, 32+ characters) | Keys the rate-limit hash of client addresses. Without it leads are not stored (503); a production build fails with a shorter one. Also keys the signed links for the free download (lib/freebies/token.ts); rotating it invalidates every download link already emailed (up to 30 days) and the one on any open page. The contact form is open only with a valid one, and its rate limit is keyed by it too. |
 | `LEAD_ACK_SEND_LIMIT_PER_HOUR` | server | optional | BIBO Bay owner | Hourly cap on emails sent straight away, applied PER MESSAGE KIND (final review D-I1): the lead acknowledgement, lead staff alert, order acknowledgement and order staff alert each have their own bucket (`send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`), staff quotes their own (`send:quote`), and the contact staff alert its own (`send:contact_staff_alert`), all with this cap (1 to 10000, default 60). A full bucket defers only its own kind: a flood of signups cannot hold back a quote. |
 | `PAYMENT_HOST_ALLOWLIST` | server | for staff quotes | BIBO Bay owner | Comma-separated exact host names of the payment providers a quote's payment link may point to, e.g. `pay.example.com,checkout.example.net` (no `https://`, no wildcards; a subdomain needs its own entry). Empty: staff cannot save any quote. An entry that is not one exact host fails `verify-env` (Task 8b). |
@@ -118,7 +118,7 @@ failure, the hourly send cap, or Resend not yet configured.
   still unconfirmed after that retry, or left unconfirmed by a daily run, is parked at the next run
   as `delivery_expired` for a human (nothing is claimed as sent; see
   [incident-runbook.md](incident-runbook.md#parked-emails)). The worker needs no other change,
-  since every run claims only rows that are due. Contact staff alerts are the exception (R185): an
+  since every run claims only rows that are due. Contact staff alerts are the exception (R211): an
   unconfirmed contact alert is never parked for its age. It is retried at every run under the same
   idempotency key (once the provider has forgotten the key, as a new send) until its eighth
   attempt, because staff receiving an alert twice is harmless and a lost alert leaves a stored
@@ -203,10 +203,10 @@ Handling a request: [incident-runbook.md](incident-runbook.md#removal-requests).
 
 ## Contact form
 
-`/contact` and `POST /api/contact` (rulings R158-R177) take messages only while the contact form is open,
+`/contact` and `POST /api/contact` (rulings R190-R209) take messages only while the contact form is open,
 and the contact form is open only when Supabase is configured (the project URL and a server key that is
 not a publishable one), email sending is configured (`RESEND_API_KEY` and `RESEND_FROM`),
-`STAFF_NOTIFICATION_EMAIL` is set and `LEAD_IP_HASH_SECRET` is a valid secret of 32+ characters (R173).
+`STAFF_NOTIFICATION_EMAIL` is set and `LEAD_IP_HASH_SECRET` is a valid secret of 32+ characters (R205).
 It adds no environment name. `/api/readiness` reports the answer as `contact`; `contact` never changes
 `ready`.
 
@@ -214,20 +214,20 @@ It adds no environment name. `/api/readiness` reports the answer as `contact`; `
   closed notice, and is `noindex` in the second case. The footer link is hidden, the sitemap leaves the
   page out when it is the closed notice, and the API answers 503 `{ "ok": false, "persisted": false,
   "closed": true }` and stores nothing.
-- **Removed later (R177).** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued, their
+- **Removed later (R209).** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued, their
   alerts wait (the worker claims no contact alert without a staff address, so none is parked), readiness
   shows `contact: false` and the form closes. Removing the Resend key does the same: the worker answers
   503 while Resend is unconfigured, so the alerts wait. Setting them again lets the next cron run send
   them ([Email outbox worker](#email-outbox-worker-task-8a)).
 - **Limits and budget.** 3 messages per 10 minutes per client and, in all, as many per hour as the
-  alert's send cap (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R186), in the buckets `contact:<hmac>`
+  alert's send cap (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R212), in the buckets `contact:<hmac>`
   and `contact:global`; the alert spends `send:contact_staff_alert`, capped by the same value, so the
   form never stores more messages in an hour than their alerts can announce. The alert is attempted
   right after the answer; the cron worker is only the retry net, and retries an unconfirmed alert
-  until its eighth attempt rather than parking it (R185).
+  until its eighth attempt rather than parking it (R211).
 - **Reading a message.** In the alert email (Reply-To is the sender, labelled unverified), or by SQL when
   an alert is parked, which happens only after its eighth attempt or on `invalid_idempotent_request`
-  (R185; [incident-runbook.md](incident-runbook.md#contact-messages)).
+  (R211; [incident-runbook.md](incident-runbook.md#contact-messages)).
 
 ## Contact form: steps after merge
 
@@ -322,7 +322,7 @@ fails to build. CI has no secrets and checks names, strings and token shapes onl
 | `e2e` (after `verify`) | `npm ci` only, as Vercel installs (so it proves the site builds without the Studio: `next build` type-checks `tsconfig.build.json`, which leaves tests out), Playwright Chromium, `npm run build`, `next start` on 127.0.0.1:3000 with a wait on `/api/health`, `npx playwright test` with `E2E_PRODUCTION=1`, then `npm run verify:deployment -- http://127.0.0.1:3000 --browser`; the Playwright report and traces are uploaded on failure |
 | `e2e-commerce` (after `verify`) | The commerce-on browser run (ruling R130): copies the checkout without `.git` and `node_modules` to `../commerce-copy`, `node scripts/e2e/enable-commerce-fixture.mjs ../commerce-copy` (the script refuses any folder inside a git work tree), then in the copy `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3100 -H 127.0.0.1` with a wait on `/api/health`, and `E2E_PRODUCTION=1 E2E_COMMERCE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npx playwright test e2e/shop e2e/commerce`; the report is uploaded on failure as `playwright-report-commerce` |
 | `e2e-keyed` (after `verify`) | The analytics and Sentry browser run (ruling R130): `npm ci`, Playwright Chromium, `npm run build` with the placeholder `NEXT_PUBLIC_POSTHOG_KEY=phc_e2eplaceholder0000000000000000000000000`, `NEXT_PUBLIC_POSTHOG_HOST=https://ph.example.com` and `NEXT_PUBLIC_SENTRY_DSN=https://0123456789abcdef0123456789abcdef@o0.ingest.example.com/1`, `next start -p 3200 -H 127.0.0.1` with the placeholder `CRON_SECRET=e2e-placeholder-cron-secret-0123456789abcdef`, and `E2E_PRODUCTION=1 E2E_ANALYTICS=1 E2E_SENTRY=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test e2e/analytics e2e/observability`; the report is uploaded on failure as `playwright-report-keyed` |
-| `e2e-contact` (after `verify`) | The contact form open (ruling R187), so the open-form contact specs never sit skipped: `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3300 -H 127.0.0.1` with the placeholder contact environment `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` (no secret; every page renders per request, so the form's open condition is read at start), and `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact`; every `/api/contact` call is answered by Playwright; the report is uploaded on failure as `playwright-report-contact` |
+| `e2e-contact` (after `verify`) | The contact form open (ruling R213), so the open-form contact specs never sit skipped: `npm ci`, Playwright Chromium, `npm run build`, `next start -p 3300 -H 127.0.0.1` with the placeholder contact environment `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` (no secret; every page renders per request, so the form's open condition is read at start), and `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3300 npx playwright test e2e/contact`; every `/api/contact` call is answered by Playwright; the report is uploaded on failure as `playwright-report-contact` |
 
 The end-to-end tests never reach a real service: every lead, contact and order request is mocked or
 answered by the fixture, every PostHog and Sentry request goes to a reserved example domain that

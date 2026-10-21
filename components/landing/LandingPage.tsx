@@ -13,7 +13,7 @@ export interface LandingPageProps {
   settings: SiteSettings;
   /** The founding-family form for the lead section; omitted, the section shows its CMS copy only. */
   leadForm?: ReactNode;
-  /** The contact form is open (R158); the footer then links to /contact. */
+  /** The contact form is open (R190); the footer then links to /contact. */
   contactOpen?: boolean;
 }
 

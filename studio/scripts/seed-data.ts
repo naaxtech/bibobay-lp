@@ -104,7 +104,7 @@ export function buildSeedDocuments(): SeedDocument[] {
     orderConsentCopy: "I am an adult, and I agree that BIBO Bay may use these details to answer this order request, send me a quote and deliver the order if I go ahead.",
     orderConsentCopyVersion: "order-1",
   };
-  // R158, R163: the same strings as SAFE_FALLBACK_CONTACT_PAGE (tests/content/studio-contract.test.ts).
+  // R190, R195: the same strings as SAFE_FALLBACK_CONTACT_PAGE (tests/content/studio-contract.test.ts).
   const contactPage: SeedDocument = {
     _id: "contactPage", _type: "contactPage",
     seo: seo("Contact BIBO Bay", "Write to the BIBO Bay team with a question, a partnership idea or a press enquiry."),

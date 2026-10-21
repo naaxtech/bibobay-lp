@@ -4,13 +4,13 @@ import type { ContactDeliveryKind } from "./constants";
 import type { ClaimedContactDelivery, ContactDeliveryOutbox } from "./types";
 
 /**
- * The contact outbox as an attempt channel (rulings R160, R169): a claimed row becomes the staff
- * alert for one message, addressed to the staff inbox with the sender as reply-to (R172). The
+ * The contact outbox as an attempt channel (rulings R192, R201): a claimed row becomes the staff
+ * alert for one message, addressed to the staff inbox with the sender as reply-to (R204). The
  * provider idempotency key is the row id, `contact-delivery/<row id>`. The message depends on the
  * row alone, so every attempt builds the same email; no email ever goes to the sender.
  */
 export interface ContactChannelSettings {
-  /** Null: no alert is claimed or sent, and the rows wait (R177). */
+  /** Null: no alert is claimed or sent, and the rows wait (R209). */
   staffEmail: string | null;
 }
 
@@ -27,7 +27,7 @@ export function contactAlertChannel(outbox: ContactDeliveryOutbox, settings: Con
     idempotencyKey: (item) => `contact-delivery/${item.id}`,
     build(item) {
       if (!settings.staffEmail) return null;
-      // R172: the documented exception to review M3. The address is unverified and labelled so in the body.
+      // R204: the documented exception to review M3. The address is unverified and labelled so in the body.
       return { to: [settings.staffEmail], replyTo: item.email, ...buildStaffContactAlert(item) };
     },
   };

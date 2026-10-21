@@ -12,7 +12,7 @@ import { UI_COPY } from "./ui-copy";
 
 export interface FooterProps {
   settings: SiteSettings;
-  /** The contact form is open (R158, `contactFormOpen()`); only then does the footer link to /contact. */
+  /** The contact form is open (R190, `contactFormOpen()`); only then does the footer link to /contact. */
   contactOpen?: boolean;
 }
 
@@ -22,7 +22,7 @@ const TRACK_PATH = "/track";
 /**
  * Navy band with the canonical logo, the CMS footer copy and legal links, led by the shop link while
  * commerce is on (spec §10, Task 7b) and the tracking link while tracking is also on (Task 7c).
- * then the contact page link while its form is open (R158), before the legal links. Social links come
+ * then the contact page link while its form is open (R190), before the legal links. Social links come
  * only from verified settings, and the contact address appears only when one is configured.
  */
 export function Footer({ settings, contactOpen = false }: FooterProps) {

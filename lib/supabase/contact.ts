@@ -8,7 +8,7 @@ import { batchFrom, isAttempt, isText, isUuid, outcomeArguments, recordedFrom } 
 import { RpcError, callRpc, firstRow, type RpcClient } from "./rpc";
 
 /**
- * The contact form's storage and its own outbox (rulings R159, R169) through the service-role RPCs
+ * The contact form's storage and its own outbox (rulings R191, R201) through the service-role RPCs
  * of migration 0008. A message and its staff alert are written by one RPC in one transaction; the
  * alert is then claimed and recorded like any other outbox row. Every claimed entry is rebuilt from
  * its locked keys and checked, so a changed database answer can never put an unvetted value into

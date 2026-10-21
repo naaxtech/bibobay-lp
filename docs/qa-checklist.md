@@ -43,7 +43,7 @@ build (no `'unsafe-eval'` in the CSP). The expected heading is the repository fa
 deployment with Sanity content, use the published hero heading or leave the flag out.
 
 This keyless run skips the commerce-on, analytics, Sentry and open-contact-form specs, which need a
-differently built or started server. CI runs them as three more jobs (`e2e-commerce`, `e2e-keyed` and `e2e-contact`, rulings R130 and R187;
+differently built or started server. CI runs them as three more jobs (`e2e-commerce`, `e2e-keyed` and `e2e-contact`, rulings R130 and R213;
 [deployment.md](deployment.md#continuous-integration)); run them by hand like this when you want them
 locally. Each uses a free port in place of 3260, 3261 and 3262, and each needs `npm ci` in the folder it builds.
 

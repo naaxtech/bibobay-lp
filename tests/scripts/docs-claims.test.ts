@@ -26,7 +26,7 @@ const section = (markdown: string, heading: string) => {
   return next < 0 ? markdown.slice(start) : markdown.slice(start, start + 3 + next);
 };
 
-/** Every send bucket of every outbox (leads, orders and the contact alert), so a new outbox cannot go undocumented (R165 #17). */
+/** Every send bucket of every outbox (leads, orders and the contact alert), so a new outbox cannot go undocumented (R197 #17). */
 const ALL_SEND_BUDGETS = Object.values(SEND_BUDGETS).flatMap((budgets) => Object.values(budgets));
 
 describe("operations docs", () => {
@@ -412,14 +412,14 @@ describe("final fix wave docs (rulings R130 to R134, findings O-I1 to O-I8)", ()
 });
 
 /*
- * The contact form docs (rulings R158-R177): each claim is pinned to the code it describes, so the
+ * The contact form docs (rulings R190-R209): each claim is pinned to the code it describes, so the
  * docs cannot drift from the route, the migration or the worker.
  */
-describe("contact form docs (R158-R177)", () => {
+describe("contact form docs (R190-R209)", () => {
   const flat = (text: string) => text.replace(/\s+/g, " ");
   const lines = (file: string) => read(file).split(/\r?\n/);
 
-  it("documents the readiness key, the staff address that opens the form, and the open condition (R161, R173)", () => {
+  it("documents the readiness key, the staff address that opens the form, and the open condition (R193, R205)", () => {
     expect(read("lib/ops/readiness.ts")).toContain("contact: boolean");
     const deployment = read("docs/deployment.md");
     const readinessRow = lines("docs/deployment.md").find((line) => line.startsWith("| `GET /api/readiness` |")) ?? "";
@@ -431,20 +431,20 @@ describe("contact form docs (R158-R177)", () => {
     expect(deployment).toContain("`/api/contact`");
   });
 
-  it("names the contact tables, functions, buckets and limits in the database doc (R159, R169-R171, R175)", () => {
+  it("names the contact tables, functions, buckets and limits in the database doc (R191, R201-R203, R207)", () => {
     const database = read("docs/database-security.md");
     for (const name of ["contact_messages", "contact_message_deliveries", "submit_contact_message", "claim_contact_deliveries", "record_contact_delivery_attempt", "contact:global", "contact:<HMAC of the client address>"]) {
       expect(database, name).toContain(`\`${name}\``);
     }
     expect(database).toContain("`send:contact_staff_alert`");
     expect(database).toMatch(/\| Contact messages per client \| `contact:<HMAC of the client address>` \| 3 per 10 minutes/);
-    expect(database).toMatch(/\| Contact messages in all \| `contact:global` \| `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\) from everyone together, the contact alert's own send cap \(R186\)/);
+    expect(database).toMatch(/\| Contact messages in all \| `contact:global` \| `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\) from everyone together, the contact alert's own send cap \(R212\)/);
     expect(flat(database)).toMatch(/no `skipped` status[^.]*"skipped": 0/);
     expect(flat(database)).toMatch(/lead outbox[^.]*not altered/i);
     expect(read("supabase/migrations/0008_contact_messages.sql")).toContain("create table if not exists public.contact_message_deliveries");
   });
 
-  it("states the limits the code enforces (R171, R186)", () => {
+  it("states the limits the code enforces (R203, R212)", () => {
     const submit = read("lib/contact/submit.ts");
     expect(submit).toContain('{ scope: "contact", maxHits: 3, windowSeconds: 600 }');
     expect(submit).toContain('{ key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds }');
@@ -454,7 +454,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(flat(read("docs/architecture.md"))).toMatch(/3 per 10 minutes per hashed client, then LEAD_ACK_SEND_LIMIT_PER_HOUR \(default 60, the alert's own send cap\) per hour in all/);
   });
 
-  it("documents the contact events, the route failure and every contact warning that reaches Sentry (R166)", () => {
+  it("documents the contact events, the route failure and every contact warning that reaches Sentry (R198)", () => {
     const observability = read("docs/observability.md");
     const warning = /_(failed|unavailable|unconfigured|invalid)$/;
     const reported = [...read("lib/contact/submit.ts").matchAll(/\{ event: "(\w+)"/g)].map((match) => match[1]!).filter((event) => warning.test(event));
@@ -467,7 +467,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(observability).toContain("`send:contact_staff_alert`");
   });
 
-  it("documents the Contact page document, the footer label and 33 seeded documents (R158, R163)", () => {
+  it("documents the Contact page document, the footer label and 33 seeded documents (R190, R195)", () => {
     const cms = read("docs/cms-operations.md");
     expect(cms).toContain("`contactPage`");
     expect(cms).toContain("`contactPageLabel`");
@@ -478,7 +478,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(flat(cms)).toMatch(/after a schema change[^.]*redeploy/i);
   });
 
-  it("describes the routes, the contact flow and the worker's three outboxes in the architecture doc (R158-R161, R169)", () => {
+  it("describes the routes, the contact flow and the worker's three outboxes in the architecture doc (R190-R193, R201)", () => {
     const architecture = read("docs/architecture.md");
     const rows = lines("docs/architecture.md");
     expect(rows.some((line) => line.startsWith("| `/contact` |"))).toBe(true);
@@ -489,7 +489,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(flat(architecture)).toMatch(/Reply-To[^.]*sender/);
   });
 
-  it("adds the contact messages to the data-protection record, its legal-review question and retention item (R164, R174)", () => {
+  it("adds the contact messages to the data-protection record, its legal-review question and retention item (R196, R206)", () => {
     const text = read("docs/data-protection.md");
     expect(text).toContain("`contact_messages`");
     expect(text).toContain("`contact_message_deliveries`");
@@ -501,7 +501,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(flat(text.slice(text.indexOf("## Handling a request from a person")))).toMatch(/delete from public\.contact_messages[^]*delivery rows cascade|cascade[^]*contact_messages/i);
   });
 
-  it("tells staff how to find a parked contact alert and read the message (R168, R177)", () => {
+  it("tells staff how to find a parked contact alert and read the message (R200, R209)", () => {
     const runbook = read("docs/incident-runbook.md");
     expect(runbook).toContain("contact_message_deliveries");
     expect(runbook).toContain("'infinity'");
@@ -510,7 +510,7 @@ describe("contact form docs (R158-R177)", () => {
     expect(flat(runbook)).toMatch(/contact-delivery\/<row id>/);
   });
 
-  it("adds a contact-open run to the QA checklist (R167)", () => {
+  it("adds a contact-open run to the QA checklist (R199)", () => {
     const qa = read("docs/qa-checklist.md");
     expect(qa).toContain("E2E_CONTACT_OPEN=1");
     expect(qa).toContain("e2e/contact");
@@ -522,19 +522,19 @@ describe("contact form docs (R158-R177)", () => {
     const changelog = read("CHANGELOG.md");
     const head = changelog.slice(changelog.indexOf("## 2026-10-21"), changelog.indexOf("## 2026-10-21", changelog.indexOf("## 2026-10-21") + 5));
     expect(head).toMatch(/^## 2026-10-21 — Contact form/);
-    expect(head).toContain("R158-R177");
+    expect(head).toContain("R190-R209");
     expect(changelog.indexOf("## 2026-10-21 — Contact form")).toBeLessThan(changelog.indexOf("## 2026-10-21 — Email cron back"));
     expect(flat(read("docs/deployment.md"))).toMatch(/0008_contact_messages\.sql/);
     expect(flat(read("docs/deployment.md"))).toMatch(/Contact form: steps after merge/);
   });
 
-  it("covers the deployment verifier's contact checks as built (R167)", () => {
+  it("covers the deployment verifier's contact checks as built (R199)", () => {
     expect(read("scripts/lib/deployment-checks.ts")).toContain('FORM_API_PATHS = ["/api/leads", "/api/contact"]');
     expect(flat(read("docs/deployment.md"))).toMatch(/fetches `\/`, `\/privacy`, `\/terms`, `\/thank-you` and `\/contact`/);
     expect(flat(read("docs/deployment.md"))).toMatch(/blocks and fails any request to `\/api\/leads` or `\/api\/contact`/);
   });
 
-  it("names every doc that says once a day in the restore sentence (R176)", () => {
+  it("names every doc that says once a day in the restore sentence (R208)", () => {
     const sentence = flat(read("docs/deployment.md")).match(/change every file that says once a day, which are[^]*?and the tests in `tests\/scripts`/)?.[0] ?? "";
     expect(sentence).not.toBe("");
     const files = ["README.md", ...readdirSync(resolve("docs")).filter((name) => name.endsWith(".md")).map((name) => `docs/${name}`)];
@@ -544,13 +544,13 @@ describe("contact form docs (R158-R177)", () => {
     for (const file of saying) expect(sentence, file).toContain(`\`${file}\``);
   });
 
-  it("says the overall contact limit is the alert's send cap, with no fixed number, everywhere it is described (R186)", () => {
+  it("says the overall contact limit is the alert's send cap, with no fixed number, everywhere it is described (R212)", () => {
     for (const file of ["docs/deployment.md", "docs/database-security.md", "docs/observability.md", "docs/architecture.md", "CHANGELOG.md"]) {
       expect(read(file), file).not.toMatch(/100 per hour|100 messages in an hour/);
     }
-    expect(read("docs/superpowers/plans/2026-10-21-contact-form.md")).toMatch(/\*\*R171 Rate limits\.\*\*[^\n]*superseded by R186/);
-    expect(flat(read("docs/deployment.md"))).toMatch(/3 messages per 10 minutes per client and, in all, as many per hour as the alert's send cap \(`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R186\)/);
-    expect(read("docs/observability.md")).toMatch(/`global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\), the alert's own send cap, R186/);
+    expect(read("docs/superpowers/plans/2026-10-21-contact-form.md")).toMatch(/\*\*R203 Rate limits\.\*\*[^\n]*superseded by R212/);
+    expect(flat(read("docs/deployment.md"))).toMatch(/3 messages per 10 minutes per client and, in all, as many per hour as the alert's send cap \(`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R212\)/);
+    expect(read("docs/observability.md")).toMatch(/`global` for the overall one, `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour \(default 60\), the alert's own send cap, R212/);
     // The privacy text names no number: the cap is an operator setting.
     const legal = read("lib/content/legal-fallback.ts");
     const paragraph = legal.slice(legal.indexOf("Messages sent through the contact form are counted"), legal.indexOf("Those counts are not linked to your message."));
@@ -558,22 +558,22 @@ describe("contact form docs (R158-R177)", () => {
     expect(paragraph.slice(paragraph.indexOf("all messages together"))).not.toMatch(/\d/);
   });
 
-  it("says a contact alert is parked only at the attempt cap, never for the age of an unconfirmed send (R185)", () => {
-    expect(flat(read("docs/deployment.md"))).toMatch(/Contact staff alerts are the exception \(R185\): an unconfirmed contact alert is never parked for its age/);
+  it("says a contact alert is parked only at the attempt cap, never for the age of an unconfirmed send (R211)", () => {
+    expect(flat(read("docs/deployment.md"))).toMatch(/Contact staff alerts are the exception \(R211\): an unconfirmed contact alert is never parked for its age/);
     const database = flat(section(read("docs/database-security.md"), "Contact messages (migration 0008)"));
     expect(database).not.toMatch(/retried only within 23 hours/);
-    expect(database).toMatch(/an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt \(R185\)/);
+    expect(database).toMatch(/an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt \(R211\)/);
     const runbook = read("docs/incident-runbook.md");
     expect(flat(section(runbook, "Parked emails"))).toMatch(/\*\*`stale_unconfirmed`\*\*: a signup or order email whose outcome is unknown/);
-    expect(flat(section(runbook, "Contact messages"))).toMatch(/A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` \(R185\)/);
+    expect(flat(section(runbook, "Contact messages"))).toMatch(/A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` \(R211\)/);
     const observability = flat(read("docs/observability.md"));
-    expect(observability).toMatch(/A `delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an `invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send \(R185\)/);
+    expect(observability).toMatch(/A `delivery_expired` for that kind means an alert is parked for a person after its eighth attempt or an `invalid_idempotent_request`; a contact alert is never parked for the age of an unconfirmed send \(R211\)/);
     expect(observability).toMatch(/as a count, with the `outbox` whose claim parked them/);
-    for (const file of ["docs/observability.md", "docs/database-security.md"]) expect(flat(read(file)), file).toMatch(/A contact staff alert is re-sent whatever its age, until its eighth attempt \(R185\)/);
-    expect(read("CHANGELOG.md").slice(0, read("CHANGELOG.md").indexOf("## 2026-10-21 — Email cron back"))).toContain("R185");
+    for (const file of ["docs/observability.md", "docs/database-security.md"]) expect(flat(read(file)), file).toMatch(/A contact staff alert is re-sent whatever its age, until its eighth attempt \(R211\)/);
+    expect(read("CHANGELOG.md").slice(0, read("CHANGELOG.md").indexOf("## 2026-10-21 — Email cron back"))).toContain("R211");
   });
 
-  it("documents the contact-open CI job with the workflow's own command and environment, and the same in the QA checklist (R187)", () => {
+  it("documents the contact-open CI job with the workflow's own command and environment, and the same in the QA checklist (R213)", () => {
     const workflow = parse(read(".github/workflows/ci.yml")) as { jobs: Record<string, { steps: Array<{ run?: string; env?: Record<string, string> }> }> };
     const start = workflow.jobs["e2e-contact"]!.steps.find((step) => step.run?.includes("next start"))!.env!;
     const row = lines("docs/deployment.md").find((line) => line.startsWith("| `e2e-contact` (after `verify`) |")) ?? "";

@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page, type Request, type Route 
 import { CONTACT_FORM_COPY } from "@/components/forms/contact-copy";
 
 /*
- * The contact page and form in a real browser (R158, R161, R167).
+ * The contact page and form in a real browser (R190, R193, R199).
  *
  * Like e2e/leads (ruling R39): no test here ever sends a request to the real `/api/contact`.
  * Whatever server the suite runs against, a real request could store a message and send a staff
@@ -27,7 +27,7 @@ const VIEWPORTS = [
 
 // The CMS copy is the repository fallback's (lib/content/fallback.ts; the e2e server has no Sanity
 // project). It stays literal here because that module imports a JSON manifest, which the specs read
-// from disk rather than import. The form's chrome is imported from the code that renders it (R184).
+// from disk rather than import. The form's chrome is imported from the code that renders it (R210).
 const SUCCESS = "Thank you. We have received your message.";
 const ERROR = "We could not save your message. Please try again.";
 const CLOSED = "The contact form is not open yet, so no message can be saved from this page. Please check back soon.";
@@ -69,7 +69,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 test.afterEach(async ({ context }) => {
-  expect(unroutedRequests.get(context), "a contact request was not routed by the test (R39, R167)").toEqual([]);
+  expect(unroutedRequests.get(context), "a contact request was not routed by the test (R39, R199)").toEqual([]);
 });
 
 /** Every request the page makes to the contact route. */

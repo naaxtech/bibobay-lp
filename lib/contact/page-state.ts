@@ -1,7 +1,7 @@
 import type { SiteSettings } from "@/lib/content/types";
 
 /**
- * What /contact shows (R158, R161). The form while it is open; otherwise the CMS contact address as
+ * What /contact shows (R190, R193). The form while it is open; otherwise the CMS contact address as
  * a mailto link when one is set; otherwise a closed notice. Pure, so the metadata and the sitemap
  * can use it without reaching the server-only availability check: callers pass `open` in.
  */

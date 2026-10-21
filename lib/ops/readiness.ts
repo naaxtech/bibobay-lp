@@ -32,7 +32,7 @@ export interface Readiness {
    */
   leadRemovalChannel: boolean;
   /**
-   * The contact form is open (R173): lead storage, email sending, a staff address and the hash
+   * The contact form is open (R205): lead storage, email sending, a staff address and the hash
    * secret. Reported; not required, so `ready` is unchanged.
    */
   contact: boolean;

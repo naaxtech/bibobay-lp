@@ -138,7 +138,7 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
   };
 }
 /**
- * R158, R163: field by field over the repository copy; a success message that claims delivery is replaced (C7, R160).
+ * R190, R195: field by field over the repository copy; a success message that claims delivery is replaced (C7, R192).
  * In a Studio preview each text keeps its click-to-edit payload, and `text` judges emptiness on the
  * plain words and leaves the payload only at the end, so the claim check reads the editor's words.
  */

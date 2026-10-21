@@ -15,7 +15,7 @@ async function commerceRoutes(settings: SiteSettings): Promise<string[]> {
   return [SHOP_PATH, ...products.filter((product) => product.seo?.noIndex !== true).map(productPath)];
 }
 
-/** R158: /contact is listed when it offers a way to reach the team (the open form, or a CMS address) and the CMS allows indexing. */
+/** R190: /contact is listed when it offers a way to reach the team (the open form, or a CMS address) and the CMS allows indexing. */
 async function contactListed(settings: SiteSettings): Promise<boolean> {
   if (contactPageState(contactFormOpen(), settings).kind === "closed") return false;
   return (await getContactPage()).seo.noIndex !== true;
@@ -24,7 +24,7 @@ async function contactListed(settings: SiteSettings): Promise<boolean> {
 /**
  * Ruling R35: the home page, plus the legal pages once their Sanity text is reviewed, plus (Task 7b)
  * the shop and its listed products while commerce is on. The catalogue is not read otherwise. The
- * contact page joins them while someone can be reached through it (R158).
+ * contact page joins them while someone can be reached through it (R190).
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [settings, legal] = await Promise.all([getSiteSettings(), getLegalSettings()]);

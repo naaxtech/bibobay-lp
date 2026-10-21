@@ -14,18 +14,18 @@ import type { ContactRepository } from "./types";
  *   → (after the answer) the staff alert
  *
  * `persisted: true` only after the database confirmed the message and its outbox row in one
- * transaction (R159, R169). Nothing is sent before the answer; once it has gone out, the one staff
+ * transaction (R191, R201). Nothing is sent before the answer; once it has gone out, the one staff
  * alert is attempted through the outbox's shared claim, and the cron worker retries what is left.
- * No email goes to the sender (R160), and no message here says anything was emailed.
+ * No email goes to the sender (R192), and no message here says anything was emailed.
  */
 
 /** Largest request body the contact route reads: a 3,000-character message of 4-byte characters fits. */
 export const CONTACT_BODY_LIMIT_BYTES = 32 * 1024;
 
-/** Three messages per client per ten minutes, shared by every server instance (R171). */
+/** Three messages per client per ten minutes, shared by every server instance (R203). */
 export const CONTACT_RATE_LIMIT = { scope: "contact", maxHits: 3, windowSeconds: 600 } as const;
 /**
- * Every message from everyone together, per hour (R171). R186: its cap is the alert's own hourly send
+ * Every message from everyone together, per hour (R203). R212: its cap is the alert's own hourly send
  * cap (`globalLimitPerHour`, from `LEAD_ACK_SEND_LIMIT_PER_HOUR`), over the same window, so the form
  * never stores more messages in an hour than their staff alerts can announce.
  */
@@ -49,7 +49,7 @@ export type ContactLogEvent =
   | { event: "contact_honeypot" };
 
 export interface ContactSubmissionDependencies {
-  /** `contactFormOpen()` (R173): storage, email sending, a staff address and the hash secret. */
+  /** `contactFormOpen()` (R205): storage, email sending, a staff address and the hash secret. */
   open: boolean;
   /** Null while Supabase is not configured: nothing can be stored, so nothing is accepted. */
   repository: ContactRepository | null;
@@ -58,7 +58,7 @@ export interface ContactSubmissionDependencies {
   /** An opaque, keyed hash of the client address (lib/leads/http.ts); never the address itself. */
   clientKey: string;
   /**
-   * R186: the cap of `contact:global` per hour, the same value the alert's send budget
+   * R212: the cap of `contact:global` per hour, the same value the alert's send budget
    * (`send:contact_staff_alert`) is capped at, so intake never outruns the alerts.
    */
   globalLimitPerHour: number;

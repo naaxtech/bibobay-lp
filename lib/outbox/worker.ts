@@ -9,7 +9,7 @@ import type { ContactDeliveryOutbox, LeadDeliveryOutbox, OrderEmailOutbox } from
  * One pass of the email outbox worker (Task 8a, R88: the retry net behind the sends made right
  * after each answer). It drains the order outbox first (a buyer waits on it), quotes first (staff
  * sent them, and the buyer's payment link is in them), then the signup outbox, then the contact
- * outbox (R169: a staff alert waits behind the emails to buyers and parents), one kind at a time
+ * outbox (R201: a staff alert waits behind the emails to buyers and parents), one kind at a time
  * and one row per claim through the same claim functions the immediate sends use, so no row is
  * ever sent by both. Each row is: claimed (attempt counted) → built → one unit of the send budget
  * of its own kind (fix wave D-I1, `send:<budget>`, lib/outbox/constants.ts) → sent under the row's
@@ -24,7 +24,7 @@ const ORDER_DRAIN_ORDER: readonly OrderEmailKind[] = ["quote", "acknowledgement"
 export interface OutboxWorkerInput {
   leads: { outbox: LeadDeliveryOutbox; settings: LeadChannelSettings };
   orders: { outbox: OrderEmailOutbox; settings: OrderChannelSettings };
-  /** The contact form's staff alerts (R169); claims nothing without a staff address (R177). */
+  /** The contact form's staff alerts (R201); claims nothing without a staff address (R209). */
   contact: { outbox: ContactDeliveryOutbox; settings: ContactChannelSettings };
   /** Per-kind budgets, bounded send and log, shared by the three outboxes (lib/outbox/send.ts). */
   context: AttemptContext<LeadDeliveryKind | OrderEmailKind | ContactDeliveryKind>;

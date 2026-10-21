@@ -4,11 +4,11 @@
 
 **Goal:** A `/contact` page where a grown-up writes to the BIBO Bay team. The message is stored in Supabase and announced to staff by exactly one alert email through an outbox. The form is open only when someone will actually receive the message.
 
-**Architecture:** A server page reads CMS copy (with a repository fallback). It renders the client form only while `contactFormOpen()` holds; otherwise it shows the CMS contact address as a mailto link, or a closed notice. The form posts JSON to `POST /api/contact`, which runs honeypot → zod validation → open check → per-client and global DB rate limits → one `security definer` RPC that writes `contact_messages` and its row in a new outbox table, `contact_message_deliveries`, in one transaction (R169). After the answer, `after()` claims that row through `claim_contact_deliveries` and sends it with the shared attempt step (`lib/outbox/attempt.ts`). The cron worker (once a day, R180) drains this third outbox, named `contact`, after the order and signup outboxes, as the retry net. The lead outbox and the lead and consent tables are not touched.
+**Architecture:** A server page reads CMS copy (with a repository fallback). It renders the client form only while `contactFormOpen()` holds; otherwise it shows the CMS contact address as a mailto link, or a closed notice. The form posts JSON to `POST /api/contact`, which runs honeypot → zod validation → open check → per-client and global DB rate limits → one `security definer` RPC that writes `contact_messages` and its row in a new outbox table, `contact_message_deliveries`, in one transaction (R201). After the answer, `after()` claims that row through `claim_contact_deliveries` and sends it with the shared attempt step (`lib/outbox/attempt.ts`). The cron worker (once a day, R180) drains this third outbox, named `contact`, after the order and signup outboxes, as the retry net. The lead outbox and the lead and consent tables are not touched.
 
 **Tech Stack:** Next.js 16.3.8 App Router, React 19.3, TypeScript, zod 4.6.6, `@supabase/supabase-js` 2.117.3 (RPC only), `resend` 6.32.1, Sanity (standalone Studio in `studio/`), Vitest with PGlite and pgTAP, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-02-bibobay-production-platform-design.md` (the binding truth, child-data, lead-capture and security rules) and the controller rulings R158–R177 quoted below, which are this slice's specification.
+**Spec:** `docs/superpowers/specs/2026-10-02-bibobay-production-platform-design.md` (the binding truth, child-data, lead-capture and security rules) and the controller rulings R190–R209 quoted below, which are this slice's specification.
 
 **Base:** `main` once PR #5 has merged: `39b95e1` plus `2e2c197` (R180, the email outbox cron once a day on Hobby). Branch `slice/bibobay/contact-form` from that `main`. Every file:line reference below is to that tree.
 
@@ -17,61 +17,61 @@
 - npm only (`package-lock.json`), never bun. Implementers never run `npm ci`, `npm install` or `npm update` (R112), never build, and never start a server or Playwright (the controller does, R150).
 - Implementers make no git writes (R7). The controller stages explicit paths, reads `git diff --cached --numstat`, and commits.
 - Never edit `AGENTS.md` or `CLAUDE.md`. Never delete a file, export, test or feature. Migrations `0001`–`0007` are not edited.
-- R169: the lead outbox is not altered. No task touches `lead_delivery_events` or its constraints, `lead_submissions`, the consent columns, `enqueue_lead_delivery`, `claim_lead_deliveries`, `record_lead_delivery_attempt`, `LEAD_DELIVERY_KINDS`, `lib/outbox/leads.ts` or `lib/supabase/leads.ts`.
+- R201: the lead outbox is not altered. No task touches `lead_delivery_events` or its constraints, `lead_submissions`, the consent columns, `enqueue_lead_delivery`, `claim_lead_deliveries`, `record_lead_delivery_attempt`, `LEAD_DELIVERY_KINDS`, `lib/outbox/leads.ts` or `lib/supabase/leads.ts`.
 - Public repository: every new or changed tracked file must pass `tests/scripts/docs-hygiene.test.ts`. That means no local absolute paths, addresses only on reserved domains (`example.com`, `.test`), no private project or tool names, and never the name of the dotted, git-ignored working-ledger folder.
 - No child data. Grown-ups only: no age field, no child's name. Copy addresses parents, carers and professionals.
 - Truth: `persisted: true` only after the RPC returned both ids. No visible string says a message was emailed, sent or delivered (`DELIVERY_CLAIM_PATTERN`, C7).
-- The sender never receives an email (R160).
+- The sender never receives an email (R192).
 - Every database touch is a `security definer` RPC with `set search_path = ''`, executable by `service_role` only. The browser never talks to Supabase or Resend.
 - No raw IP is stored anywhere. Rate-limit keys come from `clientKeyFromHeaders` (`lib/leads/http.ts:21`, IPv6 per /64), keyed by `LEAD_IP_HASH_SECRET`.
-- No new environment names. Reused: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEAD_IP_HASH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `STAFF_NOTIFICATION_EMAIL`, `LEAD_ACK_SEND_LIMIT_PER_HOUR`, and `CRON_SECRET` (worker only). `RESEND_REPLY_TO` is not used by the contact alert: its Reply-To is the sender (R172).
+- No new environment names. Reused: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEAD_IP_HASH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `STAFF_NOTIFICATION_EMAIL`, `LEAD_ACK_SEND_LIMIT_PER_HOUR`, and `CRON_SECRET` (worker only). `RESEND_REPLY_TO` is not used by the contact alert: its Reply-To is the sender (R204).
 - Law 1: no `any`, no TODO, no stub, no commented-out code and no unhandled error path. Lint passes at zero warnings, and no `eslint-disable` is added in advance.
 - Next 16.3.8 differs from older versions. Before using any Next API, read its guide in the copy of the framework docs that the controller names in the brief (R113), and cite it as `// src: <doc path> · next 16.3.8 · <date>`.
 - Browser specs never reach the real `/api/contact`. Every call is answered by `page.route`, and a context guard aborts and fails any call a test did not route (the R39 pattern of `e2e/leads/lead-form.spec.ts`).
-- The cron worker runs once a day on Hobby (R180). The alert relies on the send made right after the answer; the worker is only the retry net (R174). Text this slice adds says "the next cron run" and links `docs/deployment.md#email-outbox-worker-task-8a`; it says "once a day" only in a file the R180 restore sentence of `docs/deployment.md` lists.
+- The cron worker runs once a day on Hobby (R180). The alert relies on the send made right after the answer; the worker is only the retry net (R206). Text this slice adds says "the next cron run" and links `docs/deployment.md#email-outbox-worker-task-8a`; it says "once a day" only in a file the R180 restore sentence of `docs/deployment.md` lists.
 
 ## Rulings
 
-- **R158 Route `/contact`.** A server page, with every string CMS-controlled and a repository fallback. It is added to the sitemap and follows the site's existing indexing rules. The footer gets a "Contact us" link to `/contact` whenever the form is open. The existing footer mailto (CMS `contactEmail`) stays as it is.
-- **R159 Storage.** A NEW migration (the next number after the existing ones; applied migrations are never edited) creates `contact_messages` with forced RLS and no anon/authenticated policies. A `security definer` RPC with `set search_path = ''`, executable only by `service_role`, inserts the message AND its outbox row in one transaction. No raw IP is stored (it is hashed, as for leads). The rate limit is DB-backed and uses the existing limiter, with buckets per IP and global (numbers: R171). A honeypot hit gets the same generic 400 as leads and nothing is stored. The route accepts JSON only, has a body size limit, and validates with zod, with field error codes like leads.
-- **R160 Delivery.** Exactly one staff-alert email per message, through an outbox (R169: its own table, not a kind of the lead outbox), to the existing staff-alert recipient env, with Reply-To set to the sender's address (R172) and the topic in the subject. NO email goes to the sender (an anonymous form cannot prove address ownership, so sending one would make us a relay). The success copy says the message was received, never that it was emailed. `persisted: true` only after the DB confirmed both rows.
-- **R161 Availability.** The form is OPEN only when Supabase AND email sending are configured (otherwise nobody would ever read the message; exact condition: R173). When closed, the page shows the CMS contact email as a mailto if one is set, else a plain closed notice, and the API answers 503 in the same JSON shape. `/api/readiness` gains a `contact` boolean.
-- **R162 Fields.** Name (required, ≤ 80), email (required, reusing `EMAIL_PATTERN` and its limits), topic (enum: `general`, `partnerships`, `press`, `shop-order`, `privacy`), message (required, 10–3000 characters) and a honeypot. Grown-ups only: no child data and no age field, and the copy addresses parents and other grown-ups. No consent checkbox; a link to the privacy notice sits under the submit button.
-- **R163 CMS.** The page and form copy is modelled the same way as the lead form's (Studio schema + normalize + fallback + types). The Studio typecheck and build must stay green. After merge, the owner must redeploy the Studio and the schema.
-- **R164 Legal.** The fallback legal text (`lib/content/legal-fallback.ts`) lists the new table and what it holds, and states no retention period (R174). `tests/content/legal-pages.test.tsx` asserts it.
-- **R165 Branch inventory.** Enumerate every place in the codebase that switches or filters on the outbox or its kinds, or uses elimination logic (`!== 'x'`), list each by file:line, and say what each must do with the contact alert. Under R169 this is the inventory of a third outbox, below.
-- **R166 Analytics.** One consent-gated PostHog event on a successful submit, with no PII, following the `lib/analytics` conventions.
-- **R167 Tests.** TDD for every task (failing test first). Unit and route tests mirror `tests/leads/*`; migration tests mirror the migration-policy and pgTAP harness; e2e specs under `e2e/` answer every `/api/contact` call with `page.route` and keep the unrouted-call guard; a11y checks (labels, error summary, focus to the summary on error) match LeadForm. A second `role="status"` inside a form breaks the existing e2e locators.
-- **R168 Deferred: an admin inbox page for messages.** Trigger: the owner asks, or more than 20 messages arrive in a week. Until then, staff read each message in its alert email, or by SQL when an alert is parked (`docs/incident-runbook.md`).
-- **R169 Separate outbox table.** Contact staff alerts go in a new table `contact_message_deliveries` (forced RLS, no anon/authenticated policies). Its row is enqueued inside the submit RPC. It has its own `security definer` claim and record functions with `set search_path = ''`, executable only by `service_role`. It mirrors the lead outbox's columns and semantics: attempts, `next_attempt_at` with the same capped backoff, the `claimed_at`/`sending` lease, `unconfirmed_since` with parking outside the 23-hour idempotency window, the final-failure codes, and an idempotency key derived from the row id. `lead_delivery_events`, its constraints, `record_lead_delivery_attempt`, `LEAD_DELIVERY_KINDS` and the lead and consent tables are NOT altered at all. The worker gains a third outbox, `contact`, beside `leads` and `orders`. (Amended by R185: the contact outbox does not park an unconfirmed alert at 23 hours; only the attempt cap parks it.)
-- **R170 Send budget.** Contact alerts spend their own budget, `send:contact_staff_alert`, with the same `LEAD_ACK_SEND_LIMIT_PER_HOUR` cap.
-- **R171 Rate limits.** 3 messages per 10 minutes per client (IPv6 per /64, as leads) and 100 per hour globally. (The global figure is superseded by R186: the global cap is the alert's hourly send cap.)
-- **R172 Reply-To.** The contact staff alert, and only it, sets Reply-To to the sender's address, and its body labels the address "unverified". This is the documented exception to review M3 (`lib/outbox/leads.ts:47`): answering the sender is the point of the alert. The signup and order staff alerts keep no reply-to.
-- **R173 Open condition.** Supabase configured AND email sending configured (`RESEND_API_KEY` + `RESEND_FROM`) AND `STAFF_NOTIFICATION_EMAIL` AND a valid `LEAD_IP_HASH_SECRET` (32+ characters). `/api/readiness` `contact` reflects exactly that.
-- **R174 Legal basis and retry.** Legitimate interest is the basis. No retention period is stated; the legal review owns it, and the docs task adds it to the open items of `docs/data-protection.md`. A daily retry for contact alerts is accepted: the immediate send after submit is the main path.
-- **R175 No `skipped` status.** A contact message cannot be withdrawn, so the contact outbox has no `skipped` status and its claim always reports `"skipped": 0`.
-- **R176 Housekeeping inside this slice.** Task 0 also fixes the orphaned doc comment at `lib/outbox/constants.ts` (the comment attached to nothing, directly above another doc comment), since Task 0 edits that file anyway. Task 6 adds `docs/database-security.md` to the R180 list of files to change when `*/15` is restored, and pins the list.
-- **R177 Staff address removed.** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued, their alerts wait (never parked) and readiness reports `contact: false`; the form is closed by R173. Task 6 documents this in `docs/incident-runbook.md`. The worker drains contact alerts without `LEAD_IP_HASH_SECRET`; only the form needs it.
+- **R190 Route `/contact`.** A server page, with every string CMS-controlled and a repository fallback. It is added to the sitemap and follows the site's existing indexing rules. The footer gets a "Contact us" link to `/contact` whenever the form is open. The existing footer mailto (CMS `contactEmail`) stays as it is.
+- **R191 Storage.** A NEW migration (the next number after the existing ones; applied migrations are never edited) creates `contact_messages` with forced RLS and no anon/authenticated policies. A `security definer` RPC with `set search_path = ''`, executable only by `service_role`, inserts the message AND its outbox row in one transaction. No raw IP is stored (it is hashed, as for leads). The rate limit is DB-backed and uses the existing limiter, with buckets per IP and global (numbers: R203). A honeypot hit gets the same generic 400 as leads and nothing is stored. The route accepts JSON only, has a body size limit, and validates with zod, with field error codes like leads.
+- **R192 Delivery.** Exactly one staff-alert email per message, through an outbox (R201: its own table, not a kind of the lead outbox), to the existing staff-alert recipient env, with Reply-To set to the sender's address (R204) and the topic in the subject. NO email goes to the sender (an anonymous form cannot prove address ownership, so sending one would make us a relay). The success copy says the message was received, never that it was emailed. `persisted: true` only after the DB confirmed both rows.
+- **R193 Availability.** The form is OPEN only when Supabase AND email sending are configured (otherwise nobody would ever read the message; exact condition: R205). When closed, the page shows the CMS contact email as a mailto if one is set, else a plain closed notice, and the API answers 503 in the same JSON shape. `/api/readiness` gains a `contact` boolean.
+- **R194 Fields.** Name (required, ≤ 80), email (required, reusing `EMAIL_PATTERN` and its limits), topic (enum: `general`, `partnerships`, `press`, `shop-order`, `privacy`), message (required, 10–3000 characters) and a honeypot. Grown-ups only: no child data and no age field, and the copy addresses parents and other grown-ups. No consent checkbox; a link to the privacy notice sits under the submit button.
+- **R195 CMS.** The page and form copy is modelled the same way as the lead form's (Studio schema + normalize + fallback + types). The Studio typecheck and build must stay green. After merge, the owner must redeploy the Studio and the schema.
+- **R196 Legal.** The fallback legal text (`lib/content/legal-fallback.ts`) lists the new table and what it holds, and states no retention period (R206). `tests/content/legal-pages.test.tsx` asserts it.
+- **R197 Branch inventory.** Enumerate every place in the codebase that switches or filters on the outbox or its kinds, or uses elimination logic (`!== 'x'`), list each by file:line, and say what each must do with the contact alert. Under R201 this is the inventory of a third outbox, below.
+- **R198 Analytics.** One consent-gated PostHog event on a successful submit, with no PII, following the `lib/analytics` conventions.
+- **R199 Tests.** TDD for every task (failing test first). Unit and route tests mirror `tests/leads/*`; migration tests mirror the migration-policy and pgTAP harness; e2e specs under `e2e/` answer every `/api/contact` call with `page.route` and keep the unrouted-call guard; a11y checks (labels, error summary, focus to the summary on error) match LeadForm. A second `role="status"` inside a form breaks the existing e2e locators.
+- **R200 Deferred: an admin inbox page for messages.** Trigger: the owner asks, or more than 20 messages arrive in a week. Until then, staff read each message in its alert email, or by SQL when an alert is parked (`docs/incident-runbook.md`).
+- **R201 Separate outbox table.** Contact staff alerts go in a new table `contact_message_deliveries` (forced RLS, no anon/authenticated policies). Its row is enqueued inside the submit RPC. It has its own `security definer` claim and record functions with `set search_path = ''`, executable only by `service_role`. It mirrors the lead outbox's columns and semantics: attempts, `next_attempt_at` with the same capped backoff, the `claimed_at`/`sending` lease, `unconfirmed_since` with parking outside the 23-hour idempotency window, the final-failure codes, and an idempotency key derived from the row id. `lead_delivery_events`, its constraints, `record_lead_delivery_attempt`, `LEAD_DELIVERY_KINDS` and the lead and consent tables are NOT altered at all. The worker gains a third outbox, `contact`, beside `leads` and `orders`. (Amended by R211: the contact outbox does not park an unconfirmed alert at 23 hours; only the attempt cap parks it.)
+- **R202 Send budget.** Contact alerts spend their own budget, `send:contact_staff_alert`, with the same `LEAD_ACK_SEND_LIMIT_PER_HOUR` cap.
+- **R203 Rate limits.** 3 messages per 10 minutes per client (IPv6 per /64, as leads) and 100 per hour globally. (The global figure is superseded by R212: the global cap is the alert's hourly send cap.)
+- **R204 Reply-To.** The contact staff alert, and only it, sets Reply-To to the sender's address, and its body labels the address "unverified". This is the documented exception to review M3 (`lib/outbox/leads.ts:47`): answering the sender is the point of the alert. The signup and order staff alerts keep no reply-to.
+- **R205 Open condition.** Supabase configured AND email sending configured (`RESEND_API_KEY` + `RESEND_FROM`) AND `STAFF_NOTIFICATION_EMAIL` AND a valid `LEAD_IP_HASH_SECRET` (32+ characters). `/api/readiness` `contact` reflects exactly that.
+- **R206 Legal basis and retry.** Legitimate interest is the basis. No retention period is stated; the legal review owns it, and the docs task adds it to the open items of `docs/data-protection.md`. A daily retry for contact alerts is accepted: the immediate send after submit is the main path.
+- **R207 No `skipped` status.** A contact message cannot be withdrawn, so the contact outbox has no `skipped` status and its claim always reports `"skipped": 0`.
+- **R208 Housekeeping inside this slice.** Task 0 also fixes the orphaned doc comment at `lib/outbox/constants.ts` (the comment attached to nothing, directly above another doc comment), since Task 0 edits that file anyway. Task 6 adds `docs/database-security.md` to the R180 list of files to change when `*/15` is restored, and pins the list.
+- **R209 Staff address removed.** If `STAFF_NOTIFICATION_EMAIL` is removed after messages were queued, their alerts wait (never parked) and readiness reports `contact: false`; the form is closed by R205. Task 6 documents this in `docs/incident-runbook.md`. The worker drains contact alerts without `LEAD_IP_HASH_SECRET`; only the form needs it.
 
 Code-review rulings (2026-10-21), applied on this branch:
 
-- **R184 Neutral rate-limit copy.** The 429 answer can come from the per-client OR the global bucket, so the form's rate-limited outcome must be true for both: "A lot of messages are arriving just now. Please wait a few minutes and try again." (no `DELIVERY_CLAIM_PATTERN` match). `e2e/contact/contact-form.spec.ts` imports the form's chrome copy (`CONTACT_FORM_COPY`) instead of copying its strings, so a wording change cannot leave the spec expecting stale text; `tests/contact/contact-copy.test.ts` pins that.
-- **R185 The contact outbox never parks an unconfirmed send at 23 hours.** Under the once-a-day cron (R180), a send left unconfirmed (a timeout, a provider 5xx) in the hour after a cron run would be parked as `stale_unconfirmed` at the next run and never retried: a stored message whose alert is lost, with no inbox page (R168). For contact staff alerts a duplicate is harmless and a lost alert is not, so `claim_contact_deliveries` keeps unconfirmed and stale-`sending` rows claimable (retried under the same idempotency key, then as a new send once the provider has forgotten the key, which is accepted) until the attempt cap makes them final. The lead and order outboxes are untouched. `unconfirmed_since` stays: the record function still sets it, and the runbook reads it to tell staff an alert may have arrived twice. The claim-time `delivery_expired` log event carries the `outbox` whose claim parked rows (`lib/outbox/attempt.ts`), since the cron run logs every outbox under `channel: "worker"`.
-- **R186 Intake never outruns the alert budget.** The global contact bucket (`contact:global`) is capped per hour at the alert's own send cap: `ackSendLimitPerHour(env)` (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60), passed through the contact dependencies as `globalLimitPerHour`, over the same window as the send budget. The legal fallback text stays number-free ("all messages together by the hour").
-- **R187 The open-form browser specs run in CI.** CI never set `E2E_CONTACT_OPEN`, so the open-form specs were always skipped there (how the stale copy of R184 went unnoticed). A job `e2e-contact`, "Playwright, contact form open (placeholders)", builds, starts `next start` with the placeholder contact environment (`NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"`, `STAFF_NOTIFICATION_EMAIL=staff@example.com`; no secret) and runs `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 npx playwright test e2e/contact`. `tests/scripts/ci-workflow.test.ts` pins the job and proves the placeholders open the form (`contactFormOpen`).
+- **R210 Neutral rate-limit copy.** The 429 answer can come from the per-client OR the global bucket, so the form's rate-limited outcome must be true for both: "A lot of messages are arriving just now. Please wait a few minutes and try again." (no `DELIVERY_CLAIM_PATTERN` match). `e2e/contact/contact-form.spec.ts` imports the form's chrome copy (`CONTACT_FORM_COPY`) instead of copying its strings, so a wording change cannot leave the spec expecting stale text; `tests/contact/contact-copy.test.ts` pins that.
+- **R211 The contact outbox never parks an unconfirmed send at 23 hours.** Under the once-a-day cron (R180), a send left unconfirmed (a timeout, a provider 5xx) in the hour after a cron run would be parked as `stale_unconfirmed` at the next run and never retried: a stored message whose alert is lost, with no inbox page (R200). For contact staff alerts a duplicate is harmless and a lost alert is not, so `claim_contact_deliveries` keeps unconfirmed and stale-`sending` rows claimable (retried under the same idempotency key, then as a new send once the provider has forgotten the key, which is accepted) until the attempt cap makes them final. The lead and order outboxes are untouched. `unconfirmed_since` stays: the record function still sets it, and the runbook reads it to tell staff an alert may have arrived twice. The claim-time `delivery_expired` log event carries the `outbox` whose claim parked rows (`lib/outbox/attempt.ts`), since the cron run logs every outbox under `channel: "worker"`.
+- **R212 Intake never outruns the alert budget.** The global contact bucket (`contact:global`) is capped per hour at the alert's own send cap: `ackSendLimitPerHour(env)` (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60), passed through the contact dependencies as `globalLimitPerHour`, over the same window as the send budget. The legal fallback text stays number-free ("all messages together by the hour").
+- **R213 The open-form browser specs run in CI.** CI never set `E2E_CONTACT_OPEN`, so the open-form specs were always skipped there (how the stale copy of R210 went unnoticed). A job `e2e-contact`, "Playwright, contact form open (placeholders)", builds, starts `next start` with the placeholder contact environment (`NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM="BIBO Bay <hello@example.com>"`, `STAFF_NOTIFICATION_EMAIL=staff@example.com`; no secret) and runs `E2E_PRODUCTION=1 E2E_CONTACT_OPEN=1 npx playwright test e2e/contact`. `tests/scripts/ci-workflow.test.ts` pins the job and proves the placeholders open the form (`contactFormOpen`).
 - Review nits, same pass: `contactSubmissionSchema` is module-private (nothing else imports it); the `after()` citation in `lib/contact/dependencies.ts` names the Next.js doc; the form's error summary title is an `h2` (the `/contact` page has an `h1` and no `h2`; `OrderForm` does the same); a body with an unexpected key gets the generic whole-body 400 first, even when fields are also invalid (C5).
 
 ### Decisions this plan makes where the code and the rulings meet
 
-- **No `skipped` status in the contact outbox.** Nothing refuses a contact alert (there is no withdrawal), so the status check is `pending, sending, sent, failed`, and the claim always answers `"skipped": 0`. `OUTBOX_STATUSES` is unchanged. Everything else mirrors 0006's lead outbox (R169).
+- **No `skipped` status in the contact outbox.** Nothing refuses a contact alert (there is no withdrawal), so the status check is `pending, sending, sent, failed`, and the claim always answers `"skipped": 0`. `OUTBOX_STATUSES` is unchanged. Everything else mirrors 0006's lead outbox (R201).
 - **The contact claim takes no kinds array.** The table holds one kind, by a positive list (`kind in ('contact_staff_alert')`), so the signature is `claim_contact_deliveries(p_limit, p_message_id)`. The adapter answers an empty batch without calling the RPC when `kinds` is empty.
 - **The `kind` column stays.** `ClaimedItem` needs a kind, the send budget is keyed by it, and the logs name it. `unique (message_id, kind)` gives one alert per message, as `unique (lead_id, kind)` does for leads.
 - **Logging, as orders do it.** The submit flow logs its own `contact_*` events through `logContactEvent` (scope `contact`). The send after the answer logs its outbox events through `outboxLogger("contact")`; the cron run logs every outbox through `outboxLogger("worker")`.
 - **Drain order.** Orders (quotes first), then signups, then contact alerts. When the run's 40 seconds run out, a staff alert waits behind emails to buyers and parents.
 - **The 0008 guard** checks for `public.outbox_failure_unconfirmed(text)` (0006, which 0008's record function calls) and `public.is_active_staff()` (0007, the last migration).
-- **R158 vs R12.** The CMS owns the page heading, intro, SEO, button label, success, error and closed messages, and the footer link label. Field labels, hints, validation messages, topic labels and status words are repository chrome, exactly like `FORM_COPY` for the lead form (R163: "modelled the same way").
-- **R159, "never edit applied migrations".** No migration has been applied to a live project yet (R124). Even so, this slice adds 0008 and leaves 0001–0007 alone. The harness applies every migration twice, so 0008 must be idempotent.
-- **R161, the closed API.** It answers `503 { ok: false, persisted: false, closed: true, message }`. The API's `message` strings are informational code constants. The form never shows them: it maps each status to its CMS or chrome copy, so every visible string stays CMS- or chrome-controlled.
+- **R190 vs R12.** The CMS owns the page heading, intro, SEO, button label, success, error and closed messages, and the footer link label. Field labels, hints, validation messages, topic labels and status words are repository chrome, exactly like `FORM_COPY` for the lead form (R195: "modelled the same way").
+- **R191, "never edit applied migrations".** No migration has been applied to a live project yet (R124). Even so, this slice adds 0008 and leaves 0001–0007 alone. The harness applies every migration twice, so 0008 must be idempotent.
+- **R193, the closed API.** It answers `503 { ok: false, persisted: false, closed: true, message }`. The API's `message` strings are informational code constants. The form never shows them: it maps each status to its CMS or chrome copy, so every visible string stays CMS- or chrome-controlled.
 
 ## Review Focus
 
@@ -124,7 +124,7 @@ export interface ContactRepository extends ContactDeliveryOutbox {
 }
 ```
 
-`lib/outbox/constants.ts` additions (R169, R170):
+`lib/outbox/constants.ts` additions (R201, R202):
 
 - `CONTACT_DELIVERY_KINDS = ["contact_staff_alert"] as const`; `type ContactDeliveryKind`.
 - `type OutboxName = "leads" | "orders" | "contact"`; its comment says "The three outboxes".
@@ -145,11 +145,11 @@ export interface ContactDeliveryOutbox {
 
 ### C3. Availability: `lib/contact/availability.ts` (Task 0, `server-only`)
 
-`contactFormOpen(env: Readonly<Record<string, string | undefined>> = process.env): boolean` returns `leadStorageConfigured` (Supabase URL, a service-role key that is not `sb_publishable_…`, and a `LEAD_IP_HASH_SECRET` of 32+ characters) AND `getEmailEnvironment(env) !== null` AND `getStaffNotificationEmail(env) !== null`, each called with a copy of `env` (R173). It is the one definition used by the route, readiness, the page, the footer, the sitemap and the legal text.
+`contactFormOpen(env: Readonly<Record<string, string | undefined>> = process.env): boolean` returns `leadStorageConfigured` (Supabase URL, a service-role key that is not `sb_publishable_…`, and a `LEAD_IP_HASH_SECRET` of 32+ characters) AND `getEmailEnvironment(env) !== null` AND `getStaffNotificationEmail(env) !== null`, each called with a copy of `env` (R205). It is the one definition used by the route, readiness, the page, the footer, the sitemap and the legal text.
 
 ### C4. Database: `supabase/migrations/0008_contact_messages.sql` (Task 1)
 
-The guard, as in 0006: the migration runs as a role with BYPASSRLS (`42501` "Migration 0008 must run as a role that bypasses row level security (Supabase: postgres)." otherwise), and `to_regprocedure('public.outbox_failure_unconfirmed(text)')` and `to_regprocedure('public.is_active_staff()')` both exist (`55000` "Migrations 0001 to 0007 must be applied before 0008." otherwise). Every statement is idempotent (`create table if not exists`, `create index if not exists`, `create or replace function`, `revoke`, `grant`). The file names no lead object: not `lead_delivery_events`, `lead_submissions`, `enqueue_lead_delivery`, `claim_lead_deliveries`, `record_lead_delivery_attempt` or `submit_lead` (R169).
+The guard, as in 0006: the migration runs as a role with BYPASSRLS (`42501` "Migration 0008 must run as a role that bypasses row level security (Supabase: postgres)." otherwise), and `to_regprocedure('public.outbox_failure_unconfirmed(text)')` and `to_regprocedure('public.is_active_staff()')` both exist (`55000` "Migrations 0001 to 0007 must be applied before 0008." otherwise). Every statement is idempotent (`create table if not exists`, `create index if not exists`, `create or replace function`, `revoke`, `grant`). The file names no lead object: not `lead_delivery_events`, `lead_submissions`, `enqueue_lead_delivery`, `claim_lead_deliveries`, `record_lead_delivery_attempt` or `submit_lead` (R201).
 
 Both tables: RLS enabled and forced; all privileges revoked from `public, anon, authenticated, service_role`; no policies.
 
@@ -164,7 +164,7 @@ Both tables: RLS enabled and forced; all privileges revoked from `public, anon, 
 | `message` | `text not null` | `char_length` 10–3000; `!~ '[\x01-\x08\x0b-\x1f\x7f]'` (LF and TAB allowed) |
 | `created_at` | `timestamptz not null default now()` | |
 
-`public.contact_message_deliveries`, the contact outbox (R169), mirroring `lead_delivery_events` (0001:78-96, 0006:72-79). Index `contact_message_deliveries_due_idx (next_attempt_at) where status in ('pending', 'sending', 'failed')`.
+`public.contact_message_deliveries`, the contact outbox (R201), mirroring `lead_delivery_events` (0001:78-96, 0006:72-79). Index `contact_message_deliveries_due_idx (next_attempt_at) where status in ('pending', 'sending', 'failed')`.
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -188,7 +188,7 @@ Functions. Each is `language plpgsql`, `security definer`, `set search_path = ''
 | Signature | Returns | Rules |
 |---|---|---|
 | `submit_contact_message(p_name text, p_email text, p_topic text, p_message text)` | `table (message_id uuid, delivery_id uuid)` | `#variable_conflict use_column` (the output name `message_id` is also a column). Trims the name, and lower-cases and trims the email (as `submit_lead` does). Validates the message as given (the server sends it normalised). Inserts the message, then `contact_message_deliveries (message_id, kind, status, attempts) = (<id>, 'contact_staff_alert', 'pending', 0)`. |
-| `claim_contact_deliveries(p_limit integer default 10, p_message_id uuid default null)` | `jsonb {"claimed": [...], "skipped": 0, "expired": <n>}` | `p_limit` must be 1–50 (`22023`). The due rule, the 15-minute stale `sending` lease, the park rule (`attempts >= 8` only, R185: an unconfirmed alert is never parked for its age; a lost eighth attempt is `stale_unconfirmed`, with `next_attempt_at = 'infinity'`) and the claim update are those of `claim_lead_deliveries` (0006:226-324) on `contact_message_deliveries` joined to `contact_messages`, with no withdrawal branch and no acknowledgement mirror; `order by next_attempt_at, created_at, id`; `for update of delivery skip locked`. Each claimed entry is `{id, kind, attempt, name, email, topic, message, receivedAt}`, where `receivedAt` is the message's `created_at` as a JSON string. |
+| `claim_contact_deliveries(p_limit integer default 10, p_message_id uuid default null)` | `jsonb {"claimed": [...], "skipped": 0, "expired": <n>}` | `p_limit` must be 1–50 (`22023`). The due rule, the 15-minute stale `sending` lease, the park rule (`attempts >= 8` only, R211: an unconfirmed alert is never parked for its age; a lost eighth attempt is `stale_unconfirmed`, with `next_attempt_at = 'infinity'`) and the claim update are those of `claim_lead_deliveries` (0006:226-324) on `contact_message_deliveries` joined to `contact_messages`, with no withdrawal branch and no acknowledgement mirror; `order by next_attempt_at, created_at, id`; `for update of delivery skip locked`. Each claimed entry is `{id, kind, attempt, name, email, topic, message, receivedAt}`, where `receivedAt` is the message's `created_at` as a JSON string. |
 | `record_contact_delivery_attempt(p_delivery_id uuid, p_status text, p_provider_message_id text default null, p_error_code text default null)` | `boolean` | Validation and update are those of `record_lead_delivery_attempt` (0006:340-403) on `contact_message_deliveries`: `sent`, `failed` (backoff `least(interval '6 hours', interval '1 minute' * power(2, least(delivery.attempts, 12)))`; `'infinity'` at the eighth attempt or on `invalid_idempotent_request`; `unconfirmed_since` set through `public.outbox_failure_unconfirmed`), and `deferred` (back to the earlier status and attempt count). Only a `sending` row is updated. Returns `found`. |
 
 ### C5. API: `POST /api/contact` (Task 2)
@@ -207,7 +207,7 @@ Functions. Each is `language plpgsql`, `security definer`, `set search_path = ''
 | 503 | the form is closed (`open` false, or no repository) | `{ ok: false, persisted: false, closed: true, message: closed }` |
 | 503 | the limiter is missing or throws (fails closed) | `{ ok: false, persisted: false, message: error }` |
 
-The order of checks (`lib/contact/submit.ts`): honeypot → validation → open → `contact:<clientKey>` (3 per 600 s) → `contact:global` (`globalLimitPerHour` per 3600 s, the alert's send cap; R171, R186) → `submitMessage` → answer → `after()`: `sendAlert(messageId)`, which claims this message's alert by id, spends `send:contact_staff_alert`, sends and records (C6).
+The order of checks (`lib/contact/submit.ts`): honeypot → validation → open → `contact:<clientKey>` (3 per 600 s) → `contact:global` (`globalLimitPerHour` per 3600 s, the alert's send cap; R203, R212) → `submitMessage` → answer → `after()`: `sendAlert(messageId)`, which claims this message's alert by id, spends `send:contact_staff_alert`, sends and records (C6).
 
 `CONTACT_API_MESSAGES` (informational; the form never shows them): `received` "Message received.", `error` "The message could not be saved. Please try again.", `closed` "The contact form is not open, so nothing was saved.", `rateLimited` "Too many messages just now. Please wait a few minutes and try again.", `checkDetails` "Please check the highlighted fields and try again."
 
@@ -217,7 +217,7 @@ The order of checks (`lib/contact/submit.ts`): honeypot → validation → open 
 
 ### C6. The contact outbox, its channel and the alert (Task 2)
 
-- The outbox is named `contact` (`OutboxName`); its table is `contact_message_deliveries`; its one kind is `contact_staff_alert`; the idempotency key is `contact-delivery/<row id>`; it spends `send:contact_staff_alert`, capped by `LEAD_ACK_SEND_LIMIT_PER_HOUR` (default 60, R170).
+- The outbox is named `contact` (`OutboxName`); its table is `contact_message_deliveries`; its one kind is `contact_staff_alert`; the idempotency key is `contact-delivery/<row id>`; it spends `send:contact_staff_alert`, capped by `LEAD_ACK_SEND_LIMIT_PER_HOUR` (default 60, R202).
 - `interface ContactChannelSettings { staffEmail: string | null }`.
 - `contactKindsFor(staffEmail: string | null): ContactDeliveryKind[]` is `staffEmail ? ["contact_staff_alert"] : []`.
 - `contactAlertChannel(outbox: ContactDeliveryOutbox, settings: ContactChannelSettings): OutboxChannel<ContactDeliveryKind, ClaimedContactDelivery>` has `name: "contact"` and builds `{ to: [staffEmail], replyTo: item.email, ...buildStaffContactAlert(item) }`, or `null` without a staff address. It reads no other setting, so the message depends on the row alone.
@@ -226,7 +226,7 @@ The order of checks (`lib/contact/submit.ts`): honeypot → validation → open 
   - Subject: exactly `New BIBO Bay message: ${CONTACT_TOPIC_LABELS[topic]}`, never any submitted text.
   - Intro: "A message arrived through the contact form on the BIBO Bay website."
   - Rows: "Name", "Email (unverified)", "Topic" (the label), and "Received" (`formatReceivedAt(receivedAt)`, giving `YYYY-MM-DD HH:MM UTC`).
-  - Note: "Replying to this email writes to the address above. Nothing on the form proves the sender owns it." (R172)
+  - Note: "Replying to this email writes to the address above. Nothing on the form proves the sender owns it." (R204)
   - Then "Message", with the message escaped, in a block styled `white-space:pre-wrap;overflow-wrap:anywhere`.
   - The text part has the same rows, then a blank line, "Message:" and the message verbatim.
   - The output depends only on its input, so every attempt of a row builds the same message.
@@ -270,7 +270,7 @@ Sanity: a singleton document `contactPage` ("Contact page") with the fields abov
 - `privacyLink` "How we handle your details"
 - `sending` "Saving your message…"
 - `errorSummaryTitle` "Please check the form"
-- `outcome.rateLimited` "A lot of messages are arriving just now. Please wait a few minutes and try again." (R184)
+- `outcome.rateLimited` "A lot of messages are arriving just now. Please wait a few minutes and try again." (R210)
 - `noScript` "This form needs JavaScript. Turn it on in your browser to send a message."
 - `honeypotLabel` "Leave this field empty"
 
@@ -296,20 +296,20 @@ Sanity: a singleton document `contactPage` ("Contact page") with the fields abov
 ### C10. Analytics and readiness
 
 - `lib/analytics/events.ts`: `contact_submitted: ["persisted", "topic"]`. The form calls `track("contact_submitted", { persisted: true, topic })` once, after a persisted answer only (Task 4).
-- `Readiness.contact: boolean` is `contactFormOpen(env)` (R173). It is reported, not required: `ready` is unchanged (Task 2).
+- `Readiness.contact: boolean` is `contactFormOpen(env)` (R205). It is reported, not required: `ready` is unchanged (Task 2).
 
-## R165: the third outbox, place by place
+## R197: the third outbox, place by place
 
-R169 puts the contact alert in its own outbox, so nothing that reads `lead_delivery_events` or a lead kind can meet a contact row. What changes is every place keyed on the outbox name, the outbox list, the send budgets or the outbox log channel.
+R201 puts the contact alert in its own outbox, so nothing that reads `lead_delivery_events` or a lead kind can meet a contact row. What changes is every place keyed on the outbox name, the outbox list, the send budgets or the outbox log channel.
 
 ### TypeScript
 
 | # | Where | Keyed on | What it does with `contact` | Task |
 |---|---|---|---|---|
 | 1 | `lib/outbox/constants.ts:18-19` | `OutboxName` | Gains `"contact"` | T0 |
-| 2 | `lib/outbox/constants.ts:21-40` | `SEND_BUDGETS`, its `satisfies` clause, `SendBudget` | Gain the `contact` entry and its budget, `contact_staff_alert` (R170) | T0 |
+| 2 | `lib/outbox/constants.ts:21-40` | `SEND_BUDGETS`, its `satisfies` clause, `SendBudget` | Gain the `contact` entry and its budget, `contact_staff_alert` (R202) | T0 |
 | 3 | `lib/outbox/constants.ts:42-46` | `sendBudgetFor(outbox, kind)` | No edit. Answers `contact_staff_alert` for `("contact", "contact_staff_alert")`, and `null` for any other kind in `contact` and for `contact_staff_alert` in `leads` or `orders`, so `reserve` fails closed with `unknown_budget` (`lib/outbox/send.ts:31-35`) | T0 (test) |
-| 4 | `lib/outbox/constants.ts:10-12` | `LEAD_DELIVERY_KINDS` | Unchanged (R169; pinned to 0006 by `tests/outbox/migration-policy.test.ts:98`). `CONTACT_DELIVERY_KINDS` sits beside it | T0 |
+| 4 | `lib/outbox/constants.ts:10-12` | `LEAD_DELIVERY_KINDS` | Unchanged (R201; pinned to 0006 by `tests/outbox/migration-policy.test.ts:98`). `CONTACT_DELIVERY_KINDS` sits beside it | T0 |
 | 5 | `lib/outbox/attempt.ts:34`, `:44-59`, `:66` | `OutboxChannel.name: OutboxName`, `OutboxLogEvent` (`budget: SendBudget`), `reserve(kind, outbox: OutboxName)` | No edit: the types widen with #1 and #2. `attemptNext` (`:122`), `attemptNow` (`:171`) and `drainChannel` (`:188`) run the contact channel as they are | none |
 | 6 | `lib/outbox/send.ts:16-48` | `budgetedSends` → `sendBudgetFor(outbox, kind)` | No edit. The send after the answer and the worker spend `send:contact_staff_alert` through it | none |
 | 7 | `lib/outbox/worker.ts:20-30` | `OutboxWorkerInput` (`leads`, `orders`), `context: AttemptContext<LeadDeliveryKind \| OrderEmailKind>` | Gains a required `contact: { outbox: ContactDeliveryOutbox; settings: ContactChannelSettings }`; the context union gains `ContactDeliveryKind` | T2 |
@@ -319,7 +319,7 @@ R169 puts the contact alert in its own outbox, so nothing that reads `lead_deliv
 | 11 | `lib/outbox/log.ts:8-18` | `outboxLogger(channel: "leads" \| "orders" \| "worker")` and its comment | Gains `"contact"`; `lib/contact/dependencies.ts` passes `outboxLogger("contact")` to the send after the answer. The Sentry tags stay event, kind, budget and code | T2 |
 | 12 | `lib/outbox/log.ts:35-37`, `app/api/cron/email-outbox/route.ts:34-38` | `logWorkerRun(tally)`; the route's `{ sent, failed, skipped, deferred }` | No edit: the worker's summed tally includes contact rows. `tests/outbox/cron-route.test.ts` gains a contact case | T2 (test) |
 | 13 | `lib/supabase/outbox.ts:15-28` | module-private `isUuid`, `isText`, `isAttempt`, `batchFrom` | Exported, with no change in behaviour, for `lib/supabase/contact.ts`, which also imports `outcomeArguments` (`:74`) and `recordedFrom` (`:83`). `leadDelivery` (`:30-37`) and the order parsers are unchanged | T1 |
-| 14 | `lib/outbox/leads.ts:28`, `:38-60` (an elimination `if (item.kind === "acknowledgement") … else` staff alert); `lib/leads/submit.ts:43`, `:215` (`sendBudgetFor("leads", kind)`), `:372`; `lib/supabase/leads.ts:9` | lead kinds | Unchanged (R169). They are typed `LeadDeliveryKind` and fed only by `lead_delivery_events`, so no contact row can reach the elimination | none |
+| 14 | `lib/outbox/leads.ts:28`, `:38-60` (an elimination `if (item.kind === "acknowledgement") … else` staff alert); `lib/leads/submit.ts:43`, `:215` (`sendBudgetFor("leads", kind)`), `:372`; `lib/supabase/leads.ts:9` | lead kinds | Unchanged (R201). They are typed `LeadDeliveryKind` and fed only by `lead_delivery_events`, so no contact row can reach the elimination | none |
 | 15 | `lib/outbox/orders.ts:21-46`, `:60`; `lib/orders/dependencies.ts:99` and `lib/admin/dependencies.ts:42` (`outboxLogger("orders")`); `lib/orders/admin.ts:453`; `app/admin/orders/[reference]/page.tsx:210` | order kinds | Order outbox only; unchanged | none |
 | 16 | `tests/outbox/worker.test.ts:78-167` | every `runOutboxWorker` call | `contact` is now required: each existing call gains an empty contact outbox with `staffEmail: null` | T2 |
 | 17 | `tests/scripts/docs-claims.test.ts:360`, `:375` | buckets built from `SEND_BUDGETS.leads` and `.orders` (`toHaveLength(5)`) | Built from every outbox (`Object.values(SEND_BUDGETS).flatMap((budgets) => Object.values(budgets))`, length 6), so the docs must name `send:contact_staff_alert` | T6 |
@@ -330,7 +330,7 @@ R169 puts the contact alert in its own outbox, so nothing that reads `lead_deliv
 |---|---|---|---|
 | S1 | `supabase/migrations/0008_contact_messages.sql` (new) | `submit_contact_message`, `claim_contact_deliveries` and `record_contact_delivery_attempt` (C4). The kind is a positive list; no branch uses `<>`, `!=` or `not in` on a kind | T1 |
 | S2 | `supabase/tests/0006_catalogue.sql:118-131` | The explicit list of functions `service_role` may execute gains `claim_contact_deliveries(integer, uuid)`, `record_contact_delivery_attempt(uuid, text, text, text)` and `submit_contact_message(text, text, text, text)` in `collate "C"` order; the description becomes "(migrations 0001-0008)". The forced-RLS sweep (`:41-45`) and the `service_role` table-privilege sweep (`:81-88`) cover both new tables with no edit | T1 |
-| S3 | `0001:78-96`, `0006:72-79`, `0006:161-406` | The lead outbox table, its constraints and its four functions | Not altered (R169). T1's static gate asserts 0008 names none of them; its pgTAP asserts `lead_delivery_events.lead_id` is still `not null` and the table has no `message_id` or `contact_message_id` column |
+| S3 | `0001:78-96`, `0006:72-79`, `0006:161-406` | The lead outbox table, its constraints and its four functions | Not altered (R201). T1's static gate asserts 0008 names none of them; its pgTAP asserts `lead_delivery_events.lead_id` is still `not null` and the table has no `message_id` or `contact_message_id` column |
 
 ## Task graph and file ownership
 
@@ -362,17 +362,17 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
     - `it.each(CONTACT_FIELD_CASES)("$label", …)`: `checkContactFields(values)` equals `errors`.
     - "stays browser-safe": the file's source matches none of `/server-only|from "zod"|process\.env/`.
   - `availability.test.ts` (with `vi.mock("server-only", () => ({}))`):
-    - "opens only with storage, email sending, a staff address and the hash secret (R173)": with all of `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, a service key, a 32-character `LEAD_IP_HASH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM=BIBO Bay <hello@example.com>` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` it is `true`.
+    - "opens only with storage, email sending, a staff address and the hash secret (R205)": with all of `NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, a service key, a 32-character `LEAD_IP_HASH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM=BIBO Bay <hello@example.com>` and `STAFF_NOTIFICATION_EMAIL=staff@example.com` it is `true`.
     - Dropping any one of those, a 31-character secret, or an `sb_publishable_…` key each gives `false`.
   - `outbox-vocabulary.test.ts`:
     - "names three outboxes": `Object.keys(SEND_BUDGETS)` equals `["leads", "orders", "contact"]`; `CONTACT_DELIVERY_KINDS` equals `["contact_staff_alert"]`.
-    - "gives the contact alert its own budget (R170)": `sendBudgetFor("contact", "contact_staff_alert") === "contact_staff_alert"`; `sendBudgetKey(...) === "send:contact_staff_alert"`.
+    - "gives the contact alert its own budget (R202)": `sendBudgetFor("contact", "contact_staff_alert") === "contact_staff_alert"`; `sendBudgetKey(...) === "send:contact_staff_alert"`.
     - "never charges a contact alert to another outbox": `sendBudgetFor("leads", "contact_staff_alert")`, `sendBudgetFor("orders", "contact_staff_alert")` and `sendBudgetFor("contact", "staff_alert")` are `null`.
-    - "leaves the lead outbox's kinds alone (R169)": `LEAD_DELIVERY_KINDS` still equals `["acknowledgement", "staff_alert"]`.
+    - "leaves the lead outbox's kinds alone (R201)": `LEAD_DELIVERY_KINDS` still equals `["acknowledgement", "staff_alert"]`.
 - [ ] **Step 2: Run `npx vitest run tests/contact`.** Expected: FAIL (the modules do not exist).
 - [ ] **Step 3: Implement C1, C2 and C3 exactly as specified.**
 - [ ] **Step 4: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/contact tests/outbox tests/leads`. Expected: all pass.
-- [ ] **Step 5: Commit** these paths: `feat(contact): shared field rules, the contact outbox vocabulary and availability (R158-R173 contracts)`.
+- [ ] **Step 5: Commit** these paths: `feat(contact): shared field rules, the contact outbox vocabulary and availability (R190-R205 contracts)`.
 
 ### Task 1: Database: migration 0008, pgTAP, static gate and the Supabase adapter
 
@@ -400,8 +400,8 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - each of the three functions is `security definer` with `set search_path = ''`, revoked from `public, anon, authenticated`, and `grant execute ... to service_role` only;
   - the topic list in the table and the RPC equals `CONTACT_TOPICS`, and the bounds 80, 254, 10 and 3000 equal `CONTACT_LIMITS`;
   - the kind check lists exactly `CONTACT_DELIVERY_KINDS`; the status check lists exactly `pending, sending, sent, failed`, each of them in `OUTBOX_STATUSES`; the file matches no `/kind\s*(<>|!=|not in)\s*\(?'/`;
-  - the claim uses `interval '15 minutes'` and `attempts >= 8` (equal to `OUTBOX_LIMITS`), and no hours interval (R185); the record function uses the 6-hour cap `least(interval '6 hours', interval '1 minute' * power(2, least(delivery.attempts, 12)))`, `public.outbox_failure_unconfirmed` and each of `OUTBOX_FINAL_FAILURE_CODES`; it returns `found`;
-  - "never names a lead object (R169)": no match for `/\blead_delivery_events\b|\blead_submissions\b|\benqueue_lead_delivery\b|\bclaim_lead_deliveries\b|\brecord_lead_delivery_attempt\b|\bsubmit_lead\b/`;
+  - the claim uses `interval '15 minutes'` and `attempts >= 8` (equal to `OUTBOX_LIMITS`), and no hours interval (R211); the record function uses the 6-hour cap `least(interval '6 hours', interval '1 minute' * power(2, least(delivery.attempts, 12)))`, `public.outbox_failure_unconfirmed` and each of `OUTBOX_FINAL_FAILURE_CODES`; it returns `found`;
+  - "never names a lead object (R201)": no match for `/\blead_delivery_events\b|\blead_submissions\b|\benqueue_lead_delivery\b|\bclaim_lead_deliveries\b|\brecord_lead_delivery_attempt\b|\bsubmit_lead\b/`;
   - no column named `ip`, `inet` or `user_agent`.
 - [ ] **Step 6: Write the failing pgTAP file `supabase/tests/0007_contact_messages.sql`.** Follow the harness rules: `begin; select plan(N);` … `select * from finish(); rollback;`; temp tables created under `set local role service_role`; owner-only updates after `reset role`; order by `::text collate "C"`; N equal to the asserts written. Its asserts:
   - both tables have RLS enabled and forced, and no policies;
@@ -417,14 +417,14 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - a `sending` row whose `claimed_at` is 16 minutes old is re-claimed with the same id and the next attempt; at 25 hours it is parked (`failed`, `stale_unconfirmed`, `next_attempt_at = 'infinity'`, `expired` = 1);
   - as the owner: a delivery of kind `staff_alert` violates `23514`, and a second `contact_staff_alert` for the same message violates `23505`;
   - deleting the message removes its delivery;
-  - the lead outbox is as 0006 left it (R169): `col_not_null('public', 'lead_delivery_events', 'lead_id')`, and `hasnt_column` for `message_id` and `contact_message_id` on `lead_delivery_events`.
+  - the lead outbox is as 0006 left it (R201): `col_not_null('public', 'lead_delivery_events', 'lead_id')`, and `hasnt_column` for `message_id` and `contact_message_id` on `lead_delivery_events`.
 - [ ] **Step 7: Update the existing harness to fail first.**
   - `0006_catalogue.sql:118-131`: add `claim_contact_deliveries(integer, uuid)`, `record_contact_delivery_attempt(uuid, text, text, text)` and `submit_contact_message(text, text, text, text)` in `collate "C"` order (each sorts just before its lead counterpart); the description becomes "(migrations 0001-0008)".
   - `migration-database.test.ts`: the header comment says 0001-0008; "applies 0001 to 0008 in order", with `0008_contact_messages.sql` in the list; the pgTAP list gains `0007_contact_messages.sql`.
   - Three new cases there: "leaves the contact functions and both contact tables owned by a role that bypasses RLS"; "keeps the contact rules after a second application of every migration" (runs `0007_contact_messages.sql` again); and, under "migration preconditions", "refuses to apply the contact migration before the staff migration" (every file except 0007 and 0008, then `0008_contact_messages.sql` rejects with `/must be applied before 0008/`).
 - [ ] **Step 8: Run `npx vitest run tests/contact/migration-policy.test.ts tests/orders/migration-database.test.ts tests/leads/migration-database.test.ts`.** Expected: FAIL first (Steps 5–7 written before 0008 was complete), then PASS once 0008 meets C4. Then mutate a scratch copy of 0008 three times: drop the `attempts >= 8` park branch, raise the backoff cap to 12 hours, and remove `force row level security` from `contact_message_deliveries`. Watch the matching pgTAP, static or catalogue assert fail each time, and restore the exact bytes (check for CRLF in archive copies).
 - [ ] **Step 9: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/contact tests/outbox tests/orders tests/leads tests/admin`. Expected: all pass.
-- [ ] **Step 10: Hand back** the paths: `feat(contact): contact_messages, its own delivery outbox and RPCs (migration 0008, R159, R169)`.
+- [ ] **Step 10: Hand back** the paths: `feat(contact): contact_messages, its own delivery outbox and RPCs (migration 0008, R191, R201)`.
 
 ### Task 2: Server: validation, the route, the alert, the channel, the worker and readiness
 
@@ -436,7 +436,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
 - Consumes: C1–C3; `createSupabaseContactRepository` (Task 1); `isJsonRequest` and `readBodyWithLimit(request, limit)` (`lib/leads/http.ts:129`, `:94`); `clientKeyFromHeaders` (`:21`); `hashSecretFrom` (`lib/security/secrets.ts:13`); `getSupabaseAdminEnvironment` and `createSupabaseAdminClient` (`lib/supabase/admin.ts`); `createSupabaseRateLimiter` and `createMemoryRateLimiter` (`lib/security/rate-limit.ts`); `createEmailSenderFromEnv` and `getStaffNotificationEmail` (`lib/email/client.ts`); `ackSendLimitPerHour` (`lib/leads/dependencies.ts:70`); `errorCodeOf` (`lib/leads/submit.ts:171`); `budgetedSends` (`lib/outbox/send.ts:16`); `attemptNow` (`lib/outbox/attempt.ts:171`); `outboxLogger` (`lib/outbox/log.ts:18`); `reportError` and `reportEvent` (`lib/observability/report.ts`).
 - Produces:
   - `validateContactSubmission(input: unknown): { ok: true; data: ContactRecordInput } | { ok: false; fieldErrors: ContactFieldErrors; formError?: "invalid_body" | "unexpected_fields" }`.
-  - `submitContactMessage(input: unknown, dependencies: ContactSubmissionDependencies): Promise<{ status: 200 | 400 | 429 | 500 | 503; body: ContactApiBody; retryAfterSeconds?: number }>`, with `ContactSubmissionDependencies`, `ContactLogEvent` (C5), `CONTACT_BODY_LIMIT_BYTES`, `CONTACT_RATE_LIMIT = { scope: "contact", maxHits: 3, windowSeconds: 600 }`, `CONTACT_GLOBAL_RATE_LIMIT = { key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds }` with its cap from `globalLimitPerHour` (R171, R186) and `CONTACT_API_MESSAGES` (C5).
+  - `submitContactMessage(input: unknown, dependencies: ContactSubmissionDependencies): Promise<{ status: 200 | 400 | 429 | 500 | 503; body: ContactApiBody; retryAfterSeconds?: number }>`, with `ContactSubmissionDependencies`, `ContactLogEvent` (C5), `CONTACT_BODY_LIMIT_BYTES`, `CONTACT_RATE_LIMIT = { scope: "contact", maxHits: 3, windowSeconds: 600 }`, `CONTACT_GLOBAL_RATE_LIMIT = { key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds }` with its cap from `globalLimitPerHour` (R203, R212) and `CONTACT_API_MESSAGES` (C5).
   - `createContactDependencies(request: Request, env?): ContactSubmissionDependencies` (synchronous; no CMS read) and `logContactEvent(entry: ContactLogEvent): void`.
   - `buildStaffContactAlert` and `formatReceivedAt` (C6).
   - `ContactChannelSettings`, `contactKindsFor`, `contactAlertChannel` and `createContactAlertSender` (C6).
@@ -451,7 +451,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
     - "puts only the topic label in the subject": exactly `New BIBO Bay message: Press and media`, containing neither the name, the address nor the message.
     - "escapes every value": `<script>` appears only as `&lt;script&gt;`; `&` as `&amp;`.
     - "keeps the message verbatim in the text part and wraps it in HTML": `pre-wrap`, `overflow-wrap:anywhere`.
-    - "labels the address unverified and explains the reply (R172)".
+    - "labels the address unverified and explains the reply (R204)".
     - "formats the time": `formatReceivedAt("2026-10-21T09:30:12.345+00:00") === "2026-10-21 09:30 UTC"`.
     - "is deterministic": two builds are deep-equal.
   - `contact-channel.test.ts`:
@@ -472,7 +472,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
     - "field errors answer 400 in field order and store nothing".
     - "while closed it answers 503 with closed: true before any limiter or write" (`open: false`; and `open: true` with `repository: null`), logging `contact_unconfigured`.
     - "limits each client to 3 per 10 minutes under contact:<clientKey>": `consume("contact:k", { maxHits: 3, windowSeconds: 600 })`; the fourth call gets 429 with `retryAfterSeconds > 0`.
-    - "caps all messages per hour under contact:global at the alert's hourly send cap it is given, checked after the client limit (R186)".
+    - "caps all messages per hour under contact:global at the alert's hourly send cap it is given, checked after the client limit (R212)".
     - "fails closed with 503, not closed, when the limiter is missing or throws".
     - "stores exactly the normalised record and answers persisted only after both ids return".
     - "a write failure answers 500 and calls sendAlert never".
@@ -482,9 +482,9 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - `contact-route.test.ts` (mocking `server-only`, `@supabase/supabase-js` `createClient`, `next/server` `after` and `resend` exactly as `tests/leads/lead-route.test.ts` does; env via `vi.stubEnv`):
     - The status cases: 415 when not JSON; 413 for `content-length` above 32 KB and for a streamed body above it; 400 for bad JSON.
     - "a stored message makes exactly these RPC calls in this order": `consume_rate_limit` (`contact:<hmac>`), `consume_rate_limit` (`contact:global`), `submit_contact_message`; then, from `after()`: `claim_contact_deliveries` (`{ p_limit: 1, p_message_id: <id> }`), `consume_rate_limit` (`send:contact_staff_alert`), `record_contact_delivery_attempt`. Resend gets one send to the staff address with `replyTo` the sender.
-    - "two IPv6 addresses in one /64 share the contact bucket" (R171).
+    - "two IPv6 addresses in one /64 share the contact bucket" (R203).
     - "every answer is no-store, and 429 carries retry-after".
-    - "answers 503 closed while STAFF_NOTIFICATION_EMAIL is unset, though storage and email are configured", and likewise with a 31-character `LEAD_IP_HASH_SECRET` (R173).
+    - "answers 503 closed while STAFF_NOTIFICATION_EMAIL is unset, though storage and email are configured", and likewise with a 31-character `LEAD_IP_HASH_SECRET` (R205).
     - "an unexpected throw answers 500 and is reported under area contact".
     - "never writes the name, the address or the message to the log".
   - `worker.test.ts`: every existing `runOutboxWorker` call gains `contact: { outbox: <empty queue>, settings: { staffEmail: null } }`, and their expectations are unchanged. New cases:
@@ -499,13 +499,13 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - `lib/contact/submit.ts`: the C5 order; after the answer it runs `sendAlert(messageId)` inside `runAfterResponse` when given, catching any throw, as `lib/orders/submit.ts:251-265` does.
   - `lib/contact/dependencies.ts`: storage only with both the admin environment and the hash secret (as `storageFrom`, `lib/orders/dependencies.ts:68-72`); `open: contactFormOpen(env)`; `sendAlert` only with storage, email and a staff address: `createContactAlertSender(repository, { staffEmail }, budgetedSends<ContactDeliveryKind>({ rateLimiter, sendLimitPerHour: ackSendLimitPerHour(env), mailer: email.sender, log: outboxLogger("contact") }))`; `runAfterResponse: (task) => after(task)`, with the `src` line citing the Next `after` guide.
   - `app/api/contact/route.ts`: `runtime = "nodejs"`, the same shape as `app/api/leads/route.ts`.
-  - `lib/outbox/worker.ts`: R165 #7–#8; the module comment names the third outbox and the drain order.
-  - `lib/outbox/dependencies.ts`: R165 #9–#10.
+  - `lib/outbox/worker.ts`: R197 #7–#8; the module comment names the third outbox and the drain order.
+  - `lib/outbox/dependencies.ts`: R197 #9–#10.
   - `readinessChecks`: `contact: contactFormOpen(env)`.
   - `e2e/ops/health.spec.ts`: `READINESS_KEYS` gains `"contact"`; keyless asserts `body.contact === false`; configured asserts `typeof body.contact === "boolean"`.
 - [ ] **Step 8: Run the Step 6 command.** Expected: PASS. Mutation-check the order guards: with honeypot-after-validation, the global limit before the client limit, or the contact drain before the signup drain, a test must fail. Restore the code.
 - [ ] **Step 9: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/contact tests/outbox tests/ops tests/leads tests/orders tests/observability`. Expected: all pass. The e2e health spec is run by the controller.
-- [ ] **Step 10: Hand back** the paths: `feat(contact): POST /api/contact, the staff alert through the contact outbox, the worker's third outbox, readiness contact (R159-R161, R165, R169-R173)`.
+- [ ] **Step 10: Hand back** the paths: `feat(contact): POST /api/contact, the staff alert through the contact outbox, the worker's third outbox, readiness contact (R191-R193, R197, R201-R205)`.
 
 ### Task 3: CMS content model and Studio
 
@@ -539,7 +539,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
 - [ ] **Step 3: Implement C7** in the files listed above. The Studio field titles are plain words, and each field's description says where on the page its text shows.
 - [ ] **Step 4: Run the Step 2 command.** Expected: PASS.
 - [ ] **Step 5: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/content tests/security tests/landing && npm --prefix studio run typecheck`. Expected: all pass. The controller runs `SANITY_STUDIO_PROJECT_ID=ci-placeholder SANITY_STUDIO_DATASET=production npm --prefix studio run build` in the clean copy.
-- [ ] **Step 6: Hand back** the paths: `feat(contact): the Contact page document, footer label and fallback copy (R163)`.
+- [ ] **Step 6: Hand back** the paths: `feat(contact): the Contact page document, footer label and fallback copy (R195)`.
 
 ### Task 4: The contact form component
 
@@ -562,7 +562,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - "429 shows the chrome rate-limit message; 500 and a network failure show the CMS error; none tracks".
   - "server field errors move focus to the summary".
   - "ignores a second submit while saving: fetch is called once, the button is disabled and aria-busy, the status says Saving your message…".
-  - "keeps exactly one role=status element in the form (R167)".
+  - "keeps exactly one role=status element in the form (R199)".
   - "server HTML has the button disabled until hydration" (`renderToString`).
   - "the honeypot is aria-hidden, out of the tab order, with autocomplete off".
   - "the privacy link follows the submit button".
@@ -573,7 +573,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
 - [ ] **Step 3: Implement it, mirroring `components/forms/LeadForm.tsx`:** `useHydrated`, `pendingRef`, the summary focus effect, the focus-return effect (button only, never the status line), the reserved-height outcome wrappers holding `successMessage`, `errorMessage`, `closedMessage` and `rateLimited`, and the `noscript` line. Reuse the `lead-form__*` classes.
 - [ ] **Step 4: Run the Step 2 command.** Expected: PASS.
 - [ ] **Step 5: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/contact tests/analytics tests/leads`. Expected: all pass.
-- [ ] **Step 6: Hand back** the paths: `feat(contact): the accessible contact form and its consent-gated event (R162, R166, R167)`.
+- [ ] **Step 6: Hand back** the paths: `feat(contact): the accessible contact form and its consent-gated event (R194, R198, R199)`.
 
 ### Task 5: The page, footer, SEO, legal text, deployment checks and browser specs
 
@@ -608,13 +608,13 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - `metadata.test.ts`: "sitemapFor lists /contact only when contactListed and the site is indexable".
   - `legal-pages.test.tsx`:
     - "the text is unchanged while the form is closed": the existing `toBe(LEGAL_FALLBACK)` pins stay.
-    - A new `describe("while the contact form is open (R164)")` with the C3 placeholder environment:
+    - A new `describe("while the contact form is open (R196)")` with the C3 placeholder environment:
       - "says what a message stores: name, email address, topic, message and when it was sent";
-      - "says the team receives it by email with the sender's address to reply to, and that the website does not email the sender" (R172);
+      - "says the team receives it by email with the sender's address to reply to, and that the website does not email the sender" (R204);
       - "names contact messages among what Supabase stores";
-      - "counts messages against the keyed code, by the hour in total, never storing the address" (R171);
-      - "states no retention period: nothing deletes them automatically and none has been set" (R174);
-      - "gives the basis: a legitimate interest in replying to people who write to us" (R174).
+      - "counts messages against the keyed code, by the hour in total, never storing the address" (R203);
+      - "states no retention period: nothing deletes them automatically and none has been set" (R206);
+      - "gives the basis: a legitimate interest in replying to people who write to us" (R206).
   - `deployment-checks.test.ts`: `PAYLOAD_PATHS` equals `["/", "/privacy", "/terms", "/thank-you", "/contact"]`; `FORM_API_PATHS` is pinned.
 - [ ] **Step 2: Run `npx vitest run tests/contact tests/seo tests/content tests/scripts`.** Expected: FAIL.
 - [ ] **Step 3: Implement it.**
@@ -648,17 +648,17 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
   - The same build started with the placeholder service environment set at `next start` time (`NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.com`, `SUPABASE_SERVICE_ROLE_KEY=service-role-fixture-value`, `LEAD_IP_HASH_SECRET=e2e-placeholder-hash-secret-0123456789abcdef`, `RESEND_API_KEY=re_fixture`, `RESEND_FROM=BIBO Bay <hello@example.com>`, `STAFF_NOTIFICATION_EMAIL=staff@example.com`): run `E2E_CONTACT_OPEN=1 PLAYWRIGHT_BASE_URL=<url> npx playwright test e2e/contact`. Only that directory runs against it.
   - Curls on the keyless copy: GET `/api/contact` gives 405; a non-JSON POST gives 415; `{}` gives 400; a valid body gives 503 with `closed: true`.
   - Screenshots of `/contact` at 390, about 1100 and 1440 px, closed and open, including the error summary and a routed success.
-- [ ] **Step 7: Hand back** the paths: `feat(contact): /contact page, footer link, sitemap, legal text and browser specs (R158, R161, R164, R167, R174)`.
+- [ ] **Step 7: Hand back** the paths: `feat(contact): /contact page, footer link, sitemap, legal text and browser specs (R190, R193, R196, R199, R206)`.
 
 ### Task 6: Docs, README, CHANGELOG and their pins
 
 **Files:**
-- Modify: `README.md` (a status row), `CHANGELOG.md` (a dated entry naming R158–R174), `docs/architecture.md` (the `/contact` and `/api/contact` rows; the contact flow; the worker's three outboxes), `docs/database-security.md` (the `contact_messages` and `contact_message_deliveries` rows; the three functions; the buckets `contact:<hmac>`, `contact:global` and `send:contact_staff_alert`; that the lead outbox is unchanged), `docs/deployment.md` (readiness `contact`; `STAFF_NOTIFICATION_EMAIL` also opens the form; the new budget; the R180 restore sentence, below), `docs/observability.md` (`contact_submitted`; the `contact_*` log events and `contact_route_failed`; the `contact` outbox log channel; the budget), `docs/cms-operations.md` (the Contact page document; the footer label; seeded documents 32 → 33; the redeploy after a schema change), `docs/data-protection.md` (below), `docs/incident-runbook.md` (a parked contact alert: query `contact_message_deliveries` joined to `contact_messages` where `next_attempt_at = 'infinity'`, read the message, reply by hand), `docs/qa-checklist.md` (the contact-open run), `tests/scripts/docs-claims.test.ts`
+- Modify: `README.md` (a status row), `CHANGELOG.md` (a dated entry naming R190–R206), `docs/architecture.md` (the `/contact` and `/api/contact` rows; the contact flow; the worker's three outboxes), `docs/database-security.md` (the `contact_messages` and `contact_message_deliveries` rows; the three functions; the buckets `contact:<hmac>`, `contact:global` and `send:contact_staff_alert`; that the lead outbox is unchanged), `docs/deployment.md` (readiness `contact`; `STAFF_NOTIFICATION_EMAIL` also opens the form; the new budget; the R180 restore sentence, below), `docs/observability.md` (`contact_submitted`; the `contact_*` log events and `contact_route_failed`; the `contact` outbox log channel; the budget), `docs/cms-operations.md` (the Contact page document; the footer label; seeded documents 32 → 33; the redeploy after a schema change), `docs/data-protection.md` (below), `docs/incident-runbook.md` (a parked contact alert: query `contact_message_deliveries` joined to `contact_messages` where `next_attempt_at = 'infinity'`, read the message, reply by hand), `docs/qa-checklist.md` (the contact-open run), `tests/scripts/docs-claims.test.ts`
 
-`docs/data-protection.md` (R174): a row in "Personal data the site handles" for contact messages (name, email, topic, message and time; stored in `contact_messages`, alert records in `contact_message_deliveries`; basis (f) legitimate interest in replying; kept with no period set); under item 8, a question for the legal review naming the privacy sentence that gives that basis; under item 9 (Retention), "how long contact messages are kept (none is set; the code never deletes them)"; under "Handling a request from a person", how to find and delete a person's messages by SQL (their delivery rows cascade).
+`docs/data-protection.md` (R206): a row in "Personal data the site handles" for contact messages (name, email, topic, message and time; stored in `contact_messages`, alert records in `contact_message_deliveries`; basis (f) legitimate interest in replying; kept with no period set); under item 8, a question for the legal review naming the privacy sentence that gives that basis; under item 9 (Retention), "how long contact messages are kept (none is set; the code never deletes them)"; under "Handling a request from a person", how to find and delete a person's messages by SQL (their delivery rows cascade).
 
 - [ ] **Step 1: Write the failing pins** (`docs-claims.test.ts`):
-  - `:360` and `:375`: the bucket lists come from every outbox (R165 #17), with `toHaveLength(6)`;
+  - `:360` and `:375`: the bucket lists come from every outbox (R197 #17), with `toHaveLength(6)`;
   - `deployment.md` contains `` `contact` `` in the readiness row, and the `STAFF_NOTIFICATION_EMAIL` row says it also opens the contact form;
   - `database-security.md` contains `` `contact_messages` ``, `` `contact_message_deliveries` ``, `` `submit_contact_message` ``, `` `claim_contact_deliveries` ``, `` `record_contact_delivery_attempt` `` and `` `contact:global` ``;
   - `observability.md` contains `` `contact_submitted` ``, `` `contact_route_failed` `` and every warning event logged in `lib/contact/submit.ts` (matched as `{ event: "<name>"` and filtered by `/_(failed|unavailable|unconfigured|invalid)$/`, as the O-I5 pin does);
@@ -670,7 +670,7 @@ There are at most three implementers at once: T1, T2, and T3 followed by T4 in t
 - [ ] **Step 2: Run `npx vitest run tests/scripts`.** Expected: FAIL.
 - [ ] **Step 3: Write the docs.** Describe only what the code does; never a retention period; no new npm script names. Add `docs/database-security.md` to the R180 restore sentence in `docs/deployment.md` (it already says "once a day on Hobby", pinned at `:252-254`, but the list omits it). In files outside that list, write "the next cron run" with a link, never "once a day".
 - [ ] **Step 4: Gate.** Run `npm run typecheck && npm run lint && npx vitest run tests/scripts`, then the full `npx vitest run`. Expected: all pass, including `docs-hygiene.test.ts` once the files are staged (it scans tracked files only).
-- [ ] **Step 5: Hand back** the paths: `docs(contact): routes, tables, the contact outbox, readiness, editors' and owner's steps (R158-R174)`. Then the controller runs the whole-slice review and the ship gate, and opens the PR.
+- [ ] **Step 5: Hand back** the paths: `docs(contact): routes, tables, the contact outbox, readiness, editors' and owner's steps (R190-R206)`. Then the controller runs the whole-slice review and the ship gate, and opens the PR.
 
 ## After merge: owner steps
 

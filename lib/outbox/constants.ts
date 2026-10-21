@@ -17,7 +17,7 @@ export const ORDER_EMAIL_KINDS = ["acknowledgement", "staff_alert", "quote"] as 
 export type OrderEmailKind = (typeof ORDER_EMAIL_KINDS)[number];
 
 /**
- * The contact form's one message (migration 0008). Ruling R169: it has an outbox of its own,
+ * The contact form's one message (migration 0008). Ruling R201: it has an outbox of its own,
  * `contact_message_deliveries`, and is not a kind of the lead outbox.
  */
 export const CONTACT_DELIVERY_KINDS = ["contact_staff_alert"] as const;
@@ -41,7 +41,7 @@ export type OutboxName = "leads" | "orders" | "contact";
  * Both send paths and the cron worker spend the bucket of the row's own kind, so a flood of signups
  * from fresh addresses spends the two signup buckets and nothing else: order emails, staff quotes
  * and contact alerts keep their own hour. Replaces the single shared `ack-send:global` bucket of
- * ruling R40. The contact alert's own bucket is ruling R170.
+ * ruling R40. The contact alert's own bucket is ruling R202.
  */
 export const SEND_BUDGETS = {
   leads: { acknowledgement: "lead_acknowledgement", staff_alert: "lead_staff_alert" },
@@ -72,7 +72,7 @@ export const OUTBOX_LIMITS = {
   /**
    * An unconfirmed send of the signup and order outboxes is retried only within this many hours of
    * the attempt that made it unconfirmed: the provider keeps an idempotency key for 24 hours (R91).
-   * The contact outbox has no such window: its staff alert is retried until `maxAttempts` (R185).
+   * The contact outbox has no such window: its staff alert is retried until `maxAttempts` (R211).
    */
   idempotencyWindowHours: 23,
 } as const;

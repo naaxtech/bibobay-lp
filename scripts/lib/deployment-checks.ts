@@ -297,7 +297,7 @@ async function readJson(response: Response): Promise<unknown> {
 export const PAYLOAD_PATHS = ["/", "/privacy", "/terms", "/thank-you", "/contact"] as const;
 
 /**
- * The form APIs the browser verifier must never call: each is blocked and reported (R167), so a
+ * The form APIs the browser verifier must never call: each is blocked and reported (R199), so a
  * verification run cannot store a signup or a contact message, or send an alert.
  */
 export const FORM_API_PATHS = ["/api/leads", "/api/contact"] as const;

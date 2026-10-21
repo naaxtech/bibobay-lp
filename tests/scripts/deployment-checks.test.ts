@@ -436,7 +436,7 @@ describe("runFetchChecks client payload scan of switchable pages", () => {
     expect([...GATED_PAYLOAD_PATHS]).toEqual(["/shop", "/order", "/track"]);
   });
 
-  it("pins the form API paths the browser verifier blocks (R167)", () => {
+  it("pins the form API paths the browser verifier blocks (R199)", () => {
     expect([...FORM_API_PATHS]).toEqual(["/api/leads", "/api/contact"]);
   });
 

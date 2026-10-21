@@ -6,7 +6,7 @@
 export const DELIVERY_CLAIM_PATTERN = /\b(sent|emailed|deliver(ed|y)?|inbox|check your (email|mail)|we('ve| have) emailed)\b/i;
 
 /**
- * The contact success message check (R160): the form saves a message and never says it was
+ * The contact success message check (R192): the form saves a message and never says it was
  * emailed or delivered. `true` when fine, else the message the editor sees.
  */
 export function deliveryClaimProblem(value: unknown): string | true {

@@ -26,7 +26,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("the footer's contact link (R158)", () => {
+describe("the footer's contact link (R190)", () => {
   it("shows the CMS Contact us link to /contact only when contactOpen", () => {
     render(<Footer settings={withLabel} contactOpen />);
     expect(footerNav().getByRole("link", { name: "Write to us" }).getAttribute("href")).toBe("/contact");

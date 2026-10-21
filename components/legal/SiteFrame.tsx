@@ -23,7 +23,7 @@ export interface SiteFrameProps {
 /**
  * The frame every page but the landing page shares: skip link, the preview notice in draft mode, a
  * header with the canonical logo linking home, the page's `<main>` on paper, and the site footer,
- * which links to /contact while the contact form is open (R158).
+ * which links to /contact while the contact form is open (R190).
  * Inside the motion layer, so buttons keep their tactile press like on the landing page.
  */
 export function SiteFrame({ settings, preview, mainClassName, headerAction, children }: SiteFrameProps) {

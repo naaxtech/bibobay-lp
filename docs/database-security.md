@@ -75,7 +75,7 @@ the claim refused to send it). The signup and order outboxes use these states; t
   means the row exists, never that an email went out.
 - If the provider accepts an email but recording the result fails, the row
   stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. The shared key means the
-  provider does not deliver it twice. A contact staff alert is re-sent whatever its age, until its eighth attempt (R185); after a day the
+  provider does not deliver it twice. A contact staff alert is re-sent whatever its age, until its eighth attempt (R211); after a day the
   provider has forgotten the key, so staff may get that alert twice.
 - The cron worker (`/api/cron/email-outbox`, Task 8a) sends due `pending` and `failed` rows and
   re-claims stale `sending` ones through the same claim functions as the sends made right after
@@ -89,7 +89,7 @@ the claim refused to send it). The signup and order outboxes use these states; t
 |---|---|---|
 | Signups per client | `lead:<HMAC of the client address>` | 5 per 10 minutes. IPv4 addresses are counted whole; IPv6 addresses per /64; an IPv4-mapped IPv6 address as IPv4; anything unreadable in one shared bucket. |
 | Contact messages per client | `contact:<HMAC of the client address>` | 3 per 10 minutes, keyed like the signup limit (IPv6 per /64). Checked first. |
-| Contact messages in all | `contact:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) from everyone together, the contact alert's own send cap (R186), so the form never stores more messages in an hour than their alerts can announce. Checked second. |
+| Contact messages in all | `contact:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) from everyone together, the contact alert's own send cap (R212), so the form never stores more messages in an hour than their alerts can announce. Checked second. |
 | Emails sent straight away | `send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`, `send:quote`, `send:contact_staff_alert` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) in each bucket; the outbox worker spends the bucket of the row's kind. A full bucket defers only its own kind. Over the cap the signup, order or contact message is still stored and the email waits `pending`. |
 
 The limiter is the database whenever Supabase is configured. If it is unavailable the signup fails
@@ -161,7 +161,7 @@ Claim rules:
   a send whose outcome is unknown is retried only within 23 hours. After that the claim parks it as
   `failed` with `stale_unconfirmed` and `next_attempt_at` = infinity, for a human to check; it is
   counted as `expired`. This is the signup and order outboxes' rule; the contact outbox has no such
-  window (R185, [Contact messages](#contact-messages-migration-0008)).
+  window (R211, [Contact messages](#contact-messages-migration-0008)).
 - **At most 8 attempts.** The eighth failure, and a provider answer that the idempotency key was
   already used for another message (`invalid_idempotent_request`), are final: `failed` with
   `next_attempt_at` = infinity. Infinity is the terminal marker; no status value was added for it.
@@ -240,7 +240,7 @@ rather than run unthrottled.
 
 ## Contact messages (migration 0008)
 
-`0008_contact_messages.sql` (rulings R159, R169) stores what a grown-up writes through the contact form
+`0008_contact_messages.sql` (rulings R191, R201) stores what a grown-up writes through the contact form
 and gives its staff alert an outbox of its own. It needs `0001` to `0007` applied first (it checks for
 `outbox_failure_unconfirmed` from `0006` and `is_active_staff` from `0007`) and runs as a role that
 bypasses row level security. The lead outbox (`lead_delivery_events`), its constraints and its functions
@@ -263,20 +263,20 @@ the only way in.
 - The rules are those of the signup outbox (`0006`, [Email outbox](#email-outbox-migration-0006)) but
   one: due means `pending` or `failed` with `next_attempt_at` reached, or `sending` for over 15
   minutes; at most 8 attempts; backoff 2, 4, 8 … minutes capped at 6 hours; `invalid_idempotent_request`
-  is final. The exception: an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt (R185),
+  is final. The exception: an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt (R211),
   never parked after 23 hours. Once the provider has forgotten the key (24 hours) a retry is a new
   send, so staff may get an alert twice; that is accepted, because a lost alert leaves a stored message
   nobody reads. `unconfirmed_since` still records when a send became unconfirmed, so staff can see a
   possible duplicate. A parked row (out of attempts, or `invalid_idempotent_request`; a lost eighth
   attempt is `stale_unconfirmed`) has `next_attempt_at` = infinity and is reported as
   `delivery_expired`.
-- There is no `skipped` status (a contact message cannot be withdrawn, R175), so the claim always
+- There is no `skipped` status (a contact message cannot be withdrawn, R207), so the claim always
   answers `"skipped": 0`.
 - The provider idempotency key is `contact-delivery/<row id>`, built in code (`lib/outbox/contact.ts`).
 - The send bucket is `send:contact_staff_alert`, capped by `LEAD_ACK_SEND_LIMIT_PER_HOUR`; the
-  overall message limit `contact:global` uses the same cap (R186, [Rate limits](#rate-limits)).
+  overall message limit `contact:global` uses the same cap (R212, [Rate limits](#rate-limits)).
 - Nothing deletes a message or its alert row, and no retention period is set
-  ([data-protection.md](data-protection.md)). There is no inbox page (R168): read messages in the alert
+  ([data-protection.md](data-protection.md)). There is no inbox page (R200): read messages in the alert
   email, or by SQL ([incident-runbook.md](incident-runbook.md#contact-messages)).
 
 ## Tests

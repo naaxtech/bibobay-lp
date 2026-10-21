@@ -34,13 +34,13 @@ describe("the contact form's chrome copy", () => {
     expect(CONTACT_FORM_COPY.errors.message.too_long).toContain("3,000");
   });
 
-  it("says nothing about the visitor's connection when rate-limited: the 429 may come from the per-client or the global bucket (R184)", () => {
+  it("says nothing about the visitor's connection when rate-limited: the 429 may come from the per-client or the global bucket (R210)", () => {
     expect(CONTACT_FORM_COPY.outcome.rateLimited).toBe("A lot of messages are arriving just now. Please wait a few minutes and try again.");
     expect(CONTACT_FORM_COPY.outcome.rateLimited).not.toMatch(/\b(connection|from here|you have|your)\b/i);
     expect(CONTACT_FORM_COPY.outcome.rateLimited).not.toMatch(DELIVERY_CLAIM_PATTERN);
   });
 
-  it("is imported by the browser spec, never copied into it, so the spec cannot expect stale wording (R184)", () => {
+  it("is imported by the browser spec, never copied into it, so the spec cannot expect stale wording (R210)", () => {
     const spec = readFileSync(resolve("e2e/contact/contact-form.spec.ts"), "utf8");
     expect(spec).toContain('import { CONTACT_FORM_COPY } from "@/components/forms/contact-copy";');
     for (const text of strings(CONTACT_FORM_COPY)) expect(spec, text).not.toContain(`"${text}"`);

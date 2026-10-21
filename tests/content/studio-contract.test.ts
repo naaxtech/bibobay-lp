@@ -65,7 +65,7 @@ describe("Studio content model", () => {
     covers("leadSection", ["eyebrow", "heading", "description", "image", "buttonLabel", "consentCopy", "successMessage", "errorMessage", "leadMagnet"]);
     covers("navigationSettings", ["links", "primaryCta", "commerceLabel"]);
     covers("footerSettings", ["text", "legalLinks", "contactLabel", "contactPageLabel"]);
-    // R158, R163: the contact page's copy, one editable field per visible string.
+    // R190, R195: the contact page's copy, one editable field per visible string.
     covers("contactPage", ["seo", "heading", "description", "buttonLabel", "successMessage", "errorMessage", "closedMessage", "emailIntro"]);
     expect(types.get("contactPage")?.type).toBe("document");
     expect(fields("contactPage").get("seo")?.type).toBe("seo");
@@ -182,7 +182,7 @@ describe("the order consent version check (Task 7c review M5a, M5b)", () => {
   });
 });
 
-describe("the contact page in the Studio (R158, R163)", () => {
+describe("the contact page in the Studio (R190, R195)", () => {
   it("is a singleton the structure, the Presentation tool and the seed all know", () => {
     expect([...SINGLETON_IDS]).toContain("contactPage");
     const docs = buildSeedDocuments();
