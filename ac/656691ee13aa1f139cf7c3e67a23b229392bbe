@@ -1,0 +1,47 @@
+CHANGELOG.md
+  s_37deb30b6489aa::t_047f9859324b7b 5-14
+components/landing/FreebieCard.tsx
+  s_37deb30b6489aa::t_c6ba5d5560aae6 14-16,18,20,24,49,52,57-71
+components/landing/LeadCapture.tsx
+  s_37deb30b6489aa::t_d98f61c4242923 48-49,63
+components/landing/landing.css
+  s_37deb30b6489aa::t_df9bcbc96c5e87 1828-1847
+components/landing/ui-copy.ts
+  s_37deb30b6489aa::t_9eb439c8c420b6 100-101
+docs/cms-operations.md
+  s_37deb30b6489aa::t_72d2df55d41e74 138-159
+lib/content/fallback.ts
+  s_37deb30b6489aa::t_f1bf10b5faac4e 14-24,113
+lib/content/normalize.ts
+  s_37deb30b6489aa::t_33c4c2345f09c1 4,24-25,29-42,129
+lib/content/types.ts
+  s_37deb30b6489aa::t_c273d9bb4906c0 15-19
+lib/leads/dependencies.ts
+  s_37deb30b6489aa::t_3d298473dd8a15 109-110,128-129
+studio/schemaTypes/documents/collections.ts
+  s_37deb30b6489aa::t_c3dfc82046d310 3-4,45-56,64
+studio/schemaTypes/lead-magnet.ts
+  s_37deb30b6489aa::t_b63bce50d69396 1-19
+studio/scripts/seed-data.ts
+  s_37deb30b6489aa::t_16e9e7ecdf807b 55,67
+tests/content/activity-pack-coming-soon.test.tsx
+  s_37deb30b6489aa::t_08c4e552d8ecf1 1-181
+tests/content/studio-contract.test.ts
+  s_37deb30b6489aa::t_894ce1d8f04c88 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ac656691ee13aa1f139cf7c3e67a23b229392bbe",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
