@@ -88,6 +88,20 @@ describe("the submission key (R81)", () => {
   });
 });
 
+describe("the bot check token (C4)", () => {
+  it("is optional, and a 2048-character one is accepted and exposed on the result", () => {
+    expect(validateOrderSubmission(VALID).ok).toBe(true);
+    const token = "t".repeat(2048);
+    const result = validateOrderSubmission({ ...VALID, botCheckToken: token });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.botCheckToken).toBe(token);
+  });
+
+  it.each([["2049 characters", "t".repeat(2049)], ["an empty string", ""], ["a number", 123], ["null", null]])("refuses %s as metadata, with no field errors", (_case, botCheckToken) => {
+    expect(validateOrderSubmission({ ...VALID, botCheckToken })).toEqual({ ok: false, fieldErrors: {}, formError: "invalid_metadata" });
+  });
+});
+
 describe("consent", () => {
   it.each([["missing", undefined], ["false", false], ["the string true", "true"], ["1", 1]])("is required as a literal true (%s)", (_case, consent) => {
     expect(errorsOf({ ...VALID, consent })).toEqual({ consent: "required" });

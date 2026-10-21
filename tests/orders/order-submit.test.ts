@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ORDER_COPY } from "@/components/forms/order-copy";
+import { BOT_CHECK_MESSAGES, type BotCheckAction } from "@/lib/bot-check/fields";
+import type { BotCheck } from "@/lib/bot-check/gate";
+import type { BotCheckVerdict } from "@/lib/bot-check/turnstile";
 import type { CanonicalLinesResult, CanonicalOrderLine } from "@/lib/orders/catalogue";
 import { ORDER_RATE_LIMIT, submitOrder, type OrderLogEvent, type OrderRecordInput, type OrderRepository, type OrderSubmissionDependencies } from "@/lib/orders/submit";
 import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
@@ -116,10 +119,101 @@ function deps(overrides: Partial<OrderSubmissionDependencies> = {}) {
     orderCountries: [],
     clientKey: "client-hash",
     log: (event) => events.push(event),
+    botCheck: { state: "off" },
     ...overrides,
   };
   return { dependencies, events, resolveLines: dependencies.resolveLines as typeof resolveLines };
 }
+
+const BOT_TOKEN = "turnstile-token-must-never-be-stored-or-logged";
+
+function botChecked(outcome: BotCheckVerdict) {
+  const verify = vi.fn(async (token: string | undefined, action: BotCheckAction): Promise<BotCheckVerdict> => (void token, void action, outcome));
+  const botCheck: BotCheck = { state: "on", verifier: { verify } };
+  return { botCheck, verify };
+}
+
+describe("the bot check (R216)", () => {
+  it("with the check off, behaves as before: no token needed", async () => {
+    const { dependencies } = deps({ botCheck: { state: "off" } });
+    expect((await submitOrder(VALID, dependencies)).status).toBe(200);
+  });
+
+  it("with commerce off, answers 404 before the bot check is asked", async () => {
+    const { botCheck, verify } = botChecked({ outcome: "passed" });
+    const { dependencies } = deps({ commerceEnabled: false, botCheck });
+    expect((await submitOrder({ ...VALID, botCheckToken: BOT_TOKEN }, dependencies)).status).toBe(404);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("a refusal gives 403, logs order_bot_check_refused, and counts, reads and stores nothing", async () => {
+    const { botCheck, verify } = botChecked({ outcome: "refused", reason: "rejected" });
+    const repo = fakeRepository();
+    const consume = vi.fn(allowAll.consume);
+    const { dependencies, resolveLines, events } = deps({ botCheck, repository: repo.repository, rateLimiter: { consume } });
+    const result = await submitOrder({ ...VALID, botCheckToken: BOT_TOKEN }, dependencies);
+    expect(result).toEqual({ status: 403, body: { ok: false, persisted: false, acknowledgementQueued: false, message: BOT_CHECK_MESSAGES.refused } });
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(consume).not.toHaveBeenCalled();
+    expect(resolveLines).not.toHaveBeenCalled();
+    expect(repo.stored).toEqual([]);
+    expect(events).toEqual([{ event: "order_bot_check_refused", reason: "rejected" }]);
+  });
+
+  it("unavailable keeps the existing busy 503 body and logs order_bot_check_unavailable", async () => {
+    const { botCheck } = botChecked({ outcome: "unavailable", reason: "timeout" });
+    const consume = vi.fn(allowAll.consume);
+    const { dependencies, resolveLines, events } = deps({ botCheck, rateLimiter: { consume } });
+    const result = await submitOrder({ ...VALID, botCheckToken: BOT_TOKEN }, dependencies);
+    expect(result).toEqual({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.busy } });
+    expect(consume).not.toHaveBeenCalled();
+    expect(resolveLines).not.toHaveBeenCalled();
+    expect(events).toEqual([{ event: "order_bot_check_unavailable", reason: "timeout" }]);
+  });
+
+  it("misconfigured gives the busy 503 and logs order_bot_check_unconfigured", async () => {
+    const { dependencies, events } = deps({ botCheck: { state: "misconfigured", problem: "half" } });
+    const result = await submitOrder(VALID, dependencies);
+    expect(result).toEqual({ status: 503, body: { ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.busy } });
+    expect(events).toEqual([{ event: "order_bot_check_unconfigured", reason: "half" }]);
+  });
+
+  it("is not asked after a honeypot hit, a validation failure, a bad country or missing storage", async () => {
+    const { botCheck, verify } = botChecked({ outcome: "passed" });
+    const { dependencies } = deps({ botCheck, orderCountries: ["PH"] });
+    await submitOrder({ ...VALID, website: "spam", botCheckToken: BOT_TOKEN }, dependencies);
+    await submitOrder({ ...VALID, consent: false, botCheckToken: BOT_TOKEN }, dependencies);
+    await submitOrder({ ...VALID, botCheckToken: BOT_TOKEN }, dependencies);
+    await submitOrder({ ...VALID, country: "PH", botCheckToken: BOT_TOKEN }, deps({ botCheck, repository: null, rateLimiter: null }).dependencies);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("when passed, is asked once with (token, \"order\") before the rate limit; the token is never stored or logged", async () => {
+    const { botCheck, verify } = botChecked({ outcome: "passed" });
+    const order: string[] = [];
+    verify.mockImplementation(async () => { order.push("verify"); return { outcome: "passed" as const }; });
+    const consume = vi.fn(async () => { order.push("consume"); return { allowed: true, remaining: 4, retryAfterSeconds: 0 }; });
+    const repo = fakeRepository();
+    const { dependencies, events } = deps({ botCheck, repository: repo.repository, rateLimiter: { consume } });
+    const result = await submitOrder({ ...VALID, botCheckToken: BOT_TOKEN }, dependencies);
+    expect(result.status).toBe(200);
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith(BOT_TOKEN, "order");
+    expect(order).toEqual(["verify", "consume"]);
+    expect(repo.stored).toHaveLength(1);
+    expect(JSON.stringify(repo.stored)).not.toContain(BOT_TOKEN);
+    expect(JSON.stringify(repo.stored)).not.toContain("botCheckToken");
+    expect(JSON.stringify(events)).not.toContain(BOT_TOKEN);
+    expect(JSON.stringify(result)).not.toContain(BOT_TOKEN);
+  });
+
+  it("passes an absent token to the verifier as undefined", async () => {
+    const { botCheck, verify } = botChecked({ outcome: "refused", reason: "missing_token" });
+    const { dependencies } = deps({ botCheck });
+    expect((await submitOrder(VALID, dependencies)).status).toBe(403);
+    expect(verify).toHaveBeenCalledWith(undefined, "order");
+  });
+});
 
 describe("the commerce gate", () => {
   it("refuses every order while commerce is off, and does no work at all", async () => {
@@ -467,7 +561,7 @@ describe("POST /api/orders", () => {
     cms.getSiteSettings.mockClear();
     cms.getLegalSettings.mockClear();
     cms.getOrderableProducts.mockClear();
-    for (const name of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "LEAD_IP_HASH_SECRET"]) vi.stubEnv(name, "");
+    for (const name of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "LEAD_IP_HASH_SECRET", "NEXT_PUBLIC_TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"]) vi.stubEnv(name, "");
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
     configureSupabase();
@@ -578,6 +672,26 @@ describe("POST /api/orders", () => {
     expect(supabase.calls).toEqual([]);
   });
 
+  it("passes a 403 through with no-store when Cloudflare's test secret rejects the token", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "2x00000000000000000000AB");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "2x0000000000000000000000000000000AA");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: false, "error-codes": ["invalid-input-response"] })));
+    const response = await post({ ...VALID, botCheckToken: "XXXX.DUMMY.TOKEN.XXXX" });
+    vi.unstubAllGlobals();
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: BOT_CHECK_MESSAGES.refused });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(supabase.calls).toEqual([]);
+  });
+
+  it("answers the busy 503 when only one Turnstile key is set (fails closed)", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "2x0000000000000000000000000000000AA");
+    const response = await post(VALID);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, persisted: false, acknowledgementQueued: false, message: ORDER_COPY.outcome.busy });
+    expect(supabase.calls).toEqual([]);
+  });
+
   it("answers an unexpected failure with the generic copy", async () => {
     cms.getSiteSettings.mockRejectedValueOnce(new Error("boom"));
     const response = await post(VALID);
@@ -597,6 +711,11 @@ describe("order dependencies", () => {
     cms.orderConsentVersion = "order-2026-10";
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
+  });
+
+  it("builds the bot check from the environment: off with no keys, misconfigured with one", async () => {
+    expect((await createOrderDependencies(request(), ON, {})).botCheck).toEqual({ state: "off" });
+    expect((await createOrderDependencies(request(), ON, { TURNSTILE_SECRET_KEY: "2x0000000000000000000000000000000AA" })).botCheck).toEqual({ state: "misconfigured", problem: "half" });
   });
 
   it("reads the gate from the CMS settings it is given", async () => {

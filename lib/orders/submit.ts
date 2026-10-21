@@ -1,6 +1,8 @@
 import "server-only";
 
 import { ORDER_COPY } from "@/components/forms/order-copy";
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
+import { runBotCheck, type BotCheck } from "@/lib/bot-check/gate";
 import { errorCodeOf } from "@/lib/leads/submit";
 import type { RateLimiter } from "@/lib/security/rate-limit";
 import type { CanonicalLinesResult, CanonicalOrderLine } from "./catalogue";
@@ -11,7 +13,8 @@ import { isHoneypotFilled, validateOrderSubmission, type OrderFieldErrors } from
 /**
  * Order request orchestration (spec §10 steps 4-7). Order matters and is the whole point:
  *
- *   commerce gate → honeypot → validation (and the CMS country list) → storage configured? → shared rate limit
+ *   commerce gate → honeypot → validation (and the CMS country list) → storage configured? → bot check (R216)
+ *   → shared rate limit
  *   → canonical CMS reload of every product → one atomic write → answer
  *
  * The gate comes first and, while commerce is off, nothing else runs: no database, no CMS read.
@@ -90,7 +93,11 @@ export type OrderLogEvent =
   | { event: "order_products_refused" }
   | { event: "order_catalogue_invalid" }
   | { event: "order_catalogue_unavailable" }
-  | { event: "order_config_invalid"; code: "consent_version_invalid" };
+  | { event: "order_config_invalid"; code: "consent_version_invalid" }
+  /** The bot check refused the token: expected noise, never reported. */
+  | { event: "order_bot_check_refused"; reason: string }
+  | { event: "order_bot_check_unavailable"; reason: string }
+  | { event: "order_bot_check_unconfigured"; reason: string };
 
 export interface OrderSubmissionDependencies {
   /** The CMS commerce switch; anything but true refuses every order before any work. */
@@ -109,6 +116,8 @@ export interface OrderSubmissionDependencies {
   orderCountries: readonly string[];
   /** An opaque, keyed hash of the client address (lib/leads/http.ts); never the address itself. */
   clientKey: string;
+  /** The bot check (R215): off, misconfigured (fails closed) or a verifier. */
+  botCheck: BotCheck;
   /** Structured, PII-free operational log. */
   log: (event: OrderLogEvent) => void;
   /**
@@ -136,7 +145,7 @@ export interface OrderApiBody {
 }
 
 export interface OrderSubmissionResult {
-  status: 200 | 400 | 404 | 429 | 500 | 503;
+  status: 200 | 400 | 403 | 404 | 429 | 500 | 503;
   body: OrderApiBody;
   retryAfterSeconds?: number;
 }
@@ -178,6 +187,18 @@ export async function submitOrder(input: unknown, dependencies: OrderSubmissionD
 
   if (!repository || !rateLimiter) {
     log({ event: "order_storage_unconfigured" });
+    return refused(503, ORDER_COPY.outcome.busy);
+  }
+
+  // R216: after every check a visitor can fix, before any counter: a bot without a token spends none.
+  // src: https://developers.cloudflare.com/turnstile/get-started/server-side-validation/ · turnstile api v0 (hosted) · 2026-10-22
+  const botGate = await runBotCheck(dependencies.botCheck, validation.data.botCheckToken, "order");
+  if (!botGate.ok) {
+    if (botGate.kind === "refused") {
+      log({ event: "order_bot_check_refused", reason: botGate.reason });
+      return refused(403, BOT_CHECK_MESSAGES.refused);
+    }
+    log({ event: botGate.kind === "unconfigured" ? "order_bot_check_unconfigured" : "order_bot_check_unavailable", reason: botGate.reason });
     return refused(503, ORDER_COPY.outcome.busy);
   }
 

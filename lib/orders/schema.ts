@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { BOT_CHECK_TOKEN_FIELD, BOT_CHECK_TOKEN_MAX_LENGTH } from "@/lib/bot-check/fields";
 import { isOrderPadProductId, type OrderPadLine } from "./pad";
 import {
   COUNTRY_PATTERN,
@@ -144,6 +145,8 @@ export const orderSubmissionSchema = z.strictObject({
    * answered. Not a field the visitor fills in, so a bad one refuses the body as a whole.
    */
   submissionKey: z.uuid({ error: "invalid" }),
+  /** The bot check's single-use token (R218): metadata like the key, so a bad one is the generic 400. */
+  [BOT_CHECK_TOKEN_FIELD]: z.string().min(1).max(BOT_CHECK_TOKEN_MAX_LENGTH).optional(),
   /** The honeypot: only ever empty here; a filled one is turned away before validation. */
   [HONEYPOT_FIELD]: z.literal("").optional(),
 });

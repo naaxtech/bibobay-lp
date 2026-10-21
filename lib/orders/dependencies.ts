@@ -2,6 +2,7 @@ import "server-only";
 
 import { after } from "next/server";
 
+import { createBotCheck } from "@/lib/bot-check/gate";
 import { isCommerceEnabled, isTrackingEnabled } from "@/lib/commerce/gate";
 import { SAFE_FALLBACK_LEGAL } from "@/lib/content/fallback";
 import type { LegalSettings, SiteSettings } from "@/lib/content/types";
@@ -88,6 +89,7 @@ export async function createOrderDependencies(
     consentVersion: orderConsentFrom(legal).version,
     orderCountries: settings.orderCountries,
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    botCheck: createBotCheck(env),
     log: logOrderEvent,
     // Task 8a (R88): the two queued emails are attempted after the answer through the outbox's
     // claim, each spending its own kind's send budget (fix wave D-I1); without storage or email they wait for the worker.

@@ -34,6 +34,8 @@ describe("which order events reach Sentry", () => {
       { event: "order_catalogue_unavailable" },
       { event: "order_rate_limit_unavailable", code: "PGRST301" },
       { event: "order_config_invalid", code: "consent_version_invalid" },
+      { event: "order_bot_check_unavailable", reason: "timeout" },
+      { event: "order_bot_check_unconfigured", reason: "half" },
     ];
     const tracking: TrackingLogEvent[] = [
       { event: "order_track_failed", code: "PGRST301" },
@@ -54,6 +56,7 @@ describe("which order events reach Sentry", () => {
       { event: "order_stored", lines: 2 },
       // R81: a retry after a lost answer is the customer's connection, not a fault.
       { event: "order_duplicate" },
+      { event: "order_bot_check_refused", reason: "rejected" },
     ];
     const tracking: TrackingLogEvent[] = [{ event: "order_track_miss" }, { event: "order_track_rate_limited" }, { event: "order_tracking_disabled" }, { event: "order_tracked" }];
     for (const entry of orders) logOrderEvent(entry);
