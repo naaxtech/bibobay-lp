@@ -1,0 +1,41 @@
+tests/contact/migration-policy.test.ts
+  s_37deb30b6489aa::t_f1780f8a8c681d 1-171,173-186,188-217,223-224,226-238
+  s_37deb30b6489aa::t_0b59bdc9ef120b 218-222,225
+  s_37deb30b6489aa::t_ef4bc4aa30880b 187
+  s_37deb30b6489aa::t_60b705929e2b35 172
+supabase/tests/0006_catalogue.sql
+  s_37deb30b6489aa::t_8edddc24c1abd8 120-121,127,131,134
+supabase/migrations/0008_contact_messages.sql
+  s_37deb30b6489aa::t_12e78102f43394 1-370
+tests/contact/supabase-contact-adapter.test.ts
+  s_37deb30b6489aa::t_cf45cf71a44165 1-194
+lib/supabase/contact.ts
+  s_37deb30b6489aa::t_9c106a2c601bcb 1-54
+tests/orders/migration-database.test.ts
+  s_37deb30b6489aa::t_a9181ec54ce75e 169
+  s_37deb30b6489aa::t_710b402e57b478 152,156-165
+  s_37deb30b6489aa::t_1374cb0117b4b5 25,34,38-47
+  s_37deb30b6489aa::t_1a36cf710914d6 124-149
+  s_37deb30b6489aa::t_4e4e9d05222d02 7
+  s_37deb30b6489aa::t_d034ffcac678b2 150-151
+supabase/tests/0007_contact_messages.sql
+  s_37deb30b6489aa::t_a137ef320628bc 1-401
+lib/supabase/outbox.ts
+  s_37deb30b6489aa::t_226a7b6eb94471 12-13,16,20,22,24-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "73c5fe1576417ee0199d1b5598c84241cdcb12d4",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
