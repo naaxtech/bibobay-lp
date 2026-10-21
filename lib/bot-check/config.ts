@@ -1,4 +1,5 @@
-import { TURNSTILE_ORIGIN } from "@/lib/bot-check/fields";
+// Relative import on purpose: scripts/verify-env.ts runs this module under plain tsx, which has no "@/" path alias.
+import { TURNSTILE_ORIGIN } from "./fields";
 
 /*
  * The bot check's configuration state (R215). It is computed from an `env` argument, never from
