@@ -3,6 +3,7 @@ import "server-only";
 import { after } from "next/server";
 
 import { createEmailSenderFromEnv, getStaffNotificationEmail } from "@/lib/email/client";
+import { createBotCheck } from "@/lib/bot-check/gate";
 import { ackSendLimitPerHour } from "@/lib/leads/dependencies";
 import { clientKeyFromHeaders } from "@/lib/leads/http";
 import { reportEvent } from "@/lib/observability/report";
@@ -53,6 +54,7 @@ export function createContactDependencies(request: Request, env: Record<string, 
     open: contactFormOpen(env),
     repository,
     rateLimiter,
+    botCheck: createBotCheck(env),
     clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
     globalLimitPerHour: sendLimitPerHour,
     log: logContactEvent,

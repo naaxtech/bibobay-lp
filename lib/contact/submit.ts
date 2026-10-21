@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BOT_CHECK_MESSAGES } from "@/lib/bot-check/fields";
+import { runBotCheck, type BotCheck } from "@/lib/bot-check/gate";
 import { ACK_SEND_LIMIT, errorCodeOf } from "@/lib/leads/submit";
 import { isHoneypotFilled } from "@/lib/leads/fields";
 import type { RateLimiter } from "@/lib/security/rate-limit";
@@ -10,7 +12,7 @@ import type { ContactRepository } from "./types";
 /**
  * Contact message orchestration (plan C5). Order matters and is the whole point:
  *
- *   honeypot → validation → open? → per-client limit → global limit → one atomic write → answer
+ *   honeypot → validation → open? → bot check (R216) → per-client limit → global limit → one atomic write → answer
  *   → (after the answer) the staff alert
  *
  * `persisted: true` only after the database confirmed the message and its outbox row in one
@@ -47,7 +49,10 @@ export type ContactLogEvent =
   | { event: "contact_rate_limited"; scope: "client" | "global" }
   | { event: "contact_rate_limit_unavailable"; code: string }
   | { event: "contact_unconfigured" }
-  | { event: "contact_honeypot" };
+  | { event: "contact_honeypot" }
+  | { event: "contact_bot_check_refused"; reason: string }
+  | { event: "contact_bot_check_unavailable"; reason: string }
+  | { event: "contact_bot_check_unconfigured"; reason: string };
 
 export interface ContactSubmissionDependencies {
   /** `contactFormOpen()` (R205): storage, email sending, a staff address and the hash secret. */
@@ -56,6 +61,8 @@ export interface ContactSubmissionDependencies {
   repository: ContactRepository | null;
   /** The shared limiter. Null with a repository is a misconfiguration and fails closed. */
   rateLimiter: RateLimiter | null;
+  /** The spam check (R215): off, misconfigured (fails closed) or on with a verifier. */
+  botCheck: BotCheck;
   /** An opaque, keyed hash of the client address (lib/leads/http.ts); never the address itself. */
   clientKey: string;
   /**
@@ -76,7 +83,7 @@ export interface ContactSubmissionDependencies {
 }
 
 export interface ContactSubmissionResult {
-  status: 200 | 400 | 429 | 500 | 503;
+  status: 200 | 400 | 403 | 429 | 500 | 503;
   body: ContactApiBody;
   retryAfterSeconds?: number;
 }
@@ -113,6 +120,17 @@ export async function submitContactMessage(input: unknown, dependencies: Contact
   if (!rateLimiter) {
     log({ event: "contact_rate_limit_unavailable", code: "missing" });
     return refused(503, CONTACT_API_MESSAGES.error);
+  }
+
+  // R216: after every cheap refusal and before any counter, so a bot without a token spends nobody's count.
+  const gate = await runBotCheck(dependencies.botCheck, validation.botCheckToken, "contact");
+  if (!gate.ok) {
+    if (gate.kind === "refused") {
+      log({ event: "contact_bot_check_refused", reason: gate.reason });
+      return refused(403, BOT_CHECK_MESSAGES.refused);
+    }
+    log({ event: gate.kind === "unconfigured" ? "contact_bot_check_unconfigured" : "contact_bot_check_unavailable", reason: gate.reason });
+    return refused(503, BOT_CHECK_MESSAGES.unavailable);
   }
 
   const limits = [

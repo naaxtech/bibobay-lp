@@ -12,6 +12,9 @@ import {
   type ContactSubmissionDependencies,
 } from "@/lib/contact/submit";
 import type { ContactRecordInput, ContactRepository } from "@/lib/contact/types";
+import { BOT_CHECK_MESSAGES, BOT_CHECK_TOKEN_FIELD } from "@/lib/bot-check/fields";
+import type { BotCheck } from "@/lib/bot-check/gate";
+import type { BotCheckVerdict } from "@/lib/bot-check/turnstile";
 import { createMemoryRateLimiter, type RateLimiter } from "@/lib/security/rate-limit";
 
 const VALID = { name: "Ada", email: "Ada@Example.com", topic: "press", message: "Hello from a parent.\r\nSecond line.", website: "" };
@@ -35,6 +38,7 @@ function setup(overrides: Partial<ContactSubmissionDependencies> = {}) {
     repository,
     rateLimiter,
     clientKey: "k",
+    botCheck: { state: "off" },
     globalLimitPerHour: 60,
     log: (event) => logs.push(event),
     sendAlert,
@@ -205,5 +209,98 @@ describe("submitContactMessage", () => {
 
   it("limits the body to 32 KB", () => {
     expect(CONTACT_BODY_LIMIT_BYTES).toBe(32 * 1024);
+  });
+});
+
+const TOKEN = "tok-secret-value-1234567890";
+
+function fakeCheck(verdict: BotCheckVerdict) {
+  const verify = vi.fn(async () => verdict);
+  const botCheck: BotCheck = { state: "on", verifier: { verify } };
+  return { botCheck, verify };
+}
+
+describe("submitContactMessage bot check", () => {
+  it("off: unchanged, and a token in the body is ignored", async () => {
+    const { dependencies, stored } = setup();
+    const result = await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    expect(result.status).toBe(200);
+    expect(stored).toHaveLength(1);
+  });
+
+  it("refused gives 403 and nothing is counted or stored", async () => {
+    const { botCheck, verify } = fakeCheck({ outcome: "refused", reason: "rejected" });
+    const { dependencies, stored, consumed, logs, sendAlert } = setup({ botCheck });
+    const result = await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    expect(result).toEqual({ status: 403, body: { ok: false, persisted: false, message: BOT_CHECK_MESSAGES.refused } });
+    expect(verify).toHaveBeenCalledWith(TOKEN, "contact");
+    expect(consumed).toHaveLength(0);
+    expect(stored).toEqual([]);
+    expect(sendAlert).not.toHaveBeenCalled();
+    expect(logs).toEqual([{ event: "contact_bot_check_refused", reason: "rejected" }]);
+  });
+
+  it("a bot without a token never touches contact:<key> or contact:global", async () => {
+    const { botCheck } = fakeCheck({ outcome: "refused", reason: "missing_token" });
+    const { dependencies, consumed } = setup({ botCheck });
+    const result = await submitContactMessage(VALID, dependencies);
+    expect(result.status).toBe(403);
+    expect(consumed.map(([key]) => key)).toEqual([]);
+  });
+
+  it("unavailable gives 503 without a closed flag, and is logged", async () => {
+    const { botCheck } = fakeCheck({ outcome: "unavailable", reason: "timeout" });
+    const { dependencies, stored, consumed, logs } = setup({ botCheck });
+    const result = await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    expect(result).toEqual({ status: 503, body: { ok: false, persisted: false, message: BOT_CHECK_MESSAGES.unavailable } });
+    expect(result.body).not.toHaveProperty("closed");
+    expect(consumed).toHaveLength(0);
+    expect(stored).toEqual([]);
+    expect(logs).toEqual([{ event: "contact_bot_check_unavailable", reason: "timeout" }]);
+  });
+
+  it("misconfigured gives 503 and a contact_bot_check_unconfigured event", async () => {
+    const { dependencies, stored, consumed, logs } = setup({ botCheck: { state: "misconfigured", problem: "half" } });
+    const result = await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    expect(result).toEqual({ status: 503, body: { ok: false, persisted: false, message: BOT_CHECK_MESSAGES.unavailable } });
+    expect(consumed).toHaveLength(0);
+    expect(stored).toEqual([]);
+    expect(logs).toEqual([{ event: "contact_bot_check_unconfigured", reason: "half" }]);
+  });
+
+  it("order: a honeypot hit, a validation failure and a closed form call the verifier 0 times", async () => {
+    const { botCheck, verify } = fakeCheck({ outcome: "passed" });
+    const { dependencies } = setup({ botCheck });
+    await submitContactMessage({ ...VALID, website: "http://spam.example", [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    await submitContactMessage({ ...VALID, name: "", [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: "" }, dependencies);
+    const closed = setup({ botCheck, open: false });
+    await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, closed.dependencies);
+    const noLimiter = setup({ botCheck, rateLimiter: null });
+    await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, noLimiter.dependencies);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("passed proceeds: verified once, then the limits, and the token never reaches the record or the log", async () => {
+    const { botCheck, verify } = fakeCheck({ outcome: "passed" });
+    const { dependencies, stored, consumed, logs } = setup({ botCheck });
+    const result = await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+    expect(result.status).toBe(200);
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith(TOKEN, "contact");
+    expect(consumed.map(([key]) => key)).toEqual(["contact:k", "contact:global"]);
+    expect(stored).toHaveLength(1);
+    expect(Object.keys(stored[0]!).sort()).toEqual(["email", "message", "name", "topic"]);
+    expect(JSON.stringify(stored)).not.toContain(TOKEN);
+    expect(JSON.stringify(logs)).not.toContain(TOKEN);
+  });
+
+  it("no log entry contains the token on any refusal", async () => {
+    for (const verdict of [{ outcome: "refused", reason: "rejected" }, { outcome: "unavailable", reason: "network" }] as const) {
+      const { botCheck } = fakeCheck(verdict);
+      const { dependencies, logs } = setup({ botCheck });
+      await submitContactMessage({ ...VALID, [BOT_CHECK_TOKEN_FIELD]: TOKEN }, dependencies);
+      expect(JSON.stringify(logs)).not.toContain(TOKEN);
+    }
   });
 });
