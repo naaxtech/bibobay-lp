@@ -76,7 +76,7 @@ the claim refused to send it). The signup and order outboxes use these states; t
 - If the provider accepts an email but recording the result fails, the row
   stays `sending`; the next cron run (once a day on Hobby, and never before 15 minutes) re-sends it under the same idempotency key if that run is within 23 hours of the stuck claim; otherwise it is parked as `stale_unconfirmed`. The shared key means the
   provider does not deliver it twice. A contact staff alert is re-sent whatever its age, until its eighth attempt (R211); after a day the
-  provider has forgotten the key, so staff may get that alert twice.
+  provider has forgotten the key, so a retry made after that is a new send: at most one extra alert per such attempt, up to the eight-attempt cap.
 - The cron worker (`/api/cron/email-outbox`, Task 8a) sends due `pending` and `failed` rows and
   re-claims stale `sending` ones through the same claim functions as the sends made right after
   each answer, spends the per-kind send bucket of the row it sends (below), and uses the idempotency keys
@@ -89,7 +89,7 @@ the claim refused to send it). The signup and order outboxes use these states; t
 |---|---|---|
 | Signups per client | `lead:<HMAC of the client address>` | 5 per 10 minutes. IPv4 addresses are counted whole; IPv6 addresses per /64; an IPv4-mapped IPv6 address as IPv4; anything unreadable in one shared bucket. |
 | Contact messages per client | `contact:<HMAC of the client address>` | 3 per 10 minutes, keyed like the signup limit (IPv6 per /64). Checked first. |
-| Contact messages in all | `contact:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) from everyone together, the contact alert's own send cap (R212), so the form never stores more messages in an hour than their alerts can announce. Checked second. |
+| Contact messages in all | `contact:global` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) from everyone together, the contact alert's own send cap (R212), so it caps intake at the alert's hourly send cap; a cron retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run. Checked second. |
 | Emails sent straight away | `send:lead_acknowledgement`, `send:lead_staff_alert`, `send:order_acknowledgement`, `send:order_staff_alert`, `send:quote`, `send:contact_staff_alert` | `LEAD_ACK_SEND_LIMIT_PER_HOUR` per hour (default 60) in each bucket; the outbox worker spends the bucket of the row's kind. A full bucket defers only its own kind. Over the cap the signup, order or contact message is still stored and the email waits `pending`. |
 
 The limiter is the database whenever Supabase is configured. If it is unavailable the signup fails
@@ -265,7 +265,7 @@ the only way in.
   minutes; at most 8 attempts; backoff 2, 4, 8 … minutes capped at 6 hours; `invalid_idempotent_request`
   is final. The exception: an alert of unknown outcome is retried at any age, under the same key, until its eighth attempt (R211),
   never parked after 23 hours. Once the provider has forgotten the key (24 hours) a retry is a new
-  send, so staff may get an alert twice; that is accepted, because a lost alert leaves a stored message
+  send: at most one extra alert per such attempt, up to the eight-attempt cap; that is accepted, because a lost alert leaves a stored message
   nobody reads. `unconfirmed_since` still records when a send became unconfirmed, so staff can see a
   possible duplicate. A parked row (out of attempts, or `invalid_idempotent_request`; a lost eighth
   attempt is `stale_unconfirmed`) has `next_attempt_at` = infinity and is reported as

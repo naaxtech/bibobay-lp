@@ -558,6 +558,21 @@ describe("contact form docs (R190-R209)", () => {
     expect(paragraph.slice(paragraph.indexOf("all messages together"))).not.toMatch(/\d/);
   });
 
+  it("claims no more for the shared hourly cap than it does, and no less duplicates than a slow provider can cause (R211, R212)", () => {
+    const unwrapped = (file: string) => flat(read(file)).replace(/ (\*|--|\/\/) /g, " ");
+    const files = ["docs/deployment.md", "docs/database-security.md", "docs/observability.md", "docs/architecture.md", "docs/incident-runbook.md", "CHANGELOG.md", "docs/superpowers/plans/2026-10-21-contact-form.md", "lib/contact/submit.ts", "supabase/migrations/0008_contact_messages.sql"];
+    for (const file of files) {
+      expect(unwrapped(file), file).not.toMatch(/never stores more|than their (staff )?alerts can announce|never outruns|can never exceed|at worst (alert staff )?twice|staff may (now and then )?get (that |an )?alert twice|reach the staff inbox twice/i);
+    }
+    for (const file of ["docs/deployment.md", "docs/database-security.md", "docs/architecture.md", "CHANGELOG.md", "docs/superpowers/plans/2026-10-21-contact-form.md", "lib/contact/submit.ts"]) {
+      expect(unwrapped(file), file).toMatch(/(caps intake|intake is capped) at the alert's hourly send cap/);
+      expect(unwrapped(file), file).toMatch(/cron retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run/);
+    }
+    for (const file of ["docs/database-security.md", "docs/observability.md", "docs/incident-runbook.md", "supabase/migrations/0008_contact_messages.sql"]) {
+      expect(unwrapped(file), file).toMatch(/eight-attempt cap/);
+    }
+  });
+
   it("says a contact alert is parked only at the attempt cap, never for the age of an unconfirmed send (R211)", () => {
     expect(flat(read("docs/deployment.md"))).toMatch(/Contact staff alerts are the exception \(R211\): an unconfirmed contact alert is never parked for its age/);
     const database = flat(section(read("docs/database-security.md"), "Contact messages (migration 0008)"));

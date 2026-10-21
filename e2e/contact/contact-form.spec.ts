@@ -176,7 +176,7 @@ for (const { name, use } of VIEWPORTS) {
       await expect(summary).toHaveAccessibleName(SUMMARY_TITLE);
       await expect(summary.getByRole("link")).toHaveText([errors.name.required, errors.email.required, errors.topic.required, errors.message.required]);
       await expect(nameField(page)).toHaveAttribute("aria-invalid", "true");
-      await expect(messageField(page)).toHaveAccessibleDescription(/Write your message\./);
+      await expect(messageField(page)).toHaveAccessibleDescription(new RegExp(errors.message.required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
       await summary.getByRole("link", { name: errors.email.required }).click();
       await expect(emailField(page)).toBeFocused();

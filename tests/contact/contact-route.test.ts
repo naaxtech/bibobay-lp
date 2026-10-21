@@ -189,7 +189,7 @@ describe("POST /api/contact storing a message", () => {
     expect(limits).toEqual([[3, 600], [60, 3600]]);
   });
 
-  it("takes the overall limit from LEAD_ACK_SEND_LIMIT_PER_HOUR, the value the alert's send budget spends, so intake never outruns the alerts (R212)", async () => {
+  it("takes the overall limit from LEAD_ACK_SEND_LIMIT_PER_HOUR, the same number and window as the alert's send budget (R212)", async () => {
     configure();
     vi.stubEnv("LEAD_ACK_SEND_LIMIT_PER_HOUR", "25");
     await post(VALID);

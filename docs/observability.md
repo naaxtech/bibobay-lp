@@ -280,7 +280,7 @@ schedule such a row gets at most one retry before it is parked as `delivery_expi
 alert therefore means a person has to act, and on this schedule it will be more common than on a
 15-minute one: [incident-runbook.md](incident-runbook.md#parked-emails) says how to inspect, re-queue or close the row.
 Contact staff alerts are the exception (R211): an unconfirmed one is retried at every run until its
-eighth attempt, so staff may now and then get an alert twice, and never lose one to the 23-hour window.
+eighth attempt, so a retry made after the provider has forgotten the key is a new send (at most one extra alert per such attempt, up to the eight-attempt cap), and none is lost to the 23-hour window.
 
 Set a Sentry alert on `delivery_expired` and `outbox_worker_failed`.
 

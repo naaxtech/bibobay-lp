@@ -26,8 +26,9 @@ export const CONTACT_BODY_LIMIT_BYTES = 32 * 1024;
 export const CONTACT_RATE_LIMIT = { scope: "contact", maxHits: 3, windowSeconds: 600 } as const;
 /**
  * Every message from everyone together, per hour (R203). R212: its cap is the alert's own hourly send
- * cap (`globalLimitPerHour`, from `LEAD_ACK_SEND_LIMIT_PER_HOUR`), over the same window, so the form
- * never stores more messages in an hour than their staff alerts can announce.
+ * cap (`globalLimitPerHour`, from `LEAD_ACK_SEND_LIMIT_PER_HOUR`), over the same window, so it caps
+ * intake at the alert's hourly send cap; a cron retry in the same hour, or a burst at a window edge,
+ * can defer an alert to the next cron run.
  */
 export const CONTACT_GLOBAL_RATE_LIMIT = { key: "contact:global", windowSeconds: ACK_SEND_LIMIT.windowSeconds } as const;
 
@@ -59,7 +60,8 @@ export interface ContactSubmissionDependencies {
   clientKey: string;
   /**
    * R212: the cap of `contact:global` per hour, the same value the alert's send budget
-   * (`send:contact_staff_alert`) is capped at, so intake never outruns the alerts.
+   * (`send:contact_staff_alert`) is capped at. This caps intake at the alert's hourly send cap; a cron
+   * retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run.
    */
   globalLimitPerHour: number;
   /** Structured, PII-free operational log. */

@@ -187,7 +187,8 @@ grant execute on function public.submit_contact_message(text, text, text, text) 
 --   * parked (failed, next_attempt_at 'infinity', reported as expired): out of attempts only. An
 --     unconfirmed send is NOT parked outside the provider's 23-hour idempotency window, as the
 --     signup and order outboxes park theirs: with a once-a-day worker that would lose the alert of a
---     stored message, while a retry can at worst alert staff twice;
+--     stored message, while a retry made after the provider has forgotten the key is a new send: at
+--     most one extra alert per such attempt, up to the eight-attempt cap;
 --   * otherwise claimed: `sending`, the attempt counted, claimed_at now.
 -- Nothing is ever skipped (R207).
 -- ---------------------------------------------------------------------------

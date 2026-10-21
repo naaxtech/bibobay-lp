@@ -46,6 +46,15 @@ describe("the contact form's chrome copy", () => {
     for (const text of strings(CONTACT_FORM_COPY)) expect(spec, text).not.toContain(`"${text}"`);
   });
 
+  it("is not copied into the browser spec as a regex literal either (R210)", () => {
+    const spec = readFileSync(resolve("e2e/contact/contact-form.spec.ts"), "utf8");
+    const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+    for (const text of strings(CONTACT_FORM_COPY)) {
+      // `text` as it is written inside a regex literal, then matched literally right after the opening `/`, `^` or `(`.
+      expect(spec, text).not.toMatch(new RegExp(`[/^(]${escape(escape(text))}`));
+    }
+  });
+
   it("makes no delivery claim in any chrome string", () => {
     for (const text of strings(CONTACT_FORM_COPY)) expect(text, text).not.toMatch(DELIVERY_CLAIM_PATTERN);
   });

@@ -137,7 +137,7 @@ the sender owns it). When the alert is parked, read the message by SQL and reply
 A contact alert is parked only after its eighth attempt, or on `invalid_idempotent_request` (R211). A
 send whose outcome is unknown is not parked after 23 hours as signup and order emails are: it is
 retried at every cron run, under the same idempotency key and, once the provider has forgotten that
-key, as a new send. So an alert may now and then reach the staff inbox twice; `unconfirmed_since` on
+key, as a new send. So each such attempt can add one extra alert in the staff inbox, up to the eight-attempt cap; `unconfirmed_since` on
 its row shows that it might have. A lost eighth attempt is parked as `stale_unconfirmed`.
 
 1. List the parked alerts (`failed` with `next_attempt_at` set to infinity) with their messages:

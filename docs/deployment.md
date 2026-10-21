@@ -222,7 +222,8 @@ It adds no environment name. `/api/readiness` reports the answer as `contact`; `
 - **Limits and budget.** 3 messages per 10 minutes per client and, in all, as many per hour as the
   alert's send cap (`LEAD_ACK_SEND_LIMIT_PER_HOUR`, default 60; R212), in the buckets `contact:<hmac>`
   and `contact:global`; the alert spends `send:contact_staff_alert`, capped by the same value, so the
-  form never stores more messages in an hour than their alerts can announce. The alert is attempted
+  form's intake is capped at the alert's hourly send cap; a cron retry in the same hour, or a burst at
+  a window edge, can defer an alert to the next cron run. The alert is attempted
   right after the answer; the cron worker is only the retry net, and retries an unconfirmed alert
   until its eighth attempt rather than parking it (R211).
 - **Reading a message.** In the alert email (Reply-To is the sender, labelled unverified), or by SQL when

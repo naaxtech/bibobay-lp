@@ -212,8 +212,8 @@ ContactForm (browser)  --POST JSON-->  /api/contact  ->  lib/contact/submit.ts
   outboxes, an alert whose send was unconfirmed is retried until its eighth attempt and never parked
   for its age: a duplicate staff alert is harmless, a lost one is not (R211).
 - All messages together are capped per hour at the alert's own send cap
-  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`), so the form never stores more messages than their alerts can
-  announce (R212).
+  (`LEAD_ACK_SEND_LIMIT_PER_HOUR`), so intake is capped at the alert's hourly send cap; a cron
+  retry in the same hour, or a burst at a window edge, can defer an alert to the next cron run (R212).
 - No raw IP address is stored. The rate-limit key is the same HMAC of the client address as for
   signups (IPv6 bucketed per /64).
 - A consent-gated visit-statistics event, `contact_submitted`, follows a stored answer only

@@ -21,7 +21,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(113);
+select plan(114);
 
 -- ---------------------------------------------------------------------------
 -- Tables: RLS enabled and forced, no policies, no privileges for any API role
@@ -270,11 +270,15 @@ update public.contact_message_deliveries
 set local role service_role;
 create temp table claim_lf on commit drop as select public.claim_contact_deliveries(1, (select message_id from sent_lf)) as result;
 select is((select (result -> 'claimed' -> 0 ->> 'attempt')::integer from claim_lf), 8, 'the eighth attempt is still claimed, 30 hours after the send became unconfirmed');
-select is(public.record_contact_delivery_attempt((select delivery_id from sent_lf), 'failed', null, 'rate_limit_exceeded'), true, 'and its failure recorded');
+select is(public.record_contact_delivery_attempt((select delivery_id from sent_lf), 'failed', null, 'send_timeout'), true, 'and its unconfirmed failure (a timeout) recorded');
 reset role;
 select ok(
   (select d.status = 'failed' and d.attempts = 8 and d.next_attempt_at = 'infinity'::timestamptz from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_lf)),
-  'after the eighth attempt a failure is final: the row is never due again'
+  'after the eighth attempt an unconfirmed failure is final too: the row is parked, never due again'
+);
+select ok(
+  (select d.last_error_code = 'send_timeout' and d.unconfirmed_since <= now() - interval '29 hours' from public.contact_message_deliveries as d where d.id = (select delivery_id from sent_lf)),
+  'and the parked row still shows it was unconfirmed since the first timeout, so staff can see a possible duplicate'
 );
 
 set local role service_role;

@@ -125,7 +125,7 @@ describe("submitContactMessage", () => {
     expect(stored).toHaveLength(1);
   });
 
-  it("never stores more messages in an hour than the alert budget can announce (R212)", async () => {
+  it("stops storing messages once the hourly cap shared with the alert's send budget is spent (R212)", async () => {
     const { dependencies, stored, logs } = setup({ globalLimitPerHour: 2 });
     const answers = [];
     for (const clientKey of ["a", "b", "c"]) answers.push((await submitContactMessage(VALID, { ...dependencies, clientKey })).status);
