@@ -1,0 +1,138 @@
+docs/qa-checklist.md
+  s_37deb30b6489aa::t_d27ab63a7a26da 45-46,48
+  s_37deb30b6489aa::t_d44d1f94935b84 94-95
+docs/deployment.md
+  s_37deb30b6489aa::t_6cea6c50e85015 229-230
+  s_37deb30b6489aa::t_eab1c0d82737d2 144-147
+  s_37deb30b6489aa::t_b4bf3db99ce73c 325
+  s_37deb30b6489aa::t_3da831ab8ca82d 222-227
+  s_37deb30b6489aa::t_d53e887f5156d3 121-125
+  s_37deb30b6489aa::t_468ec1245bd286 327,330
+tests/outbox/order-send-now.test.ts
+  s_37deb30b6489aa::t_a13dd9490b6794 180-184
+docs/database-security.md
+  s_37deb30b6489aa::t_abe4a3729675a3 78-79
+  s_37deb30b6489aa::t_c2218152bc7e3b 263-272
+  s_37deb30b6489aa::t_1149654bf0f97e 276-277
+  s_37deb30b6489aa::t_fe30075fb86e13 92
+  s_37deb30b6489aa::t_5dd2a56e017269 163-164
+tests/contact/contact-form.test.tsx
+  s_37deb30b6489aa::t_7414b824077f0f 155-161
+tests/contact/supabase-contact-adapter.test.ts
+  s_37deb30b6489aa::t_d6ca43e6d2cb30 98-110
+tests/contact/migration-policy.test.ts
+  s_37deb30b6489aa::t_21e348f98d198a 186
+  s_37deb30b6489aa::t_f201cdc972806f 179-185,187-189
+tests/contact/contact-submit.test.ts
+  s_37deb30b6489aa::t_174e1a2d49fff8 76-86
+  s_37deb30b6489aa::t_65153ecfeaf890 128-136
+  s_37deb30b6489aa::t_9e7c29c06bba8b 38
+  s_37deb30b6489aa::t_889f5a5ce0931e 109,113-118
+docs/observability.md
+  s_37deb30b6489aa::t_1ae104b3309352 266-267
+  s_37deb30b6489aa::t_c7258ad6603c00 231
+  s_37deb30b6489aa::t_a769836b0672fc 261,263-265
+  s_37deb30b6489aa::t_9f7fffb842e389 282-283
+  s_37deb30b6489aa::t_8adeb3412e0528 241-244
+supabase/tests/0007_contact_messages.sql
+  s_37deb30b6489aa::t_3d8629733fb811 24
+  s_37deb30b6489aa::t_a10628c8b99e82 265-269,272
+  s_37deb30b6489aa::t_2b48cae998b8e4 326-327,329,332-333,335,340,343-345
+  s_37deb30b6489aa::t_4ae64dcdd8d96e 13-17
+  s_37deb30b6489aa::t_41a374b37823c6 240-241,243-244,247,249
+tests/scripts/ci-workflow.test.ts
+  s_37deb30b6489aa::t_a1fa7810f204db 4,7-10
+  s_37deb30b6489aa::t_0131efee22e358 244-266
+  s_37deb30b6489aa::t_b53986c73693ec 133-135,138
+  s_37deb30b6489aa::t_091f41ffbcee3a 55-64
+supabase/migrations/0008_contact_messages.sql
+  s_37deb30b6489aa::t_32ae293fd01a2f 228-232,235
+  s_37deb30b6489aa::t_888558fb64d214 280-281
+  s_37deb30b6489aa::t_f552f4108a7825 13-16
+  s_37deb30b6489aa::t_4216fb5314f917 23-25
+  s_37deb30b6489aa::t_8cff51f25bfd11 185,187-190
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_0ef7f034f5cb17 137-142
+  s_37deb30b6489aa::t_e8961ef0578df7 67,69-71
+docs/superpowers/plans/2026-10-21-contact-form.md
+  s_37deb30b6489aa::t_d8e54a1ee1eb69 648
+  s_37deb30b6489aa::t_566736444afa5d 475
+  s_37deb30b6489aa::t_897f3bccd9e084 196
+  s_37deb30b6489aa::t_97a8577e4a0b46 46
+  s_37deb30b6489aa::t_0e216509aaba0f 48
+  s_37deb30b6489aa::t_971eede27d7333 210
+  s_37deb30b6489aa::t_fb8e27454fa8cb 191
+  s_37deb30b6489aa::t_f62e1c0cdef992 214
+  s_37deb30b6489aa::t_620a02d5c06a09 273
+  s_37deb30b6489aa::t_9b9c104c5274f8 291
+  s_37deb30b6489aa::t_24126425643cdd 403
+  s_37deb30b6489aa::t_e5f8a33e80bb38 439
+  s_37deb30b6489aa::t_8f1201eee67ced 56-63
+.github/workflows/ci.yml
+  s_37deb30b6489aa::t_3ddebc8323f730 310-345,347-373
+  s_37deb30b6489aa::t_516cc6b46eee9e 346
+lib/outbox/types.ts
+  s_37deb30b6489aa::t_f11f256474928c 25-28
+docs/architecture.md
+  s_37deb30b6489aa::t_d0845d7c9524db 181-182
+  s_37deb30b6489aa::t_2937b2144c2511 211-216
+components/forms/ContactForm.tsx
+  s_37deb30b6489aa::t_d3ffc8ef65d394 200-201,203
+lib/contact/submit.ts
+  s_37deb30b6489aa::t_e15a493ae58be6 27-32
+  s_37deb30b6489aa::t_143d2a6b45e75e 60-64
+  s_37deb30b6489aa::t_3776d09d9e2854 99-101
+  s_37deb30b6489aa::t_a23aaf204c8d9a 118
+  s_37deb30b6489aa::t_52d0b2dbe9c865 3
+lib/contact/schema.ts
+  s_37deb30b6489aa::t_e55129884103f3 63
+e2e/contact/contact-form.spec.ts
+  s_37deb30b6489aa::t_a9b06f240d5efa 37
+  s_37deb30b6489aa::t_246a52f73f0987 28-30,42-46
+  s_37deb30b6489aa::t_f35922920f094d 3-4
+  s_37deb30b6489aa::t_f5366853c9c738 34,110,112,155,158,162,177,181,323
+components/forms/contact-copy.ts
+  s_37deb30b6489aa::t_d522fb6630de54 47-51
+lib/contact/dependencies.ts
+  s_37deb30b6489aa::t_dbb37a6941c77d 50-51,57,66,69
+CHANGELOG.md
+  s_37deb30b6489aa::t_5a4d54c17c3268 11
+  s_37deb30b6489aa::t_919a48e808f798 22
+  s_37deb30b6489aa::t_e83b5bd5b19281 13
+lib/outbox/attempt.ts
+  s_37deb30b6489aa::t_615388bb6a67d4 55-59,61
+  s_37deb30b6489aa::t_33ac27a7e7a0f5 141
+tests/outbox/attempt.test.ts
+  s_37deb30b6489aa::t_7ce672c44d1716 119-126
+tests/contact/contact-copy.test.ts
+  s_37deb30b6489aa::t_67b9a3f831c763 1-2
+  s_37deb30b6489aa::t_c9925c1de22264 43-48
+  s_37deb30b6489aa::t_d7d53b4de7da34 37-42
+lib/outbox/constants.ts
+  s_37deb30b6489aa::t_8e7bd66d6033a6 73-75
+tests/scripts/docs-claims.test.ts
+  s_37deb30b6489aa::t_24cd7acdea6532 441
+  s_37deb30b6489aa::t_8ecfd68ae06b80 561-592
+  s_37deb30b6489aa::t_fe869f5ca5d80e 547,550,552-557,559-560
+  s_37deb30b6489aa::t_03642b3aa41f1e 447-454
+  s_37deb30b6489aa::t_0910e0d95b673b 548-549,551
+  s_37deb30b6489aa::t_5de40f513d314d 558
+tests/contact/contact-route.test.ts
+  s_37deb30b6489aa::t_70901b07954413 185,189-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a979603bab726fb22c3e72a61b9b05323c495f81",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
