@@ -1,0 +1,43 @@
+e2e/ops/health.spec.ts
+  s_37deb30b6489aa::t_2217f5542d7b20 16
+tests/scripts/bundle-secrets.test.ts
+  s_37deb30b6489aa::t_2217f5542d7b20 39,85,95
+tests/security/headers.test.ts
+  s_37deb30b6489aa::t_2217f5542d7b20 112-119,123-125,195-203
+  s_37deb30b6489aa::t_437466411a94db 120-122
+  s_37deb30b6489aa::t_2ca44a99afb750 204
+lib/ops/readiness.ts
+  s_37deb30b6489aa::t_2efe47e3e1e199 4,44-45,60
+lib/security/headers.ts
+  s_37deb30b6489aa::t_2efe47e3e1e199 95-96,99,103-104,128
+.env.example
+  s_37deb30b6489aa::t_2efe47e3e1e199 15-16,46-47
+tests/ops/health-readiness.test.ts
+  s_37deb30b6489aa::t_2217f5542d7b20 60,64,100-110,119,132
+tests/security/bot-check-env.test.ts
+  s_37deb30b6489aa::t_e6ab2d4c3448a3 1-43,45-50
+  s_37deb30b6489aa::t_437466411a94db 44
+scripts/verify-env.ts
+  s_37deb30b6489aa::t_2efe47e3e1e199 2,40-42,45-51,152-159,161,164
+proxy.ts
+  s_37deb30b6489aa::t_2efe47e3e1e199 3,70
+tests/leads/env-boundary.test.ts
+  s_37deb30b6489aa::t_2217f5542d7b20 43-44,48-51
+  s_37deb30b6489aa::t_87862d09cf51e1 52-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "16ba212efb4c2ff64972faeca17c13ce0a8cee24",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
