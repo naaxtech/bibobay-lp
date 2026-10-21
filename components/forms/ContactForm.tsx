@@ -18,7 +18,10 @@ import {
   type ContactFieldErrors,
 } from "@/lib/contact/fields";
 import { stegaCleanText } from "@/lib/content/stega";
+import { BOT_CHECK_MESSAGES, BOT_CHECK_TOKEN_FIELD } from "@/lib/bot-check/fields";
 import { normalizeEmail } from "@/lib/leads/fields";
+import { BotCheckSlot } from "./bot-check/BotCheckSlot";
+import { useBotCheck } from "./bot-check/useBotCheck";
 import { CONTACT_FORM_COPY, contactFieldErrorMessage } from "./contact-copy";
 
 /** The CMS copy the form shows (R190, R195): the button label and the three messages. */
@@ -33,6 +36,8 @@ export interface ContactFormProps {
   copy: ContactFormCopy;
   /** Where the message is posted; tests and the route share the default. */
   endpoint?: string;
+  /** The public bot-check site key, computed on the server; null while the check is off. */
+  botCheckSiteKey: string | null;
 }
 
 type Outcome = { tone: "success" | "error"; text: string } | null;
@@ -73,7 +78,8 @@ function serverFieldErrors(body: unknown): ContactFieldErrors {
  * outcome line that keeps its height (its reserve holds the four long messages; the saving line is
  * the shortest). Before hydration the button stays disabled.
  */
-export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormProps) {
+export function ContactForm({ copy, endpoint = CONTACT_API_PATH, botCheckSiteKey }: ContactFormProps) {
+  const bot = useBotCheck(botCheckSiteKey, "contact");
   const id = useId();
   const fieldId: Record<ContactField, string> = {
     name: `${id}-name`,
@@ -137,7 +143,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     }
     setErrors({});
 
-    const body = {
+    const body: Record<string, string> = {
       name: values.name.trim(),
       email: normalizeEmail(values.email),
       topic,
@@ -150,7 +156,17 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     setPending(true);
     // Field errors move focus to the summary instead; every other outcome returns it to the button.
     let returnFocus = true;
+    let carriedToken = false;
     try {
+      if (bot.enabled) {
+        const checked = await bot.token();
+        if ("problem" in checked) {
+          setOutcome({ tone: "error", text: checked.problem === "interactive" ? BOT_CHECK_MESSAGES.interactive : BOT_CHECK_MESSAGES.notLoaded });
+          return;
+        }
+        body[BOT_CHECK_TOKEN_FIELD] = checked.token;
+        carriedToken = true;
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
@@ -165,6 +181,8 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
         form.reset();
       } else if (response.status === 503 && isRecord(answer) && answer.closed === true) {
         setOutcome({ tone: "error", text: copy.closedMessage });
+      } else if (response.status === 403) {
+        setOutcome({ tone: "error", text: BOT_CHECK_MESSAGES.refused });
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: CONTACT_FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
@@ -176,6 +194,7 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
     } catch {
       setOutcome({ tone: "error", text: copy.errorMessage });
     } finally {
+      if (carriedToken) bot.reset();
       pendingRef.current = false;
       setPending(false);
       if (returnFocus) setFocusReturn((count) => count + 1);
@@ -194,8 +213,15 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
   };
   const listed = CONTACT_FIELD_ORDER.filter((field) => errors[field]);
 
+  // The form's only role="status" (R199); never focused, as a focused live region is read out as well as announced.
+  const statusLine = (
+    <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
+      {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}
+    </p>
+  );
+
   return (
-    <form id="contact-form" className="lead-form" aria-label={CONTACT_FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
+    <form id="contact-form" className="lead-form" aria-label={CONTACT_FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit} onFocusCapture={() => bot.prepare()} onPointerDownCapture={() => bot.prepare()}>
       {listed.length > 0 ? (
         <div ref={summaryRef} role="group" className="lead-form__summary" tabIndex={-1} aria-labelledby={ids.summaryTitle}>
           {/* h2: the form sits under the /contact page's h1 with no h2 between (as OrderForm's summary). */}
@@ -318,6 +344,8 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}
       </button>
@@ -336,10 +364,15 @@ export function ContactForm({ copy, endpoint = CONTACT_API_PATH }: ContactFormPr
        */}
       <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
         <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.closedMessage)} data-reserve-b={CONTACT_FORM_COPY.outcome.rateLimited}>
-          {/* The form's only role="status" (R199); never focused, as a focused live region is read out as well as announced. */}
-          <p role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
-            {pending ? CONTACT_FORM_COPY.sending : (outcome?.text ?? "")}
-          </p>
+          {bot.enabled ? (
+            <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.refused} data-reserve-b={BOT_CHECK_MESSAGES.interactive}>
+              <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.notLoaded}>
+                {statusLine}
+              </div>
+            </div>
+          ) : (
+            statusLine
+          )}
         </div>
       </div>
 

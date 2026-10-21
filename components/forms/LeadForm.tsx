@@ -18,6 +18,9 @@ import {
 import { DownloadGlyph } from "@/components/landing/DownloadGlyph";
 import { UI_COPY } from "@/components/landing/ui-copy";
 import { stegaCleanText } from "@/lib/content/stega";
+import { BOT_CHECK_MESSAGES, BOT_CHECK_TOKEN_FIELD } from "@/lib/bot-check/fields";
+import { BotCheckSlot } from "./bot-check/BotCheckSlot";
+import { useBotCheck } from "./bot-check/useBotCheck";
 import { acceptDownload, type AcceptedDownload } from "./download-link";
 import { FORM_COPY, fieldErrorMessage } from "./form-copy";
 
@@ -33,6 +36,8 @@ export interface LeadFormProps {
   copy: LeadFormCopy;
   /** Where the signup is posted; tests and the route share the default. */
   endpoint?: string;
+  /** The bot check's public site key, read on the server; null means the check is off. */
+  botCheckSiteKey: string | null;
 }
 
 type Outcome = { tone: "success" | "error"; text: string } | null;
@@ -80,8 +85,9 @@ function serverFieldErrors(body: unknown): LeadFieldErrors {
  * and the button keeps its width between states, so nothing jumps. Before hydration the button
  * stays disabled, so a native submit can never post the form somewhere unintended.
  */
-export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
+export function LeadForm({ copy, endpoint = "/api/leads", botCheckSiteKey }: LeadFormProps) {
   const id = useId();
+  const bot = useBotCheck(botCheckSiteKey, "lead");
   const ids = {
     email: `${id}-email`,
     emailHint: `${id}-email-hint`,
@@ -150,7 +156,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
     const ageBand = values.ageBand.trim();
     const utm = utmFromSearch(window.location.search);
     const locale = safeLocale(navigator.language);
-    const body = {
+    const body: Record<string, unknown> = {
       email: values.email.trim(),
       consent: true,
       ...(firstName ? { firstName } : {}),
@@ -166,7 +172,17 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
     setPending(true);
     // Field errors move focus to the summary instead; every other outcome returns it (review M6).
     let returnFocusTo: "button" | "status" | null = "button";
+    let carriedToken = false;
     try {
+      if (bot.enabled) {
+        const result = await bot.token();
+        if ("problem" in result) {
+          setOutcome({ tone: "error", text: result.problem === "interactive" ? BOT_CHECK_MESSAGES.interactive : BOT_CHECK_MESSAGES.notLoaded });
+          return;
+        }
+        body[BOT_CHECK_TOKEN_FIELD] = result.token;
+        carriedToken = true;
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
@@ -185,6 +201,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
       } else if (response.status === 503 && isRecord(answer) && typeof answer.message === "string" && answer.message.trim() !== "") {
         // Signups can be closed on purpose (no removal channel yet, Ruling R125): say what the server says.
         setOutcome({ tone: "error", text: answer.message });
+      } else if (response.status === 403) {
+        setOutcome({ tone: "error", text: BOT_CHECK_MESSAGES.refused });
       } else if (response.status === 429) {
         setOutcome({ tone: "error", text: FORM_COPY.outcome.rateLimited });
       } else if (response.status === 400 && Object.keys(serverFieldErrors(answer)).length > 0) {
@@ -196,6 +214,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
     } catch {
       setOutcome({ tone: "error", text: copy.errorMessage });
     } finally {
+      // The token is single use: a retry needs a fresh one, whatever the answer was.
+      if (carriedToken) bot.reset();
       pendingRef.current = false;
       setPending(false);
       const target = returnFocusTo;
@@ -217,7 +237,7 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
 
   // The page renders one form, so the id is fixed on purpose (the freebie card anchors to it).
   return (
-    <form id="lead-form" className="lead-form" aria-label={FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit}>
+    <form id="lead-form" className="lead-form" aria-label={FORM_COPY.formLabel} method="post" noValidate onSubmit={handleSubmit} onFocusCapture={bot.prepare} onPointerDownCapture={bot.prepare}>
       {listed.length > 0 ? (
         // role="group": a generic <div> may not be named (ARIA 1.2), so its title might never be
         // announced when it takes focus (review M5).
@@ -345,6 +365,8 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
         <input id={ids.trap} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
+      <BotCheckSlot enabled={bot.enabled} containerRef={bot.containerRef} />
+
       <button ref={submitRef} type="submit" className="btn btn-primary lead-form__submit" disabled={pending || !hydrated} aria-busy={pending}>
         {copy.buttonLabel}
       </button>
@@ -358,10 +380,14 @@ export function LeadForm({ copy, endpoint = "/api/leads" }: LeadFormProps) {
        */}
       <div className="lead-form__outcome" data-reserve-a={stegaCleanText(copy.successMessage)} data-reserve-b={stegaCleanText(copy.errorMessage)}>
         <div className="lead-form__outcome" data-reserve-a={FORM_COPY.outcome.rateLimited} data-reserve-b={FORM_COPY.sending}>
+        <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.refused} data-reserve-b={BOT_CHECK_MESSAGES.unavailable}>
+        <div className="lead-form__outcome" data-reserve-a={BOT_CHECK_MESSAGES.interactive} data-reserve-b={BOT_CHECK_MESSAGES.notLoaded}>
           {/* Never focused (Task 5 N4): a focused live region is read out as well as announced. */}
           <p ref={statusRef} role="status" aria-live="polite" aria-atomic="true" className="lead-form__status" data-tone={pending ? "pending" : outcome?.tone}>
             {pending ? FORM_COPY.sending : (outcome?.text ?? "")}
           </p>
+        </div>
+        </div>
         </div>
       </div>
 

@@ -80,14 +80,14 @@ describe("section order and visibility", () => {
     const { unmount } = renderPage();
     expect(hrefOfCard()).toBe("#lead");
     unmount();
-    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} botCheckSiteKey={null} />);
     expect(hrefOfCard()).toBe("#lead-form");
   });
 
   it("points every in-page link at an element that exists", () => {
     for (const content of [landingContent(), landingContent((draft) => { draft.sections = draft.sections.filter((entry) => entry.id !== "lead"); })]) {
       // The locked card points at the form (#lead-form), so the page is rendered with the real form, as app/page.tsx does.
-      const { unmount } = renderPage(content, siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+      const { unmount } = renderPage(content, siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} botCheckSiteKey={null} />);
       const anchors = linkHrefs().filter((href): href is string => !!href?.startsWith("#"));
       expect(anchors.length).toBeGreaterThan(0);
       for (const href of anchors) expect(document.getElementById(href.slice(1)), href).not.toBeNull();
@@ -260,7 +260,7 @@ describe("lead capture", () => {
   });
 
   it("locks the repository's activity pack behind the signup, with its page previews and real size", () => {
-    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+    renderPage(landingContent(), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} botCheckSiteKey={null} />);
     const lead = section("lead");
     // R140: no link to the file anywhere in the card; the button leads to the form.
     expect(lead.querySelector("[data-freebie] a[href$='.pdf']")).toBeNull();
@@ -284,7 +284,7 @@ describe("lead capture", () => {
     unmount();
     renderPage(landingContent((draft) => {
       draft.lead.leadMagnet = { title: "Bay colouring sheet", description: "One printable page of the Bay.", fileUrl: "https://cdn.sanity.io/files/abc/production/sheet.pdf", available: true };
-    }), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} />);
+    }), siteSettings(), <LeadForm copy={{ buttonLabel: "Get the free pack", consentCopy: "I agree.", successMessage: "Joined.", errorMessage: "Try again." }} botCheckSiteKey={null} />);
     const link = within(section("lead")).getByRole("link", { name: /^Get the free pack/ });
     expect(link.getAttribute("href")).toBe("#lead-form");
     expect(link.getAttribute("aria-label")).toBe("Get the free pack: Bay colouring sheet");

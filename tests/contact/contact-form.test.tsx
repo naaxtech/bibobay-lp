@@ -59,7 +59,7 @@ async function submit() {
 
 async function send(answer: { status: number; body: unknown } | "network") {
   answers.push(answer);
-  render(<ContactForm copy={CMS} />);
+  render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
   fillAll();
   await submit();
 }
@@ -68,7 +68,7 @@ const status = () => screen.getByRole("status");
 
 describe("the contact form's structure", () => {
   it("labels every field and ties hints and errors through aria-describedby", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     const name = screen.getByLabelText(CONTACT_FORM_COPY.name.label);
     const email = screen.getByLabelText(CONTACT_FORM_COPY.email.label);
     const topic = screen.getByLabelText(CONTACT_FORM_COPY.topic.label);
@@ -99,14 +99,14 @@ describe("the contact form's structure", () => {
   });
 
   it("keeps exactly one role=status element in the form (R199)", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     expect(within(form()).getAllByRole("status")).toHaveLength(1);
     await submit();
     expect(within(form()).getAllByRole("status")).toHaveLength(1);
   });
 
   it("the honeypot is aria-hidden, out of the tab order, with autocomplete off", () => {
-    const { container } = render(<ContactForm copy={CMS} />);
+    const { container } = render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     const trap = container.querySelector<HTMLInputElement>(`input[name=${HONEYPOT_FIELD}]`)!;
     expect(trap.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(trap.getAttribute("tabindex")).toBe("-1");
@@ -116,28 +116,28 @@ describe("the contact form's structure", () => {
   });
 
   it("the privacy link follows the submit button", () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     const link = screen.getByRole("link", { name: CONTACT_FORM_COPY.privacyLink });
     expect(link.getAttribute("href")).toBe("/privacy");
     expect(button().compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("is the C9 form: fixed id, post method, no native validation", () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     expect(form().id).toBe("contact-form");
     expect(form().getAttribute("method")).toBe("post");
     expect(form().hasAttribute("novalidate")).toBe(true);
   });
 
   it("server HTML has the button disabled until hydration", () => {
-    const html = renderToString(<ContactForm copy={CMS} />);
+    const html = renderToString(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
   });
 });
 
 describe("browser checks", () => {
   it("an empty submit lists name, email, topic and message in that order, focuses the named summary and calls fetch zero times", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     await submit();
     const summary = screen.getByRole("group", { name: CONTACT_FORM_COPY.errorSummaryTitle });
     expect(document.activeElement).toBe(summary);
@@ -153,21 +153,21 @@ describe("browser checks", () => {
   });
 
   it("titles the summary with an h2, the next level under the /contact page's h1, as the order form does", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     await submit();
     const summary = screen.getByRole("group", { name: CONTACT_FORM_COPY.errorSummaryTitle });
     expect(within(summary).getByRole("heading", { level: 2, name: CONTACT_FORM_COPY.errorSummaryTitle })).toBeTruthy();
   });
 
   it("a summary link moves focus to its field", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     await submit();
     fireEvent.click(within(screen.getByRole("group", { name: CONTACT_FORM_COPY.errorSummaryTitle })).getAllByRole("link")[0]!);
     expect(document.activeElement).toBe(screen.getByLabelText(CONTACT_FORM_COPY.name.label));
   });
 
   it("a 9-character message is refused in the browser with the too-short message", async () => {
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     fill({ name: "Ana", email: "ana@example.com", topic: "general", message: "123456789" });
     await submit();
     expect(screen.getByText(CONTACT_FORM_COPY.errors.message.too_short, { selector: "p" })).toBeTruthy();
@@ -178,7 +178,7 @@ describe("browser checks", () => {
 describe("the request", () => {
   it("posts exactly the five fields as JSON to the contact endpoint, trimmed and normalised", async () => {
     answers.push(ok());
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     fill({ name: "  Ana Reyes ", email: " Ana@Example.com ", topic: "press", message: `  Hello\r\nteam, a question about the pack.\r\n ` });
     await submit();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -193,7 +193,7 @@ describe("the request", () => {
 
   it("posts to a given endpoint", async () => {
     answers.push(ok());
-    render(<ContactForm copy={CMS} endpoint="/api/elsewhere" />);
+    render(<ContactForm copy={CMS} endpoint="/api/elsewhere" botCheckSiteKey={null} />);
     fillAll();
     await submit();
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/elsewhere");
@@ -202,7 +202,7 @@ describe("the request", () => {
   it("ignores a second submit while saving: one fetch, a disabled aria-busy button, the saving status", async () => {
     let release: (response: Response) => void = () => {};
     fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (release = resolve)));
-    render(<ContactForm copy={CMS} />);
+    render(<ContactForm copy={CMS} botCheckSiteKey={null} />);
     fillAll();
     await submit();
     await submit();

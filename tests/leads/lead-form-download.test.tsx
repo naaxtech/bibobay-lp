@@ -41,7 +41,7 @@ async function submitForm() {
 
 async function signUp(answer: { status: number; body: unknown }) {
   answers.push(answer);
-  render(<LeadForm copy={CMS} />);
+  render(<LeadForm copy={CMS} botCheckSiteKey={null} />);
   await submitForm();
 }
 
@@ -51,7 +51,7 @@ const downloadStatus = () => document.querySelector("[data-download-announcement
 
 describe("the download announcement", () => {
   it("is an always-mounted polite region with no role, empty before any signup", () => {
-    render(<LeadForm copy={CMS} />);
+    render(<LeadForm copy={CMS} botCheckSiteKey={null} />);
     const region = downloadStatus();
     expect(region.hasAttribute("role")).toBe(false);
     expect(screen.getAllByRole("status")).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("the download announcement", () => {
 
 describe("the form's download button", () => {
   it("is the anchor target of the card", () => {
-    render(<LeadForm copy={CMS} />);
+    render(<LeadForm copy={CMS} botCheckSiteKey={null} />);
     expect(screen.getByRole("form", { name: FORM_COPY.formLabel }).id).toBe("lead-form");
   });
 
@@ -119,7 +119,7 @@ describe("the form's download button", () => {
 
   it("clears the link when a new submit starts and the next answer has none", async () => {
     answers.push(ok({ download: SIGNED }));
-    render(<LeadForm copy={CMS} />);
+    render(<LeadForm copy={CMS} botCheckSiteKey={null} />);
     await submitForm();
     expect(downloadLink()).not.toBeNull();
     answers.push({ status: 503, body: { ok: false, persisted: false, message: "Signups are not open yet." } });
