@@ -13,13 +13,19 @@ const NONCE = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
 const nonceOf = (element: HTMLElement): string => element.nonce || element.getAttribute("nonce") || "";
 
+/** The nonce Next stamped on the page's scripts, or null when there is none or it breaks the grammar. */
+export function pageScriptNonce(doc: Document): string | null {
+  const script = Array.from(doc.querySelectorAll<HTMLScriptElement>("script[nonce]")).find((element) => nonceOf(element));
+  const nonce = script ? nonceOf(script) : "";
+  return NONCE.test(nonce) ? nonce : null;
+}
+
 /** Adds the meta once; returns the nonce shared, or null when the page has none. */
 export function shareStyleNonce(doc: Document): string | null {
   const existing = doc.head.querySelector<HTMLMetaElement>(STYLE_NONCE_META);
   if (existing) return nonceOf(existing) || null;
-  const script = Array.from(doc.querySelectorAll<HTMLScriptElement>("script[nonce]")).find((element) => nonceOf(element));
-  const nonce = script ? nonceOf(script) : "";
-  if (!NONCE.test(nonce)) return null;
+  const nonce = pageScriptNonce(doc);
+  if (!nonce) return null;
   const meta = doc.createElement("meta");
   meta.setAttribute("property", "csp-nonce");
   meta.nonce = nonce;

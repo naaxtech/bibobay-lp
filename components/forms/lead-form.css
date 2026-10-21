@@ -263,4 +263,9 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  /* The bot check's slot (R217): no reserved height, since the widget is usually invisible. */
+  .bot-check {
+    max-inline-size: 100%;
+  }
 }
