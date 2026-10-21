@@ -1,0 +1,40 @@
+lib/orders/schema.ts
+  s_37deb30b6489aa::t_4f69a88c538488 148-149
+  s_37deb30b6489aa::t_cb81e23bf6ec10 3
+tests/orders/order-reporting.test.ts
+  s_37deb30b6489aa::t_c2088d00a243a9 59
+  s_37deb30b6489aa::t_d8aa115880a9f6 37
+  s_37deb30b6489aa::t_ecd0eb826c2ef3 38
+lib/orders/submit.ts
+  s_37deb30b6489aa::t_4f69a88c538488 4-5,16-17,96-100,119-120,148,193-201
+  s_37deb30b6489aa::t_e2ea9dcbe7f960 202-204
+tests/orders/order-schema.test.ts
+  s_37deb30b6489aa::t_1ee8361ed18fa9 91-104
+lib/orders/dependencies.ts
+  s_37deb30b6489aa::t_4f69a88c538488 5,92
+app/api/orders/route.ts
+  s_37deb30b6489aa::t_cb81e23bf6ec10 19-20
+tests/orders/order-submit.test.ts
+  s_37deb30b6489aa::t_efe71ce667e7f5 4-6
+  s_37deb30b6489aa::t_c68dbd603f686b 564
+  s_37deb30b6489aa::t_9cb7687ea54026 675-693,719
+  s_37deb30b6489aa::t_8b252ec19b1c91 716-717
+  s_37deb30b6489aa::t_dc8d094456ae19 122,128-216
+  s_37deb30b6489aa::t_099b25c672d7a9 217,694,718,720
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d31cef6a3116e2a6ecf26d2b82c44da101edaa4d",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
