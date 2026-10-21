@@ -11,7 +11,7 @@ const capture = (event: string, properties: Record<string, unknown>, extra: Reco
 
 describe("the event allow-list", () => {
   it("names what a visitor does on the page, and nothing else", () => {
-    expect(Object.keys(ANALYTICS_EVENTS).sort()).toEqual(["cta_clicked", "faq_opened", "freebie_downloaded", "lead_submitted", "menu_opened", "section_viewed", "tab_selected", "youtube_clicked"]);
+    expect(Object.keys(ANALYTICS_EVENTS).sort()).toEqual(["contact_submitted", "cta_clicked", "faq_opened", "freebie_downloaded", "lead_submitted", "menu_opened", "section_viewed", "tab_selected", "youtube_clicked"]);
   });
 
   it("keeps only the properties each event allows, as short plain values", () => {
@@ -21,6 +21,10 @@ describe("the event allow-list", () => {
       .toEqual({ persisted: true, acknowledgementQueued: false });
     expect(cleanProperties("cta_clicked", { label: "x".repeat(200), section: { nested: true } })).toEqual({ label: "x".repeat(80) });
     expect(cleanProperties("not_an_event", { section: "hero" })).toBeNull();
+  });
+
+  it("counts a stored contact message by its topic only, never its text or sender", () => {
+    expect(cleanProperties("contact_submitted", { persisted: true, topic: "press", email: "x@example.com", message: "hi" })).toEqual({ persisted: true, topic: "press" });
   });
 
   it("never lets an email address through, whatever property it hides in", () => {
