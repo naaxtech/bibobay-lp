@@ -1,0 +1,44 @@
+lib/contact/dependencies.ts
+  s_37deb30b6489aa::t_9a6de38a39265a 6
+  s_37deb30b6489aa::t_7b2c85bc7f5e3f 57
+lib/contact/schema.ts
+  s_37deb30b6489aa::t_c9b349a9cb3a3d 3
+  s_37deb30b6489aa::t_e08b301e7033e1 88-91
+  s_37deb30b6489aa::t_96d899380babf4 70
+  s_37deb30b6489aa::t_19078a2bf5541a 77
+tests/contact/contact-route.test.ts
+  s_37deb30b6489aa::t_c5c430db0391f1 288-308
+  s_37deb30b6489aa::t_e76914821166bc 309-310
+lib/contact/submit.ts
+  s_37deb30b6489aa::t_1a5c36bcef8304 86
+  s_37deb30b6489aa::t_bbb5c0644d7ac1 64-65
+  s_37deb30b6489aa::t_d0bd4947b939f0 15
+  s_37deb30b6489aa::t_ad807e1af78890 52-55
+  s_37deb30b6489aa::t_eba4ba1bad1b13 125-133
+  s_37deb30b6489aa::t_5b8309163efb62 3-4
+  s_37deb30b6489aa::t_ba40a1f6362a54 134-135
+tests/contact/contact-submit.test.ts
+  s_37deb30b6489aa::t_f45f7898966abd 15-17,41,214-305
+  s_37deb30b6489aa::t_5b2035cd78fe1a 306
+tests/contact/contact-schema.test.ts
+  s_37deb30b6489aa::t_c5c430db0391f1 42-54
+  s_37deb30b6489aa::t_a445b3895cf107 41,55
+app/api/contact/route.ts
+  s_37deb30b6489aa::t_07e99d1b609357 13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "563bf27320d4fc0f2ac840311f1cea7d2a0b952f",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
