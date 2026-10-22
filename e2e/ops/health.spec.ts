@@ -13,7 +13,7 @@ import { CONFIGURED } from "./environment";
  * Both are never cached, answer HEAD, and refuse POST.
  */
 
-const READINESS_KEYS = ["botCheck", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
+const READINESS_KEYS = ["botCheck", "cloudflareEdge", "cloudflareOrigin", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"];
 const READINESS_STATUS = CONFIGURED ? 200 : 503;
 
 test.describe("GET /api/health", () => {
@@ -65,6 +65,11 @@ test.describe("GET /api/readiness", () => {
     expect(body.leadRemovalChannel).toBe(CONFIGURED);
     if (CONFIGURED) expect(typeof body.contact).toBe("boolean");
     else expect(body.contact).toBe(false);
+    // R250: the keyless test server is reached directly, not through Cloudflare, and has no origin secret.
+    if (!CONFIGURED) {
+      expect(body.cloudflareEdge).toBe(false);
+      expect(body.cloudflareOrigin).toBe(false);
+    }
   });
 
   test("answers HEAD with the same status and refuses POST", async ({ request }) => {
