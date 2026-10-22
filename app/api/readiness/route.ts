@@ -30,10 +30,10 @@ const contactSettings = (): Promise<Pick<SiteSettings, "contactEmail">> =>
  * to ask for removal (email sending or the CMS contact address) are configured, else 503. The body is
  * booleans only (`leadRemovalChannel` is the removal channel; `contact` is whether the contact
  * form is open, R205). Email on its own, the contact form and reviewed legal text are reported but
- * not required.
+ * not required. `cloudflareEdge` and `cloudflareOrigin` (R250) describe THIS request and are not required either.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const [reviewed, settings] = await Promise.all([legalTextReviewed(), contactSettings()]);
-  const checks = readinessChecks(process.env, { legalReviewed: reviewed, settings });
+  const checks = readinessChecks(process.env, { legalReviewed: reviewed, settings, headers: request.headers });
   return Response.json(checks, { status: checks.ready ? 200 : 503, headers: { "cache-control": "no-store" } });
 }

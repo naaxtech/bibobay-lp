@@ -57,11 +57,11 @@ describe("GET /api/health", () => {
 
 describe("readiness checks", () => {
   it("is all false with nothing configured", () => {
-    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, contact: false, revalidation: false, legalReviewed: false, botCheck: false });
+    expect(readinessChecks({}, { legalReviewed: false, settings: {} })).toEqual({ ready: false, sanity: false, supabase: false, email: false, leadRemovalChannel: false, contact: false, revalidation: false, legalReviewed: false, botCheck: false, cloudflareEdge: false, cloudflareOrigin: false });
   });
 
   it("is ready with Sanity, Supabase lead storage, the revalidation secret and a removal channel, even without email or reviewed legal text", () => {
-    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: false, botCheck: false });
+    expect(readinessChecks(CONFIGURED, { legalReviewed: false, settings: CONTACT })).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: false, botCheck: false, cloudflareEdge: false, cloudflareOrigin: false });
   });
 
   it("counts a way to ask for removal toward readiness (P-I1, Ruling R125): email sending or a contact address", () => {
@@ -108,15 +108,45 @@ describe("readiness botCheck", () => {
   });
 });
 
+describe("readiness Cloudflare flags (R250)", () => {
+  const SECRET = "origin-secret-0123456789abcdefghijklmnop";
+  const env = { ...CONFIGURED, CLOUDFLARE_ORIGIN_SECRET: SECRET };
+  const checks = (headers: Record<string, string>, source: Record<string, string> = env) => readinessChecks(source, { legalReviewed: false, settings: CONTACT, headers: new Headers(headers) });
+
+  it("reports the edge and the origin separately for the four combinations, and never changes ready", () => {
+    expect(checks({ "x-forwarded-for": "104.16.0.1", "x-bibobay-origin": SECRET })).toMatchObject({ cloudflareEdge: true, cloudflareOrigin: true, ready: true });
+    expect(checks({ "x-forwarded-for": "104.16.0.1" })).toMatchObject({ cloudflareEdge: true, cloudflareOrigin: false, ready: true });
+    expect(checks({ "x-forwarded-for": "198.51.100.1", "x-bibobay-origin": SECRET })).toMatchObject({ cloudflareEdge: false, cloudflareOrigin: true, ready: true });
+    expect(checks({ "x-forwarded-for": "198.51.100.1" })).toMatchObject({ cloudflareEdge: false, cloudflareOrigin: false, ready: true });
+  });
+
+  it("reports no origin when the secret is unset or malformed", () => {
+    expect(checks({ "x-forwarded-for": "104.16.0.1", "x-bibobay-origin": SECRET }, CONFIGURED).cloudflareOrigin).toBe(false);
+    expect(checks({ "x-forwarded-for": "104.16.0.1", "x-bibobay-origin": "short" }, { ...CONFIGURED, CLOUDFLARE_ORIGIN_SECRET: "short" }).cloudflareOrigin).toBe(false);
+  });
+
+  it("reports false for both when no request headers are given", () => {
+    expect(readinessChecks(env, { legalReviewed: false, settings: CONTACT })).toMatchObject({ cloudflareEdge: false, cloudflareOrigin: false });
+  });
+
+  it("is answered per request by the route", async () => {
+    vi.stubEnv("CLOUDFLARE_ORIGIN_SECRET", SECRET);
+    getLegalSettings.mockResolvedValue(FALLBACK);
+    const { GET } = await import("@/app/api/readiness/route");
+    const body = await (await GET(new Request("https://www.bibobay.example/api/readiness", { headers: { "x-forwarded-for": "104.16.0.1", "x-bibobay-origin": SECRET } }))).json();
+    expect(body).toMatchObject({ cloudflareEdge: true, cloudflareOrigin: true });
+  });
+});
+
 describe("GET /api/readiness", () => {
   it("answers 503 with booleans only when production dependencies are missing", async () => {
     getLegalSettings.mockResolvedValue(FALLBACK);
     const { GET } = await import("@/app/api/readiness/route");
-    const response = await GET();
+    const response = await GET(new Request("https://www.bibobay.example/api/readiness"));
     expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(Object.keys(body).sort()).toEqual(["botCheck", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
+    expect(Object.keys(body).sort()).toEqual(["botCheck", "cloudflareEdge", "cloudflareOrigin", "contact", "email", "leadRemovalChannel", "legalReviewed", "ready", "revalidation", "sanity", "supabase"]);
     for (const value of Object.values(body)) expect(typeof value).toBe("boolean");
     expect(body.ready).toBe(false);
   });
@@ -126,10 +156,10 @@ describe("GET /api/readiness", () => {
     getLegalSettings.mockResolvedValue(REVIEWED);
     getSiteSettings.mockResolvedValue(CONTACT);
     const { GET } = await import("@/app/api/readiness/route");
-    const response = await GET();
+    const response = await GET(new Request("https://www.bibobay.example/api/readiness"));
     expect(response.status).toBe(200);
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: true, botCheck: false });
+    expect(JSON.parse(text)).toEqual({ ready: true, sanity: true, supabase: true, email: false, leadRemovalChannel: true, contact: false, revalidation: true, legalReviewed: true, botCheck: false, cloudflareEdge: false, cloudflareOrigin: false });
     for (const value of [...Object.values(CONFIGURED), CONTACT.contactEmail]) expect(text).not.toContain(value);
   });
 
@@ -138,7 +168,7 @@ describe("GET /api/readiness", () => {
     getLegalSettings.mockResolvedValue(REVIEWED);
     getSiteSettings.mockResolvedValue({});
     const { GET } = await import("@/app/api/readiness/route");
-    const response = await GET();
+    const response = await GET(new Request("https://www.bibobay.example/api/readiness"));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ ready: false, leadRemovalChannel: false, sanity: true, supabase: true, revalidation: true });
   });
@@ -149,7 +179,7 @@ describe("GET /api/readiness", () => {
     getLegalSettings.mockResolvedValue(REVIEWED);
     getSiteSettings.mockReturnValue(new Promise(() => undefined));
     const { GET } = await import("@/app/api/readiness/route");
-    const pending = GET();
+    const pending = GET(new Request("https://www.bibobay.example/api/readiness"));
     await vi.advanceTimersByTimeAsync(5000);
     const response = await pending;
     expect(response.status).toBe(200);
@@ -159,14 +189,14 @@ describe("GET /api/readiness", () => {
   it("treats legal text without a reviewed version as not reviewed", async () => {
     getLegalSettings.mockResolvedValue({ ...REVIEWED, termsVersion: undefined });
     const { GET } = await import("@/app/api/readiness/route");
-    expect((await (await GET()).json()).legalReviewed).toBe(false);
+    expect((await (await GET(new Request("https://www.bibobay.example/api/readiness"))).json()).legalReviewed).toBe(false);
   });
 
   it("answers within its time budget when the legal read hangs", async () => {
     vi.useFakeTimers();
     getLegalSettings.mockReturnValue(new Promise(() => undefined));
     const { GET } = await import("@/app/api/readiness/route");
-    const pending = GET();
+    const pending = GET(new Request("https://www.bibobay.example/api/readiness"));
     await vi.advanceTimersByTimeAsync(5000);
     const body = await (await pending).json();
     expect(body.legalReviewed).toBe(false);

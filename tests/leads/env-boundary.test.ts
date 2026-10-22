@@ -9,7 +9,7 @@ import { verifyEnvironment } from "@/scripts/verify-env";
  * lead route needs is a server name, documented in .env.example without a public prefix, refused by
  * scripts/verify-env.ts if anyone adds a NEXT_PUBLIC_ copy, and unreachable from the browser form.
  */
-const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR"];
+const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR", "CLOUDFLARE_ORIGIN_SECRET"];
 
 function envExampleNames() {
   return readFileSync(resolve(".env.example"), "utf8")
@@ -109,6 +109,28 @@ describe("cron secret strength (Task 8a, N4)", () => {
     expect(verifyEnvironment({ CRON_SECRET: "c".repeat(32) }, "production").ok).toBe(true);
     expect(verifyEnvironment({}, "production").ok).toBe(true);
     expect(verifyEnvironment({ CRON_SECRET: "short" }, "development").ok).toBe(true);
+  });
+});
+
+describe("Cloudflare origin secret (R248)", () => {
+  it("fails a production check when CLOUDFLARE_ORIGIN_SECRET is set but malformed, naming the variable and never the value", () => {
+    for (const secret of ["s".repeat(31), "s".repeat(257), `${"s".repeat(40)} x`, `${"s".repeat(40)}!`]) {
+      const report = verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: secret }, "production");
+      expect(report.ok).toBe(false);
+      expect(report.errors).toEqual(["CLOUDFLARE_ORIGIN_SECRET: must be 32 to 256 letters, digits, hyphens or underscores; the visitor address would not be read from Cloudflare"]);
+      expect(JSON.stringify(report)).not.toContain(secret);
+    }
+  });
+
+  it("passes with a valid secret, with none, and for any value outside production", () => {
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "a-B_9".repeat(8) }, "production").ok).toBe(true);
+    expect(verifyEnvironment({}, "production").ok).toBe(true);
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "" }, "production").ok).toBe(true);
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "short" }, "development").ok).toBe(true);
+  });
+
+  it("keeps CLOUDFLARE_ORIGIN_SECRET server-only", () => {
+    expect(verifyEnvironment({ NEXT_PUBLIC_CLOUDFLARE_ORIGIN_SECRET: "x" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_CLOUDFLARE_ORIGIN_SECRET"]);
   });
 });
 

@@ -66,7 +66,7 @@ export async function createSessionDependencies(request: Request, env: Env = pro
   return {
     auth: staff ? staffSignInFrom(staff.client, staff.session, staff.expireCookies) : null,
     rateLimiter: admin && secret ? createSupabaseRateLimiter(createSupabaseAdminClient(admin)) : null,
-    clientKey: secret ? clientKeyFromHeaders(request.headers, secret) : "",
+    clientKey: secret ? clientKeyFromHeaders(request.headers, secret, env.CLOUDFLARE_ORIGIN_SECRET) : "",
     emailKey: (email) => (secret ? createHmac("sha256", secret).update(`staff-login-email:${email}`).digest("hex") : ""),
     log: logAdminEvent,
   };
