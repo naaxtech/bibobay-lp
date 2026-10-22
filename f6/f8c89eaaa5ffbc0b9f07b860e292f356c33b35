@@ -1,0 +1,20 @@
+e2e/ops/health.spec.ts
+  s_37deb30b6489aa::t_3a2a868969fa73 16
+  s_37deb30b6489aa::t_bf12dfecd8228c 68-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f6f8c89eaaa5ffbc0b9f07b860e292f356c33b35",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
