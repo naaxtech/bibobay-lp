@@ -2,6 +2,16 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-22 — Client address behind Cloudflare
+
+### Fixed
+
+- Behind the Cloudflare proxy, the signup, contact and order rate limits counted every visitor on one Cloudflare server together. The key now uses `CF-Connecting-IP` when the address Vercel saw is inside Cloudflare's 22 published ranges (R245, R246), so each visitor has their own budget again. A forged header from any other address changes nothing; an unreadable or comma-list header falls back to the address Vercel saw.
+
+### Decisions recorded
+
+- R245: trust the header only from Cloudflare's ranges. R246: an IPv4-mapped IPv6 edge counts as IPv4. R247: no secret header and no origin lock; add an origin lock if abuse is seen arriving directly at Vercel.
+
 ## 2026-10-22 — Bot check (Cloudflare Turnstile)
 
 ### Added

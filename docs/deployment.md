@@ -252,10 +252,12 @@ If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
 - **Cloudflare proxy and WAF (layer 11).** The domain's DNS moved to Cloudflare on 2026-10-22, so the plan's
   deferral trigger has fired. Pre-clearance and the Cloudflare WAF stay off. The recommended set-up is `@`
   and `www` DNS only, because Vercel advises against a reverse proxy in front of it. Behind the proxy,
-  Vercel's `x-forwarded-for` is Cloudflare's address, so the per-visitor rate limits pool visitors. New
-  trigger to revisit: the owner decides to keep the proxy on. Then design the client address
-  (`CF-Connecting-IP` cannot be trusted on Hobby, because a direct request can forge it) and the WAF
-  together. (src: https://vercel.com/docs/headers/request-headers · 2026-10-22)
+  Vercel's `x-forwarded-for` is Cloudflare's address, so without a fix the per-visitor rate limits would
+  pool visitors. The rate limits therefore read `CF-Connecting-IP` only when the address Vercel saw is
+  inside Cloudflare's published ranges (R245; `lib/leads/cloudflare-ranges.ts`), so a direct caller cannot
+  forge it. Refresh that list when Cloudflare changes https://www.cloudflare.com/ips/. No secret header and
+  no origin lock (R247); add an origin lock if abuse is seen arriving directly at Vercel. The WAF is still
+  to be designed if the owner keeps the proxy on. (src: https://vercel.com/docs/headers/request-headers · 2026-10-22)
 - **Off-switch.** Remove both variables from Production and redeploy the CURRENT production deployment
   (never an older one: R188). See the [incident runbook](incident-runbook.md#bot-check-cloudflare-turnstile).
   Code rollback is `git revert -m 1 <merge-sha>`.

@@ -91,3 +91,44 @@ describe("clientKeyFromHeaders", () => {
     expect(key("2001:db8:1:2::a")).not.toBe(key("2001:db8:1:3::a"));
   });
 });
+
+/*
+ * Ruling R245: behind the Cloudflare proxy, Vercel's `x-forwarded-for` is a Cloudflare address. The
+ * visitor's own address in `cf-connecting-ip` counts only when the address Vercel saw is Cloudflare's.
+ */
+describe("clientKeyFromHeaders behind Cloudflare", () => {
+  const key = (headers: Record<string, string>) => clientKeyFromHeaders(new Headers(headers), "secret-a");
+  const direct = (address: string) => key({ "x-forwarded-for": address });
+
+  it("keys a Cloudflare-forwarded request on the visitor's address", () => {
+    expect(key({ "x-forwarded-for": "104.16.0.1", "cf-connecting-ip": "203.0.113.7" })).toBe(direct("203.0.113.7"));
+  });
+
+  it("gives two visitors behind the same Cloudflare server different keys", () => {
+    const first = key({ "x-forwarded-for": "104.16.0.1", "cf-connecting-ip": "203.0.113.7" });
+    const second = key({ "x-forwarded-for": "104.16.0.1", "cf-connecting-ip": "203.0.113.8" });
+    expect(first).not.toBe(second);
+  });
+
+  it("ignores a forged header from an address that is not Cloudflare's", () => {
+    expect(key({ "x-forwarded-for": "198.51.100.1", "cf-connecting-ip": "203.0.113.7" })).toBe(direct("198.51.100.1"));
+  });
+
+  it.each([[undefined], [""], ["garbage"], ["1.2.3.4, 5.6.7.8"]])("falls back to the Cloudflare address for the header %j", (value) => {
+    const headers: Record<string, string> = { "x-forwarded-for": "104.16.0.1" };
+    if (value !== undefined) headers["cf-connecting-ip"] = value;
+    expect(key(headers)).toBe(direct("104.16.0.1"));
+  });
+
+  it("buckets an IPv6 visitor by its /64", () => {
+    expect(key({ "x-forwarded-for": "2606:4700::1", "cf-connecting-ip": "2001:db8:1:2::5" })).toBe(direct("2001:db8:1:2::9"));
+  });
+
+  it("reads the edge from x-real-ip when x-forwarded-for is absent", () => {
+    expect(key({ "x-real-ip": "104.16.0.1", "cf-connecting-ip": "203.0.113.7" })).toBe(direct("203.0.113.7"));
+  });
+
+  it("keeps the unknown bucket when no edge address is present, whatever the header says", () => {
+    expect(key({ "cf-connecting-ip": "203.0.113.7" })).toBe(key({}));
+  });
+});
