@@ -9,7 +9,7 @@ import { verifyEnvironment } from "@/scripts/verify-env";
  * lead route needs is a server name, documented in .env.example without a public prefix, refused by
  * scripts/verify-env.ts if anyone adds a NEXT_PUBLIC_ copy, and unreachable from the browser form.
  */
-const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR"];
+const SERVER_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "STAFF_NOTIFICATION_EMAIL", "LEAD_IP_HASH_SECRET", "LEAD_ACK_SEND_LIMIT_PER_HOUR", "CLOUDFLARE_ORIGIN_SECRET"];
 
 function envExampleNames() {
   return readFileSync(resolve(".env.example"), "utf8")

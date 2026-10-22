@@ -334,12 +334,12 @@ describe("POST /api/leads with Supabase and Resend configured (both mocked)", ()
 
 describe("client key", () => {
   it("is a keyed hash of the first forwarded address, never the address itself", () => {
-    const key = clientKeyFromHeaders(new Headers({ "x-forwarded-for": `${CLIENT_IP}, 10.0.0.1` }), "secret-a");
+    const key = clientKeyFromHeaders(new Headers({ "x-forwarded-for": `${CLIENT_IP}, 10.0.0.1` }), "secret-a", undefined);
     expect(key).toMatch(/^[0-9a-f]{64}$/);
     expect(key).not.toContain(CLIENT_IP);
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), "secret-a")).toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": CLIENT_IP }), "secret-a")).toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), "secret-b")).not.toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "198.51.100.4" }), "secret-a")).not.toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), "secret-a", undefined)).toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": CLIENT_IP }), "secret-a", undefined)).toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), "secret-b", undefined)).not.toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "198.51.100.4" }), "secret-a", undefined)).not.toBe(key);
   });
 });

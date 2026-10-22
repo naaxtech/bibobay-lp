@@ -149,7 +149,7 @@ describe("POST /api/contact storing a message", () => {
     expect(await response.json()).toEqual({ ok: true, persisted: true, message: "Message received." });
     expect(response.headers.get("cache-control")).toBe("no-store");
 
-    const clientKey = clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), HASH_SECRET);
+    const clientKey = clientKeyFromHeaders(new Headers({ "x-forwarded-for": CLIENT_IP }), HASH_SECRET, undefined);
     expect(rpcCalls.map(([fn, args]) => [fn, args.bucket_key ?? null])).toEqual([
       ["consume_rate_limit", `contact:${clientKey}`],
       ["consume_rate_limit", "contact:global"],

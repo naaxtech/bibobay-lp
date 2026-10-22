@@ -77,17 +77,17 @@ describe("clientAddressBucket", () => {
 
 describe("clientKeyFromHeaders", () => {
   it("is a keyed hash of the client's bucket, never the address itself", () => {
-    const key = clientKeyFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" }), "secret-a");
+    const key = clientKeyFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" }), "secret-a", undefined);
     expect(key).toMatch(/^[0-9a-f]{64}$/);
     expect(key).not.toContain("203.0.113.9");
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "::ffff:203.0.113.9" }), "secret-a")).toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": "203.0.113.9" }), "secret-a")).toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.9" }), "secret-b")).not.toBe(key);
-    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "198.51.100.4" }), "secret-a")).not.toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "::ffff:203.0.113.9" }), "secret-a", undefined)).toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": "203.0.113.9" }), "secret-a", undefined)).toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.9" }), "secret-b", undefined)).not.toBe(key);
+    expect(clientKeyFromHeaders(new Headers({ "x-forwarded-for": "198.51.100.4" }), "secret-a", undefined)).not.toBe(key);
   });
 
   it("gives every address in one IPv6 /64 the same key, and another /64 a different one", () => {
-    const key = (address: string) => clientKeyFromHeaders(new Headers({ "x-forwarded-for": address }), "secret-a");
+    const key = (address: string) => clientKeyFromHeaders(new Headers({ "x-forwarded-for": address }), "secret-a", undefined);
     expect(key("2001:db8:1:2::a")).toBe(key("2001:db8:1:2:ffff:ffff:ffff:1"));
     expect(key("2001:db8:1:2::a")).not.toBe(key("2001:db8:1:3::a"));
   });

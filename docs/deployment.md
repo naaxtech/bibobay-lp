@@ -33,7 +33,7 @@ name holding the value of a server secret. **Owner:** who supplies the value.
 | `NEXT_PUBLIC_POSTHOG_HOST` | public | optional | PostHog project | Exact https origin events go to; default `https://us.i.posthog.com` (EU: `https://eu.i.posthog.com`, the one to use where EU or UK visitors are expected: see `docs/data-protection.md`). Added to CSP `connect-src` only. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | public | Production only, with the secret | Cloudflare Turnstile widget "BIBO Bay forms" (brand account) | The widget's site key. Public by design. Set it together with `TURNSTILE_SECRET_KEY`; both unset means no spam check. Not on Preview: preview hostnames are not on the widget's domain list. See [Bot check](#bot-check-cloudflare-turnstile). |
 | `TURNSTILE_SECRET_KEY` | server | Production only, with the site key | Cloudflare Turnstile widget "BIBO Bay forms" (brand account) | The widget's secret, used only by the server to check a form's token. Sensitive: add it with `--sensitive`, never print it. One key without the other, a malformed key, or Cloudflare's test keys in Vercel production make every form answer 503 and fail the production build. |
-| `CLOUDFLARE_ORIGIN_SECRET` | server | Production only, optional | You generate it: 32 to 256 random letters, digits, hyphens or underscores | The secret that Cloudflare's Transform Rule sends as the request header `x-bibobay-origin`. With it, the rate limits read the visitor's address from `CF-Connecting-IP` behind the Cloudflare proxy; unset, they key on the address Vercel saw (visitors behind Cloudflare pool). Sensitive: add it with `--sensitive`, never print it. A malformed value fails the production build. See [Cloudflare proxy](#bot-check-cloudflare-turnstile). |
+| `CLOUDFLARE_ORIGIN_SECRET` | server | Production only, optional | You generate it with `openssl rand -hex 32`: 32 to 256 letters, digits, hyphens or underscores (a longer one fails the build) | The secret that Cloudflare's Transform Rule sends as the request header `x-bibobay-origin`. With it, the rate limits read the visitor's address from `CF-Connecting-IP` behind the Cloudflare proxy; unset, they key on the address Vercel saw (visitors behind Cloudflare pool). Sensitive: add it with `--sensitive`, never print it. A malformed value fails the production build. See [Bot check (Cloudflare Turnstile)](#bot-check-cloudflare-turnstile), the Cloudflare proxy bullet. |
 | `SANITY_API_READ_TOKEN` | server | for Studio draft preview | Sanity project (Viewer token) | Lets `/api/draft-mode/enable` check the preview secret and read drafts. Without it that route answers 503. |
 | `SANITY_WRITE_TOKEN` | server | only to run the Studio seed | Sanity project (Editor token) | Used by `npm --prefix studio run seed`, never by the website. Do not set it on Vercel. |
 | `SANITY_REVALIDATE_SECRET` | server | production (readiness requires it) | BIBO Bay owner (random) | Shared with the Sanity webhook that calls `/api/revalidate`. |
@@ -259,20 +259,25 @@ If the widget's domain list holds `localhost` or `127.0.0.1`, remove them.
   header `x-bibobay-origin` equal to `CLOUDFLARE_ORIGIN_SECRET` (R245, R248; `lib/leads/client-address.ts`). A
   `CF-Connecting-IP` in Class E (`240.0.0.0/4`, Cloudflare's Pseudo IPv4) is never trusted (R249). With the
   secret unset or the rule missing, the limits behave as they did before this slice. Refresh the range list
-  when Cloudflare changes https://www.cloudflare.com/ips/.
-  - **Owner steps in the Cloudflare zone.**
-    1. Generate a random value of 32 or more letters and digits. Rules, Transform Rules, Modify Request Header,
-       "All incoming requests": set a static header `x-bibobay-origin` to that value.
-    2. Set `CLOUDFLARE_ORIGIN_SECRET` to the same value in Vercel Production (`--sensitive`), then redeploy the
-       CURRENT production deployment (never an older one: R188).
-    3. Check: `curl -s https://www.bibobay.com/api/readiness` shows `"cloudflareEdge":true,"cloudflareOrigin":true`.
+  when Cloudflare changes https://www.cloudflare.com/ips/. Turnstile pre-clearance stays off. Vercel advises
+  against a reverse proxy, so DNS only for `@` and `www` remains the lower-risk set-up; the owner has chosen to
+  keep the proxy, and these steps make that safe.
+  - **Owner steps in the Cloudflare zone.** Generate the value with `openssl rand -hex 32` (32 to 256 letters,
+    digits, hyphens or underscores; a longer one fails the build).
+    1. Set `CLOUDFLARE_ORIGIN_SECRET` to it in Vercel Production (`--sensitive`).
+    2. Redeploy the CURRENT production deployment (never an older one: R188).
+    3. In Cloudflare, Rules, Transform Rules, Modify Request Header, "All incoming requests": set a static
+       header `x-bibobay-origin` to the same value.
+    4. Check: `curl -s https://www.bibobay.com/api/readiness` shows `"cloudflareEdge":true,"cloudflareOrigin":true`.
        `cloudflareEdge` false means Vercel does not see a Cloudflare address (the proxy is off, or Vercel
        records something else); `cloudflareOrigin` false means the secret or the rule is missing or different.
        Neither changes `ready`.
-    4. Keep Pseudo IPv4 Off or "Add header", and keep Bot Fight Mode off (it can challenge the form posts).
+    5. Keep Pseudo IPv4 Off or "Add header", and keep Bot Fight Mode off (it can challenge the form posts).
+  - **Other Workers.** A Worker on another Cloudflare account that calls www.bibobay.com passes through our
+    zone, and Cloudflare forces its `CF-Connecting-IP` to the Worker's egress address, so such traffic shares one bucket.
   - **WAF.** The trigger to design it has fired. The recommended single rule on the Free plan (Security, WAF,
     Rate limiting rules; the Path field only, IP as the characteristic, a 10 second period): when the path
-    starts with `/api/`, allow 20 requests per 10 seconds per IP, then block for 10 seconds. The rule limits
+    starts with `/api/` and does not equal `/api/revalidate` (Sanity's publish webhook can burst; expression: URI Path starts with `/api/` AND URI Path does not equal `/api/revalidate`), allow 20 requests per 10 seconds per IP, then block for 10 seconds. The rule limits
     abusers before they reach Vercel; the per-form limits in this app still apply.
   - **Bypassing Cloudflare.** A caller who connects to Vercel directly skips Cloudflare's WAF but still meets
     Vercel's firewall, the bot check and the rate limits, keyed on their own address. Add an origin lock if

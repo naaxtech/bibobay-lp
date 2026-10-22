@@ -29,7 +29,7 @@ import { clientAddressBucket, clientAddressFromHeaders } from "./client-address"
  * and does not forward external IPs; a custom one needs Enterprise Trusted Proxy)
  * src: https://vercel.com/docs/security/reverse-proxy · fetched 2026-10-22 (Verified Proxy Lite lists Cloudflare's `CF-Connecting-IP`)
  */
-export function clientKeyFromHeaders(headers: Headers, secret: string, originSecret?: string): string {
+export function clientKeyFromHeaders(headers: Headers, secret: string, originSecret: string | undefined): string {
   return createHmac("sha256", secret).update(clientAddressBucket(clientAddressFromHeaders(headers, originSecret).address)).digest("hex");
 }
 
