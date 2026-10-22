@@ -4,13 +4,21 @@ All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](
 
 ## 2026-10-22 — Client address behind Cloudflare
 
-### Fixed
+### Added
 
-- Behind the Cloudflare proxy, the signup, contact and order rate limits counted every visitor on one Cloudflare server together. The key now uses `CF-Connecting-IP` when the address Vercel saw is inside Cloudflare's 22 published ranges (R245, R246), so each visitor has their own budget again. A forged header from any other address changes nothing; an unreadable or comma-list header falls back to the address Vercel saw.
+- The signup, contact, order, order-tracking and staff sign-in rate limits can read the visitor's address from `CF-Connecting-IP` when the site is behind the Cloudflare proxy (R245, R246, R248, R249). Vercel's address for a proxied request is expected to be a Cloudflare server, which would make every visitor share one budget; that premise is not yet observed, and the readiness flags below check it.
+- The header is trusted only when the address Vercel saw is inside Cloudflare's 22 published ranges AND the request carries `x-bibobay-origin` equal to the new `CLOUDFLARE_ORIGIN_SECRET`, which a Request Header Transform Rule in the owner's Cloudflare zone adds. A Worker on any Cloudflare account can send a chosen `CF-Connecting-IP` from those ranges, so the range alone proves nothing. A Class E address (Cloudflare's Pseudo IPv4) is never trusted. With the secret unset, nothing changes from before.
+- `CLOUDFLARE_ORIGIN_SECRET` (server, Production, optional): in `.env.example`, the env table and the secret-rotation table; set but malformed fails the production build, naming the variable only.
+- `/api/readiness` reports `cloudflareEdge` (this request came from a Cloudflare address) and `cloudflareOrigin` (the secret is configured and this request carried it) (R250). Neither is part of `ready`.
+- Docs: the owner steps for the Cloudflare zone, the recommended single Free-plan rate-limiting rule, and the rotation order.
+
+### Changed
+
+- The address parsing moved into one leaf module, `lib/leads/client-address.ts`; `clientKeyFromHeaders` takes the origin secret as an optional third argument.
 
 ### Decisions recorded
 
-- R245: trust the header only from Cloudflare's ranges. R246: an IPv4-mapped IPv6 edge counts as IPv4. R247: no secret header and no origin lock; add an origin lock if abuse is seen arriving directly at Vercel.
+- R245 (range check), R246 (IPv4-mapped edge), R248 (secret header required; R247 reopened), R249 (Class E refused), R250 (readiness flags).
 
 ## 2026-10-22 — Bot check (Cloudflare Turnstile)
 

@@ -22,14 +22,18 @@
 
 ## Rulings
 
-- **R245.** The visitor's address is the `CF-Connecting-IP` value only when the left-most `x-forwarded-for` address (or `x-real-ip` when that is absent) is inside a Cloudflare range AND the header parses as an IPv4 or IPv6 address. Otherwise it is the address Vercel saw, as today.
-  - Why: Cloudflare overwrites `CF-Connecting-IP` at its edge, so only a request Cloudflare forwarded carries a trustworthy one. A direct caller cannot make Vercel record a Cloudflare address.
+- **R245.** The visitor's address is the `CF-Connecting-IP` value only when the left-most `x-forwarded-for` address (or `x-real-ip` when that is absent) is inside a Cloudflare range AND the header parses as an IPv4 or IPv6 address, and R248 holds. Otherwise it is the address Vercel saw, as today.
+  - Why: a request that reaches Vercel from Cloudflare's ranges can carry any `CF-Connecting-IP` a Worker on any Cloudflare account chose, so the range check is only defence in depth (a leaked secret used from a direct connection still fails it). A direct caller cannot make Vercel record a Cloudflare address.
   - Cost if wrong: a list gone stale (Cloudflare adds a range) means visitors arriving through the new range pool on the Cloudflare server's address again. That is no worse than today. The trigger to refresh is Cloudflare changing its published list.
 - **R246.** An IPv4-mapped IPv6 edge address (`::ffff:a.b.c.d`) counts as IPv4 for the range check, the same way `clientAddressBucket` treats it.
-- **R247.** No secret header (Transform Rule) and no origin lock.
-  - Why: the range check needs no owner setup.
+- **R247 (reopened by R248).** An origin lock (refusing requests that did not come through Cloudflare) is still not built.
   - What bypassing Cloudflare still meets: a direct caller skips Cloudflare's WAF, but still meets Vercel's own firewall, the bot check and these rate limits.
   - The trigger to add an origin lock is abuse seen arriving directly at Vercel.
+- **R248.** `CF-Connecting-IP` is trusted only when ALL hold: (a) the edge address is inside a Cloudflare range; (b) the server env `CLOUDFLARE_ORIGIN_SECRET` is set and matches `/^[A-Za-z0-9_-]{32,256}$/`; (c) the request header `x-bibobay-origin` equals it (compared as SHA-256 digests with `timingSafeEqual`); (d) the header parses as an address and R249 holds. Otherwise the edge address is used. An unset or malformed secret means never trust (fail-closed, as before this slice).
+  - Why: only a secret that our own zone's Transform Rule adds authenticates our zone. Authenticated Origin Pulls cannot be verified on Vercel. Source: https://developers.cloudflare.com/fundamentals/reference/http-headers/ (fetched 2026-10-22).
+- **R249.** A `CF-Connecting-IP` in Class E (`240.0.0.0/4`, Cloudflare Pseudo IPv4 "Overwrite headers") is never trusted, so the edge address is used. It applies to the visitor header only, not to the edge.
+- **R250.** `/api/readiness` reports `cloudflareEdge` (the edge address of this request is a Cloudflare address) and `cloudflareOrigin` (the secret is configured and this request carried it). Neither is part of `ready`.
+  - Why: they are the only end-to-end checks that Vercel records Cloudflare's address (the premise of the slice is unobserved) and that the owner's Transform Rule works.
 
 ## Review Focus
 

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 
-import { isCloudflareAddress } from "./cloudflare-ranges";
+import { clientAddressBucket, clientAddressFromHeaders } from "./client-address";
 
 /**
  * Request helpers for the lead route.
@@ -16,97 +16,24 @@ import { isCloudflareAddress } from "./cloudflare-ranges";
  * hand out fresh budgets without limit. An IPv4-mapped IPv6 address (`::ffff:a.b.c.d`) counts as the
  * IPv4 address. Anything unreadable shares one "unknown" bucket rather than getting a fresh one.
  *
- * Behind the Cloudflare proxy (ruling R245) the address Vercel saw is a Cloudflare server, so every visitor
- * would share one bucket. Cloudflare writes the visitor's address in `CF-Connecting-IP` and overwrites any
- * value a caller sent, so that header is read only when the address Vercel saw is inside Cloudflare's
- * published ranges and the header is itself one readable address; anyone connecting to Vercel directly has
- * their own address there, so a forged header from them changes nothing. Otherwise the left-most
- * `x-forwarded-for` entry is used, which on Vercel is written by the platform edge, not the client.
- * Behind any other proxy that passes a client-supplied header through, a caller could rotate it to get
- * fresh buckets; revisit this before hosting anywhere else.
+ * Which address is the client's (rulings R245, R248, R249; `clientAddressFromHeaders`): on Vercel the
+ * left-most `x-forwarded-for` entry is written by the platform edge, not the client. Behind the Cloudflare
+ * proxy that entry is a Cloudflare server, so every visitor would share one bucket. `CF-Connecting-IP` names
+ * the visitor but cannot be trusted by itself: a Worker on any Cloudflare account sends requests from
+ * Cloudflare's ranges with a `CF-Connecting-IP` of its choosing. It is read only when the edge is inside
+ * Cloudflare's published ranges AND the request carries `x-bibobay-origin` equal to `CLOUDFLARE_ORIGIN_SECRET`,
+ * which our own zone's Transform Rule adds. Without that secret the edge address is used, as before. Behind
+ * any other proxy that passes a client-supplied header through, a caller could rotate it to get fresh
+ * buckets; revisit this before hosting anywhere else.
  * src: https://vercel.com/docs/headers/request-headers · fetched 2026-10-22 (Vercel overwrites `X-Forwarded-For`
  * and does not forward external IPs; a custom one needs Enterprise Trusted Proxy)
  * src: https://vercel.com/docs/security/reverse-proxy · fetched 2026-10-22 (Verified Proxy Lite lists Cloudflare's `CF-Connecting-IP`)
  */
-export function clientKeyFromHeaders(headers: Headers, secret: string): string {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const edge = forwarded || headers.get("x-real-ip")?.trim() || "unknown";
-  const visitor = headers.get("cf-connecting-ip")?.trim();
-  const address = visitor && isCloudflareAddress(edge) && clientAddressBucket(visitor) !== "unknown" ? visitor : edge;
-  return createHmac("sha256", secret).update(clientAddressBucket(address)).digest("hex");
+export function clientKeyFromHeaders(headers: Headers, secret: string, originSecret?: string): string {
+  return createHmac("sha256", secret).update(clientAddressBucket(clientAddressFromHeaders(headers, originSecret).address)).digest("hex");
 }
 
-const IPV4_PATTERN = /^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/;
-const HEX_GROUP_PATTERN = /^[0-9a-f]{1,4}$/i;
-
-/** Four octets of a dotted IPv4 address, or null. Leading zeros are refused (they read as octal in some parsers). */
-function parseIpv4(value: string): number[] | null {
-  const match = IPV4_PATTERN.exec(value);
-  if (!match) return null;
-  const octets = match.slice(1, 5).map(Number);
-  return octets.every((octet) => octet <= 255) ? octets : null;
-}
-
-/** Eight 16-bit groups of an IPv6 address (compressed, expanded, or with a trailing dotted IPv4), or null. */
-function parseIpv6(value: string): number[] | null {
-  const address = value.replace(/%[0-9A-Za-z_.~-]+$/, "");
-  const halves = address.split("::");
-  if (halves.length > 2) return null;
-
-  const groupsOf = (part: string | undefined): string[] | null => {
-    if (part === undefined || part === "") return [];
-    const groups = part.split(":");
-    const last = groups.at(-1)!;
-    if (last.includes(".")) {
-      const octets = parseIpv4(last);
-      if (!octets) return null;
-      groups.splice(-1, 1, ((octets[0]! << 8) | octets[1]!).toString(16), ((octets[2]! << 8) | octets[3]!).toString(16));
-    }
-    return groups.every((group) => HEX_GROUP_PATTERN.test(group)) ? groups : null;
-  };
-
-  const compressed = halves.length === 2;
-  const head = groupsOf(halves[0]);
-  const tail = compressed ? groupsOf(halves[1]) : [];
-  if (!head || !tail) return null;
-  // A dotted IPv4 part may only end the address.
-  if (compressed && head.length > 0 && halves[0]!.includes(".")) return null;
-  const given = head.length + tail.length;
-  if (compressed ? given > 7 : given !== 8) return null;
-  return [...head, ...Array<string>(8 - given).fill("0"), ...tail].map((group) => parseInt(group, 16));
-}
-
-/**
- * The groups of one client address as proxies write it (surrounding spaces, `a.b.c.d:port`, `[v6]` and
- * `[v6]:port`, a `%zone` suffix): four octets for IPv4 or an IPv4-mapped IPv6 address, eight 16-bit groups
- * for other IPv6, or null when unreadable.
- */
-export function parseClientAddress(raw: string): number[] | null {
-  let value = raw.trim();
-  const bracketed = /^\[([^\]]+)\](?::\d{1,5})?$/.exec(value);
-  if (bracketed) value = bracketed[1]!;
-  else value = value.replace(/^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/, "$1");
-
-  const ipv4 = parseIpv4(value);
-  if (ipv4) return ipv4;
-
-  const ipv6 = parseIpv6(value);
-  if (!ipv6) return null;
-  const mapped = ipv6.slice(0, 5).every((group) => group === 0) && ipv6[5] === 0xffff;
-  if (mapped) return [ipv6[6]! >> 8, ipv6[6]! & 0xff, ipv6[7]! >> 8, ipv6[7]! & 0xff];
-  return ipv6;
-}
-
-/**
- * The rate-limit bucket for one client address: `ipv4:<address>`, `ipv6:<first four groups>::/64`,
- * or `unknown`. Accepts the forms `parseClientAddress` reads.
- */
-export function clientAddressBucket(raw: string): string {
-  const groups = parseClientAddress(raw);
-  if (!groups) return "unknown";
-  if (groups.length === 4) return `ipv4:${groups.join(".")}`;
-  return `ipv6:${groups.slice(0, 4).map((group) => group.toString(16)).join(":")}::/64`;
-}
+export { clientAddressBucket };
 
 /** Largest request body the lead route reads. A real signup is well under 1 KB. */
 export const LEAD_BODY_LIMIT_BYTES = 8 * 1024;

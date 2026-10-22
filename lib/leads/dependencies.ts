@@ -158,7 +158,7 @@ export async function createLeadDependencies(request: Request, env: Record<strin
     mailer: email?.sender ?? null,
     copy,
     consentVersion: consentVersionFrom(legal.consentCopyVersion, logLeadEvent),
-    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret, env.CLOUDFLARE_ORIGIN_SECRET) : "",
     // Review M2: the staff alert is queued whenever an address is set, like the acknowledgement;
     // while Resend is unconfigured it waits in the outbox as `pending` for the Task 8 worker.
     staffEmail: getStaffNotificationEmail(env),

@@ -112,6 +112,28 @@ describe("cron secret strength (Task 8a, N4)", () => {
   });
 });
 
+describe("Cloudflare origin secret (R248)", () => {
+  it("fails a production check when CLOUDFLARE_ORIGIN_SECRET is set but malformed, naming the variable and never the value", () => {
+    for (const secret of ["s".repeat(31), "s".repeat(257), `${"s".repeat(40)} x`, `${"s".repeat(40)}!`]) {
+      const report = verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: secret }, "production");
+      expect(report.ok).toBe(false);
+      expect(report.errors).toEqual(["CLOUDFLARE_ORIGIN_SECRET: must be 32 to 256 letters, digits, hyphens or underscores; the visitor address would not be read from Cloudflare"]);
+      expect(JSON.stringify(report)).not.toContain(secret);
+    }
+  });
+
+  it("passes with a valid secret, with none, and for any value outside production", () => {
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "a-B_9".repeat(8) }, "production").ok).toBe(true);
+    expect(verifyEnvironment({}, "production").ok).toBe(true);
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "" }, "production").ok).toBe(true);
+    expect(verifyEnvironment({ CLOUDFLARE_ORIGIN_SECRET: "short" }, "development").ok).toBe(true);
+  });
+
+  it("keeps CLOUDFLARE_ORIGIN_SECRET server-only", () => {
+    expect(verifyEnvironment({ NEXT_PUBLIC_CLOUDFLARE_ORIGIN_SECRET: "x" }, "production").forbiddenPublic).toEqual(["NEXT_PUBLIC_CLOUDFLARE_ORIGIN_SECRET"]);
+  });
+});
+
 /** Relative and `@/` imports of one source file, resolved to files on disk. */
 function localImports(file: string): string[] {
   const source = readFileSync(file, "utf8");

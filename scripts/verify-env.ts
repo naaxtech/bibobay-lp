@@ -2,7 +2,7 @@ import { analyticsConfig } from "../lib/analytics/config";
 import { botCheckConfig, type BotCheckProblem } from "../lib/bot-check/config";
 import { sentryDsnFrom } from "../lib/observability/sentry-dsn";
 import { parsePaymentHostAllowlist } from "../lib/security/payment-url";
-import { SERVER_SECRET_MIN_LENGTH } from "../lib/security/secrets";
+import { cloudflareOriginSecretFrom, SERVER_SECRET_MIN_LENGTH } from "../lib/security/secrets";
 import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -157,11 +157,18 @@ export function verifyEnvironment(
     botCheck.push(`NEXT_PUBLIC_TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY: ${BOT_CHECK_PROBLEMS[botCheckState.problem]}; every form would answer 503`);
   }
 
+  // R248: a set but malformed origin secret would leave the visitor address unread (every limit pools
+  // behind Cloudflare). Name only, never the value. Unset is allowed: that is today's behaviour.
+  const cloudflare: string[] = [];
+  if (phase === "production" && (env.CLOUDFLARE_ORIGIN_SECRET?.trim() ?? "") && cloudflareOriginSecretFrom(env) === null) {
+    cloudflare.push("CLOUDFLARE_ORIGIN_SECRET: must be 32 to 256 letters, digits, hyphens or underscores; the visitor address would not be read from Cloudflare");
+  }
+
   return {
-    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0 && payment.length === 0 && botCheck.length === 0,
+    ok: forbiddenPublic.length === 0 && weak.length === 0 && monitoring.length === 0 && payment.length === 0 && botCheck.length === 0 && cloudflare.length === 0,
     phase,
     forbiddenPublic,
-    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring, ...payment, ...botCheck],
+    errors: [...forbiddenPublic.map((name) => `Forbidden public environment variable: ${name}`), ...weak, ...monitoring, ...payment, ...botCheck, ...cloudflare],
   };
 }
 

@@ -88,7 +88,7 @@ export async function createOrderDependencies(
     resolveLines: (lines) => resolveCanonicalOrderLines(lines),
     consentVersion: orderConsentFrom(legal).version,
     orderCountries: settings.orderCountries,
-    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret, env.CLOUDFLARE_ORIGIN_SECRET) : "",
     botCheck: createBotCheck(env),
     log: logOrderEvent,
     // Task 8a (R88): the two queued emails are attempted after the answer through the outbox's
@@ -119,7 +119,7 @@ export function createTrackingDependencies(
     enabled: isTrackingEnabled(settings),
     repository: client ? createSupabaseOrderRepository(client) : null,
     rateLimiter: client ? createSupabaseRateLimiter(client) : null,
-    clientKey: hashSecret ? clientKeyFromHeaders(requestHeaders, hashSecret) : "",
+    clientKey: hashSecret ? clientKeyFromHeaders(requestHeaders, hashSecret, env.CLOUDFLARE_ORIGIN_SECRET) : "",
     log: logTrackingEvent,
   };
 }

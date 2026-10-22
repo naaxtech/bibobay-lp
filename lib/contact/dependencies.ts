@@ -55,7 +55,7 @@ export function createContactDependencies(request: Request, env: Record<string, 
     repository,
     rateLimiter,
     botCheck: createBotCheck(env),
-    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret) : "",
+    clientKey: hashSecret ? clientKeyFromHeaders(request.headers, hashSecret, env.CLOUDFLARE_ORIGIN_SECRET) : "",
     globalLimitPerHour: sendLimitPerHour,
     log: logContactEvent,
     // The alert is attempted after the answer through the outbox's claim, spending its own send

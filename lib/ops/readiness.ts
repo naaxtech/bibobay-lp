@@ -4,6 +4,7 @@ import type { SiteSettings } from "@/lib/content/types";
 import { botCheckConfig } from "@/lib/bot-check/config";
 import { contactFormOpen } from "@/lib/contact/availability";
 import { getEmailEnvironment } from "@/lib/email/client";
+import { clientAddressFromHeaders } from "@/lib/leads/client-address";
 import { leadStorageConfigured } from "@/lib/leads/dependencies";
 import { removalChannelFrom } from "@/lib/leads/removal-channel";
 import { getSanityEnvironment } from "@/lib/sanity/env";
@@ -43,13 +44,20 @@ export interface Readiness {
   legalReviewed: boolean;
   /** The spam check on the forms is on (both Turnstile keys set and valid). Reported; not required, so `ready` is unchanged. */
   botCheck: boolean;
+  /**
+   * R250: the address Vercel saw on THIS request is a Cloudflare address. The only end-to-end sign that
+   * Vercel records Cloudflare's address behind the proxy. Reported; not required, so `ready` is unchanged.
+   */
+  cloudflareEdge: boolean;
+  /** R250: `CLOUDFLARE_ORIGIN_SECRET` is configured and THIS request carried it (the Transform Rule works). Reported; not required. */
+  cloudflareOrigin: boolean;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
 
 export function readinessChecks(
   env: Env,
-  { legalReviewed, settings }: { legalReviewed: boolean; settings: Pick<SiteSettings, "contactEmail"> },
+  { legalReviewed, settings, headers = new Headers() }: { legalReviewed: boolean; settings: Pick<SiteSettings, "contactEmail">; headers?: Headers },
 ): Readiness {
   const sanity = getSanityEnvironment(env as NodeJS.ProcessEnv) !== null;
   const supabase = leadStorageConfigured(env);
@@ -57,5 +65,6 @@ export function readinessChecks(
   const leadRemovalChannel = removalChannelFrom(settings, env) !== null;
   const contact = contactFormOpen(env);
   const revalidation = Boolean(env.SANITY_REVALIDATE_SECRET?.trim());
-  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, contact, revalidation, legalReviewed, botCheck: botCheckConfig(env).state === "on" };
+  const { cloudflareEdge, cloudflareOrigin } = clientAddressFromHeaders(headers, env.CLOUDFLARE_ORIGIN_SECRET);
+  return { ready: sanity && supabase && revalidation && leadRemovalChannel, sanity, supabase, email, leadRemovalChannel, contact, revalidation, legalReviewed, botCheck: botCheckConfig(env).state === "on", cloudflareEdge, cloudflareOrigin };
 }

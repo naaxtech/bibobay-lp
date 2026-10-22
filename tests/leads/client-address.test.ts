@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CLOUDFLARE_RANGES, isCloudflareAddress } from "@/lib/leads/cloudflare-ranges";
+import { CLOUDFLARE_RANGES, isCloudflareAddress } from "@/lib/leads/client-address";
 
 vi.mock("server-only", () => ({}));
 
@@ -89,5 +89,37 @@ describe("isCloudflareAddress", () => {
 
   it.each([["203.0.113.7"], ["2001:db8::1"], [""], ["garbage"], ["104.16.0.1, 10.0.0.1"], ["unknown"]])("refuses %j", (raw) => {
     expect(isCloudflareAddress(raw)).toBe(false);
+  });
+});
+
+/** The last address of a range, computed from its CIDR, and the address just past its end (null at the top of the space). */
+function edges(range: string): { last: string; past: string | null } {
+  const [base, length] = range.split("/");
+  const prefix = Number(length);
+  if (base!.includes(":")) {
+    const groups = base!.split(":").filter((group) => group !== "").map((group) => parseInt(group, 16));
+    const last = [...groups, ...Array<number>(8 - groups.length).fill(0)];
+    for (let bit = prefix; bit < 128; bit += 1) last[bit >> 4]! |= 1 << (15 - (bit & 15));
+    const past = [...last];
+    const index = (prefix - 1) >> 4;
+    past[index] = last[index]! + 1;
+    for (let rest = index + 1; rest < 8; rest += 1) past[rest] = 0;
+    const text = (parts: number[]) => parts.map((part) => part.toString(16)).join(":");
+    return { last: text(last), past: past[index]! > 0xffff ? null : text(past) };
+  }
+  const octets = base!.split(".").map(Number);
+  const value = ((octets[0]! << 24) | (octets[1]! << 16) | (octets[2]! << 8) | octets[3]!) >>> 0;
+  const lastValue = (value | (2 ** (32 - prefix) - 1)) >>> 0;
+  const text = (n: number) => [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+  return { last: text(lastValue), past: lastValue === 0xffffffff ? null : text(lastValue + 1) };
+}
+
+describe("every published range, computed", () => {
+  it.each(PUBLISHED)("%s holds its last address and not the one past it, unless another range starts there", (range) => {
+    const { last, past } = edges(range);
+    expect(isCloudflareAddress(last), `last of ${range}`).toBe(true);
+    if (past === null) return;
+    const adjacent = PUBLISHED.some((other) => other.split("/")[0] === past);
+    if (!adjacent) expect(isCloudflareAddress(past), `past ${range}`).toBe(false);
   });
 });

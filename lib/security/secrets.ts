@@ -14,3 +14,13 @@ export function hashSecretFrom(env: Record<string, string | undefined>): string 
   const secret = env.LEAD_IP_HASH_SECRET?.trim();
   return secret && secret.length >= SERVER_SECRET_MIN_LENGTH ? secret : null;
 }
+
+/**
+ * The secret our Cloudflare zone's Transform Rule sends as `x-bibobay-origin` (ruling R248), or null when
+ * unset or not 32 to 256 letters, digits, hyphens or underscores. Null means the visitor address is never
+ * read from Cloudflare's header.
+ */
+export function cloudflareOriginSecretFrom(env: Record<string, string | undefined>): string | null {
+  const secret = env.CLOUDFLARE_ORIGIN_SECRET?.trim();
+  return secret && /^[A-Za-z0-9_-]{32,256}$/.test(secret) ? secret : null;
+}
