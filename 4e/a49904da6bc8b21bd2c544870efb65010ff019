@@ -1,0 +1,31 @@
+docs/incident-runbook.md
+  s_37deb30b6489aa::t_233303053424dd 276
+tests/leads/client-key.test.ts
+  s_37deb30b6489aa::t_1774b1b8dccacf 80,83-86,90
+lib/leads/http.ts
+  s_37deb30b6489aa::t_233303053424dd 32
+docs/deployment.md
+  s_37deb30b6489aa::t_233303053424dd 36,262-271,275-277,280
+tests/leads/lead-route.test.ts
+  s_37deb30b6489aa::t_233303053424dd 337,340-343
+tests/contact/contact-route.test.ts
+  s_37deb30b6489aa::t_233303053424dd 152
+tests/leads/env-boundary.test.ts
+  s_37deb30b6489aa::t_233303053424dd 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4ea49904da6bc8b21bd2c544870efb65010ff019",
+  "prompts": {},
+  "sessions": {
+    "s_37deb30b6489aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791c066c-b99f-499a-832d-4bb799f2daf9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "naaxtech <naaxtech.official@gmail.com>"
+    }
+  }
+}
