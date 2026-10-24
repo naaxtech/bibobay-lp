@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import nextConfig from "@/next.config";
 import { config as proxyConfig, proxy } from "@/proxy";
+import { ADSENSE_CSP_SOURCES } from "@/lib/ads/adsense";
 import {
   NONCE_HEADER,
+  PATHNAME_HEADER,
   buildContentSecurityPolicy,
   createNonce,
   securityEnvironment,
@@ -123,6 +125,23 @@ describe("content security policy", () => {
     expect(directives(plain).has("frame-src")).toBe(false);
   });
 
+  it("adds Google's ad hosts to img-src, connect-src and frame-src only while the AdSense tag is on (R253)", () => {
+    const base = { nonce: "n", environment: securityEnvironment(PRODUCTION) };
+    const plain = buildContentSecurityPolicy(base);
+    expect(buildContentSecurityPolicy({ ...base, ads: false })).toBe(plain);
+    const on = directives(buildContentSecurityPolicy({ ...base, ads: true }));
+    const before = directives(plain);
+    expect(on.get("script-src")).toEqual(["'self'", "'nonce-n'", "'strict-dynamic'"]);
+    expect(on.get("img-src")).toEqual([...before.get("img-src")!, ...ADSENSE_CSP_SOURCES]);
+    expect(on.get("connect-src")).toEqual([...before.get("connect-src")!, ...ADSENSE_CSP_SOURCES]);
+    expect(on.get("frame-src")).toEqual([...ADSENSE_CSP_SOURCES]);
+    for (const name of ["default-src", "style-src-elem", "style-src-attr", "style-src", "font-src", "object-src", "base-uri", "form-action", "frame-ancestors"]) expect(on.get(name), name).toEqual(before.get(name));
+    // With the bot check on too, its frame comes first and the ad hosts follow.
+    const both = directives(buildContentSecurityPolicy({ ...base, ads: true, extraFrameSources: ["https://challenges.cloudflare.com"] }));
+    expect(both.get("frame-src")).toEqual(["https://challenges.cloudflare.com", ...ADSENSE_CSP_SOURCES]);
+    expect(directives(buildContentSecurityPolicy({ ...base, ads: true, extraConnectSources: ["https://o1.ingest.sentry.io"] })).get("connect-src")).toEqual(["'self'", "https://o1.ingest.sentry.io", ...ADSENSE_CSP_SOURCES]);
+  });
+
   it("refuses a nonce that could break out of the header", () => {
     expect(() => buildContentSecurityPolicy({ nonce: "a'; script-src *", environment: securityEnvironment(PRODUCTION) })).toThrow();
   });
@@ -200,6 +219,28 @@ describe("proxy.ts", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
     const on = (await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy") ?? "";
     expect(directives(on).get("frame-src")).toEqual(["https://challenges.cloudflare.com"]);
+  });
+
+  it("adds the ad hosts on production public pages only, and names the page for the layout (R252, R253)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "production");
+    const home = await proxy(new NextRequest("https://bibo.example/"));
+    expect(directives(home.headers.get("content-security-policy") ?? "").get("frame-src")).toEqual([...ADSENSE_CSP_SOURCES]);
+    expect(home.headers.get(`x-middleware-request-${PATHNAME_HEADER}`)).toBe("/");
+    for (const path of ["/orders/abc123token", "/admin/orders", "/track"]) {
+      const policy = (await proxy(new NextRequest(`https://bibo.example${path}`))).headers.get("content-security-policy") ?? "";
+      expect(policy, path).not.toContain("googlesyndication");
+      expect(policy, path).not.toContain("frame-src");
+    }
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await proxy(new NextRequest("https://bibo.example/"))).headers.get("content-security-policy")).not.toContain("googlesyndication");
+  });
+
+  it("overwrites a page name the browser sent, so a request cannot ask for the tag on a private page", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "production");
+    const spoofed = await proxy(new NextRequest("https://bibo.example/orders/abc123token", { headers: { [PATHNAME_HEADER]: "/" } }));
+    expect(spoofed.headers.get(`x-middleware-request-${PATHNAME_HEADER}`)).toBe("/orders/abc123token");
   });
 
   it("puts a fresh nonce in the response policy and hands the same policy to the renderer", async () => {

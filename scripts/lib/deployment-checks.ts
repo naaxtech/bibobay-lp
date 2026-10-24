@@ -495,6 +495,12 @@ export interface BrowserObservation {
   headingVisible: boolean;
   /** Calls to /api/leads during the load: verification must never submit the form. */
   leadRequests: string[];
+  /**
+   * R255: console errors raised by Google's ad script or for its files (lib/ads/adsense.ts
+   * isAdScriptUrl), such as its own "no_div" before AdSense approves the site, or a resolver that
+   * blocks ad domains. Listed as a warning: the site's own console errors still fail.
+   */
+  adScriptMessages?: string[];
 }
 
 const clip = (items: string[], limit = 3) => (items.length <= limit ? items.join(" | ") : `${items.slice(0, limit).join(" | ")} | +${items.length - limit} more`);
@@ -513,6 +519,7 @@ export function classifyBrowserRun(observation: BrowserObservation): CheckResult
   return [
     { name: "browser heading", status: observation.headingVisible ? "pass" : "fail", detail: observation.headingVisible ? "an <h1> is visible after load" : "no visible <h1> after load" },
     list("browser console", observation.consoleErrors, "no console errors"),
+    { name: "browser ad script", status: (observation.adScriptMessages ?? []).length === 0 ? "pass" : "warn", detail: (observation.adScriptMessages ?? []).length === 0 ? "no messages from Google's ad script" : clip(observation.adScriptMessages!) },
     list("browser page errors", observation.pageErrors, "no uncaught errors"),
     list("browser csp violations", observation.cspViolations, "no CSP violations"),
     list("browser same-origin responses", sameOrigin.map((response) => `${response.status} ${safeDisplay(response.url)}`), `${observation.responses.length} responses, none >= 400`),
