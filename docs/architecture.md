@@ -306,10 +306,10 @@ script-src 'self' 'nonce-<per request>' 'strict-dynamic';
 style-src-elem 'self' 'nonce-<per request>';
 style-src-attr 'unsafe-inline';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob: https://cdn.sanity.io;
+img-src 'self' data: blob: https://cdn.sanity.io [AdSense hosts];
 font-src 'self';
-connect-src 'self';
-frame-src https://challenges.cloudflare.com;   (only while the bot check is on)
+connect-src 'self' [AdSense hosts];
+frame-src https://challenges.cloudflare.com [AdSense hosts];   (only while the bot check or AdSense is on)
 object-src 'none';
 base-uri 'self';
 form-action 'self';
@@ -322,6 +322,13 @@ upgrade-insecure-requests            (Vercel deployments only)
 - `frame-src` is sent only while the bot check is on (R220); with it off the policy is byte-identical to
   the one before the check existed. Cloudflare's script is trusted through the nonce and `'strict-dynamic'`
   (the loader copies the page nonce onto its script tag), so `script-src` and `connect-src` do not change.
+- AdSense (R251-R253): the root layout's `<head>` carries Google's AdSense tag, with the page nonce,
+  only on the Vercel production deployment and never on `/admin`, `/orders`, `/track` or `/studio`
+  (`lib/ads/adsense.ts`; `proxy.ts` forwards the path in `x-bibobay-pathname`). Exactly those pages
+  add `[AdSense hosts]` (`ADSENSE_CSP_SOURCES`: Google's ad-only domains plus a few named google.com
+  and gstatic.com hosts) to `img-src`, `connect-src` and `frame-src`; `script-src` does not change,
+  because `'strict-dynamic'` trusts what the nonced `adsbygoogle.js` loads. Everywhere else, the
+  policy is the one above without them.
 - API routes get `default-src 'none'; frame-ancestors 'none'` (`next.config.ts`).
 - Every response also carries `Referrer-Policy: strict-origin-when-cross-origin`,
   `X-Content-Type-Options: nosniff`, a restrictive `Permissions-Policy`,

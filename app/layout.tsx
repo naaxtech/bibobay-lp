@@ -3,6 +3,7 @@ import { Fredoka, Plus_Jakarta_Sans } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
+import { AdSenseTag } from "@/components/ads/AdSenseTag";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ConsentNotice } from "@/components/analytics/ConsentNotice";
 import { analyticsConfig } from "@/lib/analytics/config";
@@ -41,6 +42,10 @@ async function RenderPerRequest() {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={`${displayFace.variable} ${bodyFace.variable}`}>
+      <head>
+        {/* Rulings R251/R252: Google AdSense, in the <head> as AdSense asks; production public pages only. */}
+        <AdSenseTag />
+      </head>
       <body>
         <RenderPerRequest />
         {/*

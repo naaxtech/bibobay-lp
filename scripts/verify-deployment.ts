@@ -2,6 +2,7 @@ import nextEnv from "@next/env";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { isAdScriptUrl } from "../lib/ads/adsense";
 import { deriveSecretRules } from "./lib/bundle-secrets";
 import { classifyBrowserRun, DeploymentNetworkError, displayUrl, exitCodeFor, FORM_API_PATHS, formatTable, parseArgs, redactQueries, runFetchChecks, USAGE, type BrowserObservation, type CheckResult, type CliOptions } from "./lib/deployment-checks";
 import { bypassFetch, bypassSecretFrom, carriesBypass } from "./lib/protection-bypass";
@@ -47,7 +48,7 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
   } catch (error) {
     throw new DeploymentNetworkError(`Chromium could not start (run \`npx playwright install chromium\`): ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
   }
-  const observation: BrowserObservation = { origin: options.url.origin, consoleErrors: [], pageErrors: [], cspViolations: [], responses: [], headingVisible: false, leadRequests: [] };
+  const observation: BrowserObservation = { origin: options.url.origin, consoleErrors: [], pageErrors: [], cspViolations: [], responses: [], headingVisible: false, leadRequests: [], adScriptMessages: [] };
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const secret = bypassSecretFrom(process.env);
@@ -72,7 +73,10 @@ async function browserChecks(options: CliOptions): Promise<CheckResult[]> {
     });
     const page = await context.newPage();
     page.on("console", (message) => {
-      if (message.type() === "error") observation.consoleErrors.push(message.text());
+      if (message.type() !== "error") return;
+      // R255: Google's ad script reports its own state (e.g. "no_div" before approval); that is not the site failing.
+      if (isAdScriptUrl(message.location().url)) observation.adScriptMessages!.push(message.text());
+      else observation.consoleErrors.push(message.text());
     });
     page.on("pageerror", (error) => observation.pageErrors.push(error.message));
     page.on("response", (response) => observation.responses.push({ url: response.url(), status: response.status() }));

@@ -14,6 +14,8 @@ export interface LegalDocumentProps {
   contactOpen?: boolean;
   /** The bot check is on (R222): the fallback privacy text then names Cloudflare Turnstile. */
   botCheck?: boolean;
+  /** The AdSense tag is on (R254): the fallback privacy text then describes Google's advertising. */
+  ads?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface LegalDocumentProps {
  * nothing is sold while commerce is off, and describes order requests while it is on. Only the
  * fallback privacy page adds the configured contact address: Sanity text carries its own.
  */
-export function LegalDocument({ kind, legal, state, settings, contactOpen = false, botCheck = false }: LegalDocumentProps) {
+export function LegalDocument({ kind, legal, state, settings, contactOpen = false, botCheck = false, ads = false }: LegalDocumentProps) {
   if (state.source === "cms") {
     return (
       <>
@@ -36,7 +38,7 @@ export function LegalDocument({ kind, legal, state, settings, contactOpen = fals
       <p role="note" className="simple-page__note">
         {LEGAL_PAGE_COPY.fallbackNote}
       </p>
-      <PortableText value={legalFallbackFor(settings, process.env, contactOpen, botCheck)[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
+      <PortableText value={legalFallbackFor(settings, process.env, contactOpen, botCheck, ads)[kind]} headingLevel={2} className="prose-paper simple-page__prose" />
       {kind === "privacy" && settings.contactEmail ? (
         <p className="simple-page__contact">
           {LEGAL_PAGE_COPY.contactLead}{" "}

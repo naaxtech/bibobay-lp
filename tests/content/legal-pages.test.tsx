@@ -559,3 +559,62 @@ describe("while the bot check is on (R222, C7)", () => {
     expect(screen.getByText(/Cloudflare Turnstile checks that a form/)).toBeTruthy();
   });
 });
+
+describe("while the AdSense tag is on (R254)", () => {
+  const off = textOf(legalFallbackFor({}, {}, false, false, false).privacy);
+  const on = textOf(legalFallbackFor({}, {}, false, false, true).privacy);
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("changes nothing while ads are off: the text is the one pinned before the flag existed", () => {
+    // SHA-256 of the joined privacy text as built at commit 63d0d64 (same pins as the bot-check block).
+    const sha = (content: PortableContent) => createHash("sha256").update(textOf(content)).digest("hex");
+    expect(sha(legalFallbackFor({}, {}, false, false, false).privacy)).toBe("917f4a48b600db5c6b461f68faeba6c2325bbbd43058cd18b58cfe46320c0670");
+    expect(sha(legalFallbackFor({ commerceEnabled: true }, {}, false, false, false).privacy)).toBe("5d36578131deca7c60640c43b723838e27c3b5ef7ca281af33da66317c2af13f");
+    expect(legalFallbackFor({}, {}, false, false, false)).toBe(LEGAL_FALLBACK);
+    expect(off).not.toMatch(/AdSense|advertising script|My Ad Center/i);
+  });
+
+  it("names Google AdSense, what Google receives, its cookies, and where to turn personalised ads off", () => {
+    expect(on).toContain("This website shows ads from Google AdSense.");
+    expect(on).toMatch(/Google then receives your browser's requests, including its network address, the address of the page and information about your browser and device/);
+    expect(on).toContain("This website sends Google nothing you type into a form.");
+    expect(on).toMatch(/Google and its partners may use cookies or similar technology on your device to show ads based on your visits to this and other websites/);
+    expect(on).toContain("https://policies.google.com/technologies/partner-sites");
+    expect(on).toContain("https://myadcenter.google.com/");
+    expect(on).toContain("The pages for BIBO Bay staff do not load Google's advertising script.");
+    // With commerce on, the private order page (its address carries the tracking code) is named too.
+    expect(textOf(legalFallbackFor({ commerceEnabled: true }, {}, false, false, true).privacy)).toContain("The pages for BIBO Bay staff and the private order page your order email links to do not load Google's advertising script.");
+    // /track is not claimed: a visitor can reach it in-app from a page that already loaded the script.
+    expect(on).not.toMatch(/track[^.]*advertising script|advertising script[^.]*track/i);
+  });
+
+  it("rewords the two sentences that ads would make untrue, and names Google among the services", () => {
+    expect(off).toContain("This website does not use advertising or analytics cookies.");
+    expect(off).toContain("We do not sell your details or share them with advertisers.");
+    expect(on).not.toContain("This website does not use advertising or analytics cookies.");
+    expect(on).not.toContain("We do not sell your details or share them with advertisers.");
+    expect(on).toContain("Apart from Google's advertising, described above, this website does not use advertising or analytics cookies.");
+    expect(on).toContain("We do not sell your details. Nothing you type into a form is shared with advertisers; what Google's advertising script receives is described under Advertising.");
+    expect(on).toMatch(/Google receives the information described under Advertising/);
+    // No legal basis is claimed for ads: that is the owner's to state (consent message in AdSense).
+    expect(on).not.toMatch(/legal basis for (showing|the) ads/i);
+  });
+
+  it("leaves the terms alone", () => {
+    expect(textOf(legalFallbackFor({}, {}, false, false, true).terms)).toBe(textOf(LEGAL_FALLBACK.terms));
+  });
+
+  it("/privacy describes the ads exactly on the Vercel production deployment", async () => {
+    const { default: PrivacyPage } = await import("@/app/privacy/page");
+    render(await PrivacyPage());
+    expect(screen.queryByRole("heading", { name: "Advertising" })).toBeNull();
+    cleanup();
+    vi.stubEnv("VERCEL_ENV", "production");
+    render(await PrivacyPage());
+    expect(screen.getByRole("heading", { name: "Advertising" })).toBeTruthy();
+    expect(screen.getByText(/This website shows ads from Google AdSense\./)).toBeTruthy();
+  });
+});

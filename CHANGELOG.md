@@ -2,6 +2,28 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-24 — Dependency security fixes
+
+### Security
+
+- `next`, `@next/env` and `eslint-config-next` 16.3.8 → 16.4.3 (exact pins). `next` 16.0.0–16.4.0 is affected by GHSA-2464-fhr4-w9xw (critical, remote code execution in the image optimizer with SVG files), GHSA-673q-mjm6-r5xr (remote code execution in `use cache` functions returning typed arrays) and GHSA-p3m5-59mp-jv5r (denial of service through Server Actions; this site has one, `lib/sanity/preview-actions.ts`). No 16.3.x release carries the fix.
+- `undici` 7.30.0 → 7.30.1 and 8.11.2 → 8.12.3 (lockfile only, plain `npm audit fix`): GHSA-f72v-6w45-q472 and GHSA-xjj6-f33q-929c.
+- `npm audit --omit=dev --audit-level=high` (the blocking CI audit) and the full `npm audit` both report 0 vulnerabilities.
+
+## 2026-10-24 — Google AdSense
+
+### Added
+
+- The AdSense tag for publisher `ca-pub-6883401604924323` in the `<head>` of every public page, exactly as AdSense gives it, plus the request's CSP nonce (R251). Only the Vercel production deployment loads it; previews, local runs and CI never contact Google.
+- Never on the staff pages, the private order pages, `/track` or `/studio` (R252): an ad request carries the page address, and an order page's address holds its tracking code. `proxy.ts` forwards the document path in `x-bibobay-pathname`, always overwritten.
+- CSP on the pages with the tag (R253): `img-src`, `connect-src` and `frame-src` admit Google's ad hosts (`ADSENSE_CSP_SOURCES`); `script-src` is unchanged (no `'unsafe-eval'`, no host list).
+- Privacy text, while ads are on (R254): an Advertising section (Google AdSense, what Google receives, its cookies, Google's partner-sites page and My Ad Center), Google among the services, and the cookie and "advertisers" sentences reworded so they stay true. With ads off the text is unchanged (hash-pinned).
+- `verify:deployment --browser` lists console messages from Google's ad script as a warning row, `browser ad script` (R255); the site's own console errors still fail.
+
+### Decisions recorded
+
+- R251 (production only), R252 (private pages), R253 (CSP), R254 (privacy text), R255 (ad-script messages).
+
 ## 2026-10-22 — Client address behind Cloudflare
 
 ### Added

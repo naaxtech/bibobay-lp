@@ -54,6 +54,16 @@ import type { PortableContent, SiteSettings } from "./types";
  * about what Cloudflare stores inside its own frame beyond the addendum. Off, the text is exactly
  * what it was.
  *
+ * Advertising (R254): while the AdSense tag is on (`adsenseEnabled(process.env)`, the Vercel production
+ * deployment, passed in by the page as `ads`), the text adds an Advertising section naming Google
+ * AdSense (what Google receives, its cookies, its partner-sites page and My Ad Center), names Google
+ * among the services, and rewords the two sentences ads would make untrue (no advertising cookies;
+ * nothing shared with advertisers). It says only which pages never load the script
+ * (lib/ads/adsense.ts ADSENSE_PRIVATE_PATHS: staff pages, and the private order page an order email
+ * opens); /track is left out of that claim because a visitor can reach it in-app from a page that
+ * already loaded the script. No legal basis is claimed for the ads: that is the owner's to state.
+ * Off, the text is exactly what it was.
+ *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
  * default, which tells pages that Sanity has no text) stays unchanged.
  */
@@ -71,13 +81,16 @@ const whenContactOpen = whenSelling;
 /** Blocks that appear only while the bot check is on (R222). */
 const whenBotCheckOn = whenSelling;
 
+/** Blocks that appear only while the AdSense tag is on (R254). */
+const whenAdsOn = whenSelling;
+
 /** What the database stores, for the sentence naming Supabase. */
 function storedKinds(commerce: boolean, contact: boolean): string {
   const kinds = ["signups", ...(commerce ? ["order requests"] : []), ...(contact ? ["contact messages"] : [])];
   return kinds.length === 1 ? kinds[0]! : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`;
 }
 
-function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolean, botCheck: boolean): PortableContent {
+function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolean, botCheck: boolean, ads = false): PortableContent {
   return [
     paragraph(
       "BIBO Bay is a story world in development. This page explains what happens to the details you share through this website, in plain words.",
@@ -150,9 +163,27 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
     ...whenSelling(commerce, () =>
       paragraph("The private code in your order's tracking link is never sent to the statistics or the error reports described here: they record the page as /orders/[token] instead."),
     ),
+    ...whenAdsOn(
+      ads,
+      () => heading("Advertising"),
+      () =>
+        paragraph(
+          commerce
+            ? "This website shows ads from Google AdSense. Google, not BIBO Bay, chooses which ads appear. The pages for BIBO Bay staff and the private order page your order email links to do not load Google's advertising script."
+            : "This website shows ads from Google AdSense. Google, not BIBO Bay, chooses which ads appear. The pages for BIBO Bay staff do not load Google's advertising script.",
+        ),
+      () =>
+        paragraph(
+          "On the other pages, your browser loads Google's advertising script from Google. Google then receives your browser's requests, including its network address, the address of the page and information about your browser and device, and uses them to choose, show and measure ads and to detect fraud. This website sends Google nothing you type into a form.",
+        ),
+      () =>
+        paragraph(
+          "Google and its partners may use cookies or similar technology on your device to show ads based on your visits to this and other websites, to limit how often you see an ad and to measure ads. Google explains how it uses information from websites that show its ads: https://policies.google.com/technologies/partner-sites. You can turn personalised ads off in Google's My Ad Center: https://myadcenter.google.com/",
+        ),
+    ),
     heading("Cookies and what is kept on your device"),
     paragraph(
-      "This website does not use advertising or analytics cookies. It sets two kinds of cookie, neither for visitors: a preview cookie used by the people who edit the website, and session cookies set only when BIBO Bay staff sign in to manage orders. The staff session cookies are httpOnly, so page scripts cannot read them, and they are removed when staff sign out.",
+      `${ads ? "Apart from Google's advertising, described above, this website" : "This website"} does not use advertising or analytics cookies. It sets two kinds of cookie, neither for visitors: a preview cookie used by the people who edit the website, and session cookies set only when BIBO Bay staff sign in to manage orders. The staff session cookies are httpOnly, so page scripts cannot read them, and they are removed when staff sign out.`,
     ),
     paragraph(
       "Your answer to the notice is kept as one entry in this browser's storage on your device, so you are not asked again; a change you make under Analytics choices replaces it. It holds only yes or no, and it stays until you clear this website's data. If your browser blocks that storage, your answer lasts only until this page is reloaded or closed.",
@@ -183,7 +214,11 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
         : "Our legitimate interest in keeping the website working and safe is the legal basis for the rate-limit counts and the error reports described on this page, and for the requests the servers receive in order to send pages back.",
     ),
     paragraph("We make no decisions about you by automated means."),
-    paragraph("We do not sell your details or share them with advertisers."),
+    paragraph(
+      ads
+        ? "We do not sell your details. Nothing you type into a form is shared with advertisers; what Google's advertising script receives is described under Advertising."
+        : "We do not sell your details or share them with advertisers.",
+    ),
     heading("Services that handle your details"),
     paragraph("Vercel hosts the website and runs the code that serves these pages."),
     paragraph(`Supabase hosts the database where ${storedKinds(commerce, contact)} are stored.`),
@@ -192,6 +227,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
     paragraph(
       "Sentry receives error reports, only when error reporting is switched on for this website: what went wrong and where in the code, the page address without anything after a question mark, your browser type, and the website's own short labels for the problem. Error reports carry no form details and no cookies, and the website does not add your network address to them.",
     ),
+    ...whenAdsOn(ads, () => paragraph("Google receives the information described under Advertising, to show and measure the ads on this website.")),
     ...whenBotCheckOn(botCheck, () =>
       paragraph(
         "Cloudflare Turnstile checks that a form is sent by a person and not by an automated program. It loads only once you start filling in a form. Cloudflare then receives information about your browser and its connection, such as your network address, your browser's user-agent string, technical details of the connection, the address of the page and this website's Turnstile key. This website sends Cloudflare nothing you type into the form. Cloudflare describes how it handles this information, including its own use of it to improve Turnstile, in its Turnstile Privacy Addendum: https://www.cloudflare.com/turnstile-privacy-policy/",
@@ -276,7 +312,7 @@ export const LEGAL_FALLBACK_WITH_COMMERCE: LegalFallback = Object.freeze({ priva
  * literal `true` counts as commerce on. With no removal channel (no email sending, no contact
  * address) the text is the frozen no-channel text and promises nothing; otherwise the removal
  * sentences name the channel that exists. `contactOpen` (the page's `contactFormOpen()`, R196) adds
- * what the contact form stores and `botCheck` (the bot check is on, R222) names Cloudflare Turnstile; both are false by default, so the frozen texts stay as they were.
+ * what the contact form stores, `botCheck` (the bot check is on, R222) names Cloudflare Turnstile and `ads` (the AdSense tag is on, R254) adds the Advertising section; all are false by default, so the frozen texts stay as they were.
  * `env` is injectable for tests.
  */
 export function legalFallbackFor(
@@ -284,11 +320,12 @@ export function legalFallbackFor(
   env: Readonly<Record<string, string | undefined>> = process.env,
   contactOpen = false,
   botCheck = false,
+  ads = false,
 ): LegalFallback {
   const commerce = isCommerceEnabled(settings);
   const channel = removalChannelFrom(settings, env);
-  if (channel === null && !contactOpen && !botCheck) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
-  return { privacy: privacyText(commerce, channel, contactOpen, botCheck), terms: termsText(commerce, channel) };
+  if (channel === null && !contactOpen && !botCheck && !ads) return commerce ? LEGAL_FALLBACK_WITH_COMMERCE : LEGAL_FALLBACK;
+  return { privacy: privacyText(commerce, channel, contactOpen, botCheck, ads), terms: termsText(commerce, channel) };
 }
 
 /** The privacy page's removal paragraph; with no channel it says signups are not open, and promises nothing. */

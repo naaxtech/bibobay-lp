@@ -530,6 +530,17 @@ describe("classifyBrowserRun", () => {
   const origin = "http://127.0.0.1:3200";
   const clean = { origin, consoleErrors: [], pageErrors: [], cspViolations: [], responses: [{ url: `${origin}/`, status: 200 }], headingVisible: true, leadRequests: [] };
 
+  it("lists messages from Google's ad script as a warning, never a failure, and keeps our own console errors failing (R255)", () => {
+    const ad = classifyBrowserRun({ ...clean, adScriptMessages: ["Error: no_div", "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"] });
+    const row = ad.find((result) => result.name === "browser ad script");
+    expect(row?.status).toBe("warn");
+    expect(row?.detail).toContain("no_div");
+    expect(ad.filter((result) => result.status === "fail")).toEqual([]);
+    expect(classifyBrowserRun(clean).find((result) => result.name === "browser ad script")?.status).toBe("pass");
+    const ours = classifyBrowserRun({ ...clean, consoleErrors: ["TypeError: x is undefined"], adScriptMessages: ["Error: no_div"] });
+    expect(ours.find((result) => result.name === "browser console")?.status).toBe("fail");
+  });
+
   it("passes a clean load", () => {
     expect(classifyBrowserRun(clean).every((result) => result.status === "pass")).toBe(true);
   });

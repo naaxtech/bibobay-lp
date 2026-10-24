@@ -13,9 +13,16 @@
  * `connect-src`) build the exact policy production sends.
  */
 
+import { ADSENSE_CSP_SOURCES } from "../ads/adsense";
 import { ORDER_LINK_SOURCE } from "../privacy/private-links";
 
 export const NONCE_HEADER = "x-nonce";
+
+/**
+ * R252: the document path, forwarded by proxy.ts to the page render (always overwritten, so a
+ * browser cannot choose it). The root layout reads it to keep the AdSense tag off private pages.
+ */
+export const PATHNAME_HEADER = "x-bibobay-pathname";
 
 /**
  * Ruling R166: the Sanity Dashboard. A hosted Studio (https://<host>.sanity.studio) now opens inside
@@ -94,13 +101,18 @@ export interface PolicyOptions {
   extraConnectSources?: readonly string[];
   /** Extra exact https origins for `frame-src` (bot check, R220), only when configured. Absent or empty: no `frame-src` directive. */
   extraFrameSources?: readonly string[];
+  /** R253: the page carries the AdSense tag; img-src, connect-src and frame-src admit Google's ad hosts (fixed list, lib/ads/adsense.ts). */
+  ads?: boolean;
 }
 
-export function buildContentSecurityPolicy({ nonce, environment, extraConnectSources = [], extraFrameSources = [] }: PolicyOptions): string {
+export function buildContentSecurityPolicy({ nonce, environment, extraConnectSources = [], extraFrameSources = [], ads = false }: PolicyOptions): string {
   if (!NONCE.test(nonce)) throw new Error("Invalid CSP nonce");
   const connect = [...new Set(extraConnectSources.map((source) => exactOrigin(source, { allowLocalHttp: false })).filter((origin): origin is string => origin !== null))];
 
   const frames = [...new Set(extraFrameSources.map((source) => exactOrigin(source, { allowLocalHttp: false })).filter((origin): origin is string => origin !== null))];
+  // R253: a fixed, reviewed list (it has wildcards on ad-only domains, which exactOrigin would refuse).
+  const adSources = ads ? ADSENSE_CSP_SOURCES : [];
+  frames.push(...adSources);
 
   const directives: Array<[string, ...string[]]> = [
     ["default-src", "'self'"],
@@ -120,11 +132,11 @@ export function buildContentSecurityPolicy({ nonce, environment, extraConnectSou
   }
   directives.push(
     // Sanity's image CDN serves CMS art; data:/blob: cover inline SVG data and generated images.
-    ["img-src", "'self'", "data:", "blob:", "https://cdn.sanity.io"],
+    ["img-src", "'self'", "data:", "blob:", "https://cdn.sanity.io", ...adSources],
     // next/font self-hosts the brand faces; nothing loads from a font CDN.
     ["font-src", "'self'"],
     // The lead form posts to /api/leads on this origin; the browser never talks to Supabase or Resend.
-    ["connect-src", "'self'", ...connect],
+    ["connect-src", "'self'", ...connect, ...adSources],
     ...(frames.length > 0 ? [["frame-src", ...frames] as [string, ...string[]]] : []),
     ["object-src", "'none'"],
     ["base-uri", "'self'"],
