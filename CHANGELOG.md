@@ -2,6 +2,14 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-24 — Dependency security fixes
+
+### Security
+
+- `next`, `@next/env` and `eslint-config-next` 16.3.8 → 16.4.3 (exact pins). `next` 16.0.0–16.4.0 is affected by GHSA-2464-fhr4-w9xw (critical, remote code execution in the image optimizer with SVG files), GHSA-673q-mjm6-r5xr (remote code execution in `use cache` functions returning typed arrays) and GHSA-p3m5-59mp-jv5r (denial of service through Server Actions; this site has one, `lib/sanity/preview-actions.ts`). No 16.3.x release carries the fix.
+- `undici` 7.30.0 → 7.30.1 and 8.11.2 → 8.12.3 (lockfile only, plain `npm audit fix`): GHSA-f72v-6w45-q472 and GHSA-xjj6-f33q-929c.
+- `npm audit --omit=dev --audit-level=high` (the blocking CI audit) and the full `npm audit` both report 0 vulnerabilities.
+
 ## 2026-10-24 — Google AdSense
 
 ### Added
