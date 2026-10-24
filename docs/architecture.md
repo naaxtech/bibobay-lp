@@ -322,10 +322,14 @@ upgrade-insecure-requests            (Vercel deployments only)
 - `frame-src` is sent only while the bot check is on (R220); with it off the policy is byte-identical to
   the one before the check existed. Cloudflare's script is trusted through the nonce and `'strict-dynamic'`
   (the loader copies the page nonce onto its script tag), so `script-src` and `connect-src` do not change.
-- AdSense (R251-R253): the root layout's `<head>` carries Google's AdSense tag, with the page nonce,
-  only on the Vercel production deployment and never on `/admin`, `/orders`, `/track` or `/studio`
-  (`lib/ads/adsense.ts`; `proxy.ts` forwards the path in `x-bibobay-pathname`). Exactly those pages
-  add `[AdSense hosts]` (`ADSENSE_CSP_SOURCES`: Google's ad-only domains plus a few named google.com
+- AdSense (R251-R253, R256-R257): the root layout's `<head>` carries Google's AdSense tag, with the
+  page nonce, only on the Vercel production deployment, only on the content pages in `ADSENSE_PAGES`
+  (today the home page; Google forbids ads on thank-you, error, form and alert screens), never on
+  `/admin`, `/orders`, `/track` or `/studio`, and never in Sanity draft mode (`lib/ads/adsense.ts`;
+  `proxy.ts` forwards the path in `x-bibobay-pathname`). A client-side navigation away from an ad page
+  reloads the document (`components/ads/AdPageGuard.tsx`), so the script never reaches another screen.
+  `public/ads.txt` authorises Google as the seller (`ADS_TXT_LINE`; `verify:deployment` checks it).
+  Exactly the ad pages add `[AdSense hosts]` (`ADSENSE_CSP_SOURCES`: Google's ad-only domains plus a few named google.com
   and gstatic.com hosts) to `img-src`, `connect-src` and `frame-src`; `script-src` does not change,
   because `'strict-dynamic'` trusts what the nonced `adsbygoogle.js` loads. Everywhere else, the
   policy is the one above without them.

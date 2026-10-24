@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ADSENSE_PAGES } from "@/lib/ads/adsense";
 import { AGE_BANDS } from "@/lib/leads/fields";
 import { SAFE_FALLBACK_LEGAL, SAFE_FALLBACK_SETTINGS } from "@/lib/content/fallback";
 import { LEGAL_FALLBACK, legalFallbackFor } from "@/lib/content/legal-fallback";
@@ -578,17 +579,23 @@ describe("while the AdSense tag is on (R254)", () => {
   });
 
   it("names Google AdSense, what Google receives, its cookies, and where to turn personalised ads off", () => {
-    expect(on).toContain("This website shows ads from Google AdSense.");
+    expect(on).toContain("This website shows ads from Google AdSense on its home page.");
     expect(on).toMatch(/Google then receives your browser's requests, including its network address, the address of the page and information about your browser and device/);
     expect(on).toContain("This website sends Google nothing you type into a form.");
-    expect(on).toMatch(/Google and its partners may use cookies or similar technology on your device to show ads based on your visits to this and other websites/);
     expect(on).toContain("https://policies.google.com/technologies/partner-sites");
     expect(on).toContain("https://myadcenter.google.com/");
-    expect(on).toContain("The pages for BIBO Bay staff do not load Google's advertising script.");
-    // With commerce on, the private order page (its address carries the tracking code) is named too.
-    expect(textOf(legalFallbackFor({ commerceEnabled: true }, {}, false, false, true).privacy)).toContain("The pages for BIBO Bay staff and the private order page your order email links to do not load Google's advertising script.");
-    // /track is not claimed: a visitor can reach it in-app from a page that already loaded the script.
-    expect(on).not.toMatch(/track[^.]*advertising script|advertising script[^.]*track/i);
+    // R257: the text names the only page that loads the script, and says no other page does.
+    expect(ADSENSE_PAGES).toEqual(["/"]);
+    expect(on).toContain("No other page of this website loads Google's advertising script.");
+    expect(textOf(legalFallbackFor({ commerceEnabled: true }, {}, false, false, true).privacy)).toContain("No other page of this website loads Google's advertising script.");
+  });
+
+  it("carries Google's required privacy disclosures for AdSense (R258)", () => {
+    // support.google.com/adsense/answer/1348695 ("Required content").
+    expect(on).toContain("Third-party vendors, including Google, use cookies to serve ads based on your prior visits to this website or other websites.");
+    expect(on).toContain("Google's use of advertising cookies enables it and its partners to serve ads to you based on your visits to this website and/or other websites on the internet.");
+    expect(on).toContain("You can opt out of personalised advertising in Google's Ads Settings: https://myadcenter.google.com/");
+    expect(on).toContain("You can also opt out of some third-party vendors' use of cookies for personalised advertising at https://www.aboutads.info/choices/");
   });
 
   it("rewords the two sentences that ads would make untrue, and names Google among the services", () => {
@@ -607,6 +614,17 @@ describe("while the AdSense tag is on (R254)", () => {
     expect(textOf(legalFallbackFor({}, {}, false, false, true).terms)).toBe(textOf(LEGAL_FALLBACK.terms));
   });
 
+  it("terms never read as a site under construction, and keep the as-is disclaimer (R259)", () => {
+    for (const commerce of [false, true]) {
+      const terms = textOf(legalFallbackFor({ commerceEnabled: commerce }, {}).terms);
+      expect(terms, String(commerce)).not.toMatch(/being built|under construction/i);
+      expect(terms).toContain("These terms cover using this website.");
+      expect(terms).toContain("The website is offered as it is. Pages and features may change, move or be unavailable at times.");
+    }
+    // The page's meta description and every other line of legal chrome too.
+    expect(JSON.stringify(LEGAL_PAGE_COPY)).not.toMatch(/being built|under construction/i);
+  });
+
   it("/privacy describes the ads exactly on the Vercel production deployment", async () => {
     const { default: PrivacyPage } = await import("@/app/privacy/page");
     render(await PrivacyPage());
@@ -615,6 +633,6 @@ describe("while the AdSense tag is on (R254)", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     render(await PrivacyPage());
     expect(screen.getByRole("heading", { name: "Advertising" })).toBeTruthy();
-    expect(screen.getByText(/This website shows ads from Google AdSense\./)).toBeTruthy();
+    expect(screen.getByText(/This website shows ads from Google AdSense on its home page\./)).toBeTruthy();
   });
 });

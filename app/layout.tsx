@@ -3,7 +3,7 @@ import { Fredoka, Plus_Jakarta_Sans } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-import { AdSenseTag } from "@/components/ads/AdSenseTag";
+import { AdSenseLeaveGuard, AdSenseTag } from "@/components/ads/AdSenseTag";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ConsentNotice } from "@/components/analytics/ConsentNotice";
 import { analyticsConfig } from "@/lib/analytics/config";
@@ -43,11 +43,13 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en" className={`${displayFace.variable} ${bodyFace.variable}`}>
       <head>
-        {/* Rulings R251/R252: Google AdSense, in the <head> as AdSense asks; production public pages only. */}
+        {/* Rulings R251/R252/R257: Google AdSense, in the <head> as AdSense asks; production ad pages only (the home page). */}
         <AdSenseTag />
       </head>
       <body>
         <RenderPerRequest />
+        {/* R257: leaving an ad page client-side reloads the document, so the ad script never reaches another screen. */}
+        <AdSenseLeaveGuard />
         {/*
           Rulings R144/R148: the consent notice comes first in the body, so keyboard and
           screen-reader users reach it early. It renders in the browser only, and only when there

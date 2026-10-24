@@ -58,10 +58,14 @@ import type { PortableContent, SiteSettings } from "./types";
  * deployment, passed in by the page as `ads`), the text adds an Advertising section naming Google
  * AdSense (what Google receives, its cookies, its partner-sites page and My Ad Center), names Google
  * among the services, and rewords the two sentences ads would make untrue (no advertising cookies;
- * nothing shared with advertisers). It says only which pages never load the script
- * (lib/ads/adsense.ts ADSENSE_PRIVATE_PATHS: staff pages, and the private order page an order email
- * opens); /track is left out of that claim because a visitor can reach it in-app from a page that
- * already loaded the script. No legal basis is claimed for the ads: that is the owner's to state.
+ * nothing shared with advertisers). R257: it names the only page that loads the script, the home page
+ * (lib/ads/adsense.ts ADSENSE_PAGES); components/ads/AdPageGuard.tsx reloads the document when a visitor
+ * leaves it client-side, so no other page runs the script. R258: it carries Google's required content
+ * for AdSense publishers (third-party vendors including Google use cookies; Ads Settings and
+ * aboutads.info opt-outs). No legal basis is claimed for the ads: that is the owner's to state.
+ *
+ * Terms (R259): the text says nothing that reads as a site under construction; the as-is disclaimer
+ * stays.
  * Off, the text is exactly what it was.
  *
  * Kept outside lib/content/fallback.ts so SAFE_FALLBACK_LEGAL (the content contract's empty
@@ -168,18 +172,20 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
       () => heading("Advertising"),
       () =>
         paragraph(
-          commerce
-            ? "This website shows ads from Google AdSense. Google, not BIBO Bay, chooses which ads appear. The pages for BIBO Bay staff and the private order page your order email links to do not load Google's advertising script."
-            : "This website shows ads from Google AdSense. Google, not BIBO Bay, chooses which ads appear. The pages for BIBO Bay staff do not load Google's advertising script.",
+          "This website shows ads from Google AdSense on its home page. Google, not BIBO Bay, chooses which ads appear. No other page of this website loads Google's advertising script.",
         ),
       () =>
         paragraph(
-          "On the other pages, your browser loads Google's advertising script from Google. Google then receives your browser's requests, including its network address, the address of the page and information about your browser and device, and uses them to choose, show and measure ads and to detect fraud. This website sends Google nothing you type into a form.",
+          "When you open the home page, your browser loads Google's advertising script from Google. Google then receives your browser's requests, including its network address, the address of the page and information about your browser and device, and uses them to choose, show and measure ads and to detect fraud. This website sends Google nothing you type into a form.",
         ),
+      // R258: Google's required content for AdSense publishers (support.google.com/adsense/answer/1348695).
       () =>
         paragraph(
-          "Google and its partners may use cookies or similar technology on your device to show ads based on your visits to this and other websites, to limit how often you see an ad and to measure ads. Google explains how it uses information from websites that show its ads: https://policies.google.com/technologies/partner-sites. You can turn personalised ads off in Google's My Ad Center: https://myadcenter.google.com/",
+          "Third-party vendors, including Google, use cookies to serve ads based on your prior visits to this website or other websites. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visits to this website and/or other websites on the internet.",
         ),
+      () => paragraph("Google explains how it uses information from websites that show its ads: https://policies.google.com/technologies/partner-sites"),
+      () => paragraph("You can opt out of personalised advertising in Google's Ads Settings: https://myadcenter.google.com/"),
+      () => paragraph("You can also opt out of some third-party vendors' use of cookies for personalised advertising at https://www.aboutads.info/choices/"),
     ),
     heading("Cookies and what is kept on your device"),
     paragraph(
@@ -266,7 +272,7 @@ function privacyText(commerce: boolean, channel: RemovalChannel, contact: boolea
 function termsText(commerce: boolean, channel: RemovalChannel): PortableContent {
   return [
     paragraph(
-      "BIBO Bay is a story world in development. These terms cover using this website while it is being built.",
+      "BIBO Bay is a story world in development. These terms cover using this website.",
     ),
     heading("What this website is"),
     paragraph(
@@ -292,7 +298,7 @@ function termsText(commerce: boolean, channel: RemovalChannel): PortableContent 
       "The BIBO Bay name, characters, artwork and words on this website are not licensed for reuse. Please ask before copying them. The free activity pack may be printed for use at home.",
     ),
     paragraph(
-      "The website is offered as it is while it is being built. Pages and features may change, move or be unavailable at times.",
+      "The website is offered as it is. Pages and features may change, move or be unavailable at times.",
     ),
     heading("Changes to these terms"),
     paragraph("When these terms change, the new version will be published on this page."),

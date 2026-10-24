@@ -2,6 +2,24 @@
 
 All notable changes to the BIBO Bay site. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); newest entries first.
 
+## 2026-10-24 — AdSense review readiness
+
+### Added
+
+- `public/ads.txt` with Google's record for publisher `pub-6883401604924323` (R256). AdSense reported "Not found"; www.bibobay.com/ads.txt now answers it, and bibobay.com/ads.txt redirects there within the same root domain.
+- `verify:deployment` checks `/ads.txt`: 200, plain text, and the publisher record (R260).
+
+### Changed
+
+- The AdSense tag loads on the home page only (R257, overriding R251/R252's "every public page"). Google Publisher Policies forbid ads on screens without publisher content (thank-you and error pages) and on form or alert screens; the tag had been on `/thank-you`, every 404 and `/contact`. It is also off in Sanity draft mode, so editors' previews are not ad impressions.
+- Leaving the home page by a client-side navigation now reloads the document (`AdPageGuard`), so Google's script and any anchor ad never carry over to another screen.
+- Privacy text while ads are on (R258): Google's required disclosures for AdSense publishers (third-party vendors including Google use cookies to serve ads based on prior visits; opt out in Ads Settings or at aboutads.info), and the page that loads the script is named.
+- Terms text (R259): no longer says the website is "being built"; the as-is disclaimer stays.
+
+### Decisions recorded
+
+- R256 (ads.txt), R257 (home page only, leave guard, draft mode), R258 (required privacy content), R259 (terms wording), R260 (ads.txt check).
+
 ## 2026-10-24 — Dependency security fixes
 
 ### Security
