@@ -8,6 +8,12 @@
  * (the policy is nonce + 'strict-dynamic', lib/security/headers.ts), so adsbygoogle.js may load
  * Google's other scripts without a host list in script-src.
  *
+ * R257 (overrides R251/R252's "every public page"): only the content pages in ADSENSE_PAGES load it,
+ * today the home page. Google Publisher Policies forbid ads on screens without publisher content
+ * (thank-you and error/404 pages, alerts) and the contact page is a form; legal and shop pages are
+ * left out until there is a reason to add them. Adding a page here changes the privacy text's claim
+ * (lib/content/legal-fallback.ts names the pages), so change both together.
+ *
  * R251: only the Vercel production deployment loads it. Previews, a local `next start`, the dev
  * server and CI never ask Google for anything, so their tests keep the "no third-party request"
  * contract and no test run counts as ad traffic.
@@ -28,7 +34,16 @@ export const ADSENSE_CLIENT = "ca-pub-6883401604924323";
 
 export const ADSENSE_SCRIPT_SRC = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
 
-/** Path prefixes that never load the ad script (R252); each matches the path itself and anything under it. */
+/**
+ * R256: the line public/ads.txt carries, exactly as AdSense gives it: Google's domain, this publisher
+ * (`pub-`, without the `ca-` prefix), DIRECT, and Google's certification authority ID.
+ */
+export const ADS_TXT_LINE = `google.com, ${ADSENSE_CLIENT.replace(/^ca-/, "")}, DIRECT, f08c47fec0942fa0`;
+
+/** R257: the exact paths (no trailing slash, no query) whose documents carry the tag. */
+export const ADSENSE_PAGES: readonly string[] = ["/"];
+
+/** Path prefixes that never load the ad script (R252), kept as a second guard behind ADSENSE_PAGES; each matches the path itself and anything under it. */
 export const ADSENSE_PRIVATE_PATHS: readonly string[] = ["/admin", "/orders", "/track", "/studio"];
 
 /** R251: the Vercel production deployment only. */
@@ -36,9 +51,9 @@ export function adsenseEnabled(env: Env = process.env): boolean {
   return env.VERCEL_ENV?.trim() === "production";
 }
 
-/** Whether the document at `pathname` carries the tag (R251, R252). */
+/** Whether the document at `pathname` carries the tag (R251, R252, R257). */
 export function adsenseOnFor(pathname: string | null | undefined, env: Env = process.env): boolean {
-  if (!adsenseEnabled(env) || !pathname || !pathname.startsWith("/")) return false;
+  if (!adsenseEnabled(env) || !pathname || !ADSENSE_PAGES.includes(pathname)) return false;
   return !ADSENSE_PRIVATE_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 

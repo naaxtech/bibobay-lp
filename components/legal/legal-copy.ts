@@ -10,7 +10,8 @@ export const LEGAL_PAGE_COPY = {
   },
   terms: {
     title: "Terms",
-    description: "The terms for using the BIBO Bay website while it is being built.",
+    // R259: nothing reads as a site under construction (Google: no ads on screens under construction).
+    description: "The terms for using the BIBO Bay website.",
   },
   /** Shown above repository fallback text, so nobody mistakes it for reviewed legal wording. */
   fallbackNote:

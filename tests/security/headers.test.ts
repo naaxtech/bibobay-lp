@@ -227,7 +227,7 @@ describe("proxy.ts", () => {
     const home = await proxy(new NextRequest("https://bibo.example/"));
     expect(directives(home.headers.get("content-security-policy") ?? "").get("frame-src")).toEqual([...ADSENSE_CSP_SOURCES]);
     expect(home.headers.get(`x-middleware-request-${PATHNAME_HEADER}`)).toBe("/");
-    for (const path of ["/orders/abc123token", "/admin/orders", "/track"]) {
+    for (const path of ["/orders/abc123token", "/admin/orders", "/track", "/thank-you", "/contact", "/no-such-page"]) {
       const policy = (await proxy(new NextRequest(`https://bibo.example${path}`))).headers.get("content-security-policy") ?? "";
       expect(policy, path).not.toContain("googlesyndication");
       expect(policy, path).not.toContain("frame-src");

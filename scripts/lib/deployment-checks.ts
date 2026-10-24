@@ -8,6 +8,7 @@
  * check below would have failed that page.
  */
 
+import { ADS_TXT_LINE } from "../../lib/ads/adsense";
 import { ADDRESS_NAMES, scanText, type SecretRules } from "./bundle-secrets";
 
 export type CheckStatus = "pass" | "warn" | "fail" | "skip";
@@ -477,6 +478,9 @@ export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = 
   const readiness = await probe("/api/readiness");
   results.push(checkReadiness(readiness.status, readiness.response ? await readJson(readiness.response) : null, { requireReady: options.requireReady === true }));
 
+  const adsTxt = await probe("/ads.txt");
+  results.push(checkAdsTxt(adsTxt.status, adsTxt.response?.headers.get("content-type") ?? null, adsTxt.response && adsTxt.status === 200 ? await adsTxt.response.text() : ""));
+
   const robots = await probe("/robots.txt");
   const robotsTxt = robots.response && robots.status === 200 ? await robots.response.text() : "";
   results.push({ name: "robots.txt", status: robots.status === 200 ? "pass" : "fail", detail: `/robots.txt -> ${robots.status || "unreachable"}` });
@@ -484,6 +488,24 @@ export async function runFetchChecks(pageUrl: URL, options: FetchCheckOptions = 
   results.push(checkNoindex({ production: options.production === true, robotsMeta: analysis.robotsMeta, robotsHeader: home.headers.get("x-robots-tag"), robotsTxt }));
   if (options.scanRules) results.push(await scanClientPayloads(fetcher, origin, allowed, timeoutMs, options.scanRules));
   return results;
+}
+
+/**
+ * R256/R260: /ads.txt authorises Google to sell this site's ad space. It must answer 200 as plain
+ * text and carry the publisher's record (IAB ads.txt: comma-separated fields, the domain and the
+ * relationship are case-insensitive, whitespace around fields is ignored, `#` starts a comment).
+ */
+export function checkAdsTxt(status: number, contentType: string | null, body: string): CheckResult {
+  const name = "ads.txt";
+  if (status !== 200) return { name, status: "fail", detail: `/ads.txt -> ${status || "unreachable"}` };
+  if (!/^text\/plain\b/i.test(contentType ?? "")) return { name, status: "fail", detail: `/ads.txt -> 200 but content-type "${contentType ?? "none"}"` };
+  const fields = (line: string) => line.split("#")[0]!.split(",").map((field) => field.trim());
+  const [domain, account, relationship, authority] = fields(ADS_TXT_LINE);
+  const listed = body.split(/\r?\n/).some((line) => {
+    const [d, a, r, c] = fields(line);
+    return d?.toLowerCase() === domain && a === account && r?.toUpperCase() === relationship && c === authority;
+  });
+  return listed ? { name, status: "pass", detail: `/ads.txt lists ${account}` } : { name, status: "fail", detail: `/ads.txt does not list ${account}` };
 }
 
 export interface BrowserObservation {

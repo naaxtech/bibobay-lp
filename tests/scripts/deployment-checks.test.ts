@@ -9,6 +9,7 @@ import {
   GATED_PAYLOAD_PATHS,
   PAYLOAD_PATHS,
   analyzeHtml,
+  checkAdsTxt,
   checkAsset,
   checkBody,
   checkHealth,
@@ -24,6 +25,7 @@ import {
   runFetchChecks,
   type CheckResult,
 } from "@/scripts/lib/deployment-checks";
+import { ADS_TXT_LINE } from "@/lib/ads/adsense";
 import { deriveSecretRules } from "@/scripts/lib/bundle-secrets";
 
 /*
@@ -89,6 +91,7 @@ function healthyPage(origin: string, overrides: { html?: string; headers?: Recor
     [`${origin}/api/health`]: { status: 200, type: "application/json", body: JSON.stringify({ status: "ok", version: "local", time: "2026-10-13T00:00:00.000Z" }) },
     [`${origin}/api/readiness`]: { status: 503, type: "application/json", body: JSON.stringify({ ready: false, sanity: false, supabase: false, email: false, revalidation: false, legalReviewed: false }) },
     [`${origin}/robots.txt`]: { status: 200, type: "text/plain", body: "User-Agent: *\nDisallow: /\n" },
+    [`${origin}/ads.txt`]: { status: 200, type: "text/plain; charset=utf-8", body: `${ADS_TXT_LINE}\n` },
   };
 }
 
@@ -235,6 +238,20 @@ describe("runFetchChecks", () => {
     // The cross-origin script is listed but never fetched.
     expect(seen).not.toContain("https://cdn.example.net/widget.js");
     expect(results.find((result) => result.detail.includes("cdn.example.net"))?.status).toBe("skip");
+  });
+
+  it("checks ads.txt: 200 text/plain with the publisher line, anything else fails (R260)", async () => {
+    const origin = "http://127.0.0.1:3200";
+    expect(statusOf(await runFetchChecks(new URL(`${origin}/`), { fetch: fakeFetch(healthyPage(origin)) }), "ads.txt")).toBe("pass");
+    // Tolerates the spec's whitespace and case in the domain and relationship.
+    expect(checkAdsTxt(200, "text/plain", `# comment\nGOOGLE.COM ,pub-6883401604924323,  direct , f08c47fec0942fa0\n`).status).toBe("pass");
+    expect(checkAdsTxt(404, "text/html", "<h1>404</h1>").status).toBe("fail");
+    expect(checkAdsTxt(200, "text/html; charset=utf-8", ADS_TXT_LINE).status).toBe("fail");
+    expect(checkAdsTxt(200, "text/plain", "google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0").status).toBe("fail");
+    expect(checkAdsTxt(200, "text/plain", "# google.com, pub-6883401604924323, DIRECT, f08c47fec0942fa0").status).toBe("fail");
+    const routes = healthyPage(origin);
+    delete routes[`${origin}/ads.txt`];
+    expect(statusOf(await runFetchChecks(new URL(`${origin}/`), { fetch: fakeFetch(routes) }), "ads.txt")).toBe("fail");
   });
 
   it("fails the same deployment when readiness is required", async () => {
